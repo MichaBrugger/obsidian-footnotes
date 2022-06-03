@@ -1,6 +1,6 @@
 import { Editor, EditorPosition, MarkdownView, Plugin } from "obsidian";
 
-export default class MyPlugin extends Plugin {
+export default class ObsidianFootnotes extends Plugin {
   private detailLineRegex = /\[\^(\d+)\]\:/;
   private reOnlyMarkers = /\[\^(\d+)\]/gi;
   private numericalRe = /(\d+)/;
