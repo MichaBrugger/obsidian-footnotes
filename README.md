@@ -8,7 +8,7 @@ This hotkey lets you:
 - Jump from your footnote TO the footnote detail
 - Jump from your footnote detail BACK to the footnote 
 
-![Overview](https://github.com/akaalias/obsidian-footnotes/blob/master/basic.gif?raw=true)
+![Overview](https://user-images.githubusercontent.com/11269635/171957154-4cd6b82c-729c-4b0e-b9e5-8a087f746165.gif)
 
 ## IMPORTANT: You must to set up your footnote hotkey
 
@@ -18,7 +18,7 @@ After installing and activating this plugin, you still have to SET UP your hotke
 
 I personally use <kbd>Command</kbd>+<kbd>Shift</kbd>+<kbd>6</kbd> because "6" on a US keyboard is where the uptick/footnote character "^" is.
 
-![Hotkey](https://github.com/akaalias/obsidian-footnotes/blob/master/hotkey.png?raw=true)
+![Hotkey](https://user-images.githubusercontent.com/11269635/171957175-ba2229d1-d82e-44ad-bf3c-6055316308c7.png)
 
 ## Default Feature Details
 ### Scenario: No previous numeric (e.g. "[^1]") footnotes exist:

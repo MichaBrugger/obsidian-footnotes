@@ -1,4 +1,5 @@
 import { Editor, EditorPosition, MarkdownView, Plugin } from "obsidian";
+import { clearScreenDown } from "readline";
 
 export default class ObsidianFootnotes extends Plugin {
   private detailLineRegex = /\[\^(\d+)\]\:/;
@@ -192,9 +193,11 @@ export default class ObsidianFootnotes extends Plugin {
 
     if (currentMax == 1) {
       footnoteDetail = "\n" + footnoteDetail;
+      doc.setLine(doc.lastLine(), lastLine + footnoteDetail);
+      doc.setCursor(doc.lastLine() - 1, footnoteDetail.length - 1);
+    } else {
+      doc.setLine(doc.lastLine(), lastLine + footnoteDetail);
+      doc.setCursor(doc.lastLine(), footnoteDetail.length - 1);
     }
-
-    doc.setLine(doc.lastLine(), lastLine + footnoteDetail);
-    doc.setCursor(doc.lastLine(), footnoteDetail.length - 1);
   }
 }
