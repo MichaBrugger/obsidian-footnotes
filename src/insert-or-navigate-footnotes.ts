@@ -179,9 +179,12 @@ export function insertAutonumFootnote(plugin: FootnotePlugin) {
     if (mdView.editor == undefined) return false;
 
     const doc = mdView.editor;
-    const cursorPosition = doc.getCursor();
+    let cursorPosition = doc.getCursor();
     const lineText = doc.getLine(cursorPosition.line);
     const markdownText = mdView.data;
+
+    moveCursorToEndOfWord(lineText, cursorPosition, doc);
+    cursorPosition = doc.getCursor(); // update cursor position again since we just moved it
 
     if (shouldJumpFromDetailToMarker(lineText, cursorPosition, doc))
         return;
@@ -276,9 +279,12 @@ export function insertNamedFootnote(plugin: FootnotePlugin) {
     if (mdView.editor == undefined) return false;
 
     const doc = mdView.editor;
-    const cursorPosition = doc.getCursor();
+    let cursorPosition = doc.getCursor();
     const lineText = doc.getLine(cursorPosition.line);
     const markdownText = mdView.data;
+
+    moveCursorToEndOfWord(lineText, cursorPosition, doc);
+    cursorPosition = doc.getCursor(); // update cursor position again since we just moved it
 
     if (shouldJumpFromDetailToMarker(lineText, cursorPosition, doc))
         return;
@@ -388,4 +394,22 @@ export function shouldCreateFootnoteMarker(
     doc.setCursor(cursorPosition.line, cursorPosition.ch+2);
     //open footnotePicker popup
     
+}
+
+export function moveCursorToEndOfWord(
+    lineText: string,
+    cursorPosition: EditorPosition,
+    doc: Editor,
+) {
+    const characterAtCursor = lineText[cursorPosition.ch];
+    const isCursorInsideWord = characterAtCursor != undefined && characterAtCursor.match(/\S/) != null; // matches any non-whitespace
+
+    if (!isCursorInsideWord)
+        return;
+
+    const endOfWord = lineText.substring(cursorPosition.ch).search(/\s/); // find any whitespace
+    if (endOfWord == -1) // no whitespace found (usually at end of line)
+        doc.setCursor({line: cursorPosition.line, ch: lineText.length});
+    else
+        doc.setCursor({line: cursorPosition.line, ch: cursorPosition.ch + endOfWord});
 }
