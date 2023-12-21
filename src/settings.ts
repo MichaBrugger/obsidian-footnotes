@@ -73,7 +73,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
         .setName("Footnote Section Heading")
-        .setDesc("Heading to place above footnotes section (Supports Markdown formatting). Heading will be H1 size.")
+        .setDesc("Heading to place above footnotes section (Supports Markdown formatting). Heading will be H1 size, unless overridden.")
         .addText((text) =>
             text
                 .setPlaceholder("Heading is Empty")

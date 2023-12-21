@@ -164,7 +164,14 @@ export function addFootnoteSectionHeader(
     // else, return ""
 
     if (plugin.settings.enableFootnoteSectionHeading == true) {
-        let returnHeading = `\n# ${plugin.settings.FootnoteSectionHeading}`;
+
+        let returnHeading = plugin.settings.FootnoteSectionHeading;
+        const headingRegex = /^\#{1,6} /;
+        if (headingRegex.test(returnHeading)) {
+            returnHeading = `\n${returnHeading}`;
+        } else {
+            returnHeading = `\n# ${returnHeading}`;
+        }
         return returnHeading;
     }
     return "";
