@@ -6,6 +6,8 @@ export interface FootnotePluginSettings {
     
     enableFootnoteSectionHeading: boolean;
     FootnoteSectionHeading: string;
+
+    enableRemoveBlankLastLines: boolean;
 }
 
 export const DEFAULT_SETTINGS: FootnotePluginSettings = {
@@ -13,6 +15,8 @@ export const DEFAULT_SETTINGS: FootnotePluginSettings = {
 
     enableFootnoteSectionHeading: false,
     FootnoteSectionHeading: "Footnotes",
+
+    enableRemoveBlankLastLines: true,
 };
 
 export class FootnotePluginSettingTab extends PluginSettingTab {
@@ -51,6 +55,18 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                 .setValue(this.plugin.settings.enableAutoSuggest)
                 .onChange(async (value) => {
                     this.plugin.settings.enableAutoSuggest = value;
+                    await this.plugin.saveSettings();
+                })
+        );
+
+        new Setting(containerEl)
+        .setName("Enable Trimming of Blank Lines")
+        .setDesc("Removes blank lines from the end of the file when inserting a new footnote section")
+        .addToggle((toggle) =>
+            toggle
+                .setValue(this.plugin.settings.enableRemoveBlankLastLines)
+                .onChange(async (value) => {
+                    this.plugin.settings.enableRemoveBlankLastLines = value;
                     await this.plugin.saveSettings();
                 })
         );
