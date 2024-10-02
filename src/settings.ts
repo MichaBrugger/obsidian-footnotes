@@ -3,6 +3,8 @@ import FootnotePlugin from "./main";
 
 export interface FootnotePluginSettings {
     enableAutoSuggest: boolean;
+
+	enableFootnoteSectionDivider: boolean;
     
     enableFootnoteSectionHeading: boolean;
     FootnoteSectionHeading: string;
@@ -11,6 +13,8 @@ export interface FootnotePluginSettings {
 export const DEFAULT_SETTINGS: FootnotePluginSettings = {
     enableAutoSuggest: true,
 
+	enableFootnoteSectionDivider: false,
+	
     enableFootnoteSectionHeading: false,
     FootnoteSectionHeading: "Footnotes",
 };
@@ -70,6 +74,18 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 })
         );
+
+		new Setting(containerEl)
+		.setName("Footnote Section Divider")
+		.setDesc("Add a horizontal line above the footnotes section for more visual separation.")
+		.addToggle((toggle) =>
+			toggle
+				.setValue(this.plugin.settings.enableFootnoteSectionDivider)
+				.onChange(async (value) => {
+					this.plugin.settings.enableFootnoteSectionDivider = value;
+					await this.plugin.saveSettings();
+				})
+		);
 
         new Setting(containerEl)
         .setName("Footnote Section Heading")
