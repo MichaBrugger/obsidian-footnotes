@@ -44,7 +44,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
         containerEl.createEl('br');
         
         new Setting(containerEl)
-        .setName("Enable Footnote Autosuggest")
+        .setName("Enable Autosuggest")
         .setDesc("Suggests existing footnotes when entering named footnotes.")
         .addToggle((toggle) =>
             toggle
@@ -60,7 +60,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
         });
 
         new Setting(containerEl)
-        .setName("Enable Footnote Section Heading")
+        .setName("Enable Section Heading")
         .setDesc("Automatically adds a heading separating footnotes at the bottom of the note from the rest of the text.")
         .addToggle((toggle) =>
             toggle
@@ -72,7 +72,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
         );
 
         new Setting(containerEl)
-        .setName("Footnote Section Heading")
+        .setName("Section Heading")
         .setDesc("Heading to place above footnotes section. Accepts standard Markdown formatting.")
         .addTextArea((text) =>
             text
