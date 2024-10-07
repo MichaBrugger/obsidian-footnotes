@@ -90,6 +90,8 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
 					text.inputEl.style.resize = 'none';
 					text.inputEl.style.fontFamily = 'monospace';
 				})
-		);
+		).then((setting) => {
+			// setting.settingEl.style.display = 'block';
+		})
     }
 }
