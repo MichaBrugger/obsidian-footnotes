@@ -10,9 +10,9 @@ export interface FootnotePluginSettings {
 
 export const DEFAULT_SETTINGS: FootnotePluginSettings = {
     enableAutoSuggest: true,
-
+	
     enableFootnoteSectionHeading: false,
-    FootnoteSectionHeading: "Footnotes",
+    FootnoteSectionHeading: "# Footnotes",
 };
 
 export class FootnotePluginSettingTab extends PluginSettingTab {
@@ -44,7 +44,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
         containerEl.createEl('br');
         
         new Setting(containerEl)
-        .setName("Enable Footnote Autosuggest")
+        .setName("Enable Autosuggest")
         .setDesc("Suggests existing footnotes when entering named footnotes.")
         .addToggle((toggle) =>
             toggle
@@ -60,7 +60,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
         });
 
         new Setting(containerEl)
-        .setName("Enable Footnote Section Heading")
+        .setName("Enable Section Heading")
         .setDesc("Automatically adds a heading separating footnotes at the bottom of the note from the rest of the text.")
         .addToggle((toggle) =>
             toggle
@@ -72,16 +72,26 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
         );
 
         new Setting(containerEl)
-        .setName("Footnote Section Heading")
-        .setDesc("Heading to place above footnotes section (Supports Markdown formatting). Heading will be H1 size.")
-        .addText((text) =>
+        .setName("Section Heading")
+        .setDesc("Heading to place above footnotes section. Accepts standard Markdown formatting.")
+        .addTextArea((text) =>
             text
-                .setPlaceholder("Heading is Empty")
+                .setPlaceholder("Ex: '# Footnotes'")
                 .setValue(this.plugin.settings.FootnoteSectionHeading)
                 .onChange(async (value) => {
-                    this.plugin.settings.FootnoteSectionHeading = value;
+					this.plugin.settings.FootnoteSectionHeading = value;
+					// console.log(`obsidian-footnotes: ${value ? "enabling" : "disabling"} automatic footnote section heading creation`);
                     await this.plugin.saveSettings();
-                })
-        );
+				})
+				.then((text) => {
+					// text.inputEl.style.justifyContent = 'flex-start';
+					text.inputEl.style.width = '100%';
+					text.inputEl.rows = 6;
+					text.inputEl.style.resize = 'none';
+					text.inputEl.style.fontFamily = 'monospace';
+				})
+		).then((setting) => {
+			// setting.settingEl.style.display = 'block';
+		})
     }
 }

@@ -164,11 +164,12 @@ export function addFootnoteSectionHeader(
     // else, return ""
 
     if (plugin.settings.enableFootnoteSectionHeading == true) {
-        let returnHeading = `\n# ${plugin.settings.FootnoteSectionHeading}`;
+        let returnHeading = plugin.settings.FootnoteSectionHeading;
         return returnHeading;
     }
     return "";
 }
+
 
 //FUNCTIONS FOR AUTONUMBERED FOOTNOTES
 
