@@ -3,8 +3,6 @@ import FootnotePlugin from "./main";
 
 export interface FootnotePluginSettings {
     enableAutoSuggest: boolean;
-
-	enableFootnoteSectionDivider: boolean;
     
     enableFootnoteSectionHeading: boolean;
     FootnoteSectionHeading: string;
@@ -12,11 +10,9 @@ export interface FootnotePluginSettings {
 
 export const DEFAULT_SETTINGS: FootnotePluginSettings = {
     enableAutoSuggest: true,
-
-	enableFootnoteSectionDivider: false,
 	
     enableFootnoteSectionHeading: false,
-    FootnoteSectionHeading: "Footnotes",
+    FootnoteSectionHeading: "# Footnotes",
 };
 
 export class FootnotePluginSettingTab extends PluginSettingTab {
@@ -75,29 +71,25 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                 })
         );
 
-		new Setting(containerEl)
-		.setName("Footnote Section Divider")
-		.setDesc("Add a horizontal line above the footnotes section for more visual separation.")
-		.addToggle((toggle) =>
-			toggle
-				.setValue(this.plugin.settings.enableFootnoteSectionDivider)
-				.onChange(async (value) => {
-					this.plugin.settings.enableFootnoteSectionDivider = value;
-					await this.plugin.saveSettings();
-				})
-		);
-
         new Setting(containerEl)
         .setName("Footnote Section Heading")
-        .setDesc("Heading to place above footnotes section (Supports Markdown formatting). Heading will be H1 size.")
-        .addText((text) =>
+        .setDesc("Heading to place above footnotes section. Accepts standard Markdown formatting.")
+        .addTextArea((text) =>
             text
-                .setPlaceholder("Heading is Empty")
+                .setPlaceholder("Ex: '# Footnotes'")
                 .setValue(this.plugin.settings.FootnoteSectionHeading)
                 .onChange(async (value) => {
-                    this.plugin.settings.FootnoteSectionHeading = value;
+					this.plugin.settings.FootnoteSectionHeading = value;
+					// console.log(`obsidian-footnotes: ${value ? "enabling" : "disabling"} automatic footnote section heading creation`);
                     await this.plugin.saveSettings();
-                })
-        );
+				})
+				.then((text) => {
+					// text.inputEl.style.justifyContent = 'flex-start';
+					text.inputEl.style.width = '100%';
+					text.inputEl.rows = 6;
+					text.inputEl.style.resize = 'none';
+					text.inputEl.style.fontFamily = 'monospace';
+				})
+		);
     }
 }
