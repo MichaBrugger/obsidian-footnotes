@@ -66,6 +66,25 @@ export function listExistingFootnoteMarkersAndLocations(
     return FootnoteMarkerInfo;
 }
 
+function moveCursorAndSetJumpPoint(
+    doc: Editor,
+    oldCursorPos: EditorPosition,
+    newCursorPos: EditorPosition,
+): void {
+    doc.setCursor(newCursorPos);
+
+    // if user has vim mode enabled, set jump point
+    if (app.vault.getConfig("vimMode")) {
+        // @ts-expect-error
+        activeWindow.CodeMirrorAdapter.Vim.getVimGlobalState_().jumpList.add(
+            // @ts-expect-error
+            doc.cm.cm, // SIC two levels deep
+            oldCursorPos,
+            newCursorPos,
+        );
+    }
+}
+
 export function shouldJumpFromDetailToMarker(
     lineText: string,
     cursorPosition: EditorPosition,
@@ -88,10 +107,8 @@ export function shouldJumpFromDetailToMarker(
             if (scanLine.contains(footnote)) {
                 let cursorLocationIndex = scanLine.indexOf(footnote);
                 returnLineIndex = i;
-                doc.setCursor({
-                line: returnLineIndex,
-                ch: cursorLocationIndex + footnote.length,
-                });
+                const newCursorPos = { line: returnLineIndex, ch: cursorLocationIndex + footnote.length };
+                moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos);
                 return true;
             }
         }
@@ -146,7 +163,8 @@ export function shouldJumpFromMarkerToDetail(
                     // compare to the index
                     let nameMatch = lineMatch[1];
                     if (nameMatch == footnoteName) {
-                        doc.setCursor({ line: i, ch: lineMatch[0].length + 1 });
+                        const newCursorPos = { line: i, ch: lineMatch[0].length + 1 };
+                        moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos);
                         return true;
                     }
                 }
@@ -259,10 +277,12 @@ export function shouldCreateAutonumFootnote(
         footnoteDetail = "\n" + footnoteDetail;
         let Heading = addFootnoteSectionHeader(plugin);
         doc.setLine(doc.lastLine(), lastLine + Heading + footnoteDetail);
-        doc.setCursor(doc.lastLine() - 1, footnoteDetail.length - 1);
+        const newCursorPos = { line: doc.lastLine() - 1, ch: footnoteDetail.length - 1 }
+        moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos)
     } else {
         doc.setLine(doc.lastLine(), lastLine + footnoteDetail);
-        doc.setCursor(doc.lastLine(), footnoteDetail.length - 1);
+        const newCursorPos = { line: doc.lastLine(), ch: footnoteDetail.length - 1 }
+        moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos)
     }
 }
 
@@ -362,10 +382,12 @@ export function shouldCreateMatchingFootnoteDetail(
                     footnoteDetail = "\n" + footnoteDetail;
                     let Heading = addFootnoteSectionHeader(plugin);
                     doc.setLine(doc.lastLine(), lastLine + Heading + footnoteDetail);
-                    doc.setCursor(doc.lastLine() - 1, footnoteDetail.length - 1);
+                    const newCursorPos = { line: doc.lastLine() - 1, ch: footnoteDetail.length - 1 }
+                    moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos)
                 } else {
                     doc.setLine(doc.lastLine(), lastLine + footnoteDetail);
-                    doc.setCursor(doc.lastLine(), footnoteDetail.length - 1);
+                    const newCursorPos = { line: doc.lastLine(), ch: footnoteDetail.length - 1 }
+                    moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos)
                 }
 
                 return true;
@@ -385,7 +407,8 @@ export function shouldCreateFootnoteMarker(
     let emptyMarker = `[^]`;
     doc.replaceRange(emptyMarker,doc.getCursor());
     //move cursor in between [^ and ]
-    doc.setCursor(cursorPosition.line, cursorPosition.ch+2);
+    const newCursorPos = { line: cursorPosition.line, ch: cursorPosition.ch + 2 }
+    moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos)
     //open footnotePicker popup
     
 }
