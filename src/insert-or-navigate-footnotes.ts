@@ -1,7 +1,7 @@
-import { 
-    Editor, 
-    EditorPosition, 
-    MarkdownView
+import {
+	Editor,
+	EditorPosition,
+	MarkdownView
 } from "obsidian";
 
 import FootnotePlugin from "./main";
@@ -178,13 +178,13 @@ function adjustFootnotePosition(
     plugin: FootnotePlugin
 ) {
     if (!plugin.settings.insertAtEndOfWord) return cursorPosition;
+    const endOfWordUnderCursor = doc.wordAt(cursorPosition)?.to;
+    if (!endOfWordUnderCursor) return cursorPosition; // no word under cursor
+
     // adjust cursor position to insert a footnote only at the end of word
-    const endOfWordUnderCursor = doc.wordAt(cursorPosition).to;
-    if (endOfWordUnderCursor){
-        const nextChar = lineText.charAt(endOfWordUnderCursor.ch);
-        if ([".", ",", ":", ";"].includes(nextChar)) endOfWordUnderCursor.ch++;
-        cursorPosition = endOfWordUnderCursor;
-    }
+    const nextChar = lineText.charAt(endOfWordUnderCursor.ch);
+    if ([".", ",", ":", ";"].includes(nextChar)) endOfWordUnderCursor.ch++;
+    cursorPosition = endOfWordUnderCursor;
     return cursorPosition;
 }
 
