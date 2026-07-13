@@ -12,9 +12,9 @@ export interface FootnotePluginSettings {
 
 export const DEFAULT_SETTINGS: FootnotePluginSettings = {
     enableAutoSuggest: true,
-
+	
     enableFootnoteSectionHeading: false,
-    FootnoteSectionHeading: "Footnotes",
+    FootnoteSectionHeading: "# Footnotes",
 
     enableRemoveBlankLastLines: true,
 };
@@ -48,7 +48,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
         containerEl.createEl('br');
         
         new Setting(containerEl)
-        .setName("Enable Footnote Autosuggest")
+        .setName("Enable Autosuggest")
         .setDesc("Suggests existing footnotes when entering named footnotes.")
         .addToggle((toggle) =>
             toggle
@@ -76,7 +76,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
         });
 
         new Setting(containerEl)
-        .setName("Enable Footnote Section Heading")
+        .setName("Enable Section Heading")
         .setDesc("Automatically adds a heading separating footnotes at the bottom of the note from the rest of the text.")
         .addToggle((toggle) =>
             toggle
@@ -88,15 +88,21 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
         );
 
         new Setting(containerEl)
-        .setName("Footnote Section Heading")
-        .setDesc("Heading to place above footnotes section (Supports Markdown formatting). Heading will be H1 size, unless overridden.")
-        .addText((text) =>
+        .setName("Section Heading")
+        .setDesc("Heading to place above footnotes section. Accepts standard Markdown formatting, including multiple lines and dividers. Plain text will be used as an H1 heading.")
+        .addTextArea((text) =>
             text
-                .setPlaceholder("Heading is Empty")
+                .setPlaceholder("Ex: '# Footnotes'")
                 .setValue(this.plugin.settings.FootnoteSectionHeading)
                 .onChange(async (value) => {
                     this.plugin.settings.FootnoteSectionHeading = value;
                     await this.plugin.saveSettings();
+                })
+                .then((text) => {
+                    text.inputEl.style.width = '100%';
+                    text.inputEl.rows = 6;
+                    text.inputEl.style.resize = 'none';
+                    text.inputEl.style.fontFamily = 'monospace';
                 })
         );
     }

@@ -164,18 +164,18 @@ export function addFootnoteSectionHeader(
     // else, return ""
 
     if (plugin.settings.enableFootnoteSectionHeading == true) {
-
         let returnHeading = plugin.settings.FootnoteSectionHeading;
-        const headingRegex = /^\#{1,6} /;
-        if (headingRegex.test(returnHeading)) {
-            returnHeading = `\n${returnHeading}`;
-        } else {
-            returnHeading = `\n# ${returnHeading}`;
+        // values that already start with a markdown heading or divider are
+        // used as-is; plain text keeps the legacy H1 prefix
+        const markdownBlockRegex = /^(#{1,6} |---|\*\*\*|___)/;
+        if (!markdownBlockRegex.test(returnHeading)) {
+            returnHeading = `# ${returnHeading}`;
         }
-        return returnHeading;
+        return `\n${returnHeading}`;
     }
     return "";
 }
+
 
 //FUNCTIONS FOR AUTONUMBERED FOOTNOTES
 

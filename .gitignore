@@ -11,3 +11,6 @@ package-lock.json
 
 # plugin userdata
 data.json
+
+# macOS metadata files
+**.DS_Store
