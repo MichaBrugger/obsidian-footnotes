@@ -77,6 +77,7 @@ If you would like, you can further customize the plugin's behavior in Footnote S
 
 ## More Info
 
+- New to footnotes? [+1creator's video tutorial](https://www.youtube.com/watch?v=HapgV7Y52dY) covers footnotes in Obsidian and includes a full walkthrough of setting up and using this plugin.
 - For more information, please check the [plugin wiki](https://github.com/MichaBrugger/obsidian-footnotes/wiki). 
   - [Overview of how footnotes work in Obsidian](https://github.com/MichaBrugger/obsidian-footnotes/wiki/Footnote-Functionality)
   - [Debug Guide](https://github.com/MichaBrugger/obsidian-footnotes/wiki/Debug-Guide)
