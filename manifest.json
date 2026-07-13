@@ -3,8 +3,8 @@
   "name": "Footnote Shortcut",
   "version": "0.1.3",
   "minAppVersion": "0.12.0",
-  "description": "Insert and write footnotes faster",
+  "description": "Insert and write footnotes faster!",
   "author": "Alexis Rondeau, Micha Brugger, Jason Qin",
-  "authorUrl": "https://publish.obsidian.md/alexisrondeau",
+  "authorUrl": "https://github.com/Comprehensive-Jason",
   "isDesktopOnly": false
 }

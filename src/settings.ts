@@ -44,14 +44,14 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                 control: { type: "toggle", key: "enablePopupEditor" },
             },
             {
-                name: "Trim blank lines",
-                desc: "Remove blank lines from the end of the note when inserting a new footnote section.",
-                control: { type: "toggle", key: "enableRemoveBlankLastLines" },
-            },
-            {
                 type: "group",
-                heading: "Footnotes section",
+                heading: "Footnotes Section",
                 items: [
+                    {
+                        name: "Trim blank lines",
+                        desc: "Remove blank lines from the end of the note when inserting a new footnotes section.",
+                        control: { type: "toggle", key: "enableRemoveBlankLastLines" },
+                    },
                     {
                         name: "Enable section heading",
                         desc: "Automatically adds a heading separating footnotes at the bottom of the note from the rest of the text.",
@@ -104,6 +104,10 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
         );
 
         new Setting(containerEl)
+        .setName("Footnotes Section")
+        .setHeading();
+
+        new Setting(containerEl)
         .setName("Trim blank lines")
         .setDesc("Remove blank lines from the end of the note when inserting a new footnote section.")
         .addToggle((toggle) =>
@@ -114,10 +118,6 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 })
         );
-
-        new Setting(containerEl)
-        .setName("Footnotes section")
-        .setHeading();
 
         new Setting(containerEl)
         .setName("Enable section heading")

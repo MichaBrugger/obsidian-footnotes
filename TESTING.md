@@ -3,7 +3,7 @@
 Two layers, run with two commands:
 
 | Layer | Command | What it covers | Needs Obsidian running? |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | Unit (vitest) | `npm test` | Pure logic, TDD-style | No |
 | Smoke (integration) | `npm run test:smoke` | The real plugin inside the real app | Yes |
 
