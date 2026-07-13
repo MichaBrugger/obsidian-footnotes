@@ -197,7 +197,16 @@ export async function openFootnotePopup(
         if (embed.subpathNotFound) return false;
         containerEl.removeClass("footnote-shortcut-popup-loading");
         embed.showEditor();
-        embed.editMode?.editor?.focus();
+        const inner = embed.editMode?.editor;
+        if (inner) {
+            inner.focus();
+            // cursor at the END of the detail so the user can backspace
+            // or keep writing without reaching for the arrow keys
+            if (inner.lastLine && inner.getLine && inner.setCursor) {
+                const last = inner.lastLine();
+                inner.setCursor({ line: last, ch: inner.getLine(last).length });
+            }
+        }
         return true;
     };
 

@@ -26,7 +26,14 @@ export interface MarkdownEmbed {
     saving?: boolean;
     saveAgain?: boolean;
     subpathNotFound?: boolean;
-    editMode?: { editor?: { focus(): void } };
+    editMode?: {
+        editor?: {
+            focus(): void;
+            lastLine?(): number;
+            getLine?(line: number): string;
+            setCursor?(pos: EditorPosition): void;
+        };
+    };
     load(): void;
     unload(): void;
     loadFile(): Promise<void>;

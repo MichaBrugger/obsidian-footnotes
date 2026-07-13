@@ -151,7 +151,13 @@ export function jumpToFootnoteDetail(
             // compare to the index
             let nameMatch = lineMatch[1];
             if (nameMatch == footnoteName) {
-                const newCursorPos = { line: i, ch: lineMatch[0].length + 1 };
+                // land at the END of the detail (indented lines belong to
+                // it) so the user can backspace/type without arrow keys
+                let endLine = i;
+                while (endLine < doc.lastLine() && /^\s+\S/.test(doc.getLine(endLine + 1))) {
+                    endLine++;
+                }
+                const newCursorPos = { line: endLine, ch: doc.getLine(endLine).length };
                 moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos, plugin);
                 return true;
             }
