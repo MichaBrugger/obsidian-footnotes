@@ -188,7 +188,9 @@ async function main() {
         const pluginDir = join(root.slice(0, idx), ".obsidian", "plugins", PLUGIN_ID);
         for (const f of ["main.js", "styles.css"]) {
             const src = resolve(root, f);
-            if (existsSync(src)) copyFileSync(src, join(pluginDir, f));
+            const dest = join(pluginDir, f);
+            // when run from the plugin dir itself there is nothing to copy
+            if (existsSync(src) && resolve(src) !== resolve(dest)) copyFileSync(src, dest);
         }
         console.log(`deployed build to ${pluginDir}; waiting for hot-reload...`);
         await sleep(2500);
