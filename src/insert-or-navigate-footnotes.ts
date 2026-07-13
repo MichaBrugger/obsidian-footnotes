@@ -238,17 +238,19 @@ export function shouldCreateAutonumFootnote(
     let lastLineIndex = doc.lastLine();
     let lastLine = doc.getLine(lastLineIndex);
 
-    while (lastLineIndex > 0) {
-        lastLine = doc.getLine(lastLineIndex);
-        if (lastLine.length > 0) {
-            doc.replaceRange(
-                "",
-                { line: lastLineIndex, ch: 0 },
-                { line: doc.lastLine(), ch: 0 }
-            );
-            break;
+    if (plugin.settings.enableRemoveBlankLastLines === true) {
+        while (lastLineIndex > 0) {
+            lastLine = doc.getLine(lastLineIndex);
+            if (lastLine.length > 0) {
+                doc.replaceRange(
+                    "",
+                    { line: lastLineIndex, ch: 0 },
+                    { line: doc.lastLine(), ch: 0 }
+                );
+                break;
+            }
+            lastLineIndex--;
         }
-        lastLineIndex--;
     }
 
     let footnoteDetail = `\n[^${footNoteId}]: `;
@@ -343,17 +345,19 @@ export function shouldCreateMatchingFootnoteDetail(
                 let lastLineIndex = doc.lastLine();
                 let lastLine = doc.getLine(lastLineIndex);
 
-                while (lastLineIndex > 0) {
-                    lastLine = doc.getLine(lastLineIndex);
-                    if (lastLine.length > 0) {
-                        doc.replaceRange(
-                            "",
-                            { line: lastLineIndex, ch: 0 },
-                            { line: doc.lastLine(), ch: 0 }
-                        );
-                        break;
+                if (plugin.settings.enableRemoveBlankLastLines === true) {
+                    while (lastLineIndex > 0) {
+                        lastLine = doc.getLine(lastLineIndex);
+                        if (lastLine.length > 0) {
+                            doc.replaceRange(
+                                "",
+                                { line: lastLineIndex, ch: 0 },
+                                { line: doc.lastLine(), ch: 0 }
+                            );
+                            break;
+                        }
+                        lastLineIndex--;
                     }
-                    lastLineIndex--;
                 }
                 
                 let footnoteDetail = `\n[^${footnoteId}]: `;
