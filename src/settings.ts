@@ -45,7 +45,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
             },
             {
                 type: "group",
-                heading: "Footnotes Section",
+                heading: "Footnotes section",
                 items: [
                     {
                         name: "Trim blank lines",
@@ -109,7 +109,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
         .setName("Trim blank lines")
-        .setDesc("Remove blank lines from the end of the note when inserting a new footnote section.")
+        .setDesc("Remove blank lines from the end of the note when inserting a new footnotes section.")
         .addToggle((toggle) =>
             toggle
                 .setValue(this.plugin.settings.enableRemoveBlankLastLines)
