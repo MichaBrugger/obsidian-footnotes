@@ -72,6 +72,19 @@ function moveCursorAndSetJumpPoint(
     plugin: FootnotePlugin,
     changes?: EditorChange[],
 ): void {
+    // when focus sits in a sub-editor (a table cell being edited — its
+    // contentDOM is nested inside the main editor's), return it to the main
+    // editor BEFORE moving the cursor: a jump out of the table would
+    // otherwise leave keystrokes going to the abandoned cell editor, while
+    // a jump into a table re-activates cell editing on its own
+    const cmView = (doc as EditorWithCm).cm;
+    if (cmView) {
+        const active = cmView.contentDOM.ownerDocument.activeElement;
+        if (active !== cmView.contentDOM && cmView.contentDOM.contains(active)) {
+            cmView.focus();
+        }
+    }
+
     if (changes && changes.length > 0) {
         // text edits and the cursor move must go out as ONE transaction:
         // while a table cell is being edited (Obsidian 1.5+ table editor),
