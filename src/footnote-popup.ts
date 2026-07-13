@@ -1,6 +1,7 @@
 import { MarkdownView } from "obsidian";
 
 import FootnotePlugin from "./main";
+import { AppWithEmbedRegistry, EditorWithCm } from "./obsidian-internals";
 
 // A small popup anchored at the cursor containing Obsidian's own editable
 // markdown embed, bound to just the footnote's detail via the `#[^id]`
@@ -18,7 +19,7 @@ let activePopup: ActivePopup | null = null;
 export function popupEditingAvailable(plugin: FootnotePlugin): boolean {
     // embedRegistry is undocumented API, so degrade to the legacy
     // jump-to-bottom behavior if it ever changes shape
-    const registry = (plugin.app as any).embedRegistry;
+    const registry = (plugin.app as AppWithEmbedRegistry).embedRegistry;
     return plugin.settings.enablePopupEditor === true
         && typeof registry?.embedByExtension?.md === "function";
 }
@@ -49,6 +50,14 @@ export async function openFootnotePopup(
 
     const mdView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
     if (!mdView || !mdView.file) return;
+
+    // callers gate on popupEditingAvailable, but re-check so a registry
+    // shape change degrades to the legacy jump instead of throwing
+    const createEmbed = (plugin.app as AppWithEmbedRegistry).embedRegistry?.embedByExtension?.md;
+    if (!createEmbed) {
+        onUnavailable?.();
+        return;
+    }
     // capture: the null-check above doesn't narrow property access inside
     // the buildEmbed closure
     const file = mdView.file;
@@ -70,7 +79,7 @@ export async function openFootnotePopup(
     await mdView.save();
 
     // anchor just below the cursor, flipping above it near the window bottom
-    const cm = (editor as any).cm;
+    const cm = (editor as EditorWithCm).cm;
     const coords = cm ? cm.coordsAtPos(cm.state.selection.main.head) : null;
     const width = Math.min(480, win.innerWidth - 32);
     const left = Math.max(16, Math.min(coords ? coords.left : 100, win.innerWidth - width - 16));
@@ -88,7 +97,7 @@ export async function openFootnotePopup(
 
     const subpath = `#[^${footnoteId}]`;
     const buildEmbed = () => {
-        const built = (plugin.app as any).embedRegistry.embedByExtension.md(
+        const built = createEmbed(
             { app: plugin.app, linktext: subpath, sourcePath: file.path, containerEl: containerEl, depth: 0 },
             file,
             subpath,
@@ -106,7 +115,14 @@ export async function openFootnotePopup(
         activePopup = null;
         doc.removeEventListener("mousedown", onDocMouseDown, true);
         containerEl.addClass("footnote-shortcut-popup-closed");
-        if (focusEditor) editor.focus();
+        if (focusEditor) {
+            // editor.focus() can silently no-op right after the popup's
+            // embed held focus (Obsidian's focus bookkeeping lags), so
+            // focus the underlying CodeMirror view directly
+            const cmView = (editor as EditorWithCm).cm;
+            if (cmView) cmView.focus();
+            else editor.focus();
+        }
 
         // the embed saves edits on its own debounce; let that cycle finish
         // before unloading, since unloading mid-save clears the state the

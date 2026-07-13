@@ -6,12 +6,13 @@ import {
 
 import FootnotePlugin from "./main";
 import { openFootnotePopup, popupEditingAvailable, toggleCloseFootnotePopup } from "./footnote-popup";
+import { EditorWithCm, VaultWithConfig, WindowWithVim } from "./obsidian-internals";
 
-export var AllMarkers = /\[\^([^\[\]]+)\](?!:)/g;
-var AllNumberedMarkers = /\[\^(\d+)\]/gi;
-var AllDetailsNameOnly = /\[\^([^\[\]]+)\]:/g;
-var DetailInLine = /\[\^([^\[\]]+)\]:/;
-export var ExtractNameFromFootnote = /(\[\^)([^\[\]]+)(?=\])/;
+export const AllMarkers = /\[\^([^[\]]+)\](?!:)/g;
+const AllNumberedMarkers = /\[\^(\d+)\]/gi;
+const AllDetailsNameOnly = /\[\^([^[\]]+)\]:/g;
+const DetailInLine = /\[\^([^[\]]+)\]:/;
+export const ExtractNameFromFootnote = /(\[\^)([^[\]]+)(?=\])/;
 
 
 export function listExistingFootnoteDetails(
@@ -73,11 +74,9 @@ function moveCursorAndSetJumpPoint(
 
     // if user has vim mode enabled, set jump point
     // getConfig is private API, like the vim internals below
-    if ((plugin.app.vault as any).getConfig("vimMode")) {
-        // @ts-expect-error
-        activeWindow.CodeMirrorAdapter.Vim.getVimGlobalState_().jumpList.add(
-            // @ts-expect-error
-            doc.cm.cm, // SIC two levels deep
+    if ((plugin.app.vault as VaultWithConfig).getConfig?.("vimMode")) {
+        (activeWindow as WindowWithVim).CodeMirrorAdapter?.Vim.getVimGlobalState_().jumpList.add(
+            (doc as EditorWithCm).cm?.cm, // SIC two levels deep
             oldCursorPos,
             newCursorPos,
         );
@@ -96,8 +95,6 @@ export function shouldJumpFromDetailToMarker(
     let match = lineText.match(DetailInLine);
     if (match) {
         let s = match[0];
-        let index = s.replace("[^", "");
-        index = index.replace("]:", "");
         let footnote = s.replace(":", "");
 
         let returnLineIndex = cursorPosition.line;
@@ -187,7 +184,7 @@ export function shouldJumpFromMarkerToDetail(
             }
 
             if (popupEditingAvailable(plugin)) {
-                openFootnotePopup(plugin, footnoteName, () =>
+                void openFootnotePopup(plugin, footnoteName, () =>
                     jumpToFootnoteDetail(footnoteName, cursorPosition, doc, plugin)
                 );
                 return true;
@@ -297,8 +294,8 @@ export function shouldCreateAutonumFootnote(
 
     let footNoteId = currentMax;
     let footnoteMarker = `[^${footNoteId}]`;
-    let linePart1 = lineText.substr(0, cursorPosition.ch);
-    let linePart2 = lineText.substr(cursorPosition.ch);
+    let linePart1 = lineText.slice(0, cursorPosition.ch);
+    let linePart2 = lineText.slice(cursorPosition.ch);
     let newLine = linePart1 + footnoteMarker + linePart2;
 
     doc.replaceRange(
@@ -343,7 +340,7 @@ export function shouldCreateAutonumFootnote(
     if (popupEditingAvailable(plugin)) {
         // type the detail in a popup instead of jumping to the bottom
         doc.setCursor({ line: cursorPosition.line, ch: cursorPosition.ch + footnoteMarker.length });
-        openFootnotePopup(plugin, String(footNoteId), () =>
+        void openFootnotePopup(plugin, String(footNoteId), () =>
             moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos, plugin)
         );
     } else {
@@ -462,7 +459,7 @@ export function shouldCreateMatchingFootnoteDetail(
 
                 if (popupEditingAvailable(plugin)) {
                     // type the detail in a popup instead of jumping to the bottom
-                    openFootnotePopup(plugin, footnoteId, () =>
+                    void openFootnotePopup(plugin, footnoteId, () =>
                         moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos, plugin)
                     );
                 } else {

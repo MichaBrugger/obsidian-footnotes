@@ -1,0 +1,69 @@
+import { App, Editor, EditorPosition, TFile, Vault } from "obsidian";
+
+// Typed views of the undocumented Obsidian / CodeMirror internals this plugin
+// relies on. Only the members actually used are declared, and every entry
+// point is optional where a future Obsidian release could remove it, so
+// callers degrade gracefully instead of crashing.
+
+/** CodeMirror 6 EditorView, reachable through the undocumented `Editor.cm`. */
+export interface ObsidianEditorView {
+    state: { selection: { main: { head: number } } };
+    coordsAtPos(pos: number): { left: number; top: number; bottom: number } | null;
+    focus(): void;
+    /** CM5-compatibility editor attached by the vim extension ("cm two levels deep"). */
+    cm?: unknown;
+}
+
+export interface EditorWithCm extends Editor {
+    cm?: ObsidianEditorView;
+}
+
+/** The editable markdown embed produced by the embed registry. */
+export interface MarkdownEmbed {
+    editable: boolean;
+    dirty?: boolean;
+    saving?: boolean;
+    saveAgain?: boolean;
+    subpathNotFound?: boolean;
+    editMode?: { editor?: { focus(): void } };
+    load(): void;
+    unload(): void;
+    loadFile(): Promise<void>;
+    showEditor(): void;
+}
+
+export type EmbedCreator = (
+    context: {
+        app: App;
+        linktext: string;
+        sourcePath: string;
+        containerEl: HTMLElement;
+        depth: number;
+    },
+    file: TFile,
+    subpath: string,
+) => MarkdownEmbed;
+
+export interface AppWithEmbedRegistry extends App {
+    embedRegistry?: {
+        embedByExtension?: Partial<Record<string, EmbedCreator>>;
+    };
+}
+
+/** `Vault.getConfig` reads editor config like `vimMode`. */
+export interface VaultWithConfig extends Vault {
+    getConfig?(key: string): unknown;
+}
+
+/** The vim CM5-adapter global, present when vim mode is active. */
+export interface WindowWithVim extends Window {
+    CodeMirrorAdapter?: {
+        Vim: {
+            getVimGlobalState_(): {
+                jumpList: {
+                    add(cm: unknown, from: EditorPosition, to: EditorPosition): void;
+                };
+            };
+        };
+    };
+}

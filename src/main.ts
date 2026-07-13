@@ -50,7 +50,11 @@ export default class FootnotePlugin extends Plugin {
   }
 
   async loadSettings() {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    this.settings = Object.assign(
+      {},
+      DEFAULT_SETTINGS,
+      (await this.loadData()) as Partial<FootnotePluginSettings> | null,
+    );
 
     // migrate pre-1.0.4 section heading values: the old text input implied
     // an H1, the textarea takes literal markdown, so convert once and save
@@ -63,7 +67,7 @@ export default class FootnotePlugin extends Plugin {
     // drop the setting for the removed autosuggest feature (Obsidian now
     // suggests footnotes natively)
     if ("enableAutoSuggest" in this.settings) {
-      delete (this.settings as any).enableAutoSuggest;
+      delete (this.settings as { enableAutoSuggest?: boolean }).enableAutoSuggest;
       await this.saveSettings();
     }
   }
