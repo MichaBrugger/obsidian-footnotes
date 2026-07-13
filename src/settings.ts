@@ -3,6 +3,7 @@ import FootnotePlugin from "./main";
 
 export interface FootnotePluginSettings {
     enableAutoSuggest: boolean;
+    insertAtEndOfWord: boolean;
     
     enableFootnoteSectionHeading: boolean;
     FootnoteSectionHeading: string;
@@ -12,7 +13,8 @@ export interface FootnotePluginSettings {
 
 export const DEFAULT_SETTINGS: FootnotePluginSettings = {
     enableAutoSuggest: true,
-	
+    insertAtEndOfWord: true,
+
     enableFootnoteSectionHeading: false,
     FootnoteSectionHeading: "# Footnotes",
 
@@ -55,6 +57,18 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                 .setValue(this.plugin.settings.enableAutoSuggest)
                 .onChange(async (value) => {
                     this.plugin.settings.enableAutoSuggest = value;
+                    await this.plugin.saveSettings();
+                })
+        );
+
+        new Setting(containerEl)
+        .setName("Insert Footnote at end of word")
+        .setDesc("A new footnote is only inserted at the end of the word and after any punctuation.")
+        .addToggle((toggle) =>
+            toggle
+                .setValue(this.plugin.settings.insertAtEndOfWord)
+                .onChange(async (value) => {
+                    this.plugin.settings.insertAtEndOfWord = value;
                     await this.plugin.saveSettings();
                 })
         );

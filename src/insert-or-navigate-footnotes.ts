@@ -1,7 +1,7 @@
-import { 
-    Editor, 
-    EditorPosition, 
-    MarkdownView
+import {
+	Editor,
+	EditorPosition,
+	MarkdownView
 } from "obsidian";
 
 import FootnotePlugin from "./main";
@@ -176,6 +176,23 @@ export function addFootnoteSectionHeader(
     return "";
 }
 
+/** adjust cursor position to insert a footnote only at the end of word */
+function adjustFootnotePosition(
+    cursorPosition: EditorPosition,
+    doc: Editor,
+    lineText: string,
+    plugin: FootnotePlugin
+) {
+    if (!plugin.settings.insertAtEndOfWord) return cursorPosition;
+    const endOfWordUnderCursor = doc.wordAt(cursorPosition)?.to;
+    if (!endOfWordUnderCursor) return cursorPosition; // no word under cursor
+
+    // adjust cursor position to insert a footnote only at the end of word
+    const nextChar = lineText.charAt(endOfWordUnderCursor.ch);
+    if ([".", ",", ":", ";"].includes(nextChar)) endOfWordUnderCursor.ch++;
+    cursorPosition = endOfWordUnderCursor;
+    return cursorPosition;
+}
 
 //FUNCTIONS FOR AUTONUMBERED FOOTNOTES
 
@@ -212,6 +229,8 @@ export function shouldCreateAutonumFootnote(
     doc: Editor,
     markdownText: string
 ) {
+    cursorPosition = adjustFootnotePosition(cursorPosition, doc, lineText, plugin);
+
     // create new footnote with the next numerical index
     let matches = markdownText.match(AllNumberedMarkers);
     let numbers: Array<number> = [];
@@ -300,7 +319,8 @@ export function insertNamedFootnote(plugin: FootnotePlugin) {
         lineText,
         cursorPosition,
         doc,
-        markdownText
+        markdownText,
+        plugin
     );
 }
 
@@ -390,11 +410,14 @@ export function shouldCreateFootnoteMarker(
     lineText: string,
     cursorPosition: EditorPosition,
     doc: Editor,
-    markdownText: string
+    markdownText: string,
+    plugin: FootnotePlugin
 ) {
+    cursorPosition = adjustFootnotePosition(cursorPosition, doc, lineText, plugin);
+
     //create empty footnote marker for name input
     let emptyMarker = `[^]`;
-    doc.replaceRange(emptyMarker,doc.getCursor());
+    doc.replaceRange(emptyMarker,cursorPosition);
     //move cursor in between [^ and ]
     doc.setCursor(cursorPosition.line, cursorPosition.ch+2);
     //open footnotePicker popup
