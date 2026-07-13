@@ -49,6 +49,9 @@ export async function openFootnotePopup(
 
     const mdView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
     if (!mdView || !mdView.file) return;
+    // capture: the null-check above doesn't narrow property access inside
+    // the buildEmbed closure
+    const file = mdView.file;
 
     // a just-inserted detail is only indexed once the file saves — but
     // mdView.data lags a tick behind editor API changes, so saving too early
@@ -85,8 +88,8 @@ export async function openFootnotePopup(
     const subpath = `#[^${footnoteId}]`;
     const buildEmbed = () => {
         const built = (plugin.app as any).embedRegistry.embedByExtension.md(
-            { app: plugin.app, linktext: subpath, sourcePath: mdView.file.path, containerEl: containerEl, depth: 0 },
-            mdView.file,
+            { app: plugin.app, linktext: subpath, sourcePath: file.path, containerEl: containerEl, depth: 0 },
+            file,
             subpath,
         );
         built.editable = true;
