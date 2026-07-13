@@ -177,7 +177,17 @@ export async function openFootnotePopup(
     };
 
     const onDocMouseDown = (evt: MouseEvent) => {
-        if (!containerEl.contains(evt.target as Node)) close(false);
+        const target = evt.target as HTMLElement;
+        if (containerEl.contains(target)) return;
+        // taps that launch a command (mobile navbar/toolbar, command
+        // palette, ribbon) must not dismiss the popup: on mobile they're
+        // the only way to press the footnote "hotkey", and closing here
+        // would strand the cursor instead of letting the command's toggle
+        // path return it to the text
+        if (target.closest(".mobile-navbar, .mobile-toolbar, .modal-container, .prompt, .workspace-ribbon")) {
+            return;
+        }
+        close(false);
     };
     doc.addEventListener("mousedown", onDocMouseDown, true);
 
