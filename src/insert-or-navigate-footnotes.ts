@@ -1,5 +1,6 @@
 import {
 	Editor,
+	EditorChange,
 	EditorPosition,
 	MarkdownView
 } from "obsidian";
@@ -69,8 +70,18 @@ function moveCursorAndSetJumpPoint(
     oldCursorPos: EditorPosition,
     newCursorPos: EditorPosition,
     plugin: FootnotePlugin,
+    changes?: EditorChange[],
 ): void {
-    doc.setCursor(newCursorPos);
+    if (changes && changes.length > 0) {
+        // text edits and the cursor move must go out as ONE transaction:
+        // while a table cell is being edited (Obsidian 1.5+ table editor),
+        // separate dispatches in the same tick race the cell editor's
+        // sync-back and corrupt the document (issue #28). `selection` here
+        // is resolved against the post-change document.
+        doc.transaction({ changes, selection: { from: newCursorPos } });
+    } else {
+        doc.setCursor(newCursorPos);
+    }
 
     // if user has vim mode enabled, set jump point
     // getConfig is private API, like the vim internals below
@@ -216,6 +227,41 @@ export function addFootnoteSectionHeader(
     return "";
 }
 
+// Build (don't apply) the edit that appends `[^id]: ` after the last
+// non-blank line — trimming trailing blank lines if enabled, and adding a
+// blank separator plus the optional section heading before the first
+// footnote. Returned as data so the caller can bundle it with the marker
+// insertion into a single transaction (see moveCursorAndSetJumpPoint).
+function buildDetailAppend(
+    doc: Editor,
+    footnoteId: string,
+    isFirstFootnote: boolean,
+    plugin: FootnotePlugin,
+): { change: EditorChange; cursor: EditorPosition } {
+    let text = `\n[^${footnoteId}]: `;
+    if (isFirstFootnote) {
+        text = addFootnoteSectionHeader(plugin) + "\n" + text;
+    }
+
+    let fromLine = doc.lastLine();
+    let to: EditorPosition | undefined;
+    if (plugin.settings.enableRemoveBlankLastLines === true) {
+        while (fromLine > 0 && doc.getLine(fromLine).length === 0) {
+            fromLine--;
+        }
+        to = { line: doc.lastLine(), ch: doc.getLine(doc.lastLine()).length };
+    }
+    const from = { line: fromLine, ch: doc.getLine(fromLine).length };
+
+    // cursor lands at the end of the inserted detail line
+    const linesAdded = text.split("\n").length - 1;
+    const cursor = {
+        line: fromLine + linesAdded,
+        ch: text.length - text.lastIndexOf("\n") - 1,
+    };
+    return { change: { from, to, text }, cursor };
+}
+
 /** adjust cursor position to insert a footnote only at the end of word */
 function adjustFootnotePosition(
     cursorPosition: EditorPosition,
@@ -294,57 +340,25 @@ export function shouldCreateAutonumFootnote(
 
     let footNoteId = currentMax;
     let footnoteMarker = `[^${footNoteId}]`;
-    let linePart1 = lineText.slice(0, cursorPosition.ch);
-    let linePart2 = lineText.slice(cursorPosition.ch);
-    let newLine = linePart1 + footnoteMarker + linePart2;
 
-    doc.replaceRange(
-        newLine,
-        { line: cursorPosition.line, ch: 0 },
-        { line: cursorPosition.line, ch: lineText.length }
-    );
-
-    let lastLineIndex = doc.lastLine();
-    let lastLine = doc.getLine(lastLineIndex);
-
-    if (plugin.settings.enableRemoveBlankLastLines === true) {
-        while (lastLineIndex > 0) {
-            lastLine = doc.getLine(lastLineIndex);
-            if (lastLine.length > 0) {
-                doc.replaceRange(
-                    "",
-                    { line: lastLineIndex, ch: 0 },
-                    { line: doc.lastLine(), ch: 0 }
-                );
-                break;
-            }
-            lastLineIndex--;
-        }
-    }
-
-    let footnoteDetail = `\n[^${footNoteId}]: `;
-
-    let list = listExistingFootnoteDetails(doc);
-    
-    let newCursorPos: EditorPosition;
-    if (list.length === 0 && currentMax == 1) {
-        footnoteDetail = "\n" + footnoteDetail;
-        let Heading = addFootnoteSectionHeader(plugin);
-        doc.setLine(doc.lastLine(), lastLine + Heading + footnoteDetail);
-        newCursorPos = { line: doc.lastLine() - 1, ch: footnoteDetail.length - 1 }
-    } else {
-        doc.setLine(doc.lastLine(), lastLine + footnoteDetail);
-        newCursorPos = { line: doc.lastLine(), ch: footnoteDetail.length - 1 }
-    }
+    const list = listExistingFootnoteDetails(doc);
+    const isFirstFootnote = list.length === 0 && currentMax == 1;
+    const detail = buildDetailAppend(doc, String(footNoteId), isFirstFootnote, plugin);
+    const changes: EditorChange[] = [
+        { from: cursorPosition, text: footnoteMarker },
+        detail.change,
+    ];
 
     if (popupEditingAvailable(plugin)) {
-        // type the detail in a popup instead of jumping to the bottom
-        doc.setCursor({ line: cursorPosition.line, ch: cursorPosition.ch + footnoteMarker.length });
+        // type the detail in a popup instead of jumping to the bottom;
+        // the cursor only moves past the new marker
+        const afterMarker = { line: cursorPosition.line, ch: cursorPosition.ch + footnoteMarker.length };
+        doc.transaction({ changes, selection: { from: afterMarker } });
         void openFootnotePopup(plugin, String(footNoteId), () =>
-            moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos, plugin)
+            moveCursorAndSetJumpPoint(doc, cursorPosition, detail.cursor, plugin)
         );
     } else {
-        moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos, plugin)
+        moveCursorAndSetJumpPoint(doc, cursorPosition, detail.cursor, plugin, changes);
     }
 }
 
@@ -426,49 +440,22 @@ export function shouldCreateMatchingFootnoteDetail(
             // Check if the list doesn't include current footnote
             // if so, add detail for the current footnote
             if(!list.includes(footnoteId)) {
-                let lastLineIndex = doc.lastLine();
-                let lastLine = doc.getLine(lastLineIndex);
-
-                if (plugin.settings.enableRemoveBlankLastLines === true) {
-                    while (lastLineIndex > 0) {
-                        lastLine = doc.getLine(lastLineIndex);
-                        if (lastLine.length > 0) {
-                            doc.replaceRange(
-                                "",
-                                { line: lastLineIndex, ch: 0 },
-                                { line: doc.lastLine(), ch: 0 }
-                            );
-                            break;
-                        }
-                        lastLineIndex--;
-                    }
-                }
-                
-                let footnoteDetail = `\n[^${footnoteId}]: `;
-
-                let newCursorPos: EditorPosition;
-                if (list.length === 0) {
-                    footnoteDetail = "\n" + footnoteDetail;
-                    let Heading = addFootnoteSectionHeader(plugin);
-                    doc.setLine(doc.lastLine(), lastLine + Heading + footnoteDetail);
-                    newCursorPos = { line: doc.lastLine() - 1, ch: footnoteDetail.length - 1 }
-                } else {
-                    doc.setLine(doc.lastLine(), lastLine + footnoteDetail);
-                    newCursorPos = { line: doc.lastLine(), ch: footnoteDetail.length - 1 }
-                }
+                const detail = buildDetailAppend(doc, footnoteId, list.length === 0, plugin);
 
                 if (popupEditingAvailable(plugin)) {
-                    // type the detail in a popup instead of jumping to the bottom
+                    // type the detail in a popup instead of jumping to the
+                    // bottom; the cursor stays on the marker
+                    doc.transaction({ changes: [detail.change] });
                     void openFootnotePopup(plugin, footnoteId, () =>
-                        moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos, plugin)
+                        moveCursorAndSetJumpPoint(doc, cursorPosition, detail.cursor, plugin)
                     );
                 } else {
-                    moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos, plugin)
+                    moveCursorAndSetJumpPoint(doc, cursorPosition, detail.cursor, plugin, [detail.change]);
                 }
 
                 return true;
             }
-            return; 
+            return;
         }
     }
 }
@@ -482,12 +469,10 @@ export function shouldCreateFootnoteMarker(
 ) {
     cursorPosition = adjustFootnotePosition(cursorPosition, doc, lineText, plugin);
 
-    //create empty footnote marker for name input
+    //create empty footnote marker for name input, cursor in between [^ and ]
     let emptyMarker = `[^]`;
-    doc.replaceRange(emptyMarker,cursorPosition);
-    //move cursor in between [^ and ]
     const newCursorPos = { line: cursorPosition.line, ch: cursorPosition.ch + 2 }
-    moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos, plugin)
-    //open footnotePicker popup
-    
+    moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos, plugin, [
+        { from: cursorPosition, text: emptyMarker },
+    ])
 }
