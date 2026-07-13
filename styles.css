@@ -1,4 +1,6 @@
-/* Popup footnote editor, anchored at the cursor */
+/* Popup footnote editor, anchored at the cursor. The name label and the
+   editor sit side by side so the popup reads like the detail line does in
+   the note: "[^name]: content" */
 .footnote-shortcut-popup {
     position: fixed;
     z-index: var(--layer-popover);
@@ -9,6 +11,9 @@
     border: 1px solid var(--background-modifier-border);
     border-radius: var(--radius-m);
     box-shadow: var(--shadow-s);
+    display: flex;
+    align-items: flex-start;
+    gap: 0.4em;
 }
 
 /* stay invisible until the footnote detail is loaded */
@@ -21,13 +26,24 @@
     display: none;
 }
 
-/* which footnote is being edited, e.g. "[^1]:" */
+/* which footnote is being edited; metrics match the embedded editor's
+   text so the label lines up with the first line of the detail */
 .footnote-shortcut-popup .footnote-shortcut-popup-label {
-    font-family: var(--font-monospace);
-    font-size: var(--font-smallest);
+    flex: none;
+    font-size: var(--font-text-size);
+    line-height: var(--line-height-normal);
     color: var(--text-muted);
-    margin-bottom: 4px;
     user-select: none;
+}
+
+.footnote-shortcut-popup .footnote-shortcut-popup-embed {
+    flex: 1;
+    min-width: 0;
+    /* strip the transclusion look (accent left border, inset padding)
+       that Obsidian gives .markdown-embed containers */
+    border: none;
+    padding: 0;
+    margin: 0;
 }
 
 /* the embedded editor is scoped to one footnote; hide file-level chrome */
