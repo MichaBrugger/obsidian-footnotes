@@ -1,0 +1,185 @@
+import { MarkdownView } from "obsidian";
+
+import FootnotePlugin from "./main";
+
+// A small popup anchored at the cursor containing Obsidian's own editable
+// markdown embed, bound to just the footnote's detail via the `#[^id]`
+// subpath (the same machinery the core Footnotes view uses). Editing in the
+// popup saves straight back to the detail line at the bottom of the note,
+// so the user's cursor never has to leave the text.
+
+type ActivePopup = {
+    containerEl: HTMLElement;
+    close: (focusEditor: boolean) => void;
+};
+
+let activePopup: ActivePopup | null = null;
+
+export function popupEditingAvailable(plugin: FootnotePlugin): boolean {
+    // embedRegistry is undocumented API, so degrade to the legacy
+    // jump-to-bottom behavior if it ever changes shape
+    const registry = (plugin.app as any).embedRegistry;
+    return plugin.settings.enablePopupEditor === true
+        && typeof registry?.embedByExtension?.md === "function";
+}
+
+// Close from the footnote hotkey; returns whether a popup was open, so the
+// hotkey can toggle the popup instead of inserting another footnote.
+export function toggleCloseFootnotePopup(): boolean {
+    if (activePopup) {
+        activePopup.close(true);
+        return true;
+    }
+    return false;
+}
+
+// Close without stealing focus (leaf switched, plugin unloading).
+export function dismissFootnotePopup() {
+    if (activePopup) {
+        activePopup.close(false);
+    }
+}
+
+export async function openFootnotePopup(
+    plugin: FootnotePlugin,
+    footnoteId: string,
+    onUnavailable?: () => void,
+) {
+    dismissFootnotePopup();
+
+    const mdView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
+    if (!mdView || !mdView.file) return;
+
+    // a just-inserted detail is only indexed once the file saves; finishing
+    // the save (and its fold-state event) before the embed exists also keeps
+    // it from reaching a half-initialized embed
+    await mdView.save();
+    const editor = mdView.editor;
+    const doc = mdView.containerEl.ownerDocument;
+    const win = doc.defaultView || window;
+
+    // anchor just below the cursor, flipping above it near the window bottom
+    const cm = (editor as any).cm;
+    const coords = cm ? cm.coordsAtPos(cm.state.selection.main.head) : null;
+    const width = Math.min(480, win.innerWidth - 32);
+    const left = Math.max(16, Math.min(coords ? coords.left : 100, win.innerWidth - width - 16));
+    let top = (coords ? coords.bottom : 100) + 6;
+    if (top + 260 > win.innerHeight) {
+        top = Math.max(16, (coords ? coords.top : 300) - 266);
+    }
+
+    const containerEl = doc.body.createDiv("footnote-shortcut-popup");
+    containerEl.style.left = `${left}px`;
+    containerEl.style.top = `${top}px`;
+    containerEl.style.width = `${width}px`;
+    // stay invisible until the footnote detail is actually loaded
+    containerEl.style.visibility = "hidden";
+
+    const subpath = `#[^${footnoteId}]`;
+    const buildEmbed = () => {
+        const built = (plugin.app as any).embedRegistry.embedByExtension.md(
+            { app: plugin.app, linktext: subpath, sourcePath: mdView.file.path, containerEl: containerEl, depth: 0 },
+            mdView.file,
+            subpath,
+        );
+        built.editable = true;
+        built.load();
+        return built;
+    };
+    let embed = buildEmbed();
+
+    let closed = false;
+    const close = (focusEditor: boolean) => {
+        if (closed) return;
+        closed = true;
+        activePopup = null;
+        doc.removeEventListener("mousedown", onDocMouseDown, true);
+        containerEl.style.display = "none";
+        if (focusEditor) editor.focus();
+
+        // the embed saves edits on its own debounce; let that cycle finish
+        // before unloading, since unloading mid-save clears the state the
+        // save reads
+        let attempts = 0;
+        const teardown = () => {
+            if ((embed.dirty || embed.saving || embed.saveAgain) && attempts++ < 50) {
+                win.setTimeout(teardown, 100);
+                return;
+            }
+            embed.unload();
+            containerEl.remove();
+        };
+        teardown();
+    };
+
+    const onDocMouseDown = (evt: MouseEvent) => {
+        if (!containerEl.contains(evt.target as Node)) close(false);
+    };
+    doc.addEventListener("mousedown", onDocMouseDown, true);
+
+    // bubble phase, so the embedded editor (e.g. vim mode leaving insert
+    // mode) gets first claim on Escape
+    containerEl.addEventListener("keydown", (evt: KeyboardEvent) => {
+        if (evt.key === "Escape") {
+            evt.preventDefault();
+            close(true);
+        }
+    });
+
+    activePopup = { containerEl, close };
+
+    const tryShow = async (): Promise<boolean> => {
+        await embed.loadFile();
+        if (embed.subpathNotFound) return false;
+        containerEl.style.visibility = "";
+        embed.showEditor();
+        embed.editMode?.editor?.focus();
+        return true;
+    };
+
+    const waitForCacheChange = () =>
+        new Promise<void>((resolve) => {
+            const timeout = win.setTimeout(() => {
+                plugin.app.metadataCache.offref(ref);
+                resolve();
+            }, 500);
+            const ref = plugin.app.metadataCache.on("changed", (file) => {
+                if (file === mdView.file) {
+                    win.clearTimeout(timeout);
+                    plugin.app.metadataCache.offref(ref);
+                    resolve();
+                }
+            });
+        });
+
+    const showEditor = async (): Promise<boolean> => {
+        if (await tryShow()) return true;
+
+        // retry as the metadata cache catches up with the saved file; a
+        // loaded embed won't re-resolve its subpath, so rebuild each time
+        const deadline = Date.now() + 3000;
+        while (Date.now() < deadline) {
+            await waitForCacheChange();
+            if (closed) return true;
+            embed.unload();
+            containerEl.empty();
+            embed = buildEmbed();
+            if (await tryShow()) return true;
+        }
+        return false;
+    };
+
+    showEditor()
+        .then((shown) => {
+            if (!shown && !closed) {
+                close(false);
+                onUnavailable?.();
+            }
+        })
+        .catch(() => {
+            if (!closed) {
+                close(false);
+                onUnavailable?.();
+            }
+        });
+}

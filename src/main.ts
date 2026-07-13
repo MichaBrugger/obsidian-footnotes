@@ -5,6 +5,7 @@ import {
 } from "obsidian";
 
 import { FootnotePluginSettingTab, FootnotePluginSettings, DEFAULT_SETTINGS } from "./settings";
+import { dismissFootnotePopup } from "./footnote-popup";
 import { insertAutonumFootnote,insertNamedFootnote } from "./insert-or-navigate-footnotes";
 
 //Add chevron-up-square icon from lucide for mobile toolbar (temporary until Obsidian updates to Lucide v0.130.0)
@@ -38,6 +39,14 @@ export default class FootnotePlugin extends Plugin {
     });
   
     this.addSettingTab(new FootnotePluginSettingTab(this.app, this));
+
+    this.registerEvent(
+      this.app.workspace.on("active-leaf-change", () => dismissFootnotePopup())
+    );
+  }
+
+  onunload() {
+    dismissFootnotePopup();
   }
 
   async loadSettings() {

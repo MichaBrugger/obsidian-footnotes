@@ -54,6 +54,11 @@ If you would like, you can further customize the plugin's behavior in Footnote S
 - And my cursor is now placed at the end of the detail marker (e.g. `[^customName]: ▊`)
 
 ### Universal
+#### Footnote Popup Editing
+- creating or jumping to a footnote opens its detail in a small editor right at your cursor, instead of moving your cursor to the bottom of the note
+- close the popup by pressing the footnote hotkey again, hitting `Escape`, or clicking outside it
+- can be disabled in settings to restore the classic jump-to-bottom behavior
+
 #### Footnote Section Heading
 - automatically adds a customizable heading separating your footnotes from the rest of your note
 - disabled by default

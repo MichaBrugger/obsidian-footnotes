@@ -3,7 +3,8 @@ import FootnotePlugin from "./main";
 
 export interface FootnotePluginSettings {
     insertAtEndOfWord: boolean;
-    
+    enablePopupEditor: boolean;
+
     enableFootnoteSectionHeading: boolean;
     FootnoteSectionHeading: string;
 
@@ -12,6 +13,7 @@ export interface FootnotePluginSettings {
 
 export const DEFAULT_SETTINGS: FootnotePluginSettings = {
     insertAtEndOfWord: true,
+    enablePopupEditor: true,
 
     enableFootnoteSectionHeading: false,
     FootnoteSectionHeading: "# Footnotes",
@@ -55,6 +57,18 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                 .setValue(this.plugin.settings.insertAtEndOfWord)
                 .onChange(async (value) => {
                     this.plugin.settings.insertAtEndOfWord = value;
+                    await this.plugin.saveSettings();
+                })
+        );
+
+        new Setting(containerEl)
+        .setName("Edit footnotes in a popup")
+        .setDesc("Open the footnote detail in a small editor at your cursor instead of jumping to the bottom of the note. Close it by pressing the footnote hotkey again, hitting Escape, or clicking outside.")
+        .addToggle((toggle) =>
+            toggle
+                .setValue(this.plugin.settings.enablePopupEditor)
+                .onChange(async (value) => {
+                    this.plugin.settings.enablePopupEditor = value;
                     await this.plugin.saveSettings();
                 })
         );
