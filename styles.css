@@ -52,3 +52,10 @@
 .footnote-shortcut-popup .markdown-embed-link {
     display: none;
 }
+
+/* the embed inherits the vault's "show line numbers" setting and would
+   render the detail's file-absolute line number next to the label; a
+   gutter has no place in a one-footnote editor */
+.footnote-shortcut-popup .cm-gutters {
+    display: none;
+}
