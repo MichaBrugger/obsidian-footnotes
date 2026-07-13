@@ -54,11 +54,6 @@ If you would like, you can further customize the plugin's behavior in Footnote S
 - And my cursor is now placed at the end of the detail marker (e.g. `[^customName]: ▊`)
 
 ### Universal
-#### Footnote Autosuggest
-- automatically suggests similar footnotes to save you time when typing repeated footnotes
-
-![ezgif com-video-to-gif (1)](https://github.com/MichaBrugger/obsidian-footnotes/assets/68677082/f93f8828-f199-40a3-a9c3-0614bdb96e5b)
-
 #### Footnote Section Heading
 - automatically adds a customizable heading separating your footnotes from the rest of your note
 - disabled by default

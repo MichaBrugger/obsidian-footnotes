@@ -1,16 +1,10 @@
-import { 
+import {
   addIcon,
-  Editor, 
-  EditorPosition, 
-  EditorSuggest, 
-  EditorSuggestContext,
-  EditorSuggestTriggerInfo,
-  MarkdownView, 
+  MarkdownView,
   Plugin
 } from "obsidian";
 
 import { FootnotePluginSettingTab, FootnotePluginSettings, DEFAULT_SETTINGS } from "./settings";
-import { Autocomplete } from "./autosuggest"
 import { insertAutonumFootnote,insertNamedFootnote } from "./insert-or-navigate-footnotes";
 
 //Add chevron-up-square icon from lucide for mobile toolbar (temporary until Obsidian updates to Lucide v0.130.0)
@@ -21,8 +15,6 @@ export default class FootnotePlugin extends Plugin {
 
   async onload() {
     await this.loadSettings();
-
-    this.registerEditorSuggest(new Autocomplete(this));
 
     this.addCommand({
       id: "insert-autonumbered-footnote",
@@ -56,6 +48,13 @@ export default class FootnotePlugin extends Plugin {
     const heading = this.settings.FootnoteSectionHeading;
     if (heading && !/^(#{1,6} |---|\*\*\*|___)/.test(heading)) {
       this.settings.FootnoteSectionHeading = `# ${heading}`;
+      await this.saveSettings();
+    }
+
+    // drop the setting for the removed autosuggest feature (Obsidian now
+    // suggests footnotes natively)
+    if ("enableAutoSuggest" in this.settings) {
+      delete (this.settings as any).enableAutoSuggest;
       await this.saveSettings();
     }
   }

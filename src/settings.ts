@@ -2,7 +2,6 @@ import { App, PluginSettingTab, Setting } from "obsidian";
 import FootnotePlugin from "./main";
 
 export interface FootnotePluginSettings {
-    enableAutoSuggest: boolean;
     insertAtEndOfWord: boolean;
     
     enableFootnoteSectionHeading: boolean;
@@ -12,7 +11,6 @@ export interface FootnotePluginSettings {
 }
 
 export const DEFAULT_SETTINGS: FootnotePluginSettings = {
-    enableAutoSuggest: true,
     insertAtEndOfWord: true,
 
     enableFootnoteSectionHeading: false,
@@ -49,18 +47,6 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
             mainDesc.appendText('!');
         containerEl.createEl('br');
         
-        new Setting(containerEl)
-        .setName("Enable Autosuggest")
-        .setDesc("Suggests existing footnotes when entering named footnotes.")
-        .addToggle((toggle) =>
-            toggle
-                .setValue(this.plugin.settings.enableAutoSuggest)
-                .onChange(async (value) => {
-                    this.plugin.settings.enableAutoSuggest = value;
-                    await this.plugin.saveSettings();
-                })
-        );
-
         new Setting(containerEl)
         .setName("Insert Footnote at end of word")
         .setDesc("A new footnote is only inserted at the end of the word and after any punctuation.")
