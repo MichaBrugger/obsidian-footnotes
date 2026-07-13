@@ -9,6 +9,7 @@ import { App, Editor, EditorPosition, TFile, Vault } from "obsidian";
 export interface ObsidianEditorView {
     state: { selection: { main: { head: number } } };
     coordsAtPos(pos: number): { left: number; top: number; bottom: number } | null;
+    contentDOM: HTMLElement;
     focus(): void;
     /** CM5-compatibility editor attached by the vim extension ("cm two levels deep"). */
     cm?: unknown;

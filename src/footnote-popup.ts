@@ -78,9 +78,26 @@ export async function openFootnotePopup(
     }
     await mdView.save();
 
-    // anchor just below the cursor, flipping above it near the window bottom
+    // anchor just below the cursor, flipping above it near the window bottom.
+    // When focus is in a sub-editor (a table cell being edited), the main
+    // editor's coordsAtPos only knows the table widget's edge — which pins
+    // the popup to the screen border — while the sub-editor's DOM selection
+    // tracks the real caret. With the main editor focused, coordsAtPos is
+    // the reliable one (the DOM selection can lag the editor API).
     const cm = (editor as EditorWithCm).cm;
-    const coords = cm ? cm.coordsAtPos(cm.state.selection.main.head) : null;
+    let coords: { left: number; top: number; bottom: number } | null = null;
+    // focus rests ON the contentDOM element itself; a table cell's
+    // sub-editor has its own contentDOM nested inside the main one, so
+    // this must be an identity check, not containment
+    const mainEditorFocused = !!cm && doc.activeElement === cm.contentDOM;
+    if (!mainEditorFocused) {
+        const sel = win.getSelection();
+        if (sel && sel.rangeCount > 0) {
+            const rect = sel.getRangeAt(0).getBoundingClientRect();
+            if (rect.height > 0) coords = rect;
+        }
+    }
+    if (!coords && cm) coords = cm.coordsAtPos(cm.state.selection.main.head);
     const width = Math.min(480, win.innerWidth - 32);
     const left = Math.max(16, Math.min(coords ? coords.left : 100, win.innerWidth - width - 16));
     let top = (coords ? coords.bottom : 100) + 6;
@@ -95,10 +112,17 @@ export async function openFootnotePopup(
     // stay invisible until the footnote detail is actually loaded
     containerEl.addClass("footnote-shortcut-popup-loading");
 
+    // name the footnote being edited so the user can tell markers apart
+    containerEl.createDiv({
+        cls: "footnote-shortcut-popup-label",
+        text: `[^${footnoteId}]:`,
+    });
+    const embedEl = containerEl.createDiv("footnote-shortcut-popup-embed");
+
     const subpath = `#[^${footnoteId}]`;
     const buildEmbed = () => {
         const built = createEmbed(
-            { app: plugin.app, linktext: subpath, sourcePath: file.path, containerEl: containerEl, depth: 0 },
+            { app: plugin.app, linktext: subpath, sourcePath: file.path, containerEl: embedEl, depth: 0 },
             file,
             subpath,
         );
@@ -189,7 +213,7 @@ export async function openFootnotePopup(
             await waitForCacheChange();
             if (closed) return true;
             embed.unload();
-            containerEl.empty();
+            embedEl.empty();
             embed = buildEmbed();
             if (await tryShow()) return true;
         }

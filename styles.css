@@ -21,6 +21,15 @@
     display: none;
 }
 
+/* which footnote is being edited, e.g. "[^1]:" */
+.footnote-shortcut-popup .footnote-shortcut-popup-label {
+    font-family: var(--font-monospace);
+    font-size: var(--font-smallest);
+    color: var(--text-muted);
+    margin-bottom: 4px;
+    user-select: none;
+}
+
 /* the embedded editor is scoped to one footnote; hide file-level chrome */
 .footnote-shortcut-popup .metadata-container,
 .footnote-shortcut-popup .inline-title,
