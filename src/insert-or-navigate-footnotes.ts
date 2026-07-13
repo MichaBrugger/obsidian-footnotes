@@ -7,7 +7,7 @@ import {
 import FootnotePlugin from "./main";
 import { openFootnotePopup, popupEditingAvailable, toggleCloseFootnotePopup } from "./footnote-popup";
 
-export var AllMarkers = /\[\^([^\[\]]+)\](?!:)/dg;
+export var AllMarkers = /\[\^([^\[\]]+)\](?!:)/g;
 var AllNumberedMarkers = /\[\^(\d+)\]/gi;
 var AllDetailsNameOnly = /\[\^([^\[\]]+)\]:/g;
 var DetailInLine = /\[\^([^\[\]]+)\]:/;
@@ -31,11 +31,7 @@ export function listExistingFootnoteDetails(
             FootnoteDetailList.push(temp);
         }
     }
-    if (FootnoteDetailList.length > 0) {
-        return FootnoteDetailList;
-    } else {
-        return null;
-    }
+    return FootnoteDetailList;
 }
 
 export function listExistingFootnoteMarkersAndLocations(
@@ -71,11 +67,13 @@ function moveCursorAndSetJumpPoint(
     doc: Editor,
     oldCursorPos: EditorPosition,
     newCursorPos: EditorPosition,
+    plugin: FootnotePlugin,
 ): void {
     doc.setCursor(newCursorPos);
 
     // if user has vim mode enabled, set jump point
-    if (app.vault.getConfig("vimMode")) {
+    // getConfig is private API, like the vim internals below
+    if ((plugin.app.vault as any).getConfig("vimMode")) {
         // @ts-expect-error
         activeWindow.CodeMirrorAdapter.Vim.getVimGlobalState_().jumpList.add(
             // @ts-expect-error
@@ -89,7 +87,8 @@ function moveCursorAndSetJumpPoint(
 export function shouldJumpFromDetailToMarker(
     lineText: string,
     cursorPosition: EditorPosition,
-    doc: Editor
+    doc: Editor,
+    plugin: FootnotePlugin
 ) {
     // check if we're in a footnote detail line ("[^1]: footnote")
     // if so, jump cursor back to the footnote in the text
@@ -109,7 +108,7 @@ export function shouldJumpFromDetailToMarker(
                 let cursorLocationIndex = scanLine.indexOf(footnote);
                 returnLineIndex = i;
                 const newCursorPos = { line: returnLineIndex, ch: cursorLocationIndex + footnote.length };
-                moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos);
+                moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos, plugin);
                 return true;
             }
         }
@@ -120,7 +119,8 @@ export function shouldJumpFromDetailToMarker(
 export function jumpToFootnoteDetail(
     footnoteName: string,
     cursorPosition: EditorPosition,
-    doc: Editor
+    doc: Editor,
+    plugin: FootnotePlugin
 ) {
     // find the first line with this detail marker name in it.
     for (let i = 0; i < doc.lineCount(); i++) {
@@ -131,7 +131,7 @@ export function jumpToFootnoteDetail(
             let nameMatch = lineMatch[1];
             if (nameMatch == footnoteName) {
                 const newCursorPos = { line: i, ch: lineMatch[0].length + 1 };
-                moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos);
+                moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos, plugin);
                 return true;
             }
         }
@@ -182,17 +182,17 @@ export function shouldJumpFromMarkerToDetail(
             // markers without a detail line fall through to the
             // detail-creation paths
             let details = listExistingFootnoteDetails(doc);
-            if (details === null || !details.includes(footnoteName)) {
+            if (!details.includes(footnoteName)) {
                 return false;
             }
 
             if (popupEditingAvailable(plugin)) {
                 openFootnotePopup(plugin, footnoteName, () =>
-                    jumpToFootnoteDetail(footnoteName, cursorPosition, doc)
+                    jumpToFootnoteDetail(footnoteName, cursorPosition, doc, plugin)
                 );
                 return true;
             }
-            return jumpToFootnoteDetail(footnoteName, cursorPosition, doc);
+            return jumpToFootnoteDetail(footnoteName, cursorPosition, doc, plugin);
         }
     }
     return false;
@@ -243,7 +243,7 @@ export function insertAutonumFootnote(plugin: FootnotePlugin) {
     // pressing the hotkey while the popup editor is open closes it
     if (toggleCloseFootnotePopup()) return;
 
-    const mdView = app.workspace.getActiveViewOfType(MarkdownView);
+    const mdView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
 
     if (!mdView) return false;
     if (mdView.editor == undefined) return false;
@@ -253,7 +253,7 @@ export function insertAutonumFootnote(plugin: FootnotePlugin) {
     const lineText = doc.getLine(cursorPosition.line);
     const markdownText = mdView.data;
 
-    if (shouldJumpFromDetailToMarker(lineText, cursorPosition, doc))
+    if (shouldJumpFromDetailToMarker(lineText, cursorPosition, doc, plugin))
         return;
     if (shouldJumpFromMarkerToDetail(lineText, cursorPosition, doc, plugin))
         return;
@@ -330,7 +330,7 @@ export function shouldCreateAutonumFootnote(
     let list = listExistingFootnoteDetails(doc);
     
     let newCursorPos: EditorPosition;
-    if (list===null && currentMax == 1) {
+    if (list.length === 0 && currentMax == 1) {
         footnoteDetail = "\n" + footnoteDetail;
         let Heading = addFootnoteSectionHeader(plugin);
         doc.setLine(doc.lastLine(), lastLine + Heading + footnoteDetail);
@@ -344,10 +344,10 @@ export function shouldCreateAutonumFootnote(
         // type the detail in a popup instead of jumping to the bottom
         doc.setCursor({ line: cursorPosition.line, ch: cursorPosition.ch + footnoteMarker.length });
         openFootnotePopup(plugin, String(footNoteId), () =>
-            moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos)
+            moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos, plugin)
         );
     } else {
-        moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos)
+        moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos, plugin)
     }
 }
 
@@ -358,7 +358,7 @@ export function insertNamedFootnote(plugin: FootnotePlugin) {
     // pressing the hotkey while the popup editor is open closes it
     if (toggleCloseFootnotePopup()) return;
 
-    const mdView = app.workspace.getActiveViewOfType(MarkdownView);
+    const mdView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
 
     if (!mdView) return false;
     if (mdView.editor == undefined) return false;
@@ -368,7 +368,7 @@ export function insertNamedFootnote(plugin: FootnotePlugin) {
     const lineText = doc.getLine(cursorPosition.line);
     const markdownText = mdView.data;
 
-    if (shouldJumpFromDetailToMarker(lineText, cursorPosition, doc))
+    if (shouldJumpFromDetailToMarker(lineText, cursorPosition, doc, plugin))
         return;
     if (shouldJumpFromMarkerToDetail(lineText, cursorPosition, doc, plugin))
         return;
@@ -425,10 +425,10 @@ export function shouldCreateMatchingFootnoteDetail(
             let footnoteId = match[2];
 
             let list: string[] = listExistingFootnoteDetails(doc);
-            
-            // Check if the list is empty OR if the list doesn't include current footnote
+
+            // Check if the list doesn't include current footnote
             // if so, add detail for the current footnote
-            if(list === null || !list.includes(footnoteId)) {
+            if(!list.includes(footnoteId)) {
                 let lastLineIndex = doc.lastLine();
                 let lastLine = doc.getLine(lastLineIndex);
 
@@ -450,7 +450,7 @@ export function shouldCreateMatchingFootnoteDetail(
                 let footnoteDetail = `\n[^${footnoteId}]: `;
 
                 let newCursorPos: EditorPosition;
-                if (list===null || list.length < 1) {
+                if (list.length === 0) {
                     footnoteDetail = "\n" + footnoteDetail;
                     let Heading = addFootnoteSectionHeader(plugin);
                     doc.setLine(doc.lastLine(), lastLine + Heading + footnoteDetail);
@@ -463,10 +463,10 @@ export function shouldCreateMatchingFootnoteDetail(
                 if (popupEditingAvailable(plugin)) {
                     // type the detail in a popup instead of jumping to the bottom
                     openFootnotePopup(plugin, footnoteId, () =>
-                        moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos)
+                        moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos, plugin)
                     );
                 } else {
-                    moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos)
+                    moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos, plugin)
                 }
 
                 return true;
@@ -490,7 +490,7 @@ export function shouldCreateFootnoteMarker(
     doc.replaceRange(emptyMarker,cursorPosition);
     //move cursor in between [^ and ]
     const newCursorPos = { line: cursorPosition.line, ch: cursorPosition.ch + 2 }
-    moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos)
+    moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos, plugin)
     //open footnotePicker popup
     
 }
