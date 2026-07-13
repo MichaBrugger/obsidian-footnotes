@@ -146,6 +146,19 @@ export async function openFootnotePopup(
             const cmView = (editor as EditorWithCm).cm;
             if (cmView) cmView.focus();
             else editor.focus();
+
+            // land the cursor right after the marker so typing continues
+            // seamlessly (a named footnote would otherwise leave it inside
+            // the brackets); string search, since the id isn't regex-safe
+            const cursor = editor.getCursor();
+            const line = editor.getLine(cursor.line);
+            const marker = `[^${footnoteId}]`;
+            for (let idx = line.indexOf(marker); idx !== -1; idx = line.indexOf(marker, idx + 1)) {
+                if (cursor.ch >= idx && cursor.ch <= idx + marker.length) {
+                    editor.setCursor({ line: cursor.line, ch: idx + marker.length });
+                    break;
+                }
+            }
         }
 
         // the embed saves edits on its own debounce; let that cycle finish
