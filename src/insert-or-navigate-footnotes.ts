@@ -183,11 +183,12 @@ export function addFootnoteSectionHeader(
 
     if (plugin.settings.enableFootnoteSectionHeading == true) {
         let returnHeading = plugin.settings.FootnoteSectionHeading;
-        // values that already start with a markdown heading or divider are
-        // used as-is; plain text keeps the legacy H1 prefix
-        const markdownBlockRegex = /^(#{1,6} |---|\*\*\*|___)/;
-        if (!markdownBlockRegex.test(returnHeading)) {
-            returnHeading = `# ${returnHeading}`;
+        // the setting holds literal markdown (legacy plain-text values are
+        // migrated on load); a divider directly below a text line would turn
+        // that line into a setext heading, so keep a blank line in between
+        const dividerRegex = /^(---|\*\*\*|___)/;
+        if (dividerRegex.test(returnHeading)) {
+            return `\n\n${returnHeading}`;
         }
         return `\n${returnHeading}`;
     }

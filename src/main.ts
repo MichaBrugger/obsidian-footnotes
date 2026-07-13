@@ -50,6 +50,14 @@ export default class FootnotePlugin extends Plugin {
 
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+
+    // migrate pre-1.0.4 section heading values: the old text input implied
+    // an H1, the textarea takes literal markdown, so convert once and save
+    const heading = this.settings.FootnoteSectionHeading;
+    if (heading && !/^(#{1,6} |---|\*\*\*|___)/.test(heading)) {
+      this.settings.FootnoteSectionHeading = `# ${heading}`;
+      await this.saveSettings();
+    }
   }
 
   async saveSettings() {

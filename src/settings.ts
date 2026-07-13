@@ -103,7 +103,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
         .setName("Section Heading")
-        .setDesc("Heading to place above footnotes section. Accepts standard Markdown formatting, including multiple lines and dividers. Plain text will be used as an H1 heading.")
+        .setDesc("Heading to place above footnotes section. Accepts standard Markdown formatting, including multiple lines and dividers.")
         .addTextArea((text) =>
             text
                 .setPlaceholder("Ex: '# Footnotes'")
