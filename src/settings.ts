@@ -40,7 +40,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
             },
             {
                 name: "Edit footnotes in a popup",
-                desc: "Open the footnote detail in a small editor at your cursor instead of jumping to the bottom of the note. Close with the footnote hotkey, Escape, or by clicking outside.",
+                desc: "Open the footnote detail in a small editor where you're typing, instead of jumping to the bottom of the note. Close with the footnote hotkey, the escape key, or by clicking outside.",
                 control: { type: "toggle", key: "enablePopupEditor" },
             },
             {
@@ -59,7 +59,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                     },
                     {
                         name: "Section heading",
-                        desc: "Heading to place above the footnotes section. Accepts standard markdown, including multiple lines and dividers.",
+                        desc: "Heading to place above the footnotes section. Accepts standard Markdown, including multiple lines and dividers.",
                         control: {
                             type: "textarea",
                             key: "FootnoteSectionHeading",

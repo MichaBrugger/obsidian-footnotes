@@ -106,9 +106,11 @@ export async function openFootnotePopup(
     }
 
     const containerEl = doc.body.createDiv("footnote-shortcut-popup");
-    containerEl.style.left = `${left}px`;
-    containerEl.style.top = `${top}px`;
-    containerEl.style.width = `${width}px`;
+    containerEl.setCssProps({
+        left: `${left}px`,
+        top: `${top}px`,
+        width: `${width}px`,
+    });
     // stay invisible until the footnote detail is actually loaded
     containerEl.addClass("footnote-shortcut-popup-loading");
 
