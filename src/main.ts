@@ -19,7 +19,7 @@ export default class FootnotePlugin extends Plugin {
 
     this.addCommand({
       id: "insert-autonumbered-footnote",
-      name: "Insert / Navigate Auto-Numbered Footnote",
+      name: "Insert / navigate auto-numbered footnote",
       icon: "plus-square",
       checkCallback: (checking: boolean) => {
         if (checking)
@@ -29,7 +29,7 @@ export default class FootnotePlugin extends Plugin {
     });
     this.addCommand({
       id: "insert-named-footnote",
-      name: "Insert / Navigate Named Footnote",
+      name: "Insert / navigate named footnote",
       icon: "chevron-up-square",
       checkCallback: (checking: boolean) => {
         if (checking)

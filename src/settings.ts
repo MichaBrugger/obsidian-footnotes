@@ -93,7 +93,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
         .setName("Edit footnotes in a popup")
-        .setDesc("Open the footnote detail in a small editor at your cursor instead of jumping to the bottom of the note. Close with the footnote hotkey, Escape, or by clicking outside.")
+        .setDesc("Open the footnote detail in a small editor where you're typing, instead of jumping to the bottom of the note. Close with the footnote hotkey, the escape key, or by clicking outside.")
         .addToggle((toggle) =>
             toggle
                 .setValue(this.plugin.settings.enablePopupEditor)
@@ -104,7 +104,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
         );
 
         new Setting(containerEl)
-        .setName("Footnotes Section")
+        .setName("Footnotes section")
         .setHeading();
 
         new Setting(containerEl)
@@ -133,7 +133,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
         .setName("Section heading")
-        .setDesc("Heading to place above the footnotes section. Accepts standard markdown, including multiple lines and dividers.")
+        .setDesc("Heading to place above the footnotes section. Accepts standard Markdown, including multiple lines and dividers.")
         .addTextArea((text) =>
             text
                 .setPlaceholder("Ex: '# Footnotes'")
@@ -143,10 +143,8 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 })
                 .then((text) => {
-                    text.inputEl.style.width = '100%';
+                    text.inputEl.addClass("footnote-shortcut-section-heading-input");
                     text.inputEl.rows = 6;
-                    text.inputEl.style.resize = 'none';
-                    text.inputEl.style.fontFamily = 'monospace';
                 })
         );
     }

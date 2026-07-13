@@ -58,15 +58,16 @@ export async function openFootnotePopup(
     // would write pre-insertion content to disk; wait for the buffer to
     // catch up first. Finishing the save (and its fold-state event) before
     // the embed exists also keeps it from reaching a half-initialized embed.
-    const detailToken = `[^${footnoteId}]:`;
-    const dataDeadline = Date.now() + 2000;
-    while (!mdView.data.includes(detailToken) && Date.now() < dataDeadline) {
-        await new Promise((resolve) => setTimeout(resolve, 50));
-    }
-    await mdView.save();
     const editor = mdView.editor;
     const doc = mdView.containerEl.ownerDocument;
     const win = doc.defaultView || window;
+
+    const detailToken = `[^${footnoteId}]:`;
+    const dataDeadline = Date.now() + 2000;
+    while (!mdView.data.includes(detailToken) && Date.now() < dataDeadline) {
+        await new Promise((resolve) => win.setTimeout(resolve, 50));
+    }
+    await mdView.save();
 
     // anchor just below the cursor, flipping above it near the window bottom
     const cm = (editor as any).cm;
@@ -83,7 +84,7 @@ export async function openFootnotePopup(
     containerEl.style.top = `${top}px`;
     containerEl.style.width = `${width}px`;
     // stay invisible until the footnote detail is actually loaded
-    containerEl.style.visibility = "hidden";
+    containerEl.addClass("footnote-shortcut-popup-loading");
 
     const subpath = `#[^${footnoteId}]`;
     const buildEmbed = () => {
@@ -104,7 +105,7 @@ export async function openFootnotePopup(
         closed = true;
         activePopup = null;
         doc.removeEventListener("mousedown", onDocMouseDown, true);
-        containerEl.style.display = "none";
+        containerEl.addClass("footnote-shortcut-popup-closed");
         if (focusEditor) editor.focus();
 
         // the embed saves edits on its own debounce; let that cycle finish
@@ -141,7 +142,7 @@ export async function openFootnotePopup(
     const tryShow = async (): Promise<boolean> => {
         await embed.loadFile();
         if (embed.subpathNotFound) return false;
-        containerEl.style.visibility = "";
+        containerEl.removeClass("footnote-shortcut-popup-loading");
         embed.showEditor();
         embed.editMode?.editor?.focus();
         return true;

@@ -11,6 +11,16 @@
     box-shadow: var(--shadow-s);
 }
 
+/* stay invisible until the footnote detail is loaded */
+.footnote-shortcut-popup.footnote-shortcut-popup-loading {
+    visibility: hidden;
+}
+
+/* closed but not yet torn down (waiting for the embed's save debounce) */
+.footnote-shortcut-popup.footnote-shortcut-popup-closed {
+    display: none;
+}
+
 /* the embedded editor is scoped to one footnote; hide file-level chrome */
 .footnote-shortcut-popup .metadata-container,
 .footnote-shortcut-popup .inline-title,
