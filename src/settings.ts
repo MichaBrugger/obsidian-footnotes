@@ -1,4 +1,4 @@
-import { App, PluginSettingTab, Setting } from "obsidian";
+import { App, PluginSettingTab, Setting, SettingDefinitionItem } from "obsidian";
 import FootnotePlugin from "./main";
 
 export interface FootnotePluginSettings {
@@ -29,28 +29,58 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
         this.plugin = plugin;
     }
 
+    // Obsidian 1.13.0+ renders the tab from these definitions and skips
+    // display(); controls bind to this.plugin.settings[key] and auto-save
+    getSettingDefinitions(): SettingDefinitionItem[] {
+        return [
+            {
+                name: "Insert footnote at end of word",
+                desc: "A new footnote is only inserted at the end of the word and after any punctuation.",
+                control: { type: "toggle", key: "insertAtEndOfWord" },
+            },
+            {
+                name: "Edit footnotes in a popup",
+                desc: "Open the footnote detail in a small editor at your cursor instead of jumping to the bottom of the note. Close with the footnote hotkey, Escape, or by clicking outside.",
+                control: { type: "toggle", key: "enablePopupEditor" },
+            },
+            {
+                name: "Trim blank lines",
+                desc: "Remove blank lines from the end of the note when inserting a new footnote section.",
+                control: { type: "toggle", key: "enableRemoveBlankLastLines" },
+            },
+            {
+                type: "group",
+                heading: "Footnotes section",
+                items: [
+                    {
+                        name: "Enable section heading",
+                        desc: "Automatically adds a heading separating footnotes at the bottom of the note from the rest of the text.",
+                        control: { type: "toggle", key: "enableFootnoteSectionHeading" },
+                    },
+                    {
+                        name: "Section heading",
+                        desc: "Heading to place above the footnotes section. Accepts standard markdown, including multiple lines and dividers.",
+                        control: {
+                            type: "textarea",
+                            key: "FootnoteSectionHeading",
+                            rows: 6,
+                            placeholder: "Ex: '# Footnotes'",
+                            disabled: () => !this.plugin.settings.enableFootnoteSectionHeading,
+                        },
+                    },
+                ],
+            },
+        ];
+    }
+
+    // Obsidian < 1.13.0 falls back to this imperative implementation;
+    // keep it in sync with getSettingDefinitions() above
     display(): void {
         const {containerEl} = this;
         containerEl.empty();
 
-        containerEl.createEl("h2", {
-        text: "Footnote Shortcut",
-        });
-
-        const mainDesc = containerEl.createEl('p');
-
-            mainDesc.appendText('Need help? Check the ');
-            mainDesc.appendChild(
-                createEl('a', {
-                text: "README",
-                href: "https://github.com/MichaBrugger/obsidian-footnotes",
-                })
-            );
-            mainDesc.appendText('!');
-        containerEl.createEl('br');
-        
         new Setting(containerEl)
-        .setName("Insert Footnote at end of word")
+        .setName("Insert footnote at end of word")
         .setDesc("A new footnote is only inserted at the end of the word and after any punctuation.")
         .addToggle((toggle) =>
             toggle
@@ -63,7 +93,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
         .setName("Edit footnotes in a popup")
-        .setDesc("Open the footnote detail in a small editor at your cursor instead of jumping to the bottom of the note. Close it by pressing the footnote hotkey again, hitting Escape, or clicking outside.")
+        .setDesc("Open the footnote detail in a small editor at your cursor instead of jumping to the bottom of the note. Close with the footnote hotkey, Escape, or by clicking outside.")
         .addToggle((toggle) =>
             toggle
                 .setValue(this.plugin.settings.enablePopupEditor)
@@ -74,8 +104,8 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
         );
 
         new Setting(containerEl)
-        .setName("Enable Trimming of Blank Lines")
-        .setDesc("Removes blank lines from the end of the file when inserting a new footnote section")
+        .setName("Trim blank lines")
+        .setDesc("Remove blank lines from the end of the note when inserting a new footnote section.")
         .addToggle((toggle) =>
             toggle
                 .setValue(this.plugin.settings.enableRemoveBlankLastLines)
@@ -85,12 +115,12 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                 })
         );
 
-        containerEl.createEl("h3", {
-            text: "Footnotes Section Behavior",
-        });
+        new Setting(containerEl)
+        .setName("Footnotes section")
+        .setHeading();
 
         new Setting(containerEl)
-        .setName("Enable Section Heading")
+        .setName("Enable section heading")
         .setDesc("Automatically adds a heading separating footnotes at the bottom of the note from the rest of the text.")
         .addToggle((toggle) =>
             toggle
@@ -102,8 +132,8 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
         );
 
         new Setting(containerEl)
-        .setName("Section Heading")
-        .setDesc("Heading to place above footnotes section. Accepts standard Markdown formatting, including multiple lines and dividers.")
+        .setName("Section heading")
+        .setDesc("Heading to place above the footnotes section. Accepts standard markdown, including multiple lines and dividers.")
         .addTextArea((text) =>
             text
                 .setPlaceholder("Ex: '# Footnotes'")
