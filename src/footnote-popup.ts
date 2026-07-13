@@ -50,9 +50,16 @@ export async function openFootnotePopup(
     const mdView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
     if (!mdView || !mdView.file) return;
 
-    // a just-inserted detail is only indexed once the file saves; finishing
-    // the save (and its fold-state event) before the embed exists also keeps
-    // it from reaching a half-initialized embed
+    // a just-inserted detail is only indexed once the file saves — but
+    // mdView.data lags a tick behind editor API changes, so saving too early
+    // would write pre-insertion content to disk; wait for the buffer to
+    // catch up first. Finishing the save (and its fold-state event) before
+    // the embed exists also keeps it from reaching a half-initialized embed.
+    const detailToken = `[^${footnoteId}]:`;
+    const dataDeadline = Date.now() + 2000;
+    while (!mdView.data.includes(detailToken) && Date.now() < dataDeadline) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+    }
     await mdView.save();
     const editor = mdView.editor;
     const doc = mdView.containerEl.ownerDocument;
