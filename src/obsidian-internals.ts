@@ -9,6 +9,9 @@ import { App, Editor, EditorPosition, TFile, Vault } from "obsidian";
 export interface ObsidianEditorView {
     state: { selection: { main: { head: number } } };
     coordsAtPos(pos: number): { left: number; top: number; bottom: number } | null;
+    /** Maps a DOM node inside the editor — including widget DOM such as the
+     * table editor — to a document offset. Standard CM6 API. */
+    posAtDOM?(node: Node): number;
     contentDOM: HTMLElement;
     focus(): void;
     /** CM5-compatibility editor attached by the vim extension ("cm two levels deep"). */

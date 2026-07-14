@@ -8,6 +8,7 @@ import {
 import FootnotePlugin from "./main";
 import { openFootnotePopup, popupEditingAvailable, toggleCloseFootnotePopup } from "./footnote-popup";
 import { EditorWithCm, VaultWithConfig, WindowWithVim } from "./obsidian-internals";
+import { resolveTableCellCursor } from "./table-cursor";
 
 export const AllMarkers = /\[\^([^[\]]+)\](?!:)/g;
 const AllNumberedMarkers = /\[\^(\d+)\]/gi;
@@ -311,7 +312,9 @@ export function insertAutonumFootnote(plugin: FootnotePlugin) {
     if (mdView.editor == undefined) return false;
 
     const doc = mdView.editor;
-    const cursorPosition = doc.getCursor();
+    // an actively edited table cell owns the real caret; getCursor() is
+    // stale there and inserting at it shreds the row's pipes
+    const cursorPosition = resolveTableCellCursor(doc) ?? doc.getCursor();
     const lineText = doc.getLine(cursorPosition.line);
     const markdownText = mdView.data;
 
@@ -394,7 +397,9 @@ export function insertNamedFootnote(plugin: FootnotePlugin) {
     if (mdView.editor == undefined) return false;
 
     const doc = mdView.editor;
-    const cursorPosition = doc.getCursor();
+    // an actively edited table cell owns the real caret; getCursor() is
+    // stale there and inserting at it shreds the row's pipes
+    const cursorPosition = resolveTableCellCursor(doc) ?? doc.getCursor();
     const lineText = doc.getLine(cursorPosition.line);
     const markdownText = mdView.data;
 
