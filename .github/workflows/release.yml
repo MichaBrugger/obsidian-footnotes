@@ -5,17 +5,32 @@ on:
     tags:
       - "*"
 
+# gh release create needs write access even when the repo default is read-only
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Use Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: "18.x"
+          node-version: "22.x"
+
+      # Obsidian requires the release tag to exactly match manifest.json's
+      # version (no "v" prefix); fail fast instead of drafting a broken release
+      - name: Check tag matches manifest version
+        run: |
+          tag="${GITHUB_REF#refs/tags/}"
+          version="$(jq -r .version manifest.json)"
+          if [ "$tag" != "$version" ]; then
+            echo "Tag ($tag) does not match manifest.json version ($version)." >&2
+            exit 1
+          fi
 
       - name: Build plugin
         run: |
