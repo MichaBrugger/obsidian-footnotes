@@ -98,19 +98,39 @@ export async function openFootnotePopup(
         }
     }
     if (!coords && cm) coords = cm.coordsAtPos(cm.state.selection.main.head);
+    const anchor = {
+        left: coords ? coords.left : 100,
+        top: coords ? coords.top : 100,
+        bottom: coords ? coords.bottom : 100,
+    };
     const width = Math.min(480, win.innerWidth - 32);
-    const left = Math.max(16, Math.min(coords ? coords.left : 100, win.innerWidth - width - 16));
-    let top = (coords ? coords.bottom : 100) + 6;
-    if (top + 260 > win.innerHeight) {
-        top = Math.max(16, (coords ? coords.top : 300) - 266);
-    }
+    const left = Math.max(16, Math.min(anchor.left, win.innerWidth - width - 16));
 
     const containerEl = doc.body.createDiv("footnote-shortcut-popup");
     containerEl.setCssProps({
         left: `${left}px`,
-        top: `${top}px`,
+        top: `${anchor.bottom + 6}px`,
         width: `${width}px`,
     });
+
+    // keep the popup tight against the caret: just below it, or just above
+    // when there isn't room underneath. The real height is only known once
+    // the embed renders — and changes as the user types — so re-anchor on
+    // every size change instead of reserving worst-case space up front
+    // (which used to strand the popup far above a caret near the bottom).
+    // When flipped above, the bottom edge stays pinned so growth goes up.
+    // tryShow calls this directly too: observer callbacks ride the render
+    // loop, which stalls entirely while the window is hidden/occluded.
+    const positionPopup = () => {
+        const height = containerEl.offsetHeight;
+        let top = anchor.bottom + 6;
+        if (top + height > win.innerHeight - 8) {
+            top = Math.max(8, anchor.top - 6 - height);
+        }
+        containerEl.setCssProps({ top: `${top}px` });
+    };
+    const resizeObserver = new win.ResizeObserver(positionPopup);
+    resizeObserver.observe(containerEl);
     // stay invisible until the footnote detail is actually loaded
     containerEl.addClass("footnote-shortcut-popup-loading");
 
@@ -139,6 +159,7 @@ export async function openFootnotePopup(
         if (closed) return;
         closed = true;
         activePopup = null;
+        resizeObserver.disconnect();
         doc.removeEventListener("mousedown", onDocMouseDown, true);
         containerEl.addClass("footnote-shortcut-popup-closed");
         if (focusEditor) {
@@ -209,6 +230,7 @@ export async function openFootnotePopup(
         if (embed.subpathNotFound) return false;
         containerEl.removeClass("footnote-shortcut-popup-loading");
         embed.showEditor();
+        positionPopup();
         const inner = embed.editMode?.editor;
         if (inner) {
             inner.focus();
