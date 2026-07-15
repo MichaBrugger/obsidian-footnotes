@@ -29,19 +29,26 @@ jobs:
         id: tag
         run: |
           version="$(jq -r .version manifest.json)"
+          beta_version="$(jq -r .version manifest-beta.json)"
+          prerelease=false
           if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
             # suffix so a test run can't collide with a real release
             tag="$version-manual-test"
           else
             tag="${GITHUB_REF#refs/tags/}"
             # Obsidian requires the release tag to exactly match manifest.json's
-            # version (no "v" prefix); fail fast instead of drafting a broken release
-            if [ "$tag" != "$version" ]; then
-              echo "Tag ($tag) does not match manifest.json version ($version)." >&2
+            # version (no "v" prefix); a BRAT beta tag must match
+            # manifest-beta.json instead. Fail fast on anything else rather
+            # than drafting a broken release.
+            if [ "$tag" = "$beta_version" ] && [ "$tag" != "$version" ]; then
+              prerelease=true
+            elif [ "$tag" != "$version" ]; then
+              echo "Tag ($tag) matches neither manifest.json ($version) nor manifest-beta.json ($beta_version)." >&2
               exit 1
             fi
           fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
 
       - name: Build plugin
         run: |
@@ -52,7 +59,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "${{ steps.tag.outputs.tag }}" \
-            --title="${{ steps.tag.outputs.tag }}" \
-            --draft \
+          args=(--title "${{ steps.tag.outputs.tag }}" --draft)
+          if [ "${{ steps.tag.outputs.prerelease }}" = "true" ]; then
+            # BRAT installs the manifest.json shipped in the release, so a
+            # beta release must ship the beta manifest under that name
+            cp manifest-beta.json manifest.json
+            args+=(--prerelease)
+          fi
+          gh release create "${{ steps.tag.outputs.tag }}" "${args[@]}" \
             main.js manifest.json styles.css
