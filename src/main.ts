@@ -9,7 +9,9 @@ import { dismissFootnotePopup } from "./footnote-popup";
 import { insertAutonumFootnote,insertNamedFootnote } from "./insert-or-navigate-footnotes";
 
 export default class FootnotePlugin extends Plugin {
-  public settings!: FootnotePluginSettings;
+  // `declare`: refine the base Plugin.settings type (Obsidian 1.13+)
+  // without emitting a class field that would shadow it
+  declare settings: FootnotePluginSettings;
 
   async onload() {
     //Add chevron-up-square icon from lucide for mobile toolbar (temporary until Obsidian updates to Lucide v0.130.0)
