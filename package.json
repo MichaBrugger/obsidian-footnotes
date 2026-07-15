@@ -1,6 +1,6 @@
 {
   "name": "obsidian-footnotes",
-  "version": "1.0.3",
+  "version": "0.1.3",
   "description": "",
   "main": "main.js",
   "scripts": {
@@ -8,7 +8,8 @@
     "build": "rollup --config rollup.config.js",
     "lint": "eslint src",
     "test": "vitest",
-    "test:smoke": "node scripts/smoke-test.mjs"
+    "test:smoke": "node scripts/smoke-test.mjs",
+    "version": "node scripts/version-bump.mjs && git add manifest.json versions.json"
   },
   "keywords": [],
   "author": "",
