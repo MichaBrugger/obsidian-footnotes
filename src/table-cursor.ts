@@ -69,10 +69,7 @@ export function resolveTableCellCursor(editor: Editor): EditorPosition | null {
     // the table widget's start position anchors the row's line number;
     // rendered rows skip the delimiter line
     const startLine = editor.offsetToPos(cm.posAtDOM(table)).line;
-    const rowIdx = Array.prototype.indexOf.call(
-        (table as HTMLTableElement).rows,
-        tr,
-    );
+    const rowIdx = Array.prototype.indexOf.call(table.rows, tr);
     if (rowIdx < 0) return null;
     const line = startLine + (rowIdx === 0 ? 0 : rowIdx + 1);
     if (line > editor.lastLine()) return null;

@@ -11,8 +11,7 @@ import { EditorWithCm, VaultWithConfig, WindowWithVim } from "./obsidian-interna
 import { resolveTableCellCursor } from "./table-cursor";
 
 export const AllMarkers = /\[\^([^[\]]+)\](?!:)/g;
-const AllNumberedMarkers = /\[\^(\d+)\]/gi;
-const AllDetailsNameOnly = /\[\^([^[\]]+)\]:/g;
+const AllNumberedMarkers = /\[\^(\d+)\]/g;
 const DetailInLine = /\[\^([^[\]]+)\]:/;
 export const ExtractNameFromFootnote = /(\[\^)([^[\]]+)(?=\])/;
 
@@ -20,50 +19,35 @@ export const ExtractNameFromFootnote = /(\[\^)([^[\]]+)(?=\])/;
 export function listExistingFootnoteDetails(
     doc: Editor
 ) {
-    let FootnoteDetailList: string[] = [];
-    
-    //search each line for footnote details and add to list
-    for (let i = 0; i < doc.lineCount(); i++) {
-        let theLine = doc.getLine(i);
-        let lineMatch = theLine.match(AllDetailsNameOnly);
-        if (lineMatch) {
-            let temp = lineMatch[0];
-            temp = temp.replace("[^","");
-            temp = temp.replace("]:","");
+    const detailNames: string[] = [];
 
-            FootnoteDetailList.push(temp);
+    //search each line for footnote details and add their names to the list
+    for (let i = 0; i < doc.lineCount(); i++) {
+        const match = doc.getLine(i).match(DetailInLine);
+        if (match) {
+            detailNames.push(match[1]);
         }
     }
-    return FootnoteDetailList;
+    return detailNames;
 }
 
 export function listExistingFootnoteMarkersAndLocations(
     doc: Editor
 ) {
-    type markerEntry = {
-        footnote: string;
-        lineNum: number;
-        startIndex: number;
-    }
-    let markerEntry;
+    const markers: { footnote: string; lineNum: number; startIndex: number }[] = [];
 
-    let FootnoteMarkerInfo = [];
     //search each line for footnote markers
-    //for each, add their name, line number, and start index to FootnoteMarkerInfo
+    //for each, add their name, line number, and start index to the list
     for (let i = 0; i < doc.lineCount(); i++) {
-        let theLine = doc.getLine(i);
-        let lineMatch;
-
-        while ((lineMatch = AllMarkers.exec(theLine)) != null) {
-        markerEntry = {
-            footnote: lineMatch[0],
-            lineNum: i,
-            startIndex: lineMatch.index
-        }
-        FootnoteMarkerInfo.push(markerEntry);
+        for (const match of doc.getLine(i).matchAll(AllMarkers)) {
+            markers.push({
+                footnote: match[0],
+                lineNum: i,
+                startIndex: match.index ?? 0,
+            });
         }
     }
-    return FootnoteMarkerInfo;
+    return markers;
 }
 
 function moveCursorAndSetJumpPoint(
@@ -117,19 +101,15 @@ export function shouldJumpFromDetailToMarker(
     // check if we're in a footnote detail line ("[^1]: footnote")
     // if so, jump cursor back to the footnote in the text
 
-    let match = lineText.match(DetailInLine);
+    const match = lineText.match(DetailInLine);
     if (match) {
-        let s = match[0];
-        let footnote = s.replace(":", "");
+        const footnote = `[^${match[1]}]`;
 
-        let returnLineIndex = cursorPosition.line;
         // find the FIRST OCCURENCE where this footnote exists in the text
         for (let i = 0; i < doc.lineCount(); i++) {
-            let scanLine = doc.getLine(i);
-            if (scanLine.contains(footnote)) {
-                let cursorLocationIndex = scanLine.indexOf(footnote);
-                returnLineIndex = i;
-                const newCursorPos = { line: returnLineIndex, ch: cursorLocationIndex + footnote.length };
+            const ch = doc.getLine(i).indexOf(footnote);
+            if (ch !== -1) {
+                const newCursorPos = { line: i, ch: ch + footnote.length };
                 moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos, plugin);
                 return true;
             }
@@ -146,22 +126,17 @@ export function jumpToFootnoteDetail(
 ) {
     // find the first line with this detail marker name in it.
     for (let i = 0; i < doc.lineCount(); i++) {
-        let theLine = doc.getLine(i);
-        let lineMatch = theLine.match(DetailInLine);
-        if (lineMatch) {
-            // compare to the index
-            let nameMatch = lineMatch[1];
-            if (nameMatch == footnoteName) {
-                // land at the END of the detail (indented lines belong to
-                // it) so the user can backspace/type without arrow keys
-                let endLine = i;
-                while (endLine < doc.lastLine() && /^\s+\S/.test(doc.getLine(endLine + 1))) {
-                    endLine++;
-                }
-                const newCursorPos = { line: endLine, ch: doc.getLine(endLine).length };
-                moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos, plugin);
-                return true;
+        const lineMatch = doc.getLine(i).match(DetailInLine);
+        if (lineMatch && lineMatch[1] === footnoteName) {
+            // land at the END of the detail (indented lines belong to
+            // it) so the user can backspace/type without arrow keys
+            let endLine = i;
+            while (endLine < doc.lastLine() && /^\s+\S/.test(doc.getLine(endLine + 1))) {
+                endLine++;
             }
+            const newCursorPos = { line: endLine, ch: doc.getLine(endLine).length };
+            moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos, plugin);
+            return true;
         }
     }
     return false;
@@ -173,44 +148,32 @@ export function shouldJumpFromMarkerToDetail(
     doc: Editor,
     plugin: FootnotePlugin
 ) {
-    // Jump cursor TO detail marker
+    // Jump cursor TO detail marker:
+    // find the marker the cursor overlaps on this line,
+    // then place the cursor at that footnote's detail line
+    let markerTarget: string | null = null;
 
-    // does this line have a footnote marker?
-    // does the cursor overlap with one of them?
-    // if so, which one?
-    // find this footnote marker's detail line
-    // place cursor there
-    let markerTarget = null;
-
-    let FootnoteMarkerInfo = listExistingFootnoteMarkersAndLocations(doc);
-    let currentLine = cursorPosition.line;
-    let footnotesOnLine = FootnoteMarkerInfo.filter((markerEntry: { lineNum: number; }) => markerEntry.lineNum === currentLine);
-
-    if (footnotesOnLine != null) {
-        for (let i = 0; i <= footnotesOnLine.length-1; i++) {
-            if (footnotesOnLine[i].footnote !== null) {
-                let marker = footnotesOnLine[i].footnote;
-                let indexOfMarkerInLine = footnotesOnLine[i].startIndex;
-                if (
-                cursorPosition.ch >= indexOfMarkerInLine &&
-                cursorPosition.ch <= indexOfMarkerInLine + marker.length
-                ) {
-                markerTarget = marker;
-                break;
-                }
-            }
+    const markersOnLine = listExistingFootnoteMarkersAndLocations(doc)
+        .filter((entry) => entry.lineNum === cursorPosition.line);
+    for (const { footnote, startIndex } of markersOnLine) {
+        if (
+            cursorPosition.ch >= startIndex &&
+            cursorPosition.ch <= startIndex + footnote.length
+        ) {
+            markerTarget = footnote;
+            break;
         }
     }
+
     if (markerTarget !== null) {
         // extract name
-        let match = markerTarget.match(ExtractNameFromFootnote);
+        const match = markerTarget.match(ExtractNameFromFootnote);
         if (match) {
-            let footnoteName = match[2];
+            const footnoteName = match[2];
 
             // markers without a detail line fall through to the
             // detail-creation paths
-            let details = listExistingFootnoteDetails(doc);
-            if (!details.includes(footnoteName)) {
+            if (!listExistingFootnoteDetails(doc).includes(footnoteName)) {
                 return false;
             }
 
@@ -233,8 +196,8 @@ export function addFootnoteSectionHeader(
     //if so, return the "Footnote Section Heading"
     // else, return ""
 
-    if (plugin.settings.enableFootnoteSectionHeading == true) {
-        let returnHeading = plugin.settings.FootnoteSectionHeading;
+    if (plugin.settings.enableFootnoteSectionHeading) {
+        const returnHeading = plugin.settings.footnoteSectionHeading;
         // the setting holds literal markdown (legacy plain-text values are
         // migrated on load); a divider directly below a text line would turn
         // that line into a setext heading, so keep a blank line in between
@@ -308,15 +271,13 @@ export function insertAutonumFootnote(plugin: FootnotePlugin) {
 
     const mdView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
 
-    if (!mdView) return false;
-    if (mdView.editor == undefined) return false;
+    if (!mdView || !mdView.editor) return false;
 
     const doc = mdView.editor;
     // an actively edited table cell owns the real caret; getCursor() is
     // stale there and inserting at it shreds the row's pipes
     const cursorPosition = resolveTableCellCursor(doc) ?? doc.getCursor();
     const lineText = doc.getLine(cursorPosition.line);
-    const markdownText = mdView.data;
 
     if (shouldJumpFromDetailToMarker(lineText, cursorPosition, doc, plugin))
         return;
@@ -327,8 +288,7 @@ export function insertAutonumFootnote(plugin: FootnotePlugin) {
         lineText,
         cursorPosition,
         plugin,
-        doc,
-        markdownText
+        doc
     );
 }
 
@@ -337,35 +297,26 @@ export function shouldCreateAutonumFootnote(
     lineText: string,
     cursorPosition: EditorPosition,
     plugin: FootnotePlugin,
-    doc: Editor,
-    markdownText: string
+    doc: Editor
 ) {
     cursorPosition = adjustFootnotePosition(cursorPosition, doc, lineText, plugin);
 
-    // create new footnote with the next numerical index
-    let matches = markdownText.match(AllNumberedMarkers);
-    let numbers: Array<number> = [];
+    // create new footnote with the next numerical index, scanning the
+    // editor document line by line (the view's data buffer lags editor
+    // edits by a tick, so it can't be trusted here)
     let currentMax = 1;
-
-    if (matches != null) {
-        for (let i = 0; i <= matches.length - 1; i++) {
-            let match = matches[i];
-            match = match.replace("[^", "");
-            match = match.replace("]", "");
-            let matchNumber = Number(match);
-            numbers[i] = matchNumber;
-            if (matchNumber + 1 > currentMax) {
-                currentMax = matchNumber + 1;
-            }
+    for (let i = 0; i < doc.lineCount(); i++) {
+        for (const match of doc.getLine(i).matchAll(AllNumberedMarkers)) {
+            currentMax = Math.max(currentMax, Number(match[1]) + 1);
         }
     }
 
-    let footNoteId = currentMax;
-    let footnoteMarker = `[^${footNoteId}]`;
+    const footnoteId = String(currentMax);
+    const footnoteMarker = `[^${footnoteId}]`;
 
-    const list = listExistingFootnoteDetails(doc);
-    const isFirstFootnote = list.length === 0 && currentMax == 1;
-    const detail = buildDetailAppend(doc, String(footNoteId), isFirstFootnote, plugin);
+    const isFirstFootnote =
+        listExistingFootnoteDetails(doc).length === 0 && currentMax === 1;
+    const detail = buildDetailAppend(doc, footnoteId, isFirstFootnote, plugin);
     const changes: EditorChange[] = [
         { from: cursorPosition, text: footnoteMarker },
         detail.change,
@@ -376,7 +327,7 @@ export function shouldCreateAutonumFootnote(
         // the cursor only moves past the new marker
         const afterMarker = { line: cursorPosition.line, ch: cursorPosition.ch + footnoteMarker.length };
         doc.transaction({ changes, selection: { from: afterMarker } });
-        void openFootnotePopup(plugin, String(footNoteId), () =>
+        void openFootnotePopup(plugin, footnoteId, () =>
             moveCursorAndSetJumpPoint(doc, cursorPosition, detail.cursor, plugin)
         );
     } else {
@@ -393,15 +344,13 @@ export function insertNamedFootnote(plugin: FootnotePlugin) {
 
     const mdView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
 
-    if (!mdView) return false;
-    if (mdView.editor == undefined) return false;
+    if (!mdView || !mdView.editor) return false;
 
     const doc = mdView.editor;
     // an actively edited table cell owns the real caret; getCursor() is
     // stale there and inserting at it shreds the row's pipes
     const cursorPosition = resolveTableCellCursor(doc) ?? doc.getCursor();
     const lineText = doc.getLine(cursorPosition.line);
-    const markdownText = mdView.data;
 
     if (shouldJumpFromDetailToMarker(lineText, cursorPosition, doc, plugin))
         return;
@@ -409,12 +358,11 @@ export function insertNamedFootnote(plugin: FootnotePlugin) {
         return;
 
     if (shouldCreateMatchingFootnoteDetail(lineText, cursorPosition, plugin, doc))
-        return; 
+        return;
     return shouldCreateFootnoteMarker(
         lineText,
         cursorPosition,
         doc,
-        markdownText,
         plugin
     );
 }
@@ -426,44 +374,35 @@ export function shouldCreateMatchingFootnoteDetail(
     doc: Editor
 ) {
     // Create matching footnote detail for footnote marker
-    
-    // does this line have a footnote marker?
-    // does the cursor overlap with one of them?
-    // if so, which one?
-    // does this footnote marker have a detail line?
+
+    // does the cursor overlap a footnote marker on this line?
+    // does that marker have a detail line?
     // if not, create it and place cursor there
-    let reOnlyMarkersMatches = lineText.match(AllMarkers);
+    let markerTarget: string | null = null;
 
-    let markerTarget = null;
-
-    if (reOnlyMarkersMatches){
-        for (let i = 0; i <= reOnlyMarkersMatches.length; i++) {
-            let marker = reOnlyMarkersMatches[i];
-            if (marker != undefined) {
-                let indexOfMarkerInLine = lineText.indexOf(marker);
-                if (
-                    cursorPosition.ch >= indexOfMarkerInLine &&
-                    cursorPosition.ch <= indexOfMarkerInLine + marker.length
-                ) {
-                    markerTarget = marker;
-                    break;
-                }
-            }
+    for (const match of lineText.matchAll(AllMarkers)) {
+        const startIndex = match.index ?? 0;
+        if (
+            cursorPosition.ch >= startIndex &&
+            cursorPosition.ch <= startIndex + match[0].length
+        ) {
+            markerTarget = match[0];
+            break;
         }
     }
 
-    if (markerTarget != null) {
+    if (markerTarget !== null) {
         //extract footnote
-        let match = markerTarget.match(ExtractNameFromFootnote)
+        const match = markerTarget.match(ExtractNameFromFootnote);
         //find if this footnote exists by listing existing footnote details
         if (match) {
-            let footnoteId = match[2];
+            const footnoteId = match[2];
 
-            let list: string[] = listExistingFootnoteDetails(doc);
+            const list = listExistingFootnoteDetails(doc);
 
             // Check if the list doesn't include current footnote
             // if so, add detail for the current footnote
-            if(!list.includes(footnoteId)) {
+            if (!list.includes(footnoteId)) {
                 const detail = buildDetailAppend(doc, footnoteId, list.length === 0, plugin);
 
                 if (popupEditingAvailable(plugin)) {
@@ -488,15 +427,14 @@ export function shouldCreateFootnoteMarker(
     lineText: string,
     cursorPosition: EditorPosition,
     doc: Editor,
-    markdownText: string,
     plugin: FootnotePlugin
 ) {
     cursorPosition = adjustFootnotePosition(cursorPosition, doc, lineText, plugin);
 
     //create empty footnote marker for name input, cursor in between [^ and ]
-    let emptyMarker = `[^]`;
-    const newCursorPos = { line: cursorPosition.line, ch: cursorPosition.ch + 2 }
+    const emptyMarker = `[^]`;
+    const newCursorPos = { line: cursorPosition.line, ch: cursorPosition.ch + 2 };
     moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos, plugin, [
         { from: cursorPosition, text: emptyMarker },
-    ])
+    ]);
 }

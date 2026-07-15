@@ -228,7 +228,7 @@ async function main() {
 
     await test("section heading with divider gets a blank line above", async () => {
         resetSettings({ enableFootnoteSectionHeading: true,
-            FootnoteSectionHeading: "---\n## Footnotes" });
+            footnoteSectionHeading: "---\n## Footnotes" });
         await setupNote("Alpha bravo charlie");
         setCursorAndRun(0, 8, CMD_AUTONUM);
         await expectEditorText("Alpha bravo[^1] charlie\n\n---\n## Footnotes\n\n[^1]: ");

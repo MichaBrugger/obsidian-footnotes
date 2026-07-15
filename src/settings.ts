@@ -6,7 +6,7 @@ export interface FootnotePluginSettings {
     enablePopupEditor: boolean;
 
     enableFootnoteSectionHeading: boolean;
-    FootnoteSectionHeading: string;
+    footnoteSectionHeading: string;
 
     enableRemoveBlankLastLines: boolean;
 }
@@ -16,7 +16,7 @@ export const DEFAULT_SETTINGS: FootnotePluginSettings = {
     enablePopupEditor: true,
 
     enableFootnoteSectionHeading: false,
-    FootnoteSectionHeading: "# Footnotes",
+    footnoteSectionHeading: "# Footnotes",
 
     enableRemoveBlankLastLines: true,
 };
@@ -62,7 +62,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                         desc: "Heading to place above the footnotes section. Accepts standard Markdown, including multiple lines and dividers.",
                         control: {
                             type: "textarea",
-                            key: "FootnoteSectionHeading",
+                            key: "footnoteSectionHeading",
                             rows: 6,
                             placeholder: "Ex: '# Footnotes'",
                             disabled: () => !this.plugin.settings.enableFootnoteSectionHeading,
@@ -137,9 +137,9 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
         .addTextArea((text) =>
             text
                 .setPlaceholder("Ex: '# Footnotes'")
-                .setValue(this.plugin.settings.FootnoteSectionHeading)
+                .setValue(this.plugin.settings.footnoteSectionHeading)
                 .onChange(async (value) => {
-                    this.plugin.settings.FootnoteSectionHeading = value;
+                    this.plugin.settings.footnoteSectionHeading = value;
                     await this.plugin.saveSettings();
                 })
                 .then((text) => {
