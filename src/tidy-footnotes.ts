@@ -8,11 +8,12 @@ import {
 import { runOutsideTableCell } from "./insert-or-navigate-footnotes";
 import { footnoteAfterPunctuation } from "./footnote-after-punctuation";
 import { moveFootnoteDefinitionsToBottom } from "./move-footnotes-to-bottom";
-import { reindexFootnotes } from "./reindex-footnotes";
+import { reindexFootnotes, ReindexOptions } from "./reindex-footnotes";
 
 // The whole-document cleanup commands: each pure transform (see its own
 // module) gets a command, plus one "tidy" command composing all three. This
-// module owns the editor plumbing they share.
+// module owns the editor plumbing they share and the mapping from plugin
+// settings to the transforms' options.
 
 function configuredSectionHeading(plugin: FootnotePlugin): string {
     return plugin.settings.enableFootnoteSectionHeading
@@ -20,14 +21,62 @@ function configuredSectionHeading(plugin: FootnotePlugin): string {
         : "";
 }
 
-/** All three cleanups in dependency order: fix punctuation, gather definitions at the bottom, then renumber and reorder. */
-export function tidyFootnotes(markdown: string, sectionHeading = ""): string {
-    return reindexFootnotes(
-        moveFootnoteDefinitionsToBottom(
-            footnoteAfterPunctuation(markdown),
-            sectionHeading,
-        ),
-    );
+/** The reindex policy the user picked in the settings tab. */
+export function reindexOptionsFromSettings(
+    plugin: FootnotePlugin,
+): ReindexOptions {
+    return {
+        keepOrphanedDefinitions: plugin.settings.keepOrphanedDefinitions,
+        renumberNamedFootnotes: plugin.settings.renumberNamedFootnotes,
+    };
+}
+
+/** The tidy pipeline (steps + reindex policy) the user picked in the settings tab. */
+export function tidyOptionsFromSettings(
+    plugin: FootnotePlugin,
+    sectionHeading: string,
+): TidyOptions {
+    return {
+        sectionHeading,
+        fixPunctuation: plugin.settings.tidyFixPunctuation,
+        moveDefinitionsToBottom: plugin.settings.tidyMoveToBottom,
+        reindex: plugin.settings.tidyReindex,
+        reindexOptions: reindexOptionsFromSettings(plugin),
+    };
+}
+
+export interface TidyOptions {
+    /** Passed through to moveFootnoteDefinitionsToBottom (default none). */
+    sectionHeading?: string;
+    /** Run footnoteAfterPunctuation (default on). */
+    fixPunctuation?: boolean;
+    /** Run moveFootnoteDefinitionsToBottom (default on). */
+    moveDefinitionsToBottom?: boolean;
+    /** Run reindexFootnotes (default on). */
+    reindex?: boolean;
+    /** Passed through to reindexFootnotes. */
+    reindexOptions?: ReindexOptions;
+}
+
+/** The enabled cleanups in dependency order: fix punctuation, gather definitions at the bottom, then renumber and reorder. */
+export function tidyFootnotes(
+    markdown: string,
+    options: TidyOptions = {},
+): string {
+    let result = markdown;
+    if (options.fixPunctuation ?? true) {
+        result = footnoteAfterPunctuation(result);
+    }
+    if (options.moveDefinitionsToBottom ?? true) {
+        result = moveFootnoteDefinitionsToBottom(
+            result,
+            options.sectionHeading ?? "",
+        );
+    }
+    if (options.reindex ?? true) {
+        result = reindexFootnotes(result, options.reindexOptions);
+    }
+    return result;
 }
 
 // Replace only the changed middle of the document, so the cursor and the

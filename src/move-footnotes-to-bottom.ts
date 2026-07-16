@@ -1,6 +1,7 @@
 import {
     findDefinitionBlocks,
     protectedLines,
+    removeLineRanges,
 } from "./markdown-scan";
 
 // Linter's "move footnotes to the bottom" as a pure transform, integrated
@@ -33,28 +34,9 @@ export function moveFootnoteDefinitionsToBottom(
     const blocks = findDefinitionBlocks(lines, isProtected);
     if (blocks.length === 0) return markdown;
 
-    // everything that isn't a definition block, in place; where a block was
-    // cut out, two blank lines meeting each other collapse into one
-    const blockAtLine = new Map(blocks.map((block) => [block.start, block]));
-    const body: string[] = [];
-    let mergeBlanks = false;
-    for (let i = 0; i < lines.length; i++) {
-        const block = blockAtLine.get(i);
-        if (block) {
-            i = block.end;
-            mergeBlanks = true;
-            continue;
-        }
-        if (
-            mergeBlanks &&
-            lines[i] === "" &&
-            (body.length === 0 || body[body.length - 1] === "")
-        ) {
-            continue; // still merging until a non-blank line arrives
-        }
-        mergeBlanks = false;
-        body.push(lines[i]);
-    }
+    // everything that isn't a definition block, in place (removeLineRanges
+    // collapses the blank lines a cut leaves meeting each other)
+    const body = removeLineRanges(lines, blocks);
     while (body.length > 0 && body[body.length - 1] === "") body.pop();
 
     const definitions = blocks

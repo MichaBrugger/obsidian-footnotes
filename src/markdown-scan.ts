@@ -95,6 +95,38 @@ export function maskInlineCode(line: string): string {
     return chars.join("");
 }
 
+/**
+ * The lines with the given inclusive ranges cut out. Where a cut makes two
+ * blank lines meet, they collapse into one, so removing a block never
+ * leaves a double gap behind.
+ */
+export function removeLineRanges(
+    lines: string[],
+    ranges: { start: number; end: number }[],
+): string[] {
+    const rangeAtLine = new Map(ranges.map((range) => [range.start, range]));
+    const out: string[] = [];
+    let mergeBlanks = false;
+    for (let i = 0; i < lines.length; i++) {
+        const range = rangeAtLine.get(i);
+        if (range) {
+            i = range.end;
+            mergeBlanks = true;
+            continue;
+        }
+        if (
+            mergeBlanks &&
+            lines[i] === "" &&
+            (out.length === 0 || out[out.length - 1] === "")
+        ) {
+            continue; // still merging until a non-blank line arrives
+        }
+        mergeBlanks = false;
+        out.push(lines[i]);
+    }
+    return out;
+}
+
 /** Every definition with its continuation lines (indented lines, plus blank runs that lead to more indented lines). */
 export function findDefinitionBlocks(
     lines: string[],

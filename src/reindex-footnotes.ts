@@ -1,24 +1,31 @@
 import { AllMarkers } from "./insert-or-navigate-footnotes";
 import {
-    DefinitionBlock,
     DefinitionStart,
     findDefinitionBlocks,
     maskInlineCode,
     protectedLines,
+    removeLineRanges,
 } from "./markdown-scan";
 
 // The reindex algorithm: a pure markdown → markdown transform, no Editor.
 // Policy (pinned in test/reindex-footnotes.test.ts): numbered footnotes are
 // renumbered 1..n by first marker appearance and their definitions reordered
-// to match; named footnotes keep their names but slot into the definition
-// ordering; orphaned definitions are kept (numbered after everything
-// referenced); code and frontmatter are invisible to all of it.
+// to match; named footnotes keep their names (unless renumberNamedFootnotes)
+// but slot into the definition ordering; orphaned definitions are kept and
+// numbered after everything referenced (unless keepOrphanedDefinitions is
+// off); code and frontmatter are invisible to all of it.
 
-/** Distinct footnote names by first marker appearance, then orphaned definition names in definition order. */
-function appearanceOrder(
+export interface ReindexOptions {
+    /** Keep definitions no marker references, numbering them after everything referenced (default). Off deletes them. */
+    keepOrphanedDefinitions?: boolean;
+    /** Give named footnotes numbers by appearance order instead of preserving their names (default off). */
+    renumberNamedFootnotes?: boolean;
+}
+
+/** Distinct marker names by first appearance in the (unprotected) text. */
+function markerAppearanceOrder(
     lines: string[],
     isProtected: boolean[],
-    blocks: DefinitionBlock[],
 ): string[] {
     const order: string[] = [];
     const seen = new Set<string>();
@@ -29,12 +36,6 @@ function appearanceOrder(
                 seen.add(match[1]);
                 order.push(match[1]);
             }
-        }
-    }
-    for (const block of blocks) {
-        if (!seen.has(block.name)) {
-            seen.add(block.name);
-            order.push(block.name);
         }
     }
     return order;
@@ -60,20 +61,52 @@ function rewriteMarkers(line: string, renames: Map<string, string>): string {
  * order of first marker appearance (all repeats follow), named footnotes
  * keep their names, and definition blocks are reordered into the same
  * appearance order by permuting them among their existing positions —
- * everything between them stays where it was.
+ * everything between them stays where it was. `options` selects the two
+ * alternative policies: deleting orphaned definitions instead of keeping
+ * them, and renumbering named footnotes instead of preserving them.
  */
-export function reindexFootnotes(markdown: string): string {
-    const lines = markdown.split("\n");
-    const isProtected = protectedLines(lines);
-    const blocks = findDefinitionBlocks(lines, isProtected);
-    const order = appearanceOrder(lines, isProtected, blocks);
+export function reindexFootnotes(
+    markdown: string,
+    options: ReindexOptions = {},
+): string {
+    const keepOrphans = options.keepOrphanedDefinitions ?? true;
+    const renumberNamed = options.renumberNamedFootnotes ?? false;
+
+    let lines = markdown.split("\n");
+    let isProtected = protectedLines(lines);
+    let blocks = findDefinitionBlocks(lines, isProtected);
+    let markerOrder = markerAppearanceOrder(lines, isProtected);
+
+    if (!keepOrphans) {
+        const referenced = new Set(markerOrder);
+        const orphans = blocks.filter((block) => !referenced.has(block.name));
+        if (orphans.length > 0) {
+            // cut the orphan blocks out, then re-derive everything — line
+            // numbers shifted, and a cut can even change fence pairing
+            lines = removeLineRanges(lines, orphans);
+            isProtected = protectedLines(lines);
+            blocks = findDefinitionBlocks(lines, isProtected);
+            markerOrder = markerAppearanceOrder(lines, isProtected);
+        }
+    }
+
+    // referenced names first (by first marker appearance), then whatever
+    // orphaned definitions remain, in definition order
+    const order = [...markerOrder];
+    const seen = new Set(order);
+    for (const block of blocks) {
+        if (!seen.has(block.name)) {
+            seen.add(block.name);
+            order.push(block.name);
+        }
+    }
 
     // numbered names → their new number, in appearance order; named
-    // footnotes never consume a number
+    // footnotes only consume a number when they're being renumbered too
     const renames = new Map<string, string>();
     let nextNumber = 1;
     for (const name of order) {
-        if (/^\d+$/.test(name)) {
+        if (renumberNamed || /^\d+$/.test(name)) {
             renames.set(name, String(nextNumber++));
         }
     }

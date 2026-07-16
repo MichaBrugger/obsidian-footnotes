@@ -247,3 +247,92 @@ describe("reindexFootnotes", () => {
         expect(reindexFootnotes(once)).toBe(once);
     });
 });
+
+describe("reindexFootnotes with keepOrphanedDefinitions: false", () => {
+    const deleteOrphans = { keepOrphanedDefinitions: false };
+
+    it("deletes a numbered orphaned definition", () => {
+        const input = "text[^3].\n\n[^3]: used\n[^9]: orphan";
+        const expected = "text[^1].\n\n[^1]: used";
+        expect(reindexFootnotes(input, deleteOrphans)).toBe(expected);
+    });
+
+    it("deletes a named orphaned definition", () => {
+        const input = "text[^2].\n\n[^lost]: named orphan\n[^2]: used";
+        const expected = "text[^1].\n\n[^1]: used";
+        expect(reindexFootnotes(input, deleteOrphans)).toBe(expected);
+    });
+
+    it("deletes an orphan's continuation lines with it", () => {
+        const input = [
+            "text[^1].",
+            "",
+            "[^1]: used",
+            "[^9]: orphan",
+            "    orphan continued",
+            "",
+            "    orphan paragraph two",
+        ].join("\n");
+        const expected = "text[^1].\n\n[^1]: used";
+        expect(reindexFootnotes(input, deleteOrphans)).toBe(expected);
+    });
+
+    it("collapses the blank gap a mid-document orphan leaves behind", () => {
+        const input = "para one[^1].\n\n[^9]: orphan\n\npara two.\n\n[^1]: def";
+        const expected = "para one[^1].\n\npara two.\n\n[^1]: def";
+        expect(reindexFootnotes(input, deleteOrphans)).toBe(expected);
+    });
+
+    it("orphans never consume a number", () => {
+        const input = "a[^7] b[^5].\n\n[^9]: orphan\n[^5]: five\n[^7]: seven";
+        const expected = "a[^1] b[^2].\n\n[^1]: seven\n[^2]: five";
+        expect(reindexFootnotes(input, deleteOrphans)).toBe(expected);
+    });
+
+    it("keeps orphans when the option is on (the default)", () => {
+        const input = "text[^3].\n\n[^3]: used\n[^9]: orphan";
+        const expected = "text[^1].\n\n[^1]: used\n[^2]: orphan";
+        expect(
+            reindexFootnotes(input, { keepOrphanedDefinitions: true }),
+        ).toBe(expected);
+    });
+});
+
+describe("reindexFootnotes with renumberNamedFootnotes: true", () => {
+    const renumberNamed = { renumberNamedFootnotes: true };
+
+    it("converts named markers to numbers by appearance order", () => {
+        const input = "a[^note] b[^5].\n\n[^5]: five\n[^note]: n";
+        const expected = "a[^1] b[^2].\n\n[^1]: n\n[^2]: five";
+        expect(reindexFootnotes(input, renumberNamed)).toBe(expected);
+    });
+
+    it("moves every reference of a repeated named marker together", () => {
+        const input = "a[^x] b[^2] c[^x].\n\n[^2]: two\n[^x]: ex";
+        const expected = "a[^1] b[^2] c[^1].\n\n[^1]: ex\n[^2]: two";
+        expect(reindexFootnotes(input, renumberNamed)).toBe(expected);
+    });
+
+    it("a kept named orphan gets the last number", () => {
+        const input = "text[^2].\n\n[^lost]: named orphan\n[^2]: used";
+        const expected = "text[^1].\n\n[^1]: used\n[^2]: named orphan";
+        expect(reindexFootnotes(input, renumberNamed)).toBe(expected);
+    });
+
+    it("composes with orphan deletion", () => {
+        const input = "text[^b] more[^2].\n\n[^lost]: orphan\n[^2]: two\n[^b]: bee";
+        const expected = "text[^1] more[^2].\n\n[^1]: bee\n[^2]: two";
+        expect(
+            reindexFootnotes(input, {
+                renumberNamedFootnotes: true,
+                keepOrphanedDefinitions: false,
+            }),
+        ).toBe(expected);
+    });
+
+    it("is idempotent", () => {
+        const messy = "b[^note] a[^9] c[^note].\n\n[^9]: nine\n[^note]: n\n[^lost]: orphan";
+        const once = reindexFootnotes(messy, renumberNamed);
+        expect(reindexFootnotes(once, renumberNamed)).toBe(once);
+    });
+});

@@ -13,6 +13,12 @@ export interface FootnotePluginSettings {
     footnoteSectionHeading: string;
 
     enableRemoveBlankLastLines: boolean;
+
+    keepOrphanedDefinitions: boolean;
+    renumberNamedFootnotes: boolean;
+    tidyFixPunctuation: boolean;
+    tidyMoveToBottom: boolean;
+    tidyReindex: boolean;
 }
 
 export const DEFAULT_SETTINGS: FootnotePluginSettings = {
@@ -23,6 +29,12 @@ export const DEFAULT_SETTINGS: FootnotePluginSettings = {
     footnoteSectionHeading: "# Footnotes",
 
     enableRemoveBlankLastLines: true,
+
+    keepOrphanedDefinitions: true,
+    renumberNamedFootnotes: false,
+    tidyFixPunctuation: true,
+    tidyMoveToBottom: true,
+    tidyReindex: true,
 };
 
 export class FootnotePluginSettingTab extends PluginSettingTab {
@@ -71,6 +83,37 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                             placeholder: "Ex: '# Footnotes'",
                             disabled: () => !this.plugin.settings.enableFootnoteSectionHeading,
                         },
+                    },
+                ],
+            },
+            {
+                type: "group",
+                heading: "Reindexing and tidying",
+                items: [
+                    {
+                        name: "Keep orphaned definitions",
+                        desc: "Reindexing keeps definitions that no marker references and numbers them after everything else. Turn off to delete them instead.",
+                        control: { type: "toggle", key: "keepOrphanedDefinitions" },
+                    },
+                    {
+                        name: "Renumber named footnotes",
+                        desc: "Reindexing gives named footnotes (like [^note]) numbers by order of appearance instead of preserving their names.",
+                        control: { type: "toggle", key: "renumberNamedFootnotes" },
+                    },
+                    {
+                        name: "Tidy: move markers after punctuation",
+                        desc: "The tidy command moves footnote markers that sit before punctuation to sit after it.",
+                        control: { type: "toggle", key: "tidyFixPunctuation" },
+                    },
+                    {
+                        name: "Tidy: move definitions to the bottom",
+                        desc: "The tidy command gathers all footnote definitions at the end of the note.",
+                        control: { type: "toggle", key: "tidyMoveToBottom" },
+                    },
+                    {
+                        name: "Tidy: reindex",
+                        desc: "The tidy command renumbers footnotes and reorders their definitions.",
+                        control: { type: "toggle", key: "tidyReindex" },
                     },
                 ],
             },
@@ -149,6 +192,70 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                 .then((text) => {
                     text.inputEl.addClass("footnote-shortcut-section-heading-input");
                     text.inputEl.rows = 6;
+                })
+        );
+
+        new Setting(containerEl)
+        .setName("Reindexing and tidying")
+        .setHeading();
+
+        new Setting(containerEl)
+        .setName("Keep orphaned definitions")
+        .setDesc("Reindexing keeps definitions that no marker references and numbers them after everything else. Turn off to delete them instead.")
+        .addToggle((toggle) =>
+            toggle
+                .setValue(this.plugin.settings.keepOrphanedDefinitions)
+                .onChange(async (value) => {
+                    this.plugin.settings.keepOrphanedDefinitions = value;
+                    await this.plugin.saveSettings();
+                })
+        );
+
+        new Setting(containerEl)
+        .setName("Renumber named footnotes")
+        .setDesc("Reindexing gives named footnotes (like [^note]) numbers by order of appearance instead of preserving their names.")
+        .addToggle((toggle) =>
+            toggle
+                .setValue(this.plugin.settings.renumberNamedFootnotes)
+                .onChange(async (value) => {
+                    this.plugin.settings.renumberNamedFootnotes = value;
+                    await this.plugin.saveSettings();
+                })
+        );
+
+        new Setting(containerEl)
+        .setName("Tidy: move markers after punctuation")
+        .setDesc("The tidy command moves footnote markers that sit before punctuation to sit after it.")
+        .addToggle((toggle) =>
+            toggle
+                .setValue(this.plugin.settings.tidyFixPunctuation)
+                .onChange(async (value) => {
+                    this.plugin.settings.tidyFixPunctuation = value;
+                    await this.plugin.saveSettings();
+                })
+        );
+
+        new Setting(containerEl)
+        .setName("Tidy: move definitions to the bottom")
+        .setDesc("The tidy command gathers all footnote definitions at the end of the note.")
+        .addToggle((toggle) =>
+            toggle
+                .setValue(this.plugin.settings.tidyMoveToBottom)
+                .onChange(async (value) => {
+                    this.plugin.settings.tidyMoveToBottom = value;
+                    await this.plugin.saveSettings();
+                })
+        );
+
+        new Setting(containerEl)
+        .setName("Tidy: reindex")
+        .setDesc("The tidy command renumbers footnotes and reorders their definitions.")
+        .addToggle((toggle) =>
+            toggle
+                .setValue(this.plugin.settings.tidyReindex)
+                .onChange(async (value) => {
+                    this.plugin.settings.tidyReindex = value;
+                    await this.plugin.saveSettings();
                 })
         );
     }

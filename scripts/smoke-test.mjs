@@ -134,6 +134,11 @@ const BASELINE_SETTINGS = {
     insertAtEndOfWord: true,
     enableFootnoteSectionHeading: false,
     enableRemoveBlankLastLines: true,
+    keepOrphanedDefinitions: true,
+    renumberNamedFootnotes: false,
+    tidyFixPunctuation: true,
+    tidyMoveToBottom: true,
+    tidyReindex: true,
 };
 function resetSettings(overrides = {}) {
     setSettings({ ...BASELINE_SETTINGS, ...overrides });
@@ -614,6 +619,26 @@ async function main() {
         await expectEditorText(
             "Alpha,[^1] bravo.[^2]\n\nCharlie tail.\n# Footnotes\n\n[^1]: two",
         );
+    });
+
+    await test("reindex deletes orphaned definitions when the setting says so", async () => {
+        resetSettings({ keepOrphanedDefinitions: false });
+        await setupNote("Text[^2].\n\n[^2]: used\n[^9]: orphan");
+        setCursorAndRun(0, 0, CMD_REINDEX);
+        await expectEditorText("Text[^1].\n\n[^1]: used");
+    });
+
+    await test("tidy skips the reindex step when its toggle is off", async () => {
+        resetSettings({ tidyReindex: false });
+        // no marker touches punctuation and definitions sit at the bottom,
+        // so with reindex off the whole tidy must be a no-op
+        await setupNote("Beta[^2] alpha[^1] end.\n\n[^1]: one\n[^2]: two");
+        setCursorAndRun(0, 0, CMD_TIDY);
+        await sleep(800);
+        const text = readJson(`(${EDITOR}).editor.getValue()`);
+        if (text !== "Beta[^2] alpha[^1] end.\n\n[^1]: one\n[^2]: two") {
+            throw new Error(`tidy reindexed anyway: ${JSON.stringify(text)}`);
+        }
     });
 
     await test("cleanup commands do not fire while a table cell is being edited until focus returns", async () => {

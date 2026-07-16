@@ -21,7 +21,12 @@ import {
 import { footnoteAfterPunctuation } from "./footnote-after-punctuation";
 import { moveFootnoteDefinitionsToBottom } from "./move-footnotes-to-bottom";
 import { reindexFootnotes } from "./reindex-footnotes";
-import { runFootnoteTransformCommand, tidyFootnotes } from "./tidy-footnotes";
+import {
+  reindexOptionsFromSettings,
+  runFootnoteTransformCommand,
+  tidyFootnotes,
+  tidyOptionsFromSettings,
+} from "./tidy-footnotes";
 
 export default class FootnotePlugin extends Plugin {
   // `declare`: refine the base Plugin.settings type (Obsidian 1.13+)
@@ -93,10 +98,15 @@ export default class FootnotePlugin extends Plugin {
       checkCallback: (checking: boolean) => {
         if (checking)
           return !!this.app.workspace.getActiveViewOfType(MarkdownView);
-        void runFootnoteTransformCommand(this, reindexFootnotes, {
-          done: "Footnotes reindexed.",
-          noop: "Footnotes are already in order.",
-        });
+        void runFootnoteTransformCommand(
+          this,
+          (markdown) =>
+            reindexFootnotes(markdown, reindexOptionsFromSettings(this)),
+          {
+            done: "Footnotes reindexed.",
+            noop: "Footnotes are already in order.",
+          },
+        );
       },
     });
     this.addCommand({
@@ -136,10 +146,15 @@ export default class FootnotePlugin extends Plugin {
       checkCallback: (checking: boolean) => {
         if (checking)
           return !!this.app.workspace.getActiveViewOfType(MarkdownView);
-        void runFootnoteTransformCommand(this, tidyFootnotes, {
-          done: "Footnotes tidied.",
-          noop: "Footnotes are already tidy.",
-        });
+        void runFootnoteTransformCommand(
+          this,
+          (markdown, sectionHeading) =>
+            tidyFootnotes(markdown, tidyOptionsFromSettings(this, sectionHeading)),
+          {
+            done: "Footnotes tidied.",
+            noop: "Footnotes are already tidy.",
+          },
+        );
       },
     });
 
