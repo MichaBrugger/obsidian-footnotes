@@ -9,16 +9,49 @@ import { EditorWithCm } from "./obsidian-internals";
 // pipes and shredding the table. When focus is in a cell sub-editor, recover
 // the true document position from the sub-editor itself.
 
-/** CM6 attaches `cmView` to its content DOM; `view` is the cell's EditorView. */
-interface ContentDOMWithView extends Element {
-    cmView?: {
-        view?: {
-            state: {
-                doc: { toString(): string };
-                selection: { main: { head: number } };
-            };
-        };
+/**
+ * The slice of the cell sub-editor's EditorView the plugin uses. Edits that
+ * must land inside an actively edited cell are dispatched HERE, not into the
+ * main editor: the cell's widget owns the markdown write-back (pipe
+ * escaping, padding, position mapping), so going through it can't race the
+ * sync-back the way a main-editor transaction into the row does.
+ */
+export interface TableCellEditor {
+    state: {
+        doc: { toString(): string };
+        selection: { main: { head: number } };
     };
+    dispatch(spec: {
+        changes?: { from: number; to?: number; insert: string };
+        selection?: { anchor: number };
+    }): void;
+}
+
+/**
+ * The EditorView of the actively edited table cell, or null when focus
+ * isn't inside a table cell sub-editor.
+ *
+ * Obsidian attaches no plugin-visible handle to the cell sub-editor's DOM
+ * (older builds exposed `cmView` on the content element; current ones do
+ * not — verified 2026-07-15), so the cell view is recovered through CM6's
+ * own registry: `EditorView.findFromDOM` returns the innermost EditorView
+ * owning an element, and the main view's constructor IS the app's
+ * EditorView class, so no @codemirror import is needed.
+ */
+export function activeTableCellEditor(editor: Editor): TableCellEditor | null {
+    const cm = (editor as EditorWithCm).cm;
+    if (!cm) return null;
+    const active = cm.contentDOM.ownerDocument.activeElement;
+    if (!active || active === cm.contentDOM || !cm.contentDOM.contains(active)) {
+        return null;
+    }
+    if (!active.closest("td, th")) return null;
+    const EditorViewClass = cm.constructor as unknown as {
+        findFromDOM?: (el: HTMLElement) => TableCellEditor | null;
+    };
+    const view = EditorViewClass.findFromDOM?.(active as HTMLElement) ?? null;
+    if (!view || (view as unknown) === (cm as unknown)) return null;
+    return view;
 }
 
 /** Cell spans of a table row line, aware of `\|` escapes. */
@@ -63,7 +96,7 @@ export function resolveTableCellCursor(editor: Editor): EditorPosition | null {
     const tr = active.closest("tr");
     if (!td || !table || !tr) return null;
 
-    const cellView = (active as ContentDOMWithView).cmView?.view;
+    const cellView = activeTableCellEditor(editor);
     if (!cellView) return null;
 
     // the table widget's start position anchors the row's line number;

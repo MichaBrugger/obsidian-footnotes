@@ -99,6 +99,11 @@ async function setupNote(content) {
         ob("open", `file=${NOTE}`);
         noteReady = true;
     }
+    // park the cursor at the top first: if a previous test left a table
+    // cell sub-editor open, moving the selection out closes it, and the
+    // brief wait lets its sync-back finish before the content is replaced
+    action(`const v=${EDITOR}; v.editor.focus(); v.editor.setCursor({line:0,ch:0});`);
+    await sleep(150);
     action(`(${EDITOR}).editor.setValue(${JSON.stringify(content)});`);
     await waitForEditorText(content);
     // the view's data buffer lags editor changes by a tick and the plugin
@@ -272,6 +277,57 @@ async function main() {
         if (line0 !== "Alpha bravo[^1] charlie") {
             throw new Error(`toggle-close inserted an extra footnote: ${JSON.stringify(line0)}`);
         }
+    });
+
+    await test("footnote lands at the caret inside an actively edited table cell", async () => {
+        // regression (reported 2026-07-14): running the command while a
+        // table cell sub-editor owned focus raced the cell's sync-back —
+        // the insert was swallowed or the row's pipes were displaced and
+        // escaped, shredding the table
+        resetSettings();
+        const table = [
+            "| Lorem[^1]     | Ipsum[^2]          | fdssad [^five] [^six] [^2]<br> |",
+            "| ------------- | ------------------ | ------------------------------ |",
+            "| Dolor[^three] | Sit[^four] [^five] () | fddad [^bobthebuilder]         |",
+        ].join("\n");
+        // the table widget re-normalizes column padding after load, so a
+        // byte-exact setupNote wait would never match — set the content and
+        // wait for the "()" landmark on both the editor and the data buffer
+        await setupNote("table pending");
+        action(`(${EDITOR}).editor.setValue(${JSON.stringify(table)});`);
+        await pollUntil(
+            "table content in editor",
+            `(${EDITOR}).editor.getValue()`,
+            (v) => typeof v === "string" && v.includes("()"),
+        );
+        await pollUntil(
+            "table content in data buffer",
+            `(${EDITOR}).data`,
+            (v) => typeof v === "string" && v.includes("()"),
+        );
+        // focusing the editor with the caret inside the table opens the
+        // cell sub-editor in live preview — the state that triggered the bug
+        action(
+            `(() => { const v=${EDITOR}; v.editor.focus(); ` +
+            `const ch=v.editor.getLine(2).indexOf('()')+1; ` +
+            `v.editor.setCursor({line:2, ch}); })();`,
+        );
+        await pollUntil(
+            "table cell sub-editor to open",
+            `(() => { const t=document.querySelector('.markdown-source-view table'); ` +
+            `return !!(t && t.querySelector('.cm-content')); })()`,
+            (v) => v === true,
+        );
+        action(`app.commands.executeCommandById('${CMD_NAMED}');`);
+        await pollUntil(
+            "marker inserted between the parens",
+            `(${EDITOR}).editor.getLine(2)`,
+            (v) => typeof v === "string" && v.includes("([^])"),
+        );
+        const line = readJson(`(${EDITOR}).editor.getLine(2)`);
+        if (line.includes("\\|")) throw new Error(`table pipe got escaped: ${line}`);
+        const pipes = (line.match(/\|/g) ?? []).length;
+        if (pipes !== 4) throw new Error(`table row has ${pipes} pipes, expected 4: ${line}`);
     });
 
     // restore state and clean up
