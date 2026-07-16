@@ -152,11 +152,21 @@ export async function openFootnotePopup(
 
     const detailToken = `[^${footnoteId}]:`;
     const dataDeadline = Date.now() + 2000;
+    // the data buffer usually catches up within a tick — check again almost
+    // immediately before falling back to coarse 50ms polls, so the popup
+    // doesn't spend a blind 50ms on what is typically a ~1ms wait
+    let pollDelay = 0;
     while (!closed && !mdView.data.includes(detailToken) && Date.now() < dataDeadline) {
-        await new Promise((resolve) => win.setTimeout(resolve, 50));
+        await new Promise((resolve) => win.setTimeout(resolve, pollDelay));
+        pollDelay = pollDelay === 0 ? 10 : 50;
     }
     if (closed) return;
-    await mdView.save();
+    // the embed reads the FILE, so unsaved view changes must be written
+    // first — but only when the view actually differs from disk; a
+    // per-popup unconditional save is disk latency plus Syncthing churn
+    if (mdView.data !== (await plugin.app.vault.cachedRead(file))) {
+        await mdView.save();
+    }
     if (closed) return;
 
     // anchor just below the cursor, flipping above it near the window bottom.
@@ -269,41 +279,43 @@ export async function openFootnotePopup(
             placeCursorAfterMarker();
         }
 
-        // the embed saves edits on its own DEBOUNCE (1-2s); flush the save
-        // NOW so the settle wait below — which blocks the next footnote
-        // command from editing the document — lasts milliseconds instead of
-        // making rapid consecutive footnotes feel laggy
-        if (embed.dirty && !embed.saving) {
-            void embed.save?.();
-        }
-
-        // let the save cycle finish before unloading, since unloading
-        // mid-save clears the state the save reads — and block document
-        // edits until it has fully landed (whenFootnotePopupSettled) so
-        // the save can't clobber them
+        // block document edits until the typed detail has fully landed
+        // (whenFootnotePopupSettled) so the save can't clobber them
         let settle: () => void;
         pendingTeardown = new Promise<void>((resolve) => {
             settle = resolve;
         });
-        let attempts = 0;
-        const teardown = () => {
-            // 30ms ticks: the save was flushed above, so this usually
-            // clears on the first or second check — the poll granularity
-            // is user-visible latency for rapid consecutive footnotes
-            if ((embed.dirty || embed.saving || embed.saveAgain) && attempts++ < 160) {
-                win.setTimeout(teardown, 30);
-                return;
+        void (async () => {
+            // the embed saves edits on its own DEBOUNCE (1-2s); flush the
+            // save NOW and await its exact completion — this wait gates the
+            // next footnote command, so every millisecond here is felt when
+            // creating consecutive footnotes rapidly
+            try {
+                if (embed.dirty && !embed.saving) await embed.save?.();
+            } catch {
+                // fall through — the polling below is the safety net
             }
-            embed.unload();
-            containerEl.remove();
-            // one beat for Obsidian to reconcile the written file into the
-            // main view before anyone edits it
-            win.setTimeout(() => {
-                pendingTeardown = null;
-                settle();
-            }, 50);
-        };
-        teardown();
+            // safety net for saves the flush didn't cover (saveAgain, a
+            // save already in flight); usually clears on the first check.
+            // Unloading mid-save clears the state the save reads.
+            let attempts = 0;
+            const teardown = () => {
+                if ((embed.dirty || embed.saving || embed.saveAgain) && attempts++ < 160) {
+                    win.setTimeout(teardown, 30);
+                    return;
+                }
+                embed.unload();
+                containerEl.remove();
+                // one beat for Obsidian to reconcile the written file into
+                // the main view before anyone edits it (a timeout on
+                // purpose: rAF stalls entirely while the window is hidden)
+                win.setTimeout(() => {
+                    pendingTeardown = null;
+                    settle();
+                }, 50);
+            };
+            teardown();
+        })();
     };
 
     const tryShow = async (): Promise<boolean> => {
