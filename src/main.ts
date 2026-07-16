@@ -24,20 +24,23 @@ export default class FootnotePlugin extends Plugin {
   declare settings: FootnotePluginSettings;
 
   async onload() {
-    //Add chevron-up-square icon from lucide for mobile toolbar (temporary until Obsidian updates to Lucide v0.130.0)
-    addIcon("chevron-up-square", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-up-square"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect><polyline points="8,14 12,10 16,14"></polyline></svg>`);
-
-    // Placeholder icons for the inline-footnote commands — Jason is
-    // designing the real set in Inkscape; swap these SVGs when delivered.
-    addIcon("footnote-inline-cursor", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect><path d="M12 8v8"></path><path d="M10 8h4"></path><path d="M10 16h4"></path></svg>`);
-    addIcon("footnote-inline-paste", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect><path d="M9 8h6"></path><path d="M12 11v6"></path><polyline points="9,14 12,17 15,14"></polyline></svg>`);
+    // Jason's hand-drawn "marker style" icon family (icons/marker style/):
+    // a shared footnote-badge container with the action as the inner glyph
+    // — plus (add numbered), I-beam text cursor (name it), arrow (paste).
+    // Named vs inline is the container's top: notched vs flat. Source SVGs
+    // are exported from Inkscape with stroke swapped to currentColor so
+    // the icons follow the theme.
+    addIcon("footnote-numbered", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g transform="translate(0,-118)" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><g transform="translate(16,116)"><path d="m-4 12v6"/><path d="m-1 15h-6"/></g><path d="m4 120 4 3e-5 4 3 4-3 4-3e-5c1.1046 0 2 0.89542 2 2v12.005c0 0.75383-0.4259 1.443-1.1001 1.7801l-7.7997 3.8998c-0.69256 0.34628-1.5077 0.34628-2.2003 0l-7.7997-3.8998c-0.67424-0.33712-1.1001-1.0262-1.1001-1.7801v-12.005c0-1.1046 0.89543-2 2-2z"/></g></svg>`);
+    addIcon("footnote-named", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g transform="translate(0 -141.97)" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m4 144 4 3e-5 4 3 4-3 4-3e-5c1.1046 0 2 0.89543 2 2v12.005c0 0.75382-0.4259 1.443-1.1001 1.7801l-7.7997 3.8998c-0.69256 0.34628-1.5077 0.34628-2.2003 0l-7.7997-3.8998c-0.67424-0.33712-1.1001-1.0262-1.1001-1.7801v-12.005c0-1.1046 0.89543-2 2-2z"/><g transform="translate(-24 141.07)"><path d="m39 16.937h-1a2 2 0 0 1-2-2 2 2 0 0 1-2 2h-1"/><path d="m33 8.9367h1a2 2 0 0 1 2 2 2 2 0 0 1 2-2h1"/><path d="m36 10.93v4.1476"/></g></g></svg>`);
+    addIcon("footnote-inline-cursor", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g transform="translate(24,-142)" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m-20 145h16a2 2 0 0 1 2 2v11.005a1.9902 1.9902 0 0 1-1.1001 1.7801l-7.7997 3.8998a2.46 2.46 0 0 1-2.2003 0l-7.7997-3.8998a1.9902 1.9902 0 0 1-1.1001-1.7801v-11.005a2 2 0 0 1 2-2z"/><g transform="translate(-48 141.07)"><path d="m39 16.937h-1a2 2 0 0 1-2-2 2 2 0 0 1-2 2h-1"/><path d="m33 8.9367h1a2 2 0 0 1 2 2 2 2 0 0 1 2-2h1"/><path d="m36 10.93v4.1476"/></g></g></svg>`);
+    addIcon("footnote-inline-paste", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g transform="translate(24.1 -118.32)" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m-20.1 121.32h16a2 2 0 0 1 2 2v11.005a1.9902 1.9902 0 0 1-1.1001 1.7801l-7.7997 3.8999a2.46 2.46 0 0 1-2.2003 0l-7.7997-3.8999a1.9902 1.9902 0 0 1-1.1001-1.7801v-11.005a2 2 0 0 1 2-2z"/><path d="m-12 127v8"/><path d="m-16 131 4 4 4-4"/></g></svg>`);
 
     await this.loadSettings();
 
     this.addCommand({
       id: "insert-autonumbered-footnote",
       name: "Insert / navigate auto-numbered footnote",
-      icon: "plus-square",
+      icon: "footnote-numbered",
       checkCallback: (checking: boolean) => {
         if (checking)
           return !!this.app.workspace.getActiveViewOfType(MarkdownView);
@@ -47,7 +50,7 @@ export default class FootnotePlugin extends Plugin {
     this.addCommand({
       id: "insert-named-footnote",
       name: "Insert / navigate named footnote",
-      icon: "chevron-up-square",
+      icon: "footnote-named",
       checkCallback: (checking: boolean) => {
         if (checking)
           return !!this.app.workspace.getActiveViewOfType(MarkdownView);
