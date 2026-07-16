@@ -1,0 +1,34 @@
+name: CodeQL
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  # GitHub ships new queries between commits; a weekly re-scan picks them
+  # up even when the repo is quiet
+  schedule:
+    - cron: "30 4 * * 1"
+
+permissions:
+  security-events: write
+  contents: read
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          # scans TS directly, no esbuild step needed
+          languages: javascript-typescript
+          # broader than the default security suite; drop this line if it
+          # proves noisy
+          queries: security-and-quality
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@v3
