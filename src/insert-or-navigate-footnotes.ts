@@ -597,12 +597,14 @@ export function shouldCreateAutonumFootnote(
  * collapse to one space and the result is trimmed. Balanced brackets pass
  * through (pasted markdown links keep working); if any bracket is
  * unbalanced — which would end the ^[...] early and corrupt the note —
- * every bracket is escaped instead. Empty/whitespace input becomes "".
+ * every bare bracket is escaped instead (pre-escaped \[ and \] keep their
+ * meaning). A dangling trailing backslash would escape the wrapper's own
+ * closing "]", so it is doubled into a literal one. Empty/whitespace
+ * input becomes "".
  */
 export function sanitizeInlineFootnoteContent(raw: string): string {
-    const text = raw.replace(/\s+/g, " ").trim();
+    let text = raw.replace(/\s+/g, " ").trim();
     let depth = 0;
-    let balanced = true;
     for (let i = 0; i < text.length; i++) {
         const c = text[i];
         if (c === "\\") {
@@ -614,8 +616,20 @@ export function sanitizeInlineFootnoteContent(raw: string): string {
             if (depth < 0) break;
         }
     }
-    if (depth !== 0) balanced = false;
-    return balanced ? text : text.replace(/[[\]]/g, "\\$&");
+    if (depth !== 0) {
+        // keep \[ and \] pairs as the balance scan understood them; escape
+        // only the bare brackets
+        text = text.replace(/\\[\s\S]|[[\]]/g, (m) =>
+            m.length === 2 ? m : `\\${m}`,
+        );
+    }
+    // an odd trailing backslash run leaves one backslash escaping the
+    // wrapper's closing "]" — double it so it renders literally instead
+    const trailing = /\\*$/.exec(text);
+    if (trailing && trailing[0].length % 2 === 1) {
+        text += "\\";
+    }
+    return text;
 }
 
 // Shared tail of both inline commands: place `text` at the caret (through

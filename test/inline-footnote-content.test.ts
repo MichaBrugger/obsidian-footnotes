@@ -52,6 +52,32 @@ describe("sanitizeInlineFootnoteContent", () => {
         expect(sanitizeInlineFootnoteContent("a \\] b")).toBe("a \\] b");
     });
 
+    // Pinned from CodeQL js/incomplete-sanitization (2026-07-16): a trailing
+    // backslash escapes the wrapper's closing "]", so ^[...] never ends and
+    // the note corrupts. An odd-length trailing backslash run is the general
+    // case; doubling the dangling one turns it into a literal backslash.
+    it("doubles a trailing backslash that would escape the closing bracket", () => {
+        expect(sanitizeInlineFootnoteContent("see appendix\\")).toBe("see appendix\\\\");
+    });
+
+    it("leaves an even trailing backslash run alone", () => {
+        expect(sanitizeInlineFootnoteContent("a\\\\")).toBe("a\\\\");
+    });
+
+    it("doubles only the dangling backslash of an odd trailing run", () => {
+        expect(sanitizeInlineFootnoteContent("a\\\\\\")).toBe("a\\\\\\\\");
+    });
+
+    it("catches a trailing backslash even when brackets are unbalanced", () => {
+        expect(sanitizeInlineFootnoteContent("] \\")).toBe("\\] \\\\");
+    });
+
+    // escaping every bracket blindly would turn a pre-escaped \] into \\],
+    // i.e. a literal backslash followed by a live bracket
+    it("keeps pre-escaped brackets intact when escaping unbalanced text", () => {
+        expect(sanitizeInlineFootnoteContent("a \\] b ]")).toBe("a \\] b \\]");
+    });
+
     it("returns empty string for empty input", () => {
         expect(sanitizeInlineFootnoteContent("")).toBe("");
     });

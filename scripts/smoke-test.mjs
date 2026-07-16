@@ -13,7 +13,7 @@
 
 import { execFileSync } from "node:child_process";
 import { copyFileSync, existsSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import process from "node:process";
 
 const NOTE = "Smoke Test - footnotes";
@@ -204,7 +204,6 @@ async function main() {
     if (deploy) {
         // repo root may be the plugin dir itself or a worktree beneath it
         const root = process.cwd();
-        const marker = `.obsidian${join("/", "plugins")}`;
         const idx = root.indexOf(".obsidian");
         if (idx === -1) throw new Error("cannot locate plugin dir from cwd");
         const pluginDir = join(root.slice(0, idx), ".obsidian", "plugins", PLUGIN_ID);
