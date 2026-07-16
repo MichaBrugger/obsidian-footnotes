@@ -35,7 +35,10 @@ const context = await esbuild.context({
         ...builtinModules.map((m) => `node:${m}`),
     ],
     format: "cjs",
-    target: "es2022",
+    // es2018, matching the official sample plugin: Android WebViews can lag
+    // years behind (degoogled phones, e-ink readers — see issue #46), and
+    // untranspiled ?. / ?? syntax makes the whole plugin fail to LOAD there
+    target: "es2018",
     logLevel: "info",
     sourcemap: prod ? false : "inline",
     treeShaking: true,
