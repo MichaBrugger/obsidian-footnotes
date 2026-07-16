@@ -195,9 +195,14 @@ export function shouldJumpFromMarkerToDetail(
 ) {
     // Jump cursor TO detail marker:
     // find the marker whose brackets contain the cursor on this line,
-    // then place the cursor at that footnote's detail line
-    const markersOnLine = listExistingFootnoteMarkersAndLocations(doc)
-        .filter((entry) => entry.lineNum === cursorPosition.line);
+    // then place the cursor at that footnote's detail line. Only this
+    // line's markers can match, so scan just lineText — this runs on
+    // every keypress of both commands, and a whole-document scan here
+    // is measurable on large notes.
+    const markersOnLine = [...lineText.matchAll(AllMarkers)].map((match) => ({
+        footnote: match[0],
+        startIndex: match.index ?? 0,
+    }));
     const markerTarget = markerAtCursor(markersOnLine, cursorPosition.ch);
 
     if (markerTarget !== null) {
