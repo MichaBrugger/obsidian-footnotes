@@ -96,6 +96,19 @@ export function maskInlineCode(line: string): string {
 }
 
 /**
+ * Every line with code and frontmatter blotted out: protected lines become
+ * all-NUL strings, inline code spans are masked in the rest. Lengths and
+ * indices line up with the originals, so scans over these see no code
+ * while every match position stays valid in the real line.
+ */
+export function maskProtectedLines(lines: string[]): string[] {
+    const isProtected = protectedLines(lines);
+    return lines.map((line, i) =>
+        isProtected[i] ? "\0".repeat(line.length) : maskInlineCode(line),
+    );
+}
+
+/**
  * The lines with the given inclusive ranges cut out. Where a cut makes two
  * blank lines meet, they collapse into one, so removing a block never
  * leaves a double gap behind.

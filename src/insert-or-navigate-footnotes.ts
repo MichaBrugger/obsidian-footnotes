@@ -8,6 +8,7 @@ import {
 
 import FootnotePlugin from "./main";
 import { openFootnotePopup, popupEditingAvailable, settleFootnotePopupWithFeedback, toggleCloseFootnotePopup } from "./footnote-popup";
+import { maskProtectedLines } from "./markdown-scan";
 import { EditorWithCm, VaultWithConfig, WindowWithVim } from "./obsidian-internals";
 import { activeTableCellEditor, resolveTableCellCursor, TableCellEditor } from "./table-cursor";
 
@@ -38,15 +39,26 @@ export function isValidFootnoteName(name: string): boolean {
 }
 
 
-/** Names of all footnote details ("[^x]: …" lines) in document order, one per line at most. */
+// Scans run against the document's masked twin (code and frontmatter
+// blotted out, indices preserved): a "[^x]" inside a code sample is plain
+// text, not a footnote (issue #41).
+function docLines(doc: Editor): string[] {
+    const lines: string[] = [];
+    for (let i = 0; i < doc.lineCount(); i++) {
+        lines.push(doc.getLine(i));
+    }
+    return lines;
+}
+
+/** Names of all footnote details ("[^x]: …" lines) in document order, one per line at most. Code blocks don't count. */
 export function listExistingFootnoteDetails(
     doc: Editor
 ) {
     const detailNames: string[] = [];
 
     //search each line for footnote details and add their names to the list
-    for (let i = 0; i < doc.lineCount(); i++) {
-        const match = doc.getLine(i).match(DetailInLine);
+    for (const line of maskProtectedLines(docLines(doc))) {
+        const match = line.match(DetailInLine);
         if (match) {
             detailNames.push(match[1]);
         }
@@ -54,7 +66,7 @@ export function listExistingFootnoteDetails(
     return detailNames;
 }
 
-/** Every marker occurrence with its position — repeated markers appear once per use. */
+/** Every marker occurrence with its position — repeated markers appear once per use. Code blocks don't count. */
 export function listExistingFootnoteMarkersAndLocations(
     doc: Editor
 ) {
@@ -62,12 +74,17 @@ export function listExistingFootnoteMarkersAndLocations(
 
     //search each line for footnote markers
     //for each, add their name, line number, and start index to the list
-    for (let i = 0; i < doc.lineCount(); i++) {
-        for (const match of doc.getLine(i).matchAll(AllMarkers)) {
+    const lines = docLines(doc);
+    const masked = maskProtectedLines(lines);
+    for (let i = 0; i < lines.length; i++) {
+        for (const match of masked[i].matchAll(AllMarkers)) {
+            const start = match.index ?? 0;
             markers.push({
-                footnote: match[0],
+                // slice the original: the masked match text could carry
+                // mask characters when code sits inside the brackets
+                footnote: lines[i].slice(start, start + match[0].length),
                 lineNum: i,
-                startIndex: match.index ?? 0,
+                startIndex: start,
             });
         }
     }
@@ -134,13 +151,20 @@ export function shouldJumpFromDetailToMarker(
     // check if we're in a footnote detail line ("[^1]: footnote")
     // if so, jump cursor back to the footnote in the text
 
-    const match = lineText.match(DetailInLine);
+    // cheap pre-check on the raw line; the whole-document masking below
+    // only runs when the caret actually sits on something detail-shaped
+    if (!DetailInLine.test(lineText)) return false;
+
+    // #41: a "[^x]:" inside a code block is not a detail, and a marker
+    // inside code is not a jump target — scan the masked twin instead
+    const masked = maskProtectedLines(docLines(doc));
+    const match = (masked[cursorPosition.line] ?? "").match(DetailInLine);
     if (match) {
         const footnote = `[^${match[1]}]`;
 
         // find the FIRST OCCURENCE where this footnote exists in the text
-        for (let i = 0; i < doc.lineCount(); i++) {
-            const ch = doc.getLine(i).indexOf(footnote);
+        for (let i = 0; i < masked.length; i++) {
+            const ch = masked[i].indexOf(footnote);
             if (ch !== -1) {
                 const newCursorPos = { line: i, ch: ch + footnote.length };
                 moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos, plugin, undefined, true);
@@ -158,9 +182,11 @@ export function jumpToFootnoteDetail(
     doc: Editor,
     plugin: FootnotePlugin
 ) {
-    // find the first line with this detail marker name in it.
-    for (let i = 0; i < doc.lineCount(); i++) {
-        const lineMatch = doc.getLine(i).match(DetailInLine);
+    // find the first line with this detail marker name in it — matching
+    // the masked twin so detail-shaped lines inside code don't count (#41)
+    const masked = maskProtectedLines(docLines(doc));
+    for (let i = 0; i < masked.length; i++) {
+        const lineMatch = masked[i].match(DetailInLine);
         if (lineMatch && lineMatch[1] === footnoteName) {
             // land at the END of the detail (indented lines belong to
             // it) so the user can backspace/type without arrow keys
@@ -203,11 +229,22 @@ export function shouldJumpFromMarkerToDetail(
 ) {
     // Jump cursor TO detail marker:
     // find the marker whose brackets contain the cursor on this line,
-    // then place the cursor at that footnote's detail line. Only this
-    // line's markers can match, so scan just lineText — this runs on
-    // every keypress of both commands, and a whole-document scan here
-    // is measurable on large notes.
-    const markersOnLine = [...lineText.matchAll(AllMarkers)].map((match) => ({
+    // then place the cursor at that footnote's detail line. This runs on
+    // every keypress of both commands and a whole-document scan here is
+    // measurable on large notes, so the raw line gates first — masking
+    // (which needs the whole document for fence state) only runs when
+    // the caret actually sits on something marker-shaped.
+    const rawMarkers = [...lineText.matchAll(AllMarkers)].map((match) => ({
+        footnote: match[0],
+        startIndex: match.index ?? 0,
+    }));
+    if (markerAtCursor(rawMarkers, cursorPosition.ch) === null) return false;
+
+    // #41: re-check against the masked twin — a marker inside a fence or
+    // inline code is plain text, so the press falls through to insertion
+    const maskedLine =
+        maskProtectedLines(docLines(doc))[cursorPosition.line] ?? "";
+    const markersOnLine = [...maskedLine.matchAll(AllMarkers)].map((match) => ({
         footnote: match[0],
         startIndex: match.index ?? 0,
     }));
@@ -386,10 +423,12 @@ export function insertInTableCell(
 //FUNCTIONS FOR AUTONUMBERED FOOTNOTES
 
 // One more than the highest numbered marker or detail in the text; gaps in
-// the numbering are not reused, and named footnotes don't count.
+// the numbering are not reused, and named footnotes don't count. Numbers
+// inside code blocks or frontmatter don't reserve anything (#41).
 export function computeNextFootnoteNumber(markdownText: string): number {
+    const masked = maskProtectedLines(markdownText.split("\n")).join("\n");
     let currentMax = 1;
-    for (const match of markdownText.matchAll(AllNumberedMarkers)) {
+    for (const match of masked.matchAll(AllNumberedMarkers)) {
         currentMax = Math.max(currentMax, Number(match[1]) + 1);
     }
     return currentMax;
@@ -690,7 +729,17 @@ export function shouldCreateMatchingFootnoteDetail(
     // is the cursor inside a footnote marker on this line?
     // does that marker have a detail line?
     // if not, create it and place cursor there
-    const markersOnLine = [...lineText.matchAll(AllMarkers)].map((match) => ({
+    // (raw-line gate first, masked re-check after — same rationale and
+    // #41 semantics as shouldJumpFromMarkerToDetail above)
+    const rawMarkers = [...lineText.matchAll(AllMarkers)].map((match) => ({
+        footnote: match[0],
+        startIndex: match.index ?? 0,
+    }));
+    if (markerAtCursor(rawMarkers, cursorPosition.ch) === null) return;
+
+    const maskedLine =
+        maskProtectedLines(docLines(doc))[cursorPosition.line] ?? "";
+    const markersOnLine = [...maskedLine.matchAll(AllMarkers)].map((match) => ({
         footnote: match[0],
         startIndex: match.index ?? 0,
     }));

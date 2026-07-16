@@ -621,6 +621,17 @@ async function main() {
         );
     });
 
+    await test("autonumbering ignores [^x] inside code blocks (issue #41)", async () => {
+        // fenced fake marker+detail used to reserve numbers and suppress
+        // the first-footnote handling
+        resetSettings();
+        await setupNote("```\nfake[^7]\n[^9]: fake\n```\nAlpha bravo");
+        setCursorAndRun(4, 3, CMD_AUTONUM); // mid "Alpha"
+        await expectEditorText(
+            "```\nfake[^7]\n[^9]: fake\n```\nAlpha[^1] bravo\n\n[^1]: ",
+        );
+    });
+
     await test("reindex deletes orphaned definitions when the setting says so", async () => {
         resetSettings({ keepOrphanedDefinitions: false });
         await setupNote("Text[^2].\n\n[^2]: used\n[^9]: orphan");
