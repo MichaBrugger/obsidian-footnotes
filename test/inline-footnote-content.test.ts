@@ -1,0 +1,62 @@
+import { describe, expect, it } from "vitest";
+
+import { sanitizeInlineFootnoteContent } from "../src/insert-or-navigate-footnotes";
+
+// Spec for what clipboard text may become the body of an inline footnote
+// (^[...]). Inline footnotes are single-line by nature, and an unbalanced
+// bracket would end the footnote early and corrupt the note — these tests
+// ARE those decisions:
+//   - whitespace runs (including newlines) collapse to one space, trimmed
+//   - balanced brackets pass through so pasted markdown links keep working
+//   - unbalanced brackets are escaped so the footnote can't break
+//   - empty / whitespace-only input becomes "" (callers refuse to insert)
+
+describe("sanitizeInlineFootnoteContent", () => {
+    it("passes plain text through unchanged", () => {
+        expect(sanitizeInlineFootnoteContent("a quick note")).toBe("a quick note");
+    });
+
+    it("trims leading and trailing whitespace", () => {
+        expect(sanitizeInlineFootnoteContent("  padded  ")).toBe("padded");
+    });
+
+    it("collapses newlines to single spaces", () => {
+        expect(sanitizeInlineFootnoteContent("line one\nline two\r\nline three")).toBe(
+            "line one line two line three",
+        );
+    });
+
+    it("collapses runs of whitespace to one space", () => {
+        expect(sanitizeInlineFootnoteContent("a \t  b")).toBe("a b");
+    });
+
+    it("keeps balanced brackets so markdown links survive", () => {
+        expect(sanitizeInlineFootnoteContent("see [the docs](https://example.com)")).toBe(
+            "see [the docs](https://example.com)",
+        );
+    });
+
+    it("escapes a lone closing bracket that would end the footnote early", () => {
+        expect(sanitizeInlineFootnoteContent("a ] b")).toBe("a \\] b");
+    });
+
+    it("escapes a lone opening bracket", () => {
+        expect(sanitizeInlineFootnoteContent("a [ b")).toBe("a \\[ b");
+    });
+
+    it("escapes every bracket once any are unbalanced", () => {
+        expect(sanitizeInlineFootnoteContent("[a] ]")).toBe("\\[a\\] \\]");
+    });
+
+    it("treats already-escaped brackets as balanced", () => {
+        expect(sanitizeInlineFootnoteContent("a \\] b")).toBe("a \\] b");
+    });
+
+    it("returns empty string for empty input", () => {
+        expect(sanitizeInlineFootnoteContent("")).toBe("");
+    });
+
+    it("returns empty string for whitespace-only input", () => {
+        expect(sanitizeInlineFootnoteContent(" \n\t ")).toBe("");
+    });
+});

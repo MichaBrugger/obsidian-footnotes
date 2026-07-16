@@ -1,8 +1,8 @@
-// Plugin entry point: registers the two hotkey commands (auto-numbered and
+// Plugin entry point: registers the four hotkey commands (auto-numbered and
 // named footnotes — each one "insert OR navigate", see
-// insert-or-navigate-footnotes.ts for the decision cascade), the settings
-// tab, and the popup-dismissal hook. Also owns settings load/save plus
-// one-time migrations of legacy settings values.
+// insert-or-navigate-footnotes.ts for the decision cascade — plus the two
+// inline-footnote inserts), the settings tab, and the popup-dismissal hook.
+// Also owns settings load/save plus one-time migrations of legacy values.
 import {
   addIcon,
   MarkdownView,
@@ -11,7 +11,12 @@ import {
 
 import { FootnotePluginSettingTab, FootnotePluginSettings, DEFAULT_SETTINGS } from "./settings";
 import { dismissFootnotePopup } from "./footnote-popup";
-import { insertAutonumFootnote,insertNamedFootnote } from "./insert-or-navigate-footnotes";
+import {
+  insertAutonumFootnote,
+  insertInlineFootnote,
+  insertNamedFootnote,
+  pasteInlineFootnote,
+} from "./insert-or-navigate-footnotes";
 
 export default class FootnotePlugin extends Plugin {
   // `declare`: refine the base Plugin.settings type (Obsidian 1.13+)
@@ -22,6 +27,11 @@ export default class FootnotePlugin extends Plugin {
     //Add chevron-up-square icon from lucide for mobile toolbar (temporary until Obsidian updates to Lucide v0.130.0)
     addIcon("chevron-up-square", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-up-square"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect><polyline points="8,14 12,10 16,14"></polyline></svg>`);
 
+    // Placeholder icons for the inline-footnote commands — Jason is
+    // designing the real set in Inkscape; swap these SVGs when delivered.
+    addIcon("footnote-inline-cursor", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect><path d="M12 8v8"></path><path d="M10 8h4"></path><path d="M10 16h4"></path></svg>`);
+    addIcon("footnote-inline-paste", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect><path d="M9 8h6"></path><path d="M12 11v6"></path><polyline points="9,14 12,17 15,14"></polyline></svg>`);
+
     await this.loadSettings();
 
     this.addCommand({
@@ -31,7 +41,7 @@ export default class FootnotePlugin extends Plugin {
       checkCallback: (checking: boolean) => {
         if (checking)
           return !!this.app.workspace.getActiveViewOfType(MarkdownView);
-        insertAutonumFootnote(this);
+        void insertAutonumFootnote(this);
       },
     });
     this.addCommand({
@@ -41,7 +51,27 @@ export default class FootnotePlugin extends Plugin {
       checkCallback: (checking: boolean) => {
         if (checking)
           return !!this.app.workspace.getActiveViewOfType(MarkdownView);
-        insertNamedFootnote(this);
+        void insertNamedFootnote(this);
+      }
+    });
+    this.addCommand({
+      id: "insert-inline-footnote",
+      name: "Insert inline footnote",
+      icon: "footnote-inline-cursor",
+      checkCallback: (checking: boolean) => {
+        if (checking)
+          return !!this.app.workspace.getActiveViewOfType(MarkdownView);
+        void insertInlineFootnote(this);
+      }
+    });
+    this.addCommand({
+      id: "paste-inline-footnote",
+      name: "Insert inline footnote from clipboard",
+      icon: "footnote-inline-paste",
+      checkCallback: (checking: boolean) => {
+        if (checking)
+          return !!this.app.workspace.getActiveViewOfType(MarkdownView);
+        void pasteInlineFootnote(this);
       }
     });
   

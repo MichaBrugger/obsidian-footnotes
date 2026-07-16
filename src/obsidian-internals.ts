@@ -34,6 +34,7 @@ export interface MarkdownEmbed {
             focus(): void;
             lastLine?(): number;
             getLine?(line: number): string;
+            getValue?(): string;
             setCursor?(pos: EditorPosition): void;
         };
     };
@@ -41,6 +42,8 @@ export interface MarkdownEmbed {
     unload(): void;
     loadFile(): Promise<void>;
     showEditor(): void;
+    /** Immediate save — `requestSave` is its debounced wrapper. */
+    save?(): Promise<void> | void;
 }
 
 export type EmbedCreator = (

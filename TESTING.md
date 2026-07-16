@@ -25,6 +25,9 @@ Suite map (one file per unit under test):
 - `end-of-word-offset.test.ts` — cell-local end-of-word insertion point
 - `table-cell-insert.test.ts` — the edit dispatched into a table cell editor
 - `table-cursor.test.ts` — escape-aware table-row cell spans
+- `inline-footnote-content.test.ts` — clipboard sanitizing for ^[...] bodies
+- `inline-footnote-exit.test.ts` — second-press exit past the closing bracket
+- `marker-at-cursor.test.ts` — the strict "inside a marker" rule (issue #49)
 
 Standing rules:
 

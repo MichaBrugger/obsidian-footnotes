@@ -7,7 +7,7 @@ import {
 } from "obsidian";
 
 import FootnotePlugin from "./main";
-import { openFootnotePopup, popupEditingAvailable, toggleCloseFootnotePopup } from "./footnote-popup";
+import { openFootnotePopup, popupEditingAvailable, settleFootnotePopupWithFeedback, toggleCloseFootnotePopup } from "./footnote-popup";
 import { EditorWithCm, VaultWithConfig, WindowWithVim } from "./obsidian-internals";
 import { activeTableCellEditor, resolveTableCellCursor, TableCellEditor } from "./table-cursor";
 
@@ -168,6 +168,24 @@ export function jumpToFootnoteDetail(
     return false;
 }
 
+/**
+ * The marker whose brackets contain `ch`, or null. Strictly INSIDE only —
+ * same rule as inline footnotes: a caret immediately after the closing
+ * bracket (or before the opening one) is outside, so the hotkey there
+ * inserts a consecutive footnote instead of navigating (issue #49).
+ */
+export function markerAtCursor(
+    markers: { footnote: string; startIndex: number }[],
+    ch: number,
+): string | null {
+    for (const { footnote, startIndex } of markers) {
+        if (ch > startIndex && ch < startIndex + footnote.length) {
+            return footnote;
+        }
+    }
+    return null;
+}
+
 /** Cascade step 2: caret on a marker that HAS a detail → popup-edit it (when enabled) or jump to it. Markers without a detail return false so creation runs. */
 export function shouldJumpFromMarkerToDetail(
     lineText: string,
@@ -176,21 +194,11 @@ export function shouldJumpFromMarkerToDetail(
     plugin: FootnotePlugin
 ) {
     // Jump cursor TO detail marker:
-    // find the marker the cursor overlaps on this line,
+    // find the marker whose brackets contain the cursor on this line,
     // then place the cursor at that footnote's detail line
-    let markerTarget: string | null = null;
-
     const markersOnLine = listExistingFootnoteMarkersAndLocations(doc)
         .filter((entry) => entry.lineNum === cursorPosition.line);
-    for (const { footnote, startIndex } of markersOnLine) {
-        if (
-            cursorPosition.ch >= startIndex &&
-            cursorPosition.ch <= startIndex + footnote.length
-        ) {
-            markerTarget = footnote;
-            break;
-        }
-    }
+    const markerTarget = markerAtCursor(markersOnLine, cursorPosition.ch);
 
     if (markerTarget !== null) {
         // extract name
@@ -365,7 +373,13 @@ export function computeNextFootnoteNumber(markdownText: string): number {
 }
 
 /** The auto-numbered command ("Insert / navigate auto-numbered footnote"): runs the decision cascade, creating "[^N]" + detail when nothing to navigate to. */
-export function insertAutonumFootnote(plugin: FootnotePlugin) {
+export async function insertAutonumFootnote(plugin: FootnotePlugin) {
+    // ORDER MATTERS: settle first, then toggle. The settle wait must come
+    // before the popup toggle so a same-tick second press sees the popup
+    // the first press opened (and closes it) instead of racing past it —
+    // and document edits must wait for a just-closed popup's pending
+    // detail save, or that save clobbers them.
+    await settleFootnotePopupWithFeedback();
     // pressing the hotkey while the popup editor is open closes it
     if (toggleCloseFootnotePopup()) return;
 
@@ -450,10 +464,169 @@ export function shouldCreateAutonumFootnote(
 }
 
 
+//FUNCTIONS FOR INLINE FOOTNOTES (^[...])
+
+/**
+ * Clipboard text made safe as the body of an inline footnote. Inline
+ * footnotes are single-line, so whitespace runs (including newlines)
+ * collapse to one space and the result is trimmed. Balanced brackets pass
+ * through (pasted markdown links keep working); if any bracket is
+ * unbalanced — which would end the ^[...] early and corrupt the note —
+ * every bracket is escaped instead. Empty/whitespace input becomes "".
+ */
+export function sanitizeInlineFootnoteContent(raw: string): string {
+    const text = raw.replace(/\s+/g, " ").trim();
+    let depth = 0;
+    let balanced = true;
+    for (let i = 0; i < text.length; i++) {
+        const c = text[i];
+        if (c === "\\") {
+            i++; // an escaped character can't open or close anything
+        } else if (c === "[") {
+            depth++;
+        } else if (c === "]") {
+            depth--;
+            if (depth < 0) break;
+        }
+    }
+    if (depth !== 0) balanced = false;
+    return balanced ? text : text.replace(/[[\]]/g, "\\$&");
+}
+
+// Shared tail of both inline commands: place `text` at the caret (through
+// the cell sub-editor inside tables — see the table notes above) with the
+// caret landing `caretOffsetInText` characters into the insertion.
+function insertInlineText(
+    plugin: FootnotePlugin,
+    text: string,
+    caretOffsetInText: number,
+) {
+    const mdView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
+    if (!mdView || !mdView.editor) return;
+    const doc = mdView.editor;
+
+    const cell = activeTableCellEditor(doc);
+    if (cell) {
+        insertInTableCell(cell, plugin, text, caretOffsetInText);
+        return;
+    }
+    runOutsideTableCell(doc, (cursorPosition) => {
+        const lineText = doc.getLine(cursorPosition.line);
+        const at = adjustFootnotePosition(cursorPosition, doc, lineText, plugin);
+        const newCursorPos = { line: at.line, ch: at.ch + caretOffsetInText };
+        moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos, plugin, [
+            { from: at, text },
+        ]);
+    });
+}
+
+/**
+ * The position just past an inline footnote's closing bracket when `ch`
+ * sits inside one on `lineText`, or null when it doesn't. Bracket matching
+ * is escape-aware and steps over nested balanced pairs (markdown links).
+ * "Inside" spans from just after the `^` through the closing `]` itself.
+ */
+export function inlineFootnoteExitCh(lineText: string, ch: number): number | null {
+    for (let i = 0; i < lineText.length - 1; i++) {
+        const c = lineText[i];
+        if (c === "\\") {
+            i++;
+            continue;
+        }
+        if (c !== "^" || lineText[i + 1] !== "[") continue;
+
+        let depth = 0;
+        let close = -1;
+        for (let j = i + 1; j < lineText.length; j++) {
+            const cj = lineText[j];
+            if (cj === "\\") {
+                j++;
+            } else if (cj === "[") {
+                depth++;
+            } else if (cj === "]") {
+                depth--;
+                if (depth === 0) {
+                    close = j;
+                    break;
+                }
+            }
+        }
+        // unclosed footnote: no exit position exists on this line at all
+        if (close === -1) return null;
+        if (ch > i && ch <= close) return close + 1;
+        i = close; // cursor isn't in this one — keep scanning after it
+    }
+    return null;
+}
+
+/**
+ * Inline-footnote command: inserts `^[]` with the caret between the
+ * brackets for quick writing. A second press while the cursor is still
+ * inside an inline footnote instead hops it just past the closing bracket,
+ * so typing continues without reaching for the arrow keys.
+ */
+export async function insertInlineFootnote(plugin: FootnotePlugin) {
+    // settle before toggle — same ordering rationale as insertAutonumFootnote
+    await settleFootnotePopupWithFeedback();
+    // pressing any footnote hotkey while the popup editor is open closes it
+    if (toggleCloseFootnotePopup()) return;
+
+    const mdView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
+    if (!mdView || !mdView.editor) return;
+    const doc = mdView.editor;
+
+    const cell = activeTableCellEditor(doc);
+    if (cell) {
+        const exit = inlineFootnoteExitCh(
+            cell.state.doc.toString(),
+            cell.state.selection.main.head,
+        );
+        if (exit !== null) {
+            cell.dispatch({ selection: { anchor: exit } });
+            return;
+        }
+    } else {
+        const cursorPosition = doc.getCursor();
+        const exit = inlineFootnoteExitCh(doc.getLine(cursorPosition.line), cursorPosition.ch);
+        if (exit !== null) {
+            doc.setCursor({ line: cursorPosition.line, ch: exit });
+            return;
+        }
+    }
+
+    insertInlineText(plugin, "^[]", 2);
+}
+
+/** Inline-footnote paste command: inserts `^[<clipboard>]` with the caret after it. */
+export async function pasteInlineFootnote(plugin: FootnotePlugin) {
+    // settle before toggle — same ordering rationale as insertAutonumFootnote
+    await settleFootnotePopupWithFeedback();
+    if (toggleCloseFootnotePopup()) return;
+
+    // read the clipboard BEFORE resolving positions — it's the only await,
+    // and everything position-dependent should happen after it
+    let raw: string;
+    try {
+        raw = await navigator.clipboard.readText();
+    } catch {
+        new Notice("Couldn't read the clipboard.");
+        return;
+    }
+    const content = sanitizeInlineFootnoteContent(raw);
+    if (!content) {
+        new Notice("Clipboard is empty — nothing to put in an inline footnote.");
+        return;
+    }
+    const text = `^[${content}]`;
+    insertInlineText(plugin, text, text.length);
+}
+
 //FUNCTIONS FOR NAMED FOOTNOTES
 
 /** The named command ("Insert / navigate named footnote"): same cascade, but creation is two-step — first press inserts "[^]" for name entry, next press (caret on the named marker) creates its detail. */
-export function insertNamedFootnote(plugin: FootnotePlugin) {
+export async function insertNamedFootnote(plugin: FootnotePlugin) {
+    // settle before toggle — same ordering rationale as insertAutonumFootnote
+    await settleFootnotePopupWithFeedback();
     // pressing the hotkey while the popup editor is open closes it
     if (toggleCloseFootnotePopup()) return;
 
@@ -491,21 +664,14 @@ export function shouldCreateMatchingFootnoteDetail(
 ) {
     // Create matching footnote detail for footnote marker
 
-    // does the cursor overlap a footnote marker on this line?
+    // is the cursor inside a footnote marker on this line?
     // does that marker have a detail line?
     // if not, create it and place cursor there
-    let markerTarget: string | null = null;
-
-    for (const match of lineText.matchAll(AllMarkers)) {
-        const startIndex = match.index ?? 0;
-        if (
-            cursorPosition.ch >= startIndex &&
-            cursorPosition.ch <= startIndex + match[0].length
-        ) {
-            markerTarget = match[0];
-            break;
-        }
-    }
+    const markersOnLine = [...lineText.matchAll(AllMarkers)].map((match) => ({
+        footnote: match[0],
+        startIndex: match.index ?? 0,
+    }));
+    const markerTarget = markerAtCursor(markersOnLine, cursorPosition.ch);
 
     if (markerTarget !== null) {
         //extract footnote

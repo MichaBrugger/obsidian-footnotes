@@ -20,6 +20,8 @@ const NOTE = "Smoke Test - footnotes";
 const PLUGIN_ID = "obsidian-footnotes";
 const CMD_AUTONUM = "obsidian-footnotes:insert-autonumbered-footnote";
 const CMD_NAMED = "obsidian-footnotes:insert-named-footnote";
+const CMD_INLINE = "obsidian-footnotes:insert-inline-footnote";
+const CMD_PASTE_INLINE = "obsidian-footnotes:paste-inline-footnote";
 
 // ---------- CLI plumbing ----------
 
@@ -99,6 +101,12 @@ async function setupNote(content) {
         ob("open", `file=${NOTE}`);
         noteReady = true;
     }
+    // close any popup a previous test left open (Escape routes through the
+    // plugin's own close path, keeping its internal state consistent)
+    action(
+        `document.querySelectorAll('.footnote-shortcut-popup').forEach((el) => ` +
+        `el.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true})));`,
+    );
     // park the cursor at the top first: if a previous test left a table
     // cell sub-editor open, moving the selection out closes it, and the
     // brief wait lets its sync-back finish before the content is replaced
@@ -202,6 +210,11 @@ async function main() {
     }
 
     const savedSettings = readJson(`app.plugins.plugins['${PLUGIN_ID}'].settings`);
+
+    // a previous failed run (or a plugin reload mid-popup) can leave stray
+    // popup elements in the DOM; they'd poison every popup assertion below
+    action(`document.querySelectorAll('.footnote-shortcut-popup').forEach((el) => el.remove());`);
+
     console.log(`running smoke tests against vault "${vault}"\n`);
 
     await test("autonumbered footnote inserts at end of word", async () => {
@@ -216,6 +229,30 @@ async function main() {
         await setupNote("Alpha bravo[^1] charlie\n\n[^1]: existing");
         setCursorAndRun(0, 18, CMD_AUTONUM); // mid "charlie"
         await expectEditorText("Alpha bravo[^1] charlie[^2]\n\n[^1]: existing\n[^2]: ");
+    });
+
+    await test("hotkey right after an existing marker inserts a consecutive footnote", async () => {
+        // issue #49: this used to jump to [^1]'s detail because the caret
+        // touching the marker's outer edge counted as "on" it
+        resetSettings();
+        await setupNote("Alpha bravo[^1] charlie\n\n[^1]: existing");
+        setCursorAndRun(0, 15, CMD_AUTONUM); // caret immediately after "[^1]"
+        await expectEditorText("Alpha bravo[^1][^2] charlie\n\n[^1]: existing\n[^2]: ");
+    });
+
+    await test("hotkey inside an existing marker still navigates to its detail", async () => {
+        resetSettings();
+        await setupNote("Alpha bravo[^1] charlie\n\n[^1]: existing");
+        setCursorAndRun(0, 13, CMD_AUTONUM); // caret inside "[^1]"
+        await pollUntil(
+            "cursor on the detail line",
+            `(${EDITOR}).editor.getCursor()`,
+            (c) => c && c.line === 2,
+        );
+        const text = readJson(`(${EDITOR}).editor.getValue()`);
+        if (text !== "Alpha bravo[^1] charlie\n\n[^1]: existing") {
+            throw new Error(`navigation changed the text: ${JSON.stringify(text)}`);
+        }
     });
 
     await test("named footnote inserts empty marker with cursor inside", async () => {
@@ -277,6 +314,189 @@ async function main() {
         if (line0 !== "Alpha bravo[^1] charlie") {
             throw new Error(`toggle-close inserted an extra footnote: ${JSON.stringify(line0)}`);
         }
+    });
+
+    await test("inline footnote inserts ^[] at end of word with cursor inside", async () => {
+        resetSettings();
+        await setupNote("Alpha bravo charlie");
+        setCursorAndRun(0, 8, CMD_INLINE); // mid "bravo"
+        await expectEditorText("Alpha bravo^[] charlie");
+        const cursor = await pollUntil(
+            "cursor inside the inline footnote",
+            `(${EDITOR}).editor.getCursor()`,
+            (c) => c && c.line === 0,
+        );
+        // "Alpha bravo^[" is 13 chars — the caret belongs between the brackets
+        if (cursor.ch !== 13) throw new Error(`cursor at ch ${cursor.ch}, expected 13 (inside ^[])`);
+    });
+
+    await test("second inline-footnote press exits past the closing bracket", async () => {
+        resetSettings();
+        await setupNote("Alpha bravo charlie");
+        setCursorAndRun(0, 8, CMD_INLINE); // creates ^[] with cursor inside
+        await expectEditorText("Alpha bravo^[] charlie");
+        action(`app.commands.executeCommandById('${CMD_INLINE}');`);
+        // exits to ch 14 (just past "]") without inserting anything new
+        await pollUntil(
+            "cursor just past the inline footnote",
+            `(${EDITOR}).editor.getCursor()`,
+            (c) => c && c.line === 0 && c.ch === 14,
+        );
+        const line = readJson(`(${EDITOR}).editor.getLine(0)`);
+        if (line !== "Alpha bravo^[] charlie") {
+            throw new Error(`second press changed the text: ${JSON.stringify(line)}`);
+        }
+    });
+
+    await test("inline footnote from clipboard pastes sanitized content", async () => {
+        resetSettings();
+        await setupNote("Alpha bravo charlie");
+        // the real OS clipboard can't be driven headlessly (navigator.clipboard
+        // requires document focus, and Electron's clipboard module is inert in
+        // Obsidian's renderer), so stub the read at the platform boundary —
+        // the command path from clipboard text to editor is still exercised.
+        // The stub content needs sanitizing (newline) to prove that runs too.
+        action(
+            `Object.defineProperty(navigator.clipboard, 'readText', ` +
+            `{ value: async () => ${JSON.stringify("pasted\nsource")}, configurable: true });`,
+        );
+        try {
+            setCursorAndRun(0, 8, CMD_PASTE_INLINE);
+            await expectEditorText("Alpha bravo^[pasted source] charlie");
+        } finally {
+            // restore the real prototype method for whatever runs next
+            action(`delete navigator.clipboard.readText;`);
+        }
+    });
+
+    await test("rapid double press creates one footnote and toggles its popup", async () => {
+        // regression (reported 2026-07-16): the popup handle used to be
+        // registered only after async setup, so a second press during that
+        // window opened a SECOND popup instead of toggle-closing the first —
+        // and the two popups' save machinery raced, eating later footnotes
+        resetSettings({ enablePopupEditor: true });
+        await setupNote("Alpha bravo charlie");
+        action(
+            `const v=${EDITOR}; v.editor.setCursor({line:0,ch:8}); ` +
+            `app.commands.executeCommandById('${CMD_AUTONUM}'); ` +
+            `app.commands.executeCommandById('${CMD_AUTONUM}');`,
+        );
+        await pollUntil(
+            "exactly one footnote, popup closed",
+            `(() => ({ text: (${EDITOR}).editor.getValue(), ` +
+            `popup: !!document.querySelector('.footnote-shortcut-popup:not(.footnote-shortcut-popup-closed)') }))()`,
+            (s) => s && s.text === "Alpha bravo[^1] charlie\n\n[^1]: " && !s.popup,
+        );
+        // the next rapid pair chains the second footnote the same way
+        action(
+            `app.commands.executeCommandById('${CMD_AUTONUM}'); ` +
+            `app.commands.executeCommandById('${CMD_AUTONUM}');`,
+        );
+        await pollUntil(
+            "second consecutive footnote created",
+            `(${EDITOR}).editor.getValue()`,
+            (v) => v === "Alpha bravo[^1][^2] charlie\n\n[^1]: \n[^2]: ",
+        );
+    });
+
+    await test("closed untouched popups never save stale content over new footnotes", async () => {
+        // regression (reported 2026-07-16, sequence captured live): the
+        // popup embed marks itself dirty just from rendering, so a closed
+        // untouched popup's debounced save wrote its STALE file snapshot
+        // over footnotes added after it loaded — the external-change reload
+        // then dumped the cursor at the top of the note
+        resetSettings({ enablePopupEditor: true });
+        await setupNote("Alpha bravo charlie delta");
+        setCursorAndRun(0, 8, CMD_AUTONUM); // [^1] + popup
+        await sleep(1600); // popup fully shown; embed self-dirties
+        action(`app.commands.executeCommandById('${CMD_AUTONUM}');`); // close
+        await sleep(300);
+        action(`app.commands.executeCommandById('${CMD_AUTONUM}');`); // [^2] + popup
+        await sleep(300);
+        action(`app.commands.executeCommandById('${CMD_AUTONUM}');`); // close
+        // the window where embed 1's stale save used to clobber [^2]
+        await sleep(3500);
+        const state = readJson(
+            `(() => { const ed=(${EDITOR}).editor; ` +
+            `return { text: ed.getValue(), cursor: ed.getCursor() }; })()`,
+        );
+        const expected = "Alpha bravo[^1][^2] charlie delta\n\n[^1]: \n[^2]: ";
+        if (!state || state.text !== expected) {
+            throw new Error(`stale save clobbered the note: ${JSON.stringify(state)}`);
+        }
+        if (state.cursor.line === 0 && state.cursor.ch === 0) {
+            throw new Error("cursor was dumped at the start of the note");
+        }
+    });
+
+    await test("typed popup detail survives an immediately-following footnote", async () => {
+        // regression (reported 2026-07-16, third round): the user's real flow
+        // — type a detail in the popup, close, immediately insert the next
+        // footnote. The popup's (legitimate) debounced save wrote the file
+        // WITHOUT the just-inserted next footnote, clobbering it; the
+        // conflict reload then dumped the cursor at the top.
+        resetSettings({ enablePopupEditor: true });
+        await setupNote("Alpha bravo charlie");
+        setCursorAndRun(0, 8, CMD_AUTONUM); // [^1] + popup
+        await pollUntil(
+            "popup focused for typing",
+            `(() => { const p = document.querySelector('.footnote-shortcut-popup');
+                return !!(p && p.contains(document.activeElement)); })()`,
+            (v) => v === true,
+        );
+        // type through the DOM so the full real input path runs
+        action(`document.execCommand('insertText', false, 'my note');`);
+        await sleep(200);
+        action(`app.commands.executeCommandById('${CMD_AUTONUM}');`); // close popup
+        await sleep(150); // press again while the popup's save is still pending
+        action(`app.commands.executeCommandById('${CMD_AUTONUM}');`); // [^2]
+        await pollUntil(
+            "both footnotes and the typed detail present",
+            `(${EDITOR}).editor.getValue()`,
+            (v) => v === "Alpha bravo[^1][^2] charlie\n\n[^1]: my note\n[^2]: ",
+            12000,
+        );
+        const cursor = readJson(`(${EDITOR}).editor.getCursor()`);
+        if (cursor && cursor.line === 0 && cursor.ch === 0) {
+            throw new Error("cursor was dumped at the start of the note");
+        }
+        // close [^2]'s popup so it can't leak into the next test
+        action(`app.commands.executeCommandById('${CMD_AUTONUM}');`);
+        await pollUntil(
+            "trailing popup closed",
+            `!document.querySelector('.footnote-shortcut-popup:not(.footnote-shortcut-popup-closed)')`,
+            (v) => v === true,
+        );
+    });
+
+    await test("rapid presses deep in a long note keep every footnote and the cursor", async () => {
+        // regression (reported 2026-07-16): rapid create/close cycles could
+        // lose a footnote AND reload the view, dumping the cursor at the top
+        resetSettings({ enablePopupEditor: true });
+        const body = Array.from({ length: 40 }, (_, i) => `Paragraph ${i + 1} lorem ipsum.`).join("\n");
+        await setupNote(body);
+        // six presses 120ms apart at line 30: presses 1/3/5 create
+        // [^1][^2][^3], presses 2/4/6 toggle-close each pending popup
+        action(
+            `(() => { const v=${EDITOR}; v.editor.setCursor({line:30,ch:12}); ` +
+            `const run = () => app.commands.executeCommandById('${CMD_AUTONUM}'); ` +
+            `run(); for (let i=1;i<6;i++) setTimeout(run, i*120); })();`,
+        );
+        const state = await pollUntil(
+            "three footnotes present with the cursor still on line 30",
+            `(() => { const ed=(${EDITOR}).editor; return { ` +
+            `line30: ed.getLine(30), cursor: ed.getCursor(), ` +
+            `details: ['1','2','3'].filter(n => ed.getValue().includes('[^'+n+']: ')).length, ` +
+            `popup: !!document.querySelector('.footnote-shortcut-popup:not(.footnote-shortcut-popup-closed)') }; })()`,
+            (s) =>
+                s &&
+                s.line30 === "Paragraph 31[^1][^2][^3] lorem ipsum." &&
+                s.details === 3 &&
+                !s.popup &&
+                s.cursor.line === 30,
+            10000,
+        );
+        if (state.cursor.ch === 0) throw new Error("cursor was dumped at the start");
     });
 
     await test("footnote lands at the caret inside an actively edited table cell", async () => {

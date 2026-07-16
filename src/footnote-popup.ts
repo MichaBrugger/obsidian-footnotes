@@ -1,4 +1,4 @@
-import { MarkdownView } from "obsidian";
+import { MarkdownView, Notice } from "obsidian";
 
 import FootnotePlugin from "./main";
 import { AppWithEmbedRegistry, EditorWithCm } from "./obsidian-internals";
@@ -10,11 +10,46 @@ import { AppWithEmbedRegistry, EditorWithCm } from "./obsidian-internals";
 // so the user's cursor never has to leave the text.
 
 type ActivePopup = {
-    containerEl: HTMLElement;
     close: (focusEditor: boolean) => void;
 };
 
 let activePopup: ActivePopup | null = null;
+
+// Resolves once no closed popup still has file work in flight. A closed
+// popup legitimately saves the user's typed detail on a debounce — but that
+// save writes the file as the EMBED knew it, so any document edit made
+// before it lands gets clobbered, and the conflict reload dumps the cursor
+// at the top of the note (regression, reported 2026-07-16). Commands that
+// edit the document await this before touching anything.
+let pendingTeardown: Promise<void> | null = null;
+
+export function whenFootnotePopupSettled(): Promise<void> {
+    return pendingTeardown ?? Promise.resolve();
+}
+
+/**
+ * whenFootnotePopupSettled, plus user feedback: when the wait is long
+ * enough to feel like a dropped keypress, a notice explains what's
+ * happening and clears the moment the command proceeds. The keypress is
+ * never discarded — it runs as soon as the pending save has landed.
+ */
+export async function settleFootnotePopupWithFeedback(): Promise<void> {
+    if (!pendingTeardown) return;
+    // holder object: the assignment happens inside the timer callback,
+    // which TypeScript's narrowing can't see through on a plain variable
+    const feedback: { notice: Notice | null } = { notice: null };
+    const noticeTimer = window.setTimeout(() => {
+        feedback.notice = new Notice("Saving the previous footnote…", 0);
+    }, 150);
+    try {
+        while (pendingTeardown !== null) {
+            await pendingTeardown;
+        }
+    } finally {
+        window.clearTimeout(noticeTimer);
+        feedback.notice?.hide();
+    }
+}
 
 export function popupEditingAvailable(plugin: FootnotePlugin): boolean {
     // embedRegistry is undocumented API, so degrade to the legacy
@@ -71,12 +106,58 @@ export async function openFootnotePopup(
     const doc = mdView.containerEl.ownerDocument;
     const win = doc.defaultView || window;
 
+    // Register the popup handle BEFORE the first await: a hotkey press
+    // during this async setup must toggle-close THIS pending popup, not
+    // start a second one whose file saves race this one's — rapid
+    // consecutive footnotes used to lose the later markers exactly that
+    // way (regression, reported 2026-07-16). Until the DOM exists, closing
+    // just abandons the setup (the awaits below re-check `closed`).
+    let closed = false;
+    let domTeardown: ((focusEditor: boolean) => void) | null = null;
+
+    const focusMainEditor = () => {
+        // editor.focus() can silently no-op right after the popup's embed
+        // held focus (Obsidian's focus bookkeeping lags), so focus the
+        // underlying CodeMirror view directly
+        const cmView = (editor as EditorWithCm).cm;
+        if (cmView) cmView.focus();
+        else editor.focus();
+    };
+    // land the cursor right after the marker so typing continues seamlessly
+    // (a named footnote would otherwise leave it inside the brackets);
+    // string search, since the id isn't regex-safe
+    const placeCursorAfterMarker = () => {
+        const cursor = editor.getCursor();
+        const line = editor.getLine(cursor.line);
+        const marker = `[^${footnoteId}]`;
+        for (let idx = line.indexOf(marker); idx !== -1; idx = line.indexOf(marker, idx + 1)) {
+            if (cursor.ch >= idx && cursor.ch <= idx + marker.length) {
+                editor.setCursor({ line: cursor.line, ch: idx + marker.length });
+                break;
+            }
+        }
+    };
+    const close = (focusEditor: boolean) => {
+        if (closed) return;
+        closed = true;
+        activePopup = null;
+        if (domTeardown) {
+            domTeardown(focusEditor);
+        } else if (focusEditor) {
+            focusMainEditor();
+            placeCursorAfterMarker();
+        }
+    };
+    activePopup = { close };
+
     const detailToken = `[^${footnoteId}]:`;
     const dataDeadline = Date.now() + 2000;
-    while (!mdView.data.includes(detailToken) && Date.now() < dataDeadline) {
+    while (!closed && !mdView.data.includes(detailToken) && Date.now() < dataDeadline) {
         await new Promise((resolve) => win.setTimeout(resolve, 50));
     }
+    if (closed) return;
     await mdView.save();
+    if (closed) return;
 
     // anchor just below the cursor, flipping above it near the window bottom.
     // When focus is in a sub-editor (a table cell being edited), the main
@@ -154,51 +235,6 @@ export async function openFootnotePopup(
     };
     let embed = buildEmbed();
 
-    let closed = false;
-    const close = (focusEditor: boolean) => {
-        if (closed) return;
-        closed = true;
-        activePopup = null;
-        resizeObserver.disconnect();
-        doc.removeEventListener("mousedown", onDocMouseDown, true);
-        containerEl.addClass("footnote-shortcut-popup-closed");
-        if (focusEditor) {
-            // editor.focus() can silently no-op right after the popup's
-            // embed held focus (Obsidian's focus bookkeeping lags), so
-            // focus the underlying CodeMirror view directly
-            const cmView = (editor as EditorWithCm).cm;
-            if (cmView) cmView.focus();
-            else editor.focus();
-
-            // land the cursor right after the marker so typing continues
-            // seamlessly (a named footnote would otherwise leave it inside
-            // the brackets); string search, since the id isn't regex-safe
-            const cursor = editor.getCursor();
-            const line = editor.getLine(cursor.line);
-            const marker = `[^${footnoteId}]`;
-            for (let idx = line.indexOf(marker); idx !== -1; idx = line.indexOf(marker, idx + 1)) {
-                if (cursor.ch >= idx && cursor.ch <= idx + marker.length) {
-                    editor.setCursor({ line: cursor.line, ch: idx + marker.length });
-                    break;
-                }
-            }
-        }
-
-        // the embed saves edits on its own debounce; let that cycle finish
-        // before unloading, since unloading mid-save clears the state the
-        // save reads
-        let attempts = 0;
-        const teardown = () => {
-            if ((embed.dirty || embed.saving || embed.saveAgain) && attempts++ < 50) {
-                win.setTimeout(teardown, 100);
-                return;
-            }
-            embed.unload();
-            containerEl.remove();
-        };
-        teardown();
-    };
-
     const onDocMouseDown = (evt: MouseEvent) => {
         const target = evt.target as HTMLElement;
         if (containerEl.contains(target)) return;
@@ -223,7 +259,52 @@ export async function openFootnotePopup(
         }
     });
 
-    activePopup = { containerEl, close };
+    // from here on, closing must also tear the DOM and the embed down
+    domTeardown = (focusEditor: boolean) => {
+        resizeObserver.disconnect();
+        doc.removeEventListener("mousedown", onDocMouseDown, true);
+        containerEl.addClass("footnote-shortcut-popup-closed");
+        if (focusEditor) {
+            focusMainEditor();
+            placeCursorAfterMarker();
+        }
+
+        // the embed saves edits on its own DEBOUNCE (1-2s); flush the save
+        // NOW so the settle wait below — which blocks the next footnote
+        // command from editing the document — lasts milliseconds instead of
+        // making rapid consecutive footnotes feel laggy
+        if (embed.dirty && !embed.saving) {
+            void embed.save?.();
+        }
+
+        // let the save cycle finish before unloading, since unloading
+        // mid-save clears the state the save reads — and block document
+        // edits until it has fully landed (whenFootnotePopupSettled) so
+        // the save can't clobber them
+        let settle: () => void;
+        pendingTeardown = new Promise<void>((resolve) => {
+            settle = resolve;
+        });
+        let attempts = 0;
+        const teardown = () => {
+            // 30ms ticks: the save was flushed above, so this usually
+            // clears on the first or second check — the poll granularity
+            // is user-visible latency for rapid consecutive footnotes
+            if ((embed.dirty || embed.saving || embed.saveAgain) && attempts++ < 160) {
+                win.setTimeout(teardown, 30);
+                return;
+            }
+            embed.unload();
+            containerEl.remove();
+            // one beat for Obsidian to reconcile the written file into the
+            // main view before anyone edits it
+            win.setTimeout(() => {
+                pendingTeardown = null;
+                settle();
+            }, 50);
+        };
+        teardown();
+    };
 
     const tryShow = async (): Promise<boolean> => {
         await embed.loadFile();
