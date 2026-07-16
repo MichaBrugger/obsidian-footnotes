@@ -668,6 +668,31 @@ async function main() {
         );
     });
 
+    await test("new details land under the existing footnote group, not at EOF (issue #55)", async () => {
+        resetSettings();
+        const note = [
+            "Alpha[^1] bravo",
+            "",
+            "#### Citations",
+            "[^1]: one",
+            "",
+            "#### Images",
+            "picture here",
+        ].join("\n");
+        await setupNote(note);
+        setCursorAndRun(0, 12, CMD_AUTONUM); // mid "bravo"
+        await expectEditorText([
+            "Alpha[^1] bravo[^2]",
+            "",
+            "#### Citations",
+            "[^1]: one",
+            "[^2]: ",
+            "",
+            "#### Images",
+            "picture here",
+        ].join("\n"));
+    });
+
     await test("reindex deletes orphaned definitions when the setting says so", async () => {
         resetSettings({ keepOrphanedDefinitions: false });
         await setupNote("Text[^2].\n\n[^2]: used\n[^9]: orphan");

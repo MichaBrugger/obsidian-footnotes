@@ -8,7 +8,7 @@ import {
 
 import FootnotePlugin from "./main";
 import { openFootnotePopup, popupEditingAvailable, settleFootnotePopupWithFeedback, toggleCloseFootnotePopup } from "./footnote-popup";
-import { maskProtectedLines } from "./markdown-scan";
+import { findDefinitionBlocks, maskProtectedLines, protectedLines } from "./markdown-scan";
 import { EditorWithCm, VaultWithConfig, WindowWithVim } from "./obsidian-internals";
 import { activeTableCellEditor, resolveTableCellCursor, TableCellEditor } from "./table-cursor";
 
@@ -295,17 +295,34 @@ export function addFootnoteSectionHeader(
     return "";
 }
 
-// Build (don't apply) the edit that appends `[^id]: ` after the last
+// Build (don't apply) the edit that appends `[^id]: ` to the note's
+// footnote definitions: right after the last existing definition block
+// when there is one (issue #55 — the definitions may live under a
+// mid-document heading with more content below), otherwise after the last
 // non-blank line — trimming trailing blank lines if enabled, and adding a
 // blank separator plus the optional section heading before the first
 // footnote. Returned as data so the caller can bundle it with the marker
 // insertion into a single transaction (see moveCursorAndSetJumpPoint).
-function buildDetailAppend(
+export function buildDetailAppend(
     doc: Editor,
     footnoteId: string,
     isFirstFootnote: boolean,
     plugin: FootnotePlugin,
 ): { change: EditorChange; cursor: EditorPosition } {
+    const lines = docLines(doc);
+    const blocks = findDefinitionBlocks(lines, protectedLines(lines));
+    if (blocks.length > 0) {
+        const lastLine = blocks[blocks.length - 1].end;
+        const text = `\n[^${footnoteId}]: `;
+        return {
+            change: {
+                from: { line: lastLine, ch: doc.getLine(lastLine).length },
+                text,
+            },
+            cursor: { line: lastLine + 1, ch: text.length - 1 },
+        };
+    }
+
     let text = `\n[^${footnoteId}]: `;
     if (isFirstFootnote) {
         text = addFootnoteSectionHeader(plugin) + "\n" + text;
