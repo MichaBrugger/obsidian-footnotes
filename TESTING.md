@@ -9,21 +9,33 @@ Two layers, run with two commands:
 
 ## Unit tests — `npm test`
 
-Vitest, watching `test/**/*.test.ts`. These are written **TDD-style by the
-maintainer** — red, green, refactor. AI does not write unit tests or make
-them pass; it may review them after they are green and suggest missed edge
-cases on request. (The specification step is the point of the exercise.)
+Vitest, watching `test/**/*.test.ts`. The `obsidian` npm package is type
+definitions only, so `vitest.config.ts` aliases it to the runtime stub in
+`test/mocks/obsidian.ts` — extend the stub (empty classes / no-ops) if a
+new import breaks test startup.
 
-Good first targets (they require extracting pure functions from
-`src/insert-or-navigate-footnotes.ts`, which is part of the exercise):
+Suite map (one file per unit under test):
 
-- next-footnote-number logic (`shouldCreateAutonumFootnote`, ~lines 250–270):
-  empty doc, `[^1] [^2]`, gaps like `[^1] [^3]`, named/numbered mixes
-- `listExistingFootnoteDetails` / `listExistingFootnoteMarkersAndLocations`
-  against a fake `Editor` (an object with `getLine`/`lineCount` over an array)
-- `addFootnoteSectionHeader` divider/heading prefix rules
+- `next-footnote-number.test.ts` — autonumbering policy (gaps not reused,
+  named markers ignored)
+- `list-footnotes.test.ts` — document scans for details and markers
+- `section-header.test.ts` — heading/divider blank-line rules
+- `marker-regexes.test.ts` — the exported marker regexes
+- `invalid-footnote-name.test.ts` — spaced-name guard (warns via Notice)
+- `end-of-word-offset.test.ts` — cell-local end-of-word insertion point
+- `table-cell-insert.test.ts` — the edit dispatched into a table cell editor
+- `table-cursor.test.ts` — escape-aware table-row cell spans
 
-`test/harness.test.ts` is only a setup check proving the harness runs.
+Standing rules:
+
+- **Every reported bug gets a failing test before the fix** (unit if the
+  logic is pure, smoke if it needs the live editor).
+- Tests marked *characterization* pin current behavior that hasn't been
+  blessed as intended — flip the expectation to change the spec.
+- **Unit tests defend against our changes; smoke tests defend against
+  Obsidian's.** Anything that touches undocumented internals (table cell
+  sub-editors, embedRegistry) must keep a smoke test — a mocked unit test
+  would just encode our assumptions and stay green when Obsidian changes.
 
 ## Smoke tests — `npm run test:smoke`
 

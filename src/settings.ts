@@ -1,3 +1,7 @@
+// Settings shape, defaults, and the settings tab. The tab is implemented
+// TWICE on purpose: Obsidian 1.13+ renders from getSettingDefinitions()
+// (declarative, auto-saving) and ignores display(); older versions call
+// display() (imperative). Any settings change must be made in BOTH.
 import { App, PluginSettingTab, Setting, SettingDefinitionItem } from "obsidian";
 import FootnotePlugin from "./main";
 

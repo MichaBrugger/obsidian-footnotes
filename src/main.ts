@@ -1,3 +1,8 @@
+// Plugin entry point: registers the two hotkey commands (auto-numbered and
+// named footnotes — each one "insert OR navigate", see
+// insert-or-navigate-footnotes.ts for the decision cascade), the settings
+// tab, and the popup-dismissal hook. Also owns settings load/save plus
+// one-time migrations of legacy settings values.
 import {
   addIcon,
   MarkdownView,
