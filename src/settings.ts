@@ -88,7 +88,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
             },
             {
                 type: "group",
-                heading: "Reindexing and tidying",
+                heading: "Reindexing",
                 items: [
                     {
                         name: "Keep orphaned definitions",
@@ -100,18 +100,24 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                         desc: "Reindexing gives named footnotes (like [^note]) numbers by order of appearance instead of preserving their names.",
                         control: { type: "toggle", key: "renumberNamedFootnotes" },
                     },
+                ],
+            },
+            {
+                type: "group",
+                heading: "Tidying",
+                items: [
                     {
-                        name: "Tidy: move markers after punctuation",
+                        name: "Move markers after punctuation",
                         desc: "The tidy command moves footnote markers that sit before punctuation to sit after it.",
                         control: { type: "toggle", key: "tidyFixPunctuation" },
                     },
                     {
-                        name: "Tidy: move definitions to the bottom",
+                        name: "Move definitions to the bottom",
                         desc: "The tidy command gathers all footnote definitions at the end of the note.",
                         control: { type: "toggle", key: "tidyMoveToBottom" },
                     },
                     {
-                        name: "Tidy: reindex",
+                        name: "Reindex",
                         desc: "The tidy command renumbers footnotes and reorders their definitions.",
                         control: { type: "toggle", key: "tidyReindex" },
                     },
@@ -196,7 +202,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
         );
 
         new Setting(containerEl)
-        .setName("Reindexing and tidying")
+        .setName("Reindexing")
         .setHeading();
 
         new Setting(containerEl)
@@ -224,7 +230,11 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
         );
 
         new Setting(containerEl)
-        .setName("Tidy: move markers after punctuation")
+        .setName("Tidying")
+        .setHeading();
+
+        new Setting(containerEl)
+        .setName("Move markers after punctuation")
         .setDesc("The tidy command moves footnote markers that sit before punctuation to sit after it.")
         .addToggle((toggle) =>
             toggle
@@ -236,7 +246,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
         );
 
         new Setting(containerEl)
-        .setName("Tidy: move definitions to the bottom")
+        .setName("Move definitions to the bottom")
         .setDesc("The tidy command gathers all footnote definitions at the end of the note.")
         .addToggle((toggle) =>
             toggle
@@ -248,7 +258,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
         );
 
         new Setting(containerEl)
-        .setName("Tidy: reindex")
+        .setName("Reindex")
         .setDesc("The tidy command renumbers footnotes and reorders their definitions.")
         .addToggle((toggle) =>
             toggle
