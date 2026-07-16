@@ -50,10 +50,19 @@ jobs:
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
 
+      - name: Install dependencies
+        run: npm ci
+
+      # gate the release on the checks a local green run implies; smoke
+      # tests need a live Obsidian instance and stay a local pre-tag step
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npx vitest run
+
       - name: Build plugin
-        run: |
-          npm ci
-          npm run build
+        run: npm run build
 
       - name: Create release
         env:
