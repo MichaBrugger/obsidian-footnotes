@@ -1,7 +1,8 @@
-// Plugin entry point: registers the four hotkey commands (auto-numbered and
+// Plugin entry point: registers the hotkey commands (auto-numbered and
 // named footnotes — each one "insert OR navigate", see
-// insert-or-navigate-footnotes.ts for the decision cascade — plus the two
-// inline-footnote inserts), the settings tab, and the popup-dismissal hook.
+// insert-or-navigate-footnotes.ts for the decision cascade — the two
+// inline-footnote inserts, and the whole-document cleanups from
+// tidy-footnotes.ts), the settings tab, and the popup-dismissal hook.
 // Also owns settings load/save plus one-time migrations of legacy values.
 import {
   addIcon,
@@ -17,6 +18,10 @@ import {
   insertNamedFootnote,
   pasteInlineFootnote,
 } from "./insert-or-navigate-footnotes";
+import { footnoteAfterPunctuation } from "./footnote-after-punctuation";
+import { moveFootnoteDefinitionsToBottom } from "./move-footnotes-to-bottom";
+import { reindexFootnotes } from "./reindex-footnotes";
+import { runFootnoteTransformCommand, tidyFootnotes } from "./tidy-footnotes";
 
 export default class FootnotePlugin extends Plugin {
   // `declare`: refine the base Plugin.settings type (Obsidian 1.13+)
@@ -78,6 +83,66 @@ export default class FootnotePlugin extends Plugin {
       }
     });
   
+    // Whole-document cleanup commands (Linter's footnote rules, rebuilt —
+    // see tidy-footnotes.ts). Icons are stock Lucide until the hand-drawn
+    // set grows matching ones.
+    this.addCommand({
+      id: "reindex-footnotes",
+      name: "Reindex footnotes",
+      icon: "list-ordered",
+      checkCallback: (checking: boolean) => {
+        if (checking)
+          return !!this.app.workspace.getActiveViewOfType(MarkdownView);
+        void runFootnoteTransformCommand(this, reindexFootnotes, {
+          done: "Footnotes reindexed.",
+          noop: "Footnotes are already in order.",
+        });
+      },
+    });
+    this.addCommand({
+      id: "move-footnotes-to-bottom",
+      name: "Move all footnote definitions to the bottom",
+      icon: "arrow-down-to-line",
+      checkCallback: (checking: boolean) => {
+        if (checking)
+          return !!this.app.workspace.getActiveViewOfType(MarkdownView);
+        void runFootnoteTransformCommand(
+          this,
+          moveFootnoteDefinitionsToBottom,
+          {
+            done: "Footnote definitions moved to the bottom.",
+            noop: "Footnote definitions are already at the bottom.",
+          },
+        );
+      },
+    });
+    this.addCommand({
+      id: "footnotes-after-punctuation",
+      name: "Move footnote markers after punctuation",
+      icon: "arrow-right-to-line",
+      checkCallback: (checking: boolean) => {
+        if (checking)
+          return !!this.app.workspace.getActiveViewOfType(MarkdownView);
+        void runFootnoteTransformCommand(this, footnoteAfterPunctuation, {
+          done: "Footnote markers moved after punctuation.",
+          noop: "All footnote markers already follow punctuation.",
+        });
+      },
+    });
+    this.addCommand({
+      id: "tidy-footnotes",
+      name: "Tidy footnotes (punctuation, move to bottom, reindex)",
+      icon: "sparkles",
+      checkCallback: (checking: boolean) => {
+        if (checking)
+          return !!this.app.workspace.getActiveViewOfType(MarkdownView);
+        void runFootnoteTransformCommand(this, tidyFootnotes, {
+          done: "Footnotes tidied.",
+          noop: "Footnotes are already tidy.",
+        });
+      },
+    });
+
     this.addSettingTab(new FootnotePluginSettingTab(this.app, this));
 
     this.registerEvent(

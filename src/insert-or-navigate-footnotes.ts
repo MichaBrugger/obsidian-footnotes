@@ -337,7 +337,7 @@ function adjustFootnotePosition(
 // back to the main editor and only edit once the sync-back has settled.
 // The primary table-cell path dispatches through the cell's own editor
 // instead — see shouldCreateAutonumFootnote / shouldCreateFootnoteMarker.
-function runOutsideTableCell(
+export function runOutsideTableCell(
     doc: Editor,
     run: (cursorPosition: EditorPosition) => void,
 ) {
@@ -349,7 +349,17 @@ function runOutsideTableCell(
         return;
     }
     cm.focus();
-    window.requestAnimationFrame(() => run(cursorPosition));
+    // rAF stalls entirely while the window is hidden (same reason the popup
+    // teardown uses a timeout), which would swallow the command outright —
+    // whichever of the two fires first runs the edit
+    let ran = false;
+    const invoke = () => {
+        if (ran) return;
+        ran = true;
+        run(cursorPosition);
+    };
+    window.requestAnimationFrame(invoke);
+    window.setTimeout(invoke, 100);
 }
 
 // Insert `text` at the caret of an actively edited table cell, through the

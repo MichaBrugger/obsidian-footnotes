@@ -22,6 +22,10 @@ const CMD_AUTONUM = "obsidian-footnotes:insert-autonumbered-footnote";
 const CMD_NAMED = "obsidian-footnotes:insert-named-footnote";
 const CMD_INLINE = "obsidian-footnotes:insert-inline-footnote";
 const CMD_PASTE_INLINE = "obsidian-footnotes:paste-inline-footnote";
+const CMD_REINDEX = "obsidian-footnotes:reindex-footnotes";
+const CMD_MOVE_BOTTOM = "obsidian-footnotes:move-footnotes-to-bottom";
+const CMD_AFTER_PUNCT = "obsidian-footnotes:footnotes-after-punctuation";
+const CMD_TIDY = "obsidian-footnotes:tidy-footnotes";
 
 // ---------- CLI plumbing ----------
 
@@ -575,6 +579,93 @@ async function main() {
         if (line.includes("\\|")) throw new Error(`table pipe got escaped: ${line}`);
         const pipes = (line.match(/\|/g) ?? []).length;
         if (pipes !== 4) throw new Error(`table row has ${pipes} pipes, expected 4: ${line}`);
+    });
+
+    await test("reindex command renumbers and reorders footnotes", async () => {
+        resetSettings();
+        await setupNote("Beta[^2] alpha[^1].\n\n[^1]: one\n[^2]: two");
+        setCursorAndRun(0, 0, CMD_REINDEX);
+        await expectEditorText("Beta[^1] alpha[^2].\n\n[^1]: two\n[^2]: one");
+    });
+
+    await test("move-to-bottom command relocates a mid-note definition", async () => {
+        resetSettings();
+        await setupNote("Para one[^1].\n\n[^1]: def\n\nPara two.");
+        setCursorAndRun(0, 0, CMD_MOVE_BOTTOM);
+        await expectEditorText("Para one[^1].\n\nPara two.\n\n[^1]: def");
+    });
+
+    await test("after-punctuation command swaps markers across punctuation", async () => {
+        resetSettings();
+        await setupNote("Word[^1].\n\n[^1]: def");
+        setCursorAndRun(0, 0, CMD_AFTER_PUNCT);
+        await expectEditorText("Word.[^1]\n\n[^1]: def");
+    });
+
+    await test("tidy command runs all three cleanups and adds the heading", async () => {
+        resetSettings({
+            enableFootnoteSectionHeading: true,
+            footnoteSectionHeading: "# Footnotes",
+        });
+        await setupNote("Alpha[^2], bravo[^1].\n\n[^2]: two\n\nCharlie tail.");
+        setCursorAndRun(0, 0, CMD_TIDY);
+        // punctuation fixed, definition gathered under the heading at the
+        // bottom, numbering redone by appearance ([^2]→[^1], [^1]→[^2])
+        await expectEditorText(
+            "Alpha,[^1] bravo.[^2]\n\nCharlie tail.\n# Footnotes\n\n[^1]: two",
+        );
+    });
+
+    await test("cleanup commands do not fire while a table cell is being edited until focus returns", async () => {
+        // the runOutsideTableCell guard: running a whole-document cleanup
+        // while a cell sub-editor owns focus must not corrupt the table
+        resetSettings();
+        const table = [
+            "| Head     | Col     |",
+            "| -------- | ------- |",
+            "| Left[^2] | Right() |",
+            "",
+            "[^2]: def",
+        ].join("\n");
+        await setupNote("table pending");
+        action(`(${EDITOR}).editor.setValue(${JSON.stringify(table)});`);
+        await pollUntil(
+            "table content in editor",
+            `(${EDITOR}).editor.getValue()`,
+            (v) => typeof v === "string" && v.includes("()"),
+        );
+        // the table widget renders from the data buffer, which lags the
+        // editor by a tick — the cell sub-editor can't open before that
+        await pollUntil(
+            "table content in data buffer",
+            `(${EDITOR}).data`,
+            (v) => typeof v === "string" && v.includes("()"),
+        );
+        // editor.focus() can silently no-op when nothing in the editor had
+        // DOM focus (same quirk the popup-close path works around), and
+        // without real focus the cell editor never opens — focus the CM
+        // contentDOM directly and jiggle the cursor until the widget bites
+        await pollUntil(
+            "table cell sub-editor to open",
+            `(() => { const t=document.querySelector('.markdown-source-view table'); ` +
+            `const v=${EDITOR}; ` +
+            `const cm = !!(t && t.querySelector('.cm-content')); ` +
+            `if (!cm) { v.editor.cm.contentDOM.focus(); ` +
+            `const ch=v.editor.getLine(2).indexOf('()')+1; ` +
+            `v.editor.setCursor({line:2, ch:0}); v.editor.setCursor({line:2, ch}); } ` +
+            `return cm; })()`,
+            (v) => v === true,
+        );
+        action(`app.commands.executeCommandById('${CMD_REINDEX}');`);
+        await pollUntil(
+            "reindex applied without shredding the table",
+            `(${EDITOR}).editor.getValue()`,
+            (v) =>
+                typeof v === "string" &&
+                v.includes("[^1]") &&
+                !v.includes("\\|") &&
+                (v.match(/\|/g) ?? []).length === 9,
+        );
     });
 
     // restore state and clean up
