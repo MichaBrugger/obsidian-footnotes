@@ -14,3 +14,5 @@ data.json
 
 # macOS metadata files
 **.DS_Store
+# Inkscape auto-backup copies (timestamped crash-recovery files)
+icons/*.svg.*.svg
