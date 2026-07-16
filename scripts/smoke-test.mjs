@@ -255,6 +255,33 @@ async function main() {
         }
     });
 
+    await test("jumping between marker and detail centers the cursor in view", async () => {
+        // regression (reported 2026-07-16): Obsidian's minimal scrolling
+        // parked the cursor at the very edge of the viewport after a jump —
+        // on mobile, nearly off screen. Jumps should land centered.
+        resetSettings();
+        const lines = Array.from({ length: 120 }, (_, i) => `Paragraph ${i + 1} lorem ipsum.`);
+        lines[60] += "[^1]";
+        lines.push("", "[^1]: the detail");
+        await setupNote(lines.join("\n"));
+        // start on the detail line (last line) and jump UP to the marker
+        setCursorAndRun(122, 5, CMD_AUTONUM);
+        await pollUntil(
+            "cursor on the marker line",
+            `(${EDITOR}).editor.getCursor()`,
+            (c) => c && c.line === 60,
+        );
+        const ratio = await pollUntil(
+            "cursor vertically inside the middle band of the viewport",
+            `(() => { const cm = (${EDITOR}).editor.cm; ` +
+            `const c = cm.coordsAtPos(cm.state.selection.main.head); ` +
+            `const r = cm.scrollDOM.getBoundingClientRect(); ` +
+            `return c && r.height > 0 ? (c.top - r.top) / r.height : null; })()`,
+            (v) => typeof v === "number" && v > 0.25 && v < 0.75,
+        );
+        void ratio;
+    });
+
     await test("named footnote inserts empty marker with cursor inside", async () => {
         resetSettings();
         await setupNote("Alpha bravo charlie");

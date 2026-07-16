@@ -80,6 +80,7 @@ function moveCursorAndSetJumpPoint(
     newCursorPos: EditorPosition,
     plugin: FootnotePlugin,
     changes?: EditorChange[],
+    center = false,
 ): void {
     // when focus sits in a sub-editor (a table cell being edited — its
     // contentDOM is nested inside the main editor's), return it to the main
@@ -103,6 +104,13 @@ function moveCursorAndSetJumpPoint(
         doc.transaction({ changes, selection: { from: newCursorPos } });
     } else {
         doc.setCursor(newCursorPos);
+    }
+
+    // jumps land CENTERED: Obsidian's minimal scrolling would park the
+    // cursor at the viewport edge — on mobile, nearly off screen. Local
+    // inserts pass center=false so the view doesn't shift underfoot.
+    if (center) {
+        doc.scrollIntoView({ from: newCursorPos, to: newCursorPos }, true);
     }
 
     // if user has vim mode enabled, set jump point
@@ -135,7 +143,7 @@ export function shouldJumpFromDetailToMarker(
             const ch = doc.getLine(i).indexOf(footnote);
             if (ch !== -1) {
                 const newCursorPos = { line: i, ch: ch + footnote.length };
-                moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos, plugin);
+                moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos, plugin, undefined, true);
                 return true;
             }
         }
@@ -161,7 +169,7 @@ export function jumpToFootnoteDetail(
                 endLine++;
             }
             const newCursorPos = { line: endLine, ch: doc.getLine(endLine).length };
-            moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos, plugin);
+            moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos, plugin, undefined, true);
             return true;
         }
     }
@@ -440,10 +448,10 @@ export function shouldCreateAutonumFootnote(
         if (popupEditingAvailable(plugin)) {
             doc.transaction({ changes: [detail.change] });
             void openFootnotePopup(plugin, footnoteId, () =>
-                moveCursorAndSetJumpPoint(doc, cursorPosition, detail.cursor, plugin)
+                moveCursorAndSetJumpPoint(doc, cursorPosition, detail.cursor, plugin, undefined, true)
             );
         } else {
-            moveCursorAndSetJumpPoint(doc, cursorPosition, detail.cursor, plugin, [detail.change]);
+            moveCursorAndSetJumpPoint(doc, cursorPosition, detail.cursor, plugin, [detail.change], true);
         }
         return;
     }
@@ -461,10 +469,10 @@ export function shouldCreateAutonumFootnote(
         const afterMarker = { line: cursorPosition.line, ch: cursorPosition.ch + footnoteMarker.length };
         doc.transaction({ changes, selection: { from: afterMarker } });
         void openFootnotePopup(plugin, footnoteId, () =>
-            moveCursorAndSetJumpPoint(doc, cursorPosition, detail.cursor, plugin)
+            moveCursorAndSetJumpPoint(doc, cursorPosition, detail.cursor, plugin, undefined, true)
         );
     } else {
-        moveCursorAndSetJumpPoint(doc, cursorPosition, detail.cursor, plugin, changes);
+        moveCursorAndSetJumpPoint(doc, cursorPosition, detail.cursor, plugin, changes, true);
     }
 }
 
@@ -706,10 +714,10 @@ export function shouldCreateMatchingFootnoteDetail(
                     // bottom; the cursor stays on the marker
                     doc.transaction({ changes: [detail.change] });
                     void openFootnotePopup(plugin, footnoteId, () =>
-                        moveCursorAndSetJumpPoint(doc, cursorPosition, detail.cursor, plugin)
+                        moveCursorAndSetJumpPoint(doc, cursorPosition, detail.cursor, plugin, undefined, true)
                     );
                 } else {
-                    moveCursorAndSetJumpPoint(doc, cursorPosition, detail.cursor, plugin, [detail.change]);
+                    moveCursorAndSetJumpPoint(doc, cursorPosition, detail.cursor, plugin, [detail.change], true);
                 }
 
                 return true;
