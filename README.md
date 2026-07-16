@@ -49,6 +49,14 @@ If you would like, you can further customize the plugin's behavior in Footnote S
 5. And a new footnote details marker (e.g. `[^2]: `) is inserted on the last line of the document
 6. And my cursor is now placed at the end of the detail marker (e.g. `[^2]: ▊`)
 
+#### Scenario: Chapter notes that merge into one document (footnote prefix)
+
+1. Given my note is one chapter of a combined document, so plain numbers would collide across chapters
+2. And my note's properties (frontmatter) set a prefix, e.g. `footnote-prefix: 2.`
+3. When I hit `auto-numbered footnote hotkey`
+4. Then the new footnotes are numbered within that prefix (e.g. `[^2.1]`, then `[^2.2]`, …)
+5. And notes without the property keep plain numbering (`[^1]`, `[^2]`, …)
+
 ### Named Footnotes
 
 #### Scenario: Add a named footnote
