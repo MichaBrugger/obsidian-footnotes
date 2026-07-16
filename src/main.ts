@@ -24,16 +24,16 @@ export default class FootnotePlugin extends Plugin {
   declare settings: FootnotePluginSettings;
 
   async onload() {
-    // Jason's hand-drawn "marker style" icon family (icons/marker style/):
-    // a shared footnote-badge container with the action as the inner glyph
-    // — plus (add numbered), I-beam text cursor (name it), arrow (paste).
-    // Named vs inline is the container's top: notched vs flat. Source SVGs
-    // are exported from Inkscape with stroke swapped to currentColor so
-    // the icons follow the theme.
-    addIcon("footnote-numbered", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g transform="translate(0,-118)" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><g transform="translate(16,116)"><path d="m-4 12v6"/><path d="m-1 15h-6"/></g><path d="m4 120 4 3e-5 4 3 4-3 4-3e-5c1.1046 0 2 0.89542 2 2v12.005c0 0.75383-0.4259 1.443-1.1001 1.7801l-7.7997 3.8998c-0.69256 0.34628-1.5077 0.34628-2.2003 0l-7.7997-3.8998c-0.67424-0.33712-1.1001-1.0262-1.1001-1.7801v-12.005c0-1.1046 0.89543-2 2-2z"/></g></svg>`);
-    addIcon("footnote-named", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g transform="translate(0 -141.97)" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m4 144 4 3e-5 4 3 4-3 4-3e-5c1.1046 0 2 0.89543 2 2v12.005c0 0.75382-0.4259 1.443-1.1001 1.7801l-7.7997 3.8998c-0.69256 0.34628-1.5077 0.34628-2.2003 0l-7.7997-3.8998c-0.67424-0.33712-1.1001-1.0262-1.1001-1.7801v-12.005c0-1.1046 0.89543-2 2-2z"/><g transform="translate(-24 141.07)"><path d="m39 16.937h-1a2 2 0 0 1-2-2 2 2 0 0 1-2 2h-1"/><path d="m33 8.9367h1a2 2 0 0 1 2 2 2 2 0 0 1 2-2h1"/><path d="m36 10.93v4.1476"/></g></g></svg>`);
-    addIcon("footnote-inline-cursor", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g transform="translate(24,-142)" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m-20 145h16a2 2 0 0 1 2 2v11.005a1.9902 1.9902 0 0 1-1.1001 1.7801l-7.7997 3.8998a2.46 2.46 0 0 1-2.2003 0l-7.7997-3.8998a1.9902 1.9902 0 0 1-1.1001-1.7801v-11.005a2 2 0 0 1 2-2z"/><g transform="translate(-48 141.07)"><path d="m39 16.937h-1a2 2 0 0 1-2-2 2 2 0 0 1-2 2h-1"/><path d="m33 8.9367h1a2 2 0 0 1 2 2 2 2 0 0 1 2-2h1"/><path d="m36 10.93v4.1476"/></g></g></svg>`);
-    addIcon("footnote-inline-paste", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g transform="translate(24.1 -118.32)" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m-20.1 121.32h16a2 2 0 0 1 2 2v11.005a1.9902 1.9902 0 0 1-1.1001 1.7801l-7.7997 3.8999a2.46 2.46 0 0 1-2.2003 0l-7.7997-3.8999a1.9902 1.9902 0 0 1-1.1001-1.7801v-11.005a2 2 0 0 1 2-2z"/><path d="m-12 127v8"/><path d="m-16 131 4 4 4-4"/></g></svg>`);
+    // Jason's hand-drawn "action style" icon family (icons/action style/):
+    // the action is the main glyph — hash (numbered), I-beam text cursor
+    // (named / inline write), clipboard (paste) — and the small mark gives
+    // the footnote type: down ARROW (jump to the note bottom) for regular
+    // footnotes, up chevron (the ^ of ^[...]) for inline ones. Source SVGs
+    // exported from Inkscape with strokes as currentColor for theming.
+    addIcon("footnote-numbered", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g transform="translate(0,1)" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><g transform="translate(-2,-1)" stroke="currentColor"><path d="m4 9h14"/><path d="m4 15h11"/><line x1="10" x2="8" y1="3" y2="21"/><path d="m16 3-2 18"/></g><path d="m22 16-3 3-3-3" stroke="currentColor"/><path d="m19 18v-7" stroke="currentColor"/></g></svg>`);
+    addIcon("footnote-named", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g transform="translate(24,-62)" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><g transform="translate(-24,27)" stroke="currentColor"><path d="m12 53v-12c0-2.2091 1.7909-4 4-4h1"/><path d="m7 57h1a4 4 0 0 0 4-4"/><path d="m7 37h1a4 4 0 0 1 4 4"/></g><path d="m-2 78-3 3-3-3" stroke="currentColor"/><path d="m-5 80v-7" stroke="currentColor"/></g></svg>`);
+    addIcon("footnote-inline-cursor", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g transform="translate(0,-62)" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><g transform="translate(0,62)"><path d="m12 18v-12c0-2.2091 1.7909-4 4-4h1"/><path d="m7 22h1a4 4 0 0 0 4-4"/><path d="m7 2h1a4 4 0 0 1 4 4"/></g><path d="m22 81-3-3-3 3"/></g></svg>`);
+    addIcon("footnote-inline-paste", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><g transform="translate(0,-27)"><rect x="8" y="29" width="8" height="4" rx="1" ry="1"/><path d="m16 31h2c1.1046 0 2 0.89543 2 2v6m-7 10h-7c-1.1046 0-2-0.89543-2-2v-14c0-1.1046 0.89543-2 2-2h2"/></g><path d="m22 19-3-3-3 3"/></g></svg>`);
 
     await this.loadSettings();
 
