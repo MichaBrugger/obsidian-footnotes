@@ -439,13 +439,56 @@ export function insertInTableCell(
 
 //FUNCTIONS FOR AUTONUMBERED FOOTNOTES
 
+/**
+ * The note's `footnote-prefix` frontmatter value, or "" when absent. Chapter
+ * notes of a combined document set this (e.g. "2.") so the autonumbered
+ * command creates "[^2.1]", "[^2.2]", … — unique across the merged export
+ * (issue #31).
+ */
+export function footnotePrefix(markdownText: string): string {
+    const lines = markdownText.split("\n");
+    if (lines[0] !== "---") return "";
+    for (let i = 1; i < lines.length; i++) {
+        if (/^(---|\.\.\.)\s*$/.test(lines[i])) break;
+        const match = lines[i].match(/^footnote-prefix:\s*(.*)$/);
+        if (match) {
+            let value = match[1].trim();
+            const quoted = value.match(/^(["'])(.*)\1$/);
+            if (quoted) value = quoted[2];
+            return value;
+        }
+    }
+    return "";
+}
+
+// The prefix the autonumbered command should actually use: a prefix that
+// can't form a renderable footnote name is dropped with an explanation
+// instead of silently producing broken markers.
+function activeFootnotePrefix(markdownText: string): string {
+    const prefix = footnotePrefix(markdownText);
+    if (!prefix) return "";
+    if (!isValidFootnoteName(prefix) || /[[\]]/.test(prefix)) {
+        new Notice(
+            `The note's footnote-prefix ("${prefix}") contains spaces or brackets, so it was ignored.`,
+        );
+        return "";
+    }
+    return prefix;
+}
+
 // One more than the highest numbered marker or detail in the text; gaps in
 // the numbering are not reused, and named footnotes don't count. Numbers
-// inside code blocks or frontmatter don't reserve anything (#41).
-export function computeNextFootnoteNumber(markdownText: string): number {
+// inside code blocks or frontmatter don't reserve anything (#41). With a
+// `prefix`, only markers carrying it count ("[^2.7]" under prefix "2."),
+// and plain numbered markers belong to the "" prefix only.
+export function computeNextFootnoteNumber(markdownText: string, prefix = ""): number {
     const masked = maskProtectedLines(markdownText.split("\n")).join("\n");
+    const escaped = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const numberedMarkers = prefix
+        ? new RegExp(`\\[\\^${escaped}(\\d+)\\]`, "g")
+        : AllNumberedMarkers;
     let currentMax = 1;
-    for (const match of masked.matchAll(AllNumberedMarkers)) {
+    for (const match of masked.matchAll(numberedMarkers)) {
         currentMax = Math.max(currentMax, Number(match[1]) + 1);
     }
     return currentMax;
@@ -494,12 +537,15 @@ export function shouldCreateAutonumFootnote(
     doc: Editor,
     cell: TableCellEditor | null = null
 ) {
-    // create new footnote with the next numerical index, reading the editor
+    // create new footnote with the next numerical index — namespaced by the
+    // note's footnote-prefix property when set (#31) — reading the editor
     // document (the view's data buffer lags editor edits by a tick, so it
     // can't be trusted here)
-    const currentMax = computeNextFootnoteNumber(doc.getValue());
+    const markdownText = doc.getValue();
+    const prefix = activeFootnotePrefix(markdownText);
+    const currentMax = computeNextFootnoteNumber(markdownText, prefix);
 
-    const footnoteId = String(currentMax);
+    const footnoteId = `${prefix}${currentMax}`;
     const footnoteMarker = `[^${footnoteId}]`;
 
     const isFirstFootnote =

@@ -693,6 +693,20 @@ async function main() {
         ].join("\n"));
     });
 
+    await test("footnote-prefix property namespaces autonumbered footnotes (issue #31)", async () => {
+        resetSettings();
+        await setupNote("---\nfootnote-prefix: 2.\n---\nAlpha bravo");
+        setCursorAndRun(3, 8, CMD_AUTONUM); // mid "bravo"
+        await expectEditorText(
+            "---\nfootnote-prefix: 2.\n---\nAlpha bravo[^2.1]\n\n[^2.1]: ",
+        );
+        // the next press right after the marker chains [^2.2]
+        setCursorAndRun(3, 17, CMD_AUTONUM);
+        await expectEditorText(
+            "---\nfootnote-prefix: 2.\n---\nAlpha bravo[^2.1][^2.2]\n\n[^2.1]: \n[^2.2]: ",
+        );
+    });
+
     await test("reindex deletes orphaned definitions when the setting says so", async () => {
         resetSettings({ keepOrphanedDefinitions: false });
         await setupNote("Text[^2].\n\n[^2]: used\n[^9]: orphan");
