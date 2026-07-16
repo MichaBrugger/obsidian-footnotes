@@ -88,22 +88,6 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
             },
             {
                 type: "group",
-                heading: "Reindexing",
-                items: [
-                    {
-                        name: "Keep orphaned definitions",
-                        desc: "Reindexing keeps definitions that no marker references and numbers them after everything else. Turn off to delete them instead.",
-                        control: { type: "toggle", key: "keepOrphanedDefinitions" },
-                    },
-                    {
-                        name: "Renumber named footnotes",
-                        desc: "Reindexing gives named footnotes (like [^note]) numbers by order of appearance instead of preserving their names.",
-                        control: { type: "toggle", key: "renumberNamedFootnotes" },
-                    },
-                ],
-            },
-            {
-                type: "group",
                 heading: "Tidying",
                 items: [
                     {
@@ -118,8 +102,24 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                     },
                     {
                         name: "Reindex",
-                        desc: "The tidy command renumbers footnotes and reorders their definitions.",
+                        desc: "The tidy command also renumbers footnotes and reorders their definitions, following the reindexing options below.",
                         control: { type: "toggle", key: "tidyReindex" },
+                    },
+                ],
+            },
+            {
+                type: "group",
+                heading: "Reindexing",
+                items: [
+                    {
+                        name: "Keep orphaned definitions",
+                        desc: "The reindex command and tidy's reindex step keep definitions that no marker references, numbering them after everything else. Turn off to delete them instead.",
+                        control: { type: "toggle", key: "keepOrphanedDefinitions" },
+                    },
+                    {
+                        name: "Renumber named footnotes",
+                        desc: "The reindex command and tidy's reindex step give named footnotes (like [^note]) numbers by order of appearance instead of preserving their names.",
+                        control: { type: "toggle", key: "renumberNamedFootnotes" },
                     },
                 ],
             },
@@ -202,34 +202,6 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
         );
 
         new Setting(containerEl)
-        .setName("Reindexing")
-        .setHeading();
-
-        new Setting(containerEl)
-        .setName("Keep orphaned definitions")
-        .setDesc("Reindexing keeps definitions that no marker references and numbers them after everything else. Turn off to delete them instead.")
-        .addToggle((toggle) =>
-            toggle
-                .setValue(this.plugin.settings.keepOrphanedDefinitions)
-                .onChange(async (value) => {
-                    this.plugin.settings.keepOrphanedDefinitions = value;
-                    await this.plugin.saveSettings();
-                })
-        );
-
-        new Setting(containerEl)
-        .setName("Renumber named footnotes")
-        .setDesc("Reindexing gives named footnotes (like [^note]) numbers by order of appearance instead of preserving their names.")
-        .addToggle((toggle) =>
-            toggle
-                .setValue(this.plugin.settings.renumberNamedFootnotes)
-                .onChange(async (value) => {
-                    this.plugin.settings.renumberNamedFootnotes = value;
-                    await this.plugin.saveSettings();
-                })
-        );
-
-        new Setting(containerEl)
         .setName("Tidying")
         .setHeading();
 
@@ -259,12 +231,40 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
         .setName("Reindex")
-        .setDesc("The tidy command renumbers footnotes and reorders their definitions.")
+        .setDesc("The tidy command also renumbers footnotes and reorders their definitions, following the reindexing options below.")
         .addToggle((toggle) =>
             toggle
                 .setValue(this.plugin.settings.tidyReindex)
                 .onChange(async (value) => {
                     this.plugin.settings.tidyReindex = value;
+                    await this.plugin.saveSettings();
+                })
+        );
+
+        new Setting(containerEl)
+        .setName("Reindexing")
+        .setHeading();
+
+        new Setting(containerEl)
+        .setName("Keep orphaned definitions")
+        .setDesc("The reindex command and tidy's reindex step keep definitions that no marker references, numbering them after everything else. Turn off to delete them instead.")
+        .addToggle((toggle) =>
+            toggle
+                .setValue(this.plugin.settings.keepOrphanedDefinitions)
+                .onChange(async (value) => {
+                    this.plugin.settings.keepOrphanedDefinitions = value;
+                    await this.plugin.saveSettings();
+                })
+        );
+
+        new Setting(containerEl)
+        .setName("Renumber named footnotes")
+        .setDesc("The reindex command and tidy's reindex step give named footnotes (like [^note]) numbers by order of appearance instead of preserving their names.")
+        .addToggle((toggle) =>
+            toggle
+                .setValue(this.plugin.settings.renumberNamedFootnotes)
+                .onChange(async (value) => {
+                    this.plugin.settings.renumberNamedFootnotes = value;
                     await this.plugin.saveSettings();
                 })
         );
