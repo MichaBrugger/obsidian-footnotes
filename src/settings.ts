@@ -8,6 +8,7 @@ import FootnotePlugin from "./main";
 export interface FootnotePluginSettings {
     insertAtEndOfWord: boolean;
     enablePopupEditor: boolean;
+    enableFootnotePrefix: boolean;
 
     enableFootnoteSectionHeading: boolean;
     footnoteSectionHeading: string;
@@ -24,6 +25,7 @@ export interface FootnotePluginSettings {
 export const DEFAULT_SETTINGS: FootnotePluginSettings = {
     insertAtEndOfWord: true,
     enablePopupEditor: true,
+    enableFootnotePrefix: false,
 
     enableFootnoteSectionHeading: false,
     footnoteSectionHeading: "# Footnotes",
@@ -58,6 +60,11 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                 name: "Edit footnotes in a popup",
                 desc: "Open the footnote detail in a small editor where you're typing, instead of jumping to the bottom of the note. Close with the footnote hotkey, the escape key, or by clicking outside.",
                 control: { type: "toggle", key: "enablePopupEditor" },
+            },
+            {
+                name: "Per-note footnote prefix",
+                desc: "Numbered footnotes respect a footnote-prefix property in the note's frontmatter: with \"footnote-prefix: 2.\" the command inserts [^2.1], then [^2.2], and so on. Useful when chapter notes are combined into one document.",
+                control: { type: "toggle", key: "enableFootnotePrefix" },
             },
             {
                 type: "group",
@@ -152,6 +159,18 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                 .setValue(this.plugin.settings.enablePopupEditor)
                 .onChange(async (value) => {
                     this.plugin.settings.enablePopupEditor = value;
+                    await this.plugin.saveSettings();
+                })
+        );
+
+        new Setting(containerEl)
+        .setName("Per-note footnote prefix")
+        .setDesc("Numbered footnotes respect a footnote-prefix property in the note's frontmatter: with \"footnote-prefix: 2.\" the command inserts [^2.1], then [^2.2], and so on. Useful when chapter notes are combined into one document.")
+        .addToggle((toggle) =>
+            toggle
+                .setValue(this.plugin.settings.enableFootnotePrefix)
+                .onChange(async (value) => {
+                    this.plugin.settings.enableFootnotePrefix = value;
                     await this.plugin.saveSettings();
                 })
         );

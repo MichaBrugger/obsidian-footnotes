@@ -461,10 +461,12 @@ export function footnotePrefix(markdownText: string): string {
     return "";
 }
 
-// The prefix the autonumbered command should actually use: a prefix that
-// can't form a renderable footnote name is dropped with an explanation
-// instead of silently producing broken markers.
-function activeFootnotePrefix(markdownText: string): string {
+// The prefix the autonumbered command should actually use: nothing unless
+// the feature is enabled in settings, and a prefix that can't form a
+// renderable footnote name is dropped with an explanation instead of
+// silently producing broken markers.
+function activeFootnotePrefix(plugin: FootnotePlugin, markdownText: string): string {
+    if (!plugin.settings.enableFootnotePrefix) return "";
     const prefix = footnotePrefix(markdownText);
     if (!prefix) return "";
     if (!isValidFootnoteName(prefix) || /[[\]]/.test(prefix)) {
@@ -542,7 +544,7 @@ export function shouldCreateAutonumFootnote(
     // document (the view's data buffer lags editor edits by a tick, so it
     // can't be trusted here)
     const markdownText = doc.getValue();
-    const prefix = activeFootnotePrefix(markdownText);
+    const prefix = activeFootnotePrefix(plugin, markdownText);
     const currentMax = computeNextFootnoteNumber(markdownText, prefix);
 
     const footnoteId = `${prefix}${currentMax}`;

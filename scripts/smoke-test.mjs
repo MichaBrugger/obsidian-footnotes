@@ -132,6 +132,7 @@ async function setupNote(content) {
 const BASELINE_SETTINGS = {
     enablePopupEditor: false,
     insertAtEndOfWord: true,
+    enableFootnotePrefix: false,
     enableFootnoteSectionHeading: false,
     enableRemoveBlankLastLines: true,
     keepOrphanedDefinitions: true,
@@ -168,12 +169,29 @@ function setSettings(patch) {
 // ---------- test runner ----------
 
 let failures = 0;
+let skips = 0;
+
+class SkipTest extends Error {}
+
+// The table widget only opens its cell sub-editor from the render loop,
+// which stalls entirely while the window is hidden — tests that need it
+// call this and SKIP (loudly) instead of failing meaninglessly.
+function requireVisibleWindow() {
+    if (readJson("document.hidden") === true) {
+        throw new SkipTest("Obsidian window is hidden/minimized — table cell editing can't render");
+    }
+}
 
 async function test(name, fn) {
     try {
         await fn();
         console.log(`  PASS  ${name}`);
     } catch (e) {
+        if (e instanceof SkipTest) {
+            skips++;
+            console.log(`  SKIP  ${name}\n        ${e.message}`);
+            return;
+        }
         failures++;
         console.error(`  FAIL  ${name}\n        ${e.message}`);
     }
@@ -535,6 +553,7 @@ async function main() {
     });
 
     await test("footnote lands at the caret inside an actively edited table cell", async () => {
+        requireVisibleWindow();
         // regression (reported 2026-07-14): running the command while a
         // table cell sub-editor owned focus raced the cell's sync-back —
         // the insert was swallowed or the row's pipes were displaced and
@@ -693,7 +712,7 @@ async function main() {
     });
 
     await test("footnote-prefix property namespaces autonumbered footnotes (issue #31)", async () => {
-        resetSettings();
+        resetSettings({ enableFootnotePrefix: true });
         await setupNote("---\nfootnote-prefix: 2.\n---\nAlpha bravo");
         setCursorAndRun(3, 8, CMD_AUTONUM); // mid "bravo"
         await expectEditorText(
@@ -703,6 +722,15 @@ async function main() {
         setCursorAndRun(3, 17, CMD_AUTONUM);
         await expectEditorText(
             "---\nfootnote-prefix: 2.\n---\nAlpha bravo[^2.1][^2.2]\n\n[^2.1]: \n[^2.2]: ",
+        );
+    });
+
+    await test("footnote-prefix is ignored while its toggle is off (the default)", async () => {
+        resetSettings();
+        await setupNote("---\nfootnote-prefix: 2.\n---\nAlpha bravo");
+        setCursorAndRun(3, 8, CMD_AUTONUM);
+        await expectEditorText(
+            "---\nfootnote-prefix: 2.\n---\nAlpha bravo[^1]\n\n[^1]: ",
         );
     });
 
@@ -727,6 +755,7 @@ async function main() {
     });
 
     await test("cleanup commands do not fire while a table cell is being edited until focus returns", async () => {
+        requireVisibleWindow();
         // the runOutsideTableCell guard: running a whole-document cleanup
         // while a cell sub-editor owns focus must not corrupt the table
         resetSettings();
@@ -782,7 +811,8 @@ async function main() {
     setSettings(savedSettings);
     ob("delete", `path=${NOTE}.md`);
 
-    console.log(failures === 0 ? "\nall smoke tests passed" : `\n${failures} smoke test(s) FAILED`);
+    const skipNote = skips > 0 ? ` (${skips} skipped — rerun with the Obsidian window visible)` : "";
+    console.log(failures === 0 ? `\nall smoke tests passed${skipNote}` : `\n${failures} smoke test(s) FAILED${skipNote}`);
     process.exit(failures === 0 ? 0 : 1);
 }
 
