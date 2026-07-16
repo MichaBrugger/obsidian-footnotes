@@ -232,7 +232,11 @@ export async function openFootnotePopup(
     });
     const embedEl = containerEl.createDiv("footnote-shortcut-popup-embed");
 
-    const subpath = `#[^${footnoteId}]`;
+    // footnote labels are case-insensitive markdown, and the metadata cache
+    // stores their ids lowercased — a subpath in the marker's original
+    // casing (e.g. "[^arXiv:…]") resolves to nothing (issue #50's popup
+    // half: the popup silently degraded to the legacy jump)
+    const subpath = `#[^${footnoteId.toLowerCase()}]`;
     const buildEmbed = () => {
         const built = createEmbed(
             { app: plugin.app, linktext: subpath, sourcePath: file.path, containerEl: embedEl, depth: 0 },

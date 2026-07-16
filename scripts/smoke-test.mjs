@@ -621,6 +621,42 @@ async function main() {
         );
     });
 
+    await test("jump works for named footnotes with ':' in the name (issue #50)", async () => {
+        resetSettings();
+        const note = "Ref [^arXiv:1234.5678] end.\n\n[^arXiv:1234.5678]: Content 2";
+        await setupNote(note);
+        setCursorAndRun(0, 8, CMD_NAMED); // caret inside the marker
+        await pollUntil(
+            "cursor on the detail line",
+            `(${EDITOR}).editor.getCursor()`,
+            (c) => c && c.line === 2,
+        );
+        const text = readJson(`(${EDITOR}).editor.getValue()`);
+        if (text !== note) {
+            throw new Error(`jump changed the text: ${JSON.stringify(text)}`);
+        }
+    });
+
+    await test("popup binds to a named footnote with ':' in the name (issue #50)", async () => {
+        resetSettings({ enablePopupEditor: true });
+        await setupNote(
+            "Ref [^arXiv:1234.5678] end.\n\n[^arXiv:1234.5678]: Content 2",
+        );
+        setCursorAndRun(0, 8, CMD_NAMED);
+        await pollUntil(
+            "popup visible with the right detail loaded",
+            `(() => { const p = document.querySelector('.footnote-shortcut-popup');
+                return { open: !!p, text: p ? p.textContent : '' }; })()`,
+            (s) => s && s.open && s.text.includes("Content 2"),
+        );
+        action(`app.commands.executeCommandById('${CMD_NAMED}');`); // close
+        await pollUntil(
+            "popup closed again",
+            `!document.querySelector('.footnote-shortcut-popup:not(.footnote-shortcut-popup-closed)')`,
+            (v) => v === true,
+        );
+    });
+
     await test("autonumbering ignores [^x] inside code blocks (issue #41)", async () => {
         // fenced fake marker+detail used to reserve numbers and suppress
         // the first-footnote handling
