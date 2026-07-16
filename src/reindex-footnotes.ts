@@ -1,4 +1,11 @@
 import { AllMarkers } from "./insert-or-navigate-footnotes";
+import {
+    DefinitionBlock,
+    DefinitionStart,
+    findDefinitionBlocks,
+    maskInlineCode,
+    protectedLines,
+} from "./markdown-scan";
 
 // The reindex algorithm: a pure markdown → markdown transform, no Editor.
 // Policy (pinned in test/reindex-footnotes.test.ts): numbered footnotes are
@@ -6,138 +13,6 @@ import { AllMarkers } from "./insert-or-navigate-footnotes";
 // to match; named footnotes keep their names but slot into the definition
 // ordering; orphaned definitions are kept (numbered after everything
 // referenced); code and frontmatter are invisible to all of it.
-
-const DefinitionStart = /^\[\^([^[\]]+)\]:/;
-// a continuation line belongs to the definition above it
-const IndentedContent = /^\s+\S/;
-
-interface DefinitionBlock {
-    name: string;
-    /** inclusive line range, continuation lines included */
-    start: number;
-    end: number;
-}
-
-/**
- * Lines the algorithm must not read or touch: YAML frontmatter and fenced
- * code blocks (both fence delimiter lines included). Indented code blocks
- * are NOT detected — indentation is how definition continuations work.
- */
-function protectedLines(lines: string[]): boolean[] {
-    const isProtected = new Array<boolean>(lines.length).fill(false);
-    let i = 0;
-
-    if (lines[0] === "---") {
-        for (let j = 1; j < lines.length; j++) {
-            if (/^(---|\.\.\.)\s*$/.test(lines[j])) {
-                for (let k = 0; k <= j; k++) isProtected[k] = true;
-                i = j + 1;
-                break;
-            }
-        }
-    }
-
-    let fence: { char: string; length: number } | null = null;
-    for (; i < lines.length; i++) {
-        if (fence) {
-            isProtected[i] = true;
-            const close = lines[i].match(/^ {0,3}(`{3,}|~{3,})\s*$/);
-            if (
-                close &&
-                close[1][0] === fence.char &&
-                close[1].length >= fence.length
-            ) {
-                fence = null;
-            }
-        } else {
-            const open = lines[i].match(/^ {0,3}(`{3,}|~{3,})/);
-            if (open) {
-                fence = { char: open[1][0], length: open[1].length };
-                isProtected[i] = true;
-            }
-        }
-    }
-    return isProtected;
-}
-
-/**
- * The line with every inline code span (backtick run + content + matching
- * closing run, CommonMark equal-length rule) overwritten by NULs, so marker
- * scans skip code while every index still lines up with the original.
- */
-function maskInlineCode(line: string): string {
-    const chars = line.split("");
-    let i = 0;
-    while (i < line.length) {
-        if (line[i] !== "`") {
-            i++;
-            continue;
-        }
-        const runStart = i;
-        while (line[i] === "`") i++;
-        const runLength = i - runStart;
-
-        // find the next backtick run of exactly the same length
-        let close = -1;
-        for (let j = i; j < line.length; ) {
-            if (line[j] !== "`") {
-                j++;
-                continue;
-            }
-            const candidate = j;
-            while (line[j] === "`") j++;
-            if (j - candidate === runLength) {
-                close = candidate;
-                break;
-            }
-        }
-        if (close === -1) continue; // unclosed run: literal backticks
-
-        for (let k = runStart; k < close + runLength; k++) chars[k] = "\0";
-        i = close + runLength;
-    }
-    return chars.join("");
-}
-
-/** Every definition with its continuation lines (indented lines, plus blank runs that lead to more indented lines). */
-function findDefinitionBlocks(
-    lines: string[],
-    isProtected: boolean[],
-): DefinitionBlock[] {
-    const blocks: DefinitionBlock[] = [];
-    for (let i = 0; i < lines.length; i++) {
-        if (isProtected[i]) continue;
-        const match = lines[i].match(DefinitionStart);
-        if (!match) continue;
-
-        let end = i;
-        let j = i + 1;
-        while (j < lines.length && !isProtected[j]) {
-            if (IndentedContent.test(lines[j])) {
-                end = j++;
-                continue;
-            }
-            if (lines[j].trim() !== "") break;
-            // a blank run continues the block only when indented content
-            // (of an unprotected line) follows it
-            let k = j;
-            while (k < lines.length && lines[k].trim() === "") k++;
-            if (
-                k < lines.length &&
-                !isProtected[k] &&
-                IndentedContent.test(lines[k])
-            ) {
-                end = k;
-                j = k + 1;
-            } else {
-                break;
-            }
-        }
-        blocks.push({ name: match[1], start: i, end });
-        i = end;
-    }
-    return blocks;
-}
 
 /** Distinct footnote names by first marker appearance, then orphaned definition names in definition order. */
 function appearanceOrder(
