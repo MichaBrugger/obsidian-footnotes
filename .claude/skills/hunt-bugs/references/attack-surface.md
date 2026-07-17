@@ -52,6 +52,15 @@ Every closed bug is a *class*; hunters probe the class's neighbors:
 ## Lens checklists
 
 ### grammar
+Blind spots caught only by an out-of-band hunt on 2026-07-17 — always cover
+these three: **case-folding** (Obsidian treats footnote ids case-insensitively
+and `footnote-popup.ts` lowercases, but other comparisons are case-sensitive —
+probe `[^Note]` vs `[^note]` through every scan/jump/reindex path, including
+orphan deletion: worst case is silent data loss); **degenerate `[^]`** (empty
+name never matches `AllMarkers`, so navigation misses it and a second hotkey
+press nests markers); **unicode word/grapheme boundaries** (`endOfWordOffset`
+uses bare `\w` — probe combining marks, precomposed accents, CJK).
+
 Targets: `AllMarkers`, `ExtractNameFromFootnote`, `DefinitionStart`,
 `isValidFootnoteName`, `listExistingFootnoteDetails`,
 `listExistingFootnoteMarkersAndLocations`, `computeNextFootnoteNumber`.

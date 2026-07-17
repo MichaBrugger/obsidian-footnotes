@@ -30,6 +30,10 @@ wrong more than half the time — the surrounding code compensates, or the
   that didn't confirm a bug** before finishing.
 - Do not touch `scripts/smoke-test.mjs`, existing tests, or `src/` — this
   skill finds bugs, it does not fix them.
+- This vault is Syncthing-synced, and sync has been observed to transiently
+  delete `test/hunt/` mid-hunt (2026-07-17). Hunters should keep each
+  finding's essentials (scenario, expected, actual) in their returned JSON —
+  never only in the probe file — so a vanished probe can be reconstructed.
 
 ## The pipeline
 
