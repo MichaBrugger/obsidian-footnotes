@@ -1,0 +1,38 @@
+import { describe, expect, it } from "vitest";
+
+import { moveFootnoteDefinitionsToBottom } from "../../src/move-footnotes-to-bottom";
+import { reindexFootnotes } from "../../src/reindex-footnotes";
+
+// BUG (data loss): protectedLines/findDefinitionBlocks have no awareness of HTML
+// comments, so a definition-shaped line inside a multi-line <!-- --> block is
+// treated as a real definition.
+//  - move-to-bottom rips "[^9]: hidden note" out of the comment and re-exposes
+//    it as a live definition at the bottom.
+//  - reindex({ keepOrphanedDefinitions: false }) sees it as an orphan (its
+//    "[^9]:" never counts as a reference thanks to AllMarkers' (?!:)) and
+//    permanently DELETES the commented-out text — silent content loss.
+// Scenario: a footnote definition inside an HTML comment is relocated / deleted.
+// pinned 2026-07-17, hunt-bugs consolidation.
+// Provenance: iteration-1/eval-0/with_skill/run-1 (transforms hunt), lens: contexts.
+
+describe("bug: HTML-comment definition mishandled by the transforms", () => {
+    const input = [
+        "real[^1].",
+        "",
+        "<!--",
+        "[^9]: hidden note",
+        "-->",
+        "",
+        "[^1]: def",
+    ].join("\n");
+
+    it.fails("move-to-bottom leaves a commented-out definition inside its comment", () => {
+        expect(moveFootnoteDefinitionsToBottom(input)).toBe(input);
+    });
+
+    it.fails("reindex drop-orphans does not delete a commented-out definition", () => {
+        expect(
+            reindexFootnotes(input, { keepOrphanedDefinitions: false }),
+        ).toBe(input);
+    });
+});
