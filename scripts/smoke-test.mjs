@@ -22,9 +22,6 @@ const CMD_AUTONUM = "obsidian-footnotes:insert-autonumbered-footnote";
 const CMD_NAMED = "obsidian-footnotes:insert-named-footnote";
 const CMD_INLINE = "obsidian-footnotes:insert-inline-footnote";
 const CMD_PASTE_INLINE = "obsidian-footnotes:paste-inline-footnote";
-const CMD_REINDEX = "obsidian-footnotes:reindex-footnotes";
-const CMD_MOVE_BOTTOM = "obsidian-footnotes:move-footnotes-to-bottom";
-const CMD_AFTER_PUNCT = "obsidian-footnotes:footnotes-after-punctuation";
 const CMD_LINT = "obsidian-footnotes:lint-footnotes";
 
 // ---------- CLI plumbing ----------
@@ -606,24 +603,24 @@ async function main() {
         if (pipes !== 4) throw new Error(`table row has ${pipes} pipes, expected 4: ${line}`);
     });
 
-    await test("reindex command renumbers and reorders footnotes", async () => {
-        resetSettings();
+    await test("lint with only reindex on renumbers and reorders footnotes", async () => {
+        resetSettings({ lintFixPunctuation: false, lintMoveToBottom: false });
         await setupNote("Beta[^2] alpha[^1].\n\n[^1]: one\n[^2]: two");
-        setCursorAndRun(0, 0, CMD_REINDEX);
+        setCursorAndRun(0, 0, CMD_LINT);
         await expectEditorText("Beta[^1] alpha[^2].\n\n[^1]: two\n[^2]: one");
     });
 
-    await test("move-to-bottom command relocates a mid-note definition", async () => {
-        resetSettings();
+    await test("lint with only move-to-bottom on relocates a mid-note definition", async () => {
+        resetSettings({ lintFixPunctuation: false, lintReindex: false });
         await setupNote("Para one[^1].\n\n[^1]: def\n\nPara two.");
-        setCursorAndRun(0, 0, CMD_MOVE_BOTTOM);
+        setCursorAndRun(0, 0, CMD_LINT);
         await expectEditorText("Para one[^1].\n\nPara two.\n\n[^1]: def");
     });
 
-    await test("after-punctuation command swaps markers across punctuation", async () => {
-        resetSettings();
+    await test("lint with only punctuation on swaps markers across punctuation", async () => {
+        resetSettings({ lintMoveToBottom: false, lintReindex: false });
         await setupNote("Word[^1].\n\n[^1]: def");
-        setCursorAndRun(0, 0, CMD_AFTER_PUNCT);
+        setCursorAndRun(0, 0, CMD_LINT);
         await expectEditorText("Word.[^1]\n\n[^1]: def");
     });
 
@@ -736,10 +733,14 @@ async function main() {
         );
     });
 
-    await test("reindex deletes orphaned definitions when the setting says so", async () => {
-        resetSettings({ keepOrphanedDefinitions: false });
+    await test("lint reindex deletes orphaned definitions when the setting says so", async () => {
+        resetSettings({
+            keepOrphanedDefinitions: false,
+            lintFixPunctuation: false,
+            lintMoveToBottom: false,
+        });
         await setupNote("Text[^2].\n\n[^2]: used\n[^9]: orphan");
-        setCursorAndRun(0, 0, CMD_REINDEX);
+        setCursorAndRun(0, 0, CMD_LINT);
         await expectEditorText("Text[^1].\n\n[^1]: used");
     });
 
@@ -756,11 +757,12 @@ async function main() {
         }
     });
 
-    await test("cleanup commands do not fire while a table cell is being edited until focus returns", async () => {
+    await test("the lint command does not fire while a table cell is being edited until focus returns", async () => {
         requireVisibleWindow();
-        // the runOutsideTableCell guard: running a whole-document cleanup
-        // while a cell sub-editor owns focus must not corrupt the table
-        resetSettings();
+        // the runOutsideTableCell guard: running the whole-document lint
+        // while a cell sub-editor owns focus must not corrupt the table.
+        // Only the reindex step runs, matching the assertions below.
+        resetSettings({ lintFixPunctuation: false, lintMoveToBottom: false });
         const table = [
             "| Head     | Col     |",
             "| -------- | ------- |",
@@ -797,9 +799,9 @@ async function main() {
             `return cm; })()`,
             (v) => v === true,
         );
-        action(`app.commands.executeCommandById('${CMD_REINDEX}');`);
+        action(`app.commands.executeCommandById('${CMD_LINT}');`);
         await pollUntil(
-            "reindex applied without shredding the table",
+            "lint applied without shredding the table",
             `(${EDITOR}).editor.getValue()`,
             (v) =>
                 typeof v === "string" &&

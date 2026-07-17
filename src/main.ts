@@ -18,13 +18,9 @@ import {
   insertNamedFootnote,
   pasteInlineFootnote,
 } from "./insert-or-navigate-footnotes";
-import { footnoteAfterPunctuation } from "./linting/rules/footnote-after-punctuation";
-import { moveFootnoteDefinitionsToBottom } from "./linting/rules/move-footnotes-to-the-bottom";
-import { reindexFootnotes } from "./linting/rules/re-index-footnotes";
 import {
   installLintOnSave,
   noteActiveLeafForAutoLint,
-  reindexOptionsFromSettings,
   resetAutoLintTracking,
   runFootnoteTransformCommand,
   lintFootnotes,
@@ -91,57 +87,10 @@ export default class FootnotePlugin extends Plugin {
       }
     });
   
-    // Whole-document cleanup commands (Linter's footnote rules, rebuilt —
-    // see src/linting/). Icons are stock Lucide until the hand-drawn
-    // set grows matching ones.
-    this.addCommand({
-      id: "reindex-footnotes",
-      name: "Reindex footnotes",
-      icon: "list-ordered",
-      checkCallback: (checking: boolean) => {
-        if (checking)
-          return !!this.app.workspace.getActiveViewOfType(MarkdownView);
-        void runFootnoteTransformCommand(
-          this,
-          (markdown) =>
-            reindexFootnotes(markdown, reindexOptionsFromSettings(this)),
-          {
-            done: "Footnotes reindexed.",
-            noop: "Footnotes are already in order.",
-          },
-        );
-      },
-    });
-    this.addCommand({
-      id: "move-footnotes-to-bottom",
-      name: "Move all footnote definitions to the bottom",
-      icon: "arrow-down-to-line",
-      checkCallback: (checking: boolean) => {
-        if (checking)
-          return !!this.app.workspace.getActiveViewOfType(MarkdownView);
-        void runFootnoteTransformCommand(
-          this,
-          moveFootnoteDefinitionsToBottom,
-          {
-            done: "Footnote definitions moved to the bottom.",
-            noop: "Footnote definitions are already at the bottom.",
-          },
-        );
-      },
-    });
-    this.addCommand({
-      id: "footnotes-after-punctuation",
-      name: "Move footnote markers after punctuation",
-      icon: "arrow-right-to-line",
-      checkCallback: (checking: boolean) => {
-        if (checking)
-          return !!this.app.workspace.getActiveViewOfType(MarkdownView);
-        void runFootnoteTransformCommand(this, footnoteAfterPunctuation, {
-          done: "Footnote markers moved after punctuation.",
-          noop: "All footnote markers already follow punctuation.",
-        });
-      },
-    });
+    // The ONE whole-document cleanup command, like Linter's (the individual
+    // rules are settings toggles, not separate commands — palette stays
+    // uncluttered). Icon is stock Lucide until the hand-drawn set grows a
+    // matching one.
     this.addCommand({
       id: "lint-footnotes",
       name: "Lint footnotes (punctuation, move to bottom, reindex)",

@@ -118,12 +118,12 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                     },
                     {
                         name: "Keep orphaned definitions",
-                        desc: "The reindex command and the lint reindex step keep definitions that no marker references, numbering them after everything else. Turn off to delete them instead.",
+                        desc: "The lint reindex step keeps definitions that no marker references, numbering them after everything else. Turn off to delete them instead.",
                         control: { type: "toggle", key: "keepOrphanedDefinitions" },
                     },
                     {
                         name: "Renumber named footnotes",
-                        desc: "The reindex command and the lint reindex step give named footnotes (like [^note]) numbers by order of appearance instead of preserving their names.",
+                        desc: "The lint reindex step gives named footnotes (like [^note]) numbers by order of appearance instead of preserving their names.",
                         control: { type: "toggle", key: "renumberNamedFootnotes" },
                     },
                     {
@@ -270,7 +270,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
         .setName("Keep orphaned definitions")
-        .setDesc("The reindex command and the lint reindex step keep definitions that no marker references, numbering them after everything else. Turn off to delete them instead.")
+        .setDesc("The lint reindex step keeps definitions that no marker references, numbering them after everything else. Turn off to delete them instead.")
         .addToggle((toggle) =>
             toggle
                 .setValue(this.plugin.settings.keepOrphanedDefinitions)
@@ -282,7 +282,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
         .setName("Renumber named footnotes")
-        .setDesc("The reindex command and the lint reindex step give named footnotes (like [^note]) numbers by order of appearance instead of preserving their names.")
+        .setDesc("The lint reindex step gives named footnotes (like [^note]) numbers by order of appearance instead of preserving their names.")
         .addToggle((toggle) =>
             toggle
                 .setValue(this.plugin.settings.renumberNamedFootnotes)
