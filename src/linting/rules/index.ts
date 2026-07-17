@@ -1,4 +1,4 @@
-// The footnote rule registry. Order mirrors the tidy pipeline's dependency
+// The footnote rule registry. Order mirrors the lint pipeline's dependency
 // order: fix punctuation, gather definitions at the bottom, then renumber and
 // reorder (see ../linter.ts, which composes the pure transforms directly).
 // The registry itself is the Linter-shaped, self-describing view of the rule

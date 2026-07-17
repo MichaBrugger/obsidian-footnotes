@@ -9,7 +9,7 @@ import { findDefinitionBlocks, protectedLines } from "../../src/markdown-scan";
 // document — after the unclosed fence — where protectedLines (by design, an
 // unclosed fence protects to EOF) now treats it as inert code. The plugin's own
 // findDefinitionBlocks can no longer see the [^1] definition, so the working
-// [^1] marker on line 0 is severed from its body. (tidy inherits this via its
+// [^1] marker on line 0 is severed from its body. (lint inherits this via its
 // move step.)
 // Hunt: 2026-07-17. Lens: properties. Severity: data-loss.
 

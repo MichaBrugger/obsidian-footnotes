@@ -37,7 +37,7 @@ describe("spec questions (Jason decides: bug or intended?)", () => {
         expect(computeNextFootnoteNumber("$$\nx[^7]\n$$\nreal[^1]")).toBe(2);
     });
 
-    // spec question: reindex/tidy have no awareness of the footnote-prefix
+    // spec question: reindex/lint have no awareness of the footnote-prefix
     // property (issue #31). A chapter note using prefix "12" has markers like
     // [^121]/[^122]; because those names match /^\d+$/, reindex renumbers them
     // to [^1]/[^2], collapsing the namespace the prefix exists to preserve.

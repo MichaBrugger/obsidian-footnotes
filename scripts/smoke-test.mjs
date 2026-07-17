@@ -25,7 +25,7 @@ const CMD_PASTE_INLINE = "obsidian-footnotes:paste-inline-footnote";
 const CMD_REINDEX = "obsidian-footnotes:reindex-footnotes";
 const CMD_MOVE_BOTTOM = "obsidian-footnotes:move-footnotes-to-bottom";
 const CMD_AFTER_PUNCT = "obsidian-footnotes:footnotes-after-punctuation";
-const CMD_TIDY = "obsidian-footnotes:tidy-footnotes";
+const CMD_LINT = "obsidian-footnotes:lint-footnotes";
 
 // ---------- CLI plumbing ----------
 
@@ -137,11 +137,11 @@ const BASELINE_SETTINGS = {
     enableRemoveBlankLastLines: true,
     keepOrphanedDefinitions: true,
     renumberNamedFootnotes: false,
-    tidyFixPunctuation: true,
-    tidyMoveToBottom: true,
-    tidyReindex: true,
-    tidyOnSave: false,
-    tidyOnFileChange: false,
+    lintFixPunctuation: true,
+    lintMoveToBottom: true,
+    lintReindex: true,
+    lintOnSave: false,
+    lintOnFileChange: false,
 };
 function resetSettings(overrides = {}) {
     setSettings({ ...BASELINE_SETTINGS, ...overrides });
@@ -627,13 +627,13 @@ async function main() {
         await expectEditorText("Word.[^1]\n\n[^1]: def");
     });
 
-    await test("tidy command runs all three cleanups and adds the heading", async () => {
+    await test("lint command runs all three cleanups and adds the heading", async () => {
         resetSettings({
             enableFootnoteSectionHeading: true,
             footnoteSectionHeading: "# Footnotes",
         });
         await setupNote("Alpha[^2], bravo[^1].\n\n[^2]: two\n\nCharlie tail.");
-        setCursorAndRun(0, 0, CMD_TIDY);
+        setCursorAndRun(0, 0, CMD_LINT);
         // punctuation fixed, definition gathered under the heading at the
         // bottom, numbering redone by appearance ([^2]→[^1], [^1]→[^2])
         await expectEditorText(
@@ -743,16 +743,16 @@ async function main() {
         await expectEditorText("Text[^1].\n\n[^1]: used");
     });
 
-    await test("tidy skips the reindex step when its toggle is off", async () => {
-        resetSettings({ tidyReindex: false });
+    await test("lint skips the reindex step when its toggle is off", async () => {
+        resetSettings({ lintReindex: false });
         // no marker touches punctuation and definitions sit at the bottom,
-        // so with reindex off the whole tidy must be a no-op
+        // so with reindex off the whole lint must be a no-op
         await setupNote("Beta[^2] alpha[^1] end.\n\n[^1]: one\n[^2]: two");
-        setCursorAndRun(0, 0, CMD_TIDY);
+        setCursorAndRun(0, 0, CMD_LINT);
         await sleep(800);
         const text = readJson(`(${EDITOR}).editor.getValue()`);
         if (text !== "Beta[^2] alpha[^1] end.\n\n[^1]: one\n[^2]: two") {
-            throw new Error(`tidy reindexed anyway: ${JSON.stringify(text)}`);
+            throw new Error(`lint reindexed anyway: ${JSON.stringify(text)}`);
         }
     });
 
@@ -809,14 +809,14 @@ async function main() {
         );
     });
 
-    await test("tidy on save tidies before the write when enabled", async () => {
-        resetSettings({ tidyOnSave: true });
+    await test("lint on save lints before the write when enabled", async () => {
+        resetSettings({ lintOnSave: true });
         await setupNote("Beta[^2] alpha[^1] end\n\n[^1]: one\n[^2]: two");
         setCursorAndRun(0, 0, "editor:save-file");
         await expectEditorText("Beta[^1] alpha[^2] end\n\n[^1]: two\n[^2]: one");
     });
 
-    await test("saving does not tidy while the toggle is off (the default)", async () => {
+    await test("saving does not lint while the toggle is off (the default)", async () => {
         resetSettings();
         const note = "Beta[^2] alpha[^1] end\n\n[^1]: one\n[^2]: two";
         await setupNote(note);
@@ -824,14 +824,14 @@ async function main() {
         await sleep(800);
         const text = readJson(`(${EDITOR}).editor.getValue()`);
         if (text !== note) {
-            throw new Error(`save tidied anyway: ${JSON.stringify(text)}`);
+            throw new Error(`save linted anyway: ${JSON.stringify(text)}`);
         }
     });
 
-    await test("switching notes tidies the one you left when enabled", async () => {
-        resetSettings({ tidyOnFileChange: true });
+    await test("switching notes lints the one you left when enabled", async () => {
+        resetSettings({ lintOnFileChange: true });
         await setupNote("Beta[^2] alpha[^1] end\n\n[^1]: one\n[^2]: two");
-        // switching to another note must tidy the smoke note behind us
+        // switching to another note must lint the smoke note behind us
         ob("create", "name=Smoke Test - second", "content=other note", "overwrite", "silent");
         ob("open", "file=Smoke Test - second");
         await sleep(1200);

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { moveFootnoteDefinitionsToBottom } from "../../src/linting/rules/move-footnotes-to-the-bottom";
-import { tidyFootnotes } from "../../src/linting/linter";
+import { lintFootnotes } from "../../src/linting/linter";
 
 // BUG: moveFootnoteDefinitionsToBottom duplicates a footnote-section heading
 // that already sits mid-document above the definitions. The presence check is
@@ -9,7 +9,7 @@ import { tidyFootnotes } from "../../src/linting/linter";
 // "body[^1].\n# Footnotes\n\n[^1]: def\n\ntrailing prose" the body ends with
 // "trailing prose" (not the heading), so a SECOND "# Footnotes" is appended
 // above the moved definition — leaving one heading orphaned mid-document and one
-// at the bottom. Also reached via tidy.
+// at the bottom. Also reached via lint.
 // Scenario: move-to-bottom adds a second "# Footnotes" when one already exists mid-doc.
 // pinned 2026-07-17, hunt-bugs consolidation.
 // Provenance: iteration-1/eval-0/with_skill/run-1 (transforms hunt), lens: interactions.
@@ -23,8 +23,8 @@ describe("bug: move-to-bottom duplicates a mid-document footnote heading", () =>
         expect(count).toBe(1);
     });
 
-    it("tidy does not leave an orphaned heading behind", () => {
-        const out = tidyFootnotes(input, { sectionHeading: "# Footnotes" });
+    it("lint does not leave an orphaned heading behind", () => {
+        const out = lintFootnotes(input, { sectionHeading: "# Footnotes" });
         const count = out.split("\n").filter((l) => l === "# Footnotes").length;
         expect(count).toBe(1);
     });

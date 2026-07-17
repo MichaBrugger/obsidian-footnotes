@@ -10,7 +10,7 @@ import { reindexFootnotes } from "../../src/linting/rules/re-index-footnotes";
 // "para.\n\n[^1]: two body". Running the same command AGAIN (pass 2) now finds
 // that survivor unreferenced and deletes it too, silently destroying "two
 // body". A convergent transform must reach its orphan fixpoint in one run.
-// (Reached identically via tidy with keepOrphanedDefinitions:false.)
+// (Reached identically via lint with keepOrphanedDefinitions:false.)
 // Hunt: 2026-07-17. Lens: properties. Severity: data-loss.
 // fixed 2026-07-17: reindexFootnotes now re-runs reindexOnce to a fixpoint,
 // so all transitive orphans are removed within a single call.

@@ -11,7 +11,7 @@ import {
 // `lines[0] === "---"`, but a CRLF document split on "\n" leaves "---\r" on
 // line 0, so the check silently fails. On any Windows/synced (CRLF) note the
 // frontmatter is treated as live text — markers inside it are counted and get
-// rewritten by reindex/tidy/move — and the documented footnote-prefix property
+// rewritten by reindex/lint/move — and the documented footnote-prefix property
 // (issue #31) is ignored entirely.
 // Hunt: 2026-07-17. Lenses: contexts / interactions / regressions. Severity: data-loss.
 // fixed 2026-07-17: protectedLines/footnotePrefix strip a trailing "\r"; the

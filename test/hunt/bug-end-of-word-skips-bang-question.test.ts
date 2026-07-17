@@ -3,10 +3,10 @@ import { describe, expect, it } from "vitest";
 import { endOfWordOffset } from "../../src/insert-or-navigate-footnotes";
 
 // BUG: the "insert footnote at end of word" setting is described (settings.ts)
-// as placing the marker after trailing punctuation, and the tidy transform's
+// as placing the marker after trailing punctuation, and the lint transform's
 // punctuation class is .,;:!?. But endOfWordOffset only skips past ". , : ;" —
 // not "!" or "?". So inserting at "Hello!" yields "Hello[^1]!", which the
-// "footnote after punctuation" tidy then reorders to "Hello![^1]": the two
+// "footnote after punctuation" lint then reorders to "Hello![^1]": the two
 // features disagree on what counts as punctuation and fight each other.
 // (This is a distinct root cause from the unicode-grapheme endOfWordOffset bug
 // already pinned in bug-end-of-word-offset-unicode.test.ts — that one is about

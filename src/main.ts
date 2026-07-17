@@ -22,13 +22,13 @@ import { footnoteAfterPunctuation } from "./linting/rules/footnote-after-punctua
 import { moveFootnoteDefinitionsToBottom } from "./linting/rules/move-footnotes-to-the-bottom";
 import { reindexFootnotes } from "./linting/rules/re-index-footnotes";
 import {
-  installTidyOnSave,
-  noteActiveLeafForAutoTidy,
+  installLintOnSave,
+  noteActiveLeafForAutoLint,
   reindexOptionsFromSettings,
-  resetAutoTidyTracking,
+  resetAutoLintTracking,
   runFootnoteTransformCommand,
-  tidyFootnotes,
-  tidyOptionsFromSettings,
+  lintFootnotes,
+  lintOptionsFromSettings,
 } from "./linting/linter";
 
 export default class FootnotePlugin extends Plugin {
@@ -143,8 +143,8 @@ export default class FootnotePlugin extends Plugin {
       },
     });
     this.addCommand({
-      id: "tidy-footnotes",
-      name: "Tidy footnotes (punctuation, move to bottom, reindex)",
+      id: "lint-footnotes",
+      name: "Lint footnotes (punctuation, move to bottom, reindex)",
       icon: "sparkles",
       checkCallback: (checking: boolean) => {
         if (checking)
@@ -152,10 +152,10 @@ export default class FootnotePlugin extends Plugin {
         void runFootnoteTransformCommand(
           this,
           (markdown, sectionHeading) =>
-            tidyFootnotes(markdown, tidyOptionsFromSettings(this, sectionHeading)),
+            lintFootnotes(markdown, lintOptionsFromSettings(this, sectionHeading)),
           {
-            done: "Footnotes tidied.",
-            noop: "Footnotes are already tidy.",
+            done: "Footnotes linted.",
+            noop: "Footnotes are already clean.",
           },
         );
       },
@@ -166,18 +166,18 @@ export default class FootnotePlugin extends Plugin {
     this.registerEvent(
       this.app.workspace.on("active-leaf-change", () => {
         dismissFootnotePopup();
-        noteActiveLeafForAutoTidy(this);
+        noteActiveLeafForAutoLint(this);
       })
     );
-    // "Tidy on save" wraps the core save command (restored on unload);
+    // "Lint on save" wraps the core save command (restored on unload);
     // layout-ready seeds the focus tracker with the note open at startup
-    installTidyOnSave(this);
-    this.app.workspace.onLayoutReady(() => noteActiveLeafForAutoTidy(this));
+    installLintOnSave(this);
+    this.app.workspace.onLayoutReady(() => noteActiveLeafForAutoLint(this));
   }
 
   onunload() {
     dismissFootnotePopup();
-    resetAutoTidyTracking();
+    resetAutoLintTracking();
   }
 
   async loadSettings() {
@@ -212,6 +212,30 @@ export default class FootnotePlugin extends Plugin {
       delete legacySettings.enableAutoSuggest;
       await this.saveSettings();
     }
+
+    // migration: the linting settings shipped under tidy* keys in beta.5/6.
+    // Copy each saved tidy* value onto its lint* name, drop the old key, and
+    // save once so beta testers keep their toggle choices.
+    const tidyKeyRenames: Record<string, string> = {
+      tidyFixPunctuation: "lintFixPunctuation",
+      tidyMoveToBottom: "lintMoveToBottom",
+      tidyReindex: "lintReindex",
+      tidyOnSave: "lintOnSave",
+      tidyOnFileChange: "lintOnFileChange",
+    };
+    const withTidyKeys = this.settings as FootnotePluginSettings &
+      Record<string, unknown>;
+    let migratedTidyKeys = false;
+    for (const [oldKey, newKey] of Object.entries(tidyKeyRenames)) {
+      if (oldKey in withTidyKeys) {
+        // withTidyKeys is the same object as this.settings, so writing here
+        // sets the real lint* setting
+        withTidyKeys[newKey] = withTidyKeys[oldKey];
+        delete withTidyKeys[oldKey];
+        migratedTidyKeys = true;
+      }
+    }
+    if (migratedTidyKeys) await this.saveSettings();
   }
 
   async saveSettings() {

@@ -17,11 +17,11 @@ export interface FootnotePluginSettings {
 
     keepOrphanedDefinitions: boolean;
     renumberNamedFootnotes: boolean;
-    tidyFixPunctuation: boolean;
-    tidyMoveToBottom: boolean;
-    tidyReindex: boolean;
-    tidyOnSave: boolean;
-    tidyOnFileChange: boolean;
+    lintFixPunctuation: boolean;
+    lintMoveToBottom: boolean;
+    lintReindex: boolean;
+    lintOnSave: boolean;
+    lintOnFileChange: boolean;
 }
 
 export const DEFAULT_SETTINGS: FootnotePluginSettings = {
@@ -36,11 +36,11 @@ export const DEFAULT_SETTINGS: FootnotePluginSettings = {
 
     keepOrphanedDefinitions: true,
     renumberNamedFootnotes: false,
-    tidyFixPunctuation: true,
-    tidyMoveToBottom: true,
-    tidyReindex: true,
-    tidyOnSave: false,
-    tidyOnFileChange: false,
+    lintFixPunctuation: true,
+    lintMoveToBottom: true,
+    lintReindex: true,
+    lintOnSave: false,
+    lintOnFileChange: false,
 };
 
 export class FootnotePluginSettingTab extends PluginSettingTab {
@@ -99,32 +99,32 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
             },
             {
                 type: "group",
-                heading: "Tidying",
+                heading: "Linting",
                 items: [
                     {
                         name: "Move markers after punctuation",
-                        desc: "The tidy command moves footnote markers that sit before punctuation to sit after it.",
-                        control: { type: "toggle", key: "tidyFixPunctuation" },
+                        desc: "The lint command moves footnote markers that sit before punctuation to sit after it.",
+                        control: { type: "toggle", key: "lintFixPunctuation" },
                     },
                     {
                         name: "Move definitions to the bottom",
-                        desc: "The tidy command gathers all footnote definitions at the end of the note.",
-                        control: { type: "toggle", key: "tidyMoveToBottom" },
+                        desc: "The lint command gathers all footnote definitions at the end of the note.",
+                        control: { type: "toggle", key: "lintMoveToBottom" },
                     },
                     {
                         name: "Reindex",
-                        desc: "The tidy command also renumbers footnotes and reorders their definitions, following the reindexing options below.",
-                        control: { type: "toggle", key: "tidyReindex" },
+                        desc: "The lint command also renumbers footnotes and reorders their definitions, following the reindexing options below.",
+                        control: { type: "toggle", key: "lintReindex" },
                     },
                     {
-                        name: "Tidy on save",
-                        desc: "Automatically tidy the note you're editing whenever you save it.",
-                        control: { type: "toggle", key: "tidyOnSave" },
+                        name: "Lint on save",
+                        desc: "Automatically lint the note you're editing whenever you save it.",
+                        control: { type: "toggle", key: "lintOnSave" },
                     },
                     {
-                        name: "Tidy on focused file change",
-                        desc: "Automatically tidy a note when you switch from it to another note.",
-                        control: { type: "toggle", key: "tidyOnFileChange" },
+                        name: "Lint on focused file change",
+                        desc: "Automatically lint a note when you switch from it to another note.",
+                        control: { type: "toggle", key: "lintOnFileChange" },
                     },
                 ],
             },
@@ -134,12 +134,12 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                 items: [
                     {
                         name: "Keep orphaned definitions",
-                        desc: "The reindex command and tidy's reindex step keep definitions that no marker references, numbering them after everything else. Turn off to delete them instead.",
+                        desc: "The reindex command and the lint reindex step keep definitions that no marker references, numbering them after everything else. Turn off to delete them instead.",
                         control: { type: "toggle", key: "keepOrphanedDefinitions" },
                     },
                     {
                         name: "Renumber named footnotes",
-                        desc: "The reindex command and tidy's reindex step give named footnotes (like [^note]) numbers by order of appearance instead of preserving their names.",
+                        desc: "The reindex command and the lint reindex step give named footnotes (like [^note]) numbers by order of appearance instead of preserving their names.",
                         control: { type: "toggle", key: "renumberNamedFootnotes" },
                     },
                 ],
@@ -235,65 +235,65 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
         );
 
         new Setting(containerEl)
-        .setName("Tidying")
+        .setName("Linting")
         .setHeading();
 
         new Setting(containerEl)
         .setName("Move markers after punctuation")
-        .setDesc("The tidy command moves footnote markers that sit before punctuation to sit after it.")
+        .setDesc("The lint command moves footnote markers that sit before punctuation to sit after it.")
         .addToggle((toggle) =>
             toggle
-                .setValue(this.plugin.settings.tidyFixPunctuation)
+                .setValue(this.plugin.settings.lintFixPunctuation)
                 .onChange(async (value) => {
-                    this.plugin.settings.tidyFixPunctuation = value;
+                    this.plugin.settings.lintFixPunctuation = value;
                     await this.plugin.saveSettings();
                 })
         );
 
         new Setting(containerEl)
         .setName("Move definitions to the bottom")
-        .setDesc("The tidy command gathers all footnote definitions at the end of the note.")
+        .setDesc("The lint command gathers all footnote definitions at the end of the note.")
         .addToggle((toggle) =>
             toggle
-                .setValue(this.plugin.settings.tidyMoveToBottom)
+                .setValue(this.plugin.settings.lintMoveToBottom)
                 .onChange(async (value) => {
-                    this.plugin.settings.tidyMoveToBottom = value;
+                    this.plugin.settings.lintMoveToBottom = value;
                     await this.plugin.saveSettings();
                 })
         );
 
         new Setting(containerEl)
         .setName("Reindex")
-        .setDesc("The tidy command also renumbers footnotes and reorders their definitions, following the reindexing options below.")
+        .setDesc("The lint command also renumbers footnotes and reorders their definitions, following the reindexing options below.")
         .addToggle((toggle) =>
             toggle
-                .setValue(this.plugin.settings.tidyReindex)
+                .setValue(this.plugin.settings.lintReindex)
                 .onChange(async (value) => {
-                    this.plugin.settings.tidyReindex = value;
+                    this.plugin.settings.lintReindex = value;
                     await this.plugin.saveSettings();
                 })
         );
 
         new Setting(containerEl)
-        .setName("Tidy on save")
-        .setDesc("Automatically tidy the note you're editing whenever you save it.")
+        .setName("Lint on save")
+        .setDesc("Automatically lint the note you're editing whenever you save it.")
         .addToggle((toggle) =>
             toggle
-                .setValue(this.plugin.settings.tidyOnSave)
+                .setValue(this.plugin.settings.lintOnSave)
                 .onChange(async (value) => {
-                    this.plugin.settings.tidyOnSave = value;
+                    this.plugin.settings.lintOnSave = value;
                     await this.plugin.saveSettings();
                 })
         );
 
         new Setting(containerEl)
-        .setName("Tidy on focused file change")
-        .setDesc("Automatically tidy a note when you switch from it to another note.")
+        .setName("Lint on focused file change")
+        .setDesc("Automatically lint a note when you switch from it to another note.")
         .addToggle((toggle) =>
             toggle
-                .setValue(this.plugin.settings.tidyOnFileChange)
+                .setValue(this.plugin.settings.lintOnFileChange)
                 .onChange(async (value) => {
-                    this.plugin.settings.tidyOnFileChange = value;
+                    this.plugin.settings.lintOnFileChange = value;
                     await this.plugin.saveSettings();
                 })
         );
@@ -304,7 +304,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
         .setName("Keep orphaned definitions")
-        .setDesc("The reindex command and tidy's reindex step keep definitions that no marker references, numbering them after everything else. Turn off to delete them instead.")
+        .setDesc("The reindex command and the lint reindex step keep definitions that no marker references, numbering them after everything else. Turn off to delete them instead.")
         .addToggle((toggle) =>
             toggle
                 .setValue(this.plugin.settings.keepOrphanedDefinitions)
@@ -316,7 +316,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
         .setName("Renumber named footnotes")
-        .setDesc("The reindex command and tidy's reindex step give named footnotes (like [^note]) numbers by order of appearance instead of preserving their names.")
+        .setDesc("The reindex command and the lint reindex step give named footnotes (like [^note]) numbers by order of appearance instead of preserving their names.")
         .addToggle((toggle) =>
             toggle
                 .setValue(this.plugin.settings.renumberNamedFootnotes)

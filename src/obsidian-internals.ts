@@ -64,7 +64,7 @@ export interface AppWithEmbedRegistry extends App {
     };
 }
 
-/** The command registry, used to wrap the core save command ("Tidy on save"). */
+/** The command registry, used to wrap the core save command ("Lint on save"). */
 export interface AppWithCommands extends App {
     commands?: {
         commands?: Record<

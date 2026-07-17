@@ -15,9 +15,9 @@ import { moveFootnoteDefinitionsToBottom } from "./rules/move-footnotes-to-the-b
 import { reindexFootnotes, ReindexOptions } from "./rules/re-index-footnotes";
 
 // The whole-document footnote linter: each pure rule (see src/linting/rules/)
-// gets a command, plus one "tidy" command composing all three. This module
+// gets a command, plus one "lint" command composing all three. This module
 // owns the editor plumbing they share, the mapping from plugin settings to
-// the rules' options, and the automatic-tidy trigger machinery (tidy on save
+// the rules' options, and the automatic-lint trigger machinery (lint on save
 // and on focused-file change).
 
 function configuredSectionHeading(plugin: FootnotePlugin): string {
@@ -36,21 +36,21 @@ export function reindexOptionsFromSettings(
     };
 }
 
-/** The tidy pipeline (steps + reindex policy) the user picked in the settings tab. */
-export function tidyOptionsFromSettings(
+/** The lint pipeline (steps + reindex policy) the user picked in the settings tab. */
+export function lintOptionsFromSettings(
     plugin: FootnotePlugin,
     sectionHeading: string,
-): TidyOptions {
+): LintOptions {
     return {
         sectionHeading,
-        fixPunctuation: plugin.settings.tidyFixPunctuation,
-        moveDefinitionsToBottom: plugin.settings.tidyMoveToBottom,
-        reindex: plugin.settings.tidyReindex,
+        fixPunctuation: plugin.settings.lintFixPunctuation,
+        moveDefinitionsToBottom: plugin.settings.lintMoveToBottom,
+        reindex: plugin.settings.lintReindex,
         reindexOptions: reindexOptionsFromSettings(plugin),
     };
 }
 
-export interface TidyOptions {
+export interface LintOptions {
     /** Passed through to moveFootnoteDefinitionsToBottom (default none). */
     sectionHeading?: string;
     /** Run footnoteAfterPunctuation (default on). */
@@ -64,9 +64,9 @@ export interface TidyOptions {
 }
 
 /** The enabled cleanups in dependency order: fix punctuation, gather definitions at the bottom, then renumber and reorder. */
-export function tidyFootnotes(
+export function lintFootnotes(
     markdown: string,
-    options: TidyOptions = {},
+    options: LintOptions = {},
 ): string {
     // normalize once here so the composed steps all see LF and the note's
     // original endings are restored a single time on the way out
@@ -86,9 +86,6 @@ export function tidyFootnotes(
     }
     return restoreEol(result, eol);
 }
-
-/** Linter-shaped alias for {@link tidyFootnotes} (same pipeline, same behavior). */
-export const lintFootnotes = tidyFootnotes;
 
 // Replace only the changed middle of the document, so the cursor and the
 // scroll position map through the edit instead of resetting to the top.
@@ -117,12 +114,12 @@ function replaceMinimal(doc: Editor, before: string, after: string) {
     });
 }
 
-// ---------- automatic tidying (Linter-style triggers) ----------
+// ---------- automatic linting (Linter-style triggers) ----------
 
 // A sub-editor (an actively edited table cell) owning focus means document
 // edits race its sync-back (issue #28 family). The manual command defers
 // around this state; the automatic triggers just skip — a save must never
-// be delayed or destabilized by its tidy.
+// be delayed or destabilized by its lint.
 function subEditorOwnsFocus(doc: Editor): boolean {
     const cm = (doc as EditorWithCm).cm;
     const active = cm?.contentDOM.ownerDocument.activeElement;
@@ -134,38 +131,38 @@ function subEditorOwnsFocus(doc: Editor): boolean {
     );
 }
 
-// Tidy the active note synchronously when it's safe to; the save hook calls
-// this right before delegating, so the save writes the tidied text.
-function tidyActiveNoteIfSafe(plugin: FootnotePlugin) {
+// Lint the active note synchronously when it's safe to; the save hook calls
+// this right before delegating, so the save writes the linted text.
+function lintActiveNoteIfSafe(plugin: FootnotePlugin) {
     const mdView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
     if (!mdView || !mdView.editor) return;
     if (footnotePopupBusy()) return; // a pending popup save owns the file
     const doc = mdView.editor;
     if (activeTableCellEditor(doc) || subEditorOwnsFocus(doc)) return;
     const before = doc.getValue();
-    const after = tidyFootnotes(
+    const after = lintFootnotes(
         before,
-        tidyOptionsFromSettings(plugin, configuredSectionHeading(plugin)),
+        lintOptionsFromSettings(plugin, configuredSectionHeading(plugin)),
     );
     if (after === before) return;
     replaceMinimal(doc, before, after);
-    new Notice("Footnotes tidied.");
+    new Notice("Footnotes linted.");
 }
 
 /**
- * Wrap the core save command so "Tidy on save" runs just before the write.
+ * Wrap the core save command so "Lint on save" runs just before the write.
  * `app.commands` is private API, so a shape change degrades to manual
- * tidying; the original callback is restored on plugin unload.
+ * linting; the original callback is restored on plugin unload.
  */
-export function installTidyOnSave(plugin: FootnotePlugin) {
+export function installLintOnSave(plugin: FootnotePlugin) {
     const command = (plugin.app as AppWithCommands).commands?.commands?.[
         "editor:save-file"
     ];
     if (!command || typeof command.checkCallback !== "function") return;
     const original = command.checkCallback;
     command.checkCallback = (checking: boolean) => {
-        if (!checking && plugin.settings.tidyOnSave) {
-            tidyActiveNoteIfSafe(plugin);
+        if (!checking && plugin.settings.lintOnSave) {
+            lintActiveNoteIfSafe(plugin);
         }
         return original(checking);
     };
@@ -179,32 +176,32 @@ export function installTidyOnSave(plugin: FootnotePlugin) {
 let lastFocused: { view: MarkdownView; file: TFile } | null = null;
 
 /** Forget the focus tracking state (plugin unload). */
-export function resetAutoTidyTracking() {
+export function resetAutoLintTracking() {
     lastFocused = null;
 }
 
 /**
- * Feed active-leaf changes to "Tidy on focused file change": when the
- * focused markdown FILE changes, the note the user just left gets tidied.
+ * Feed active-leaf changes to "Lint on focused file change": when the
+ * focused markdown FILE changes, the note the user just left gets linted.
  * Call on every active-leaf-change and once at layout-ready (to seed the
  * tracker with the note open at startup).
  */
-export function noteActiveLeafForAutoTidy(plugin: FootnotePlugin) {
+export function noteActiveLeafForAutoLint(plugin: FootnotePlugin) {
     const current = plugin.app.workspace.getActiveViewOfType(MarkdownView);
     if (!current || !current.file) return;
     const previous = lastFocused;
     lastFocused = { view: current, file: current.file };
-    if (!plugin.settings.tidyOnFileChange) return;
+    if (!plugin.settings.lintOnFileChange) return;
     if (!previous || previous.file.path === current.file.path) return;
     if (footnotePopupBusy()) return; // its pending save owns that file
-    void tidyLeftNote(plugin, previous);
+    void lintLeftNote(plugin, previous);
 }
 
-async function tidyLeftNote(
+async function lintLeftNote(
     plugin: FootnotePlugin,
     previous: { view: MarkdownView; file: TFile },
 ) {
-    const options = tidyOptionsFromSettings(
+    const options = lintOptionsFromSettings(
         plugin,
         configuredSectionHeading(plugin),
     );
@@ -214,10 +211,10 @@ async function tidyLeftNote(
         const doc = previous.view.editor;
         if (activeTableCellEditor(doc)) return;
         const before = doc.getValue();
-        const after = tidyFootnotes(before, options);
+        const after = lintFootnotes(before, options);
         if (after === before) return;
         replaceMinimal(doc, before, after);
-        new Notice(`Tidied footnotes in "${previous.file.basename}".`);
+        new Notice(`Linted footnotes in "${previous.file.basename}".`);
         return;
     }
     // the leaf navigated away or closed — Obsidian has flushed the buffer,
@@ -225,15 +222,15 @@ async function tidyLeftNote(
     try {
         let changed = false;
         await plugin.app.vault.process(previous.file, (data) => {
-            const after = tidyFootnotes(data, options);
+            const after = lintFootnotes(data, options);
             changed = after !== data;
             return after;
         });
         if (changed) {
-            new Notice(`Tidied footnotes in "${previous.file.basename}".`);
+            new Notice(`Linted footnotes in "${previous.file.basename}".`);
         }
     } catch {
-        // the file vanished between the switch and the tidy — nothing to do
+        // the file vanished between the switch and the lint — nothing to do
     }
 }
 

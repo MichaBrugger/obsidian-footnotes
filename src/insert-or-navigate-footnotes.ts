@@ -387,7 +387,7 @@ export function buildDetailAppend(
 }
 
 // the trailing punctuation the marker hops over — the same class the
-// footnote-after-punctuation tidy reorders, so the two features can't
+// footnote-after-punctuation lint reorders, so the two features can't
 // disagree about where a marker belongs
 const TrailingPunctuation = [".", ",", ":", ";", "!", "?"];
 
