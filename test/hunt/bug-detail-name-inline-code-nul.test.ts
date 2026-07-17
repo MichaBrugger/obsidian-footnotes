@@ -22,7 +22,7 @@ function fakeEditor(lines: string[]): Editor {
 }
 
 describe("bug: detail name with an inline-code span leaks NUL characters", () => {
-    it.fails("keeps the real backtick characters of the footnote name", () => {
+    it("keeps the real backtick characters of the footnote name", () => {
         const doc = fakeEditor(["see[^a`b`c]", "[^a`b`c]: hi"]);
         expect(listExistingFootnoteDetails(doc)).toEqual(["a`b`c"]);
     });

@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { AllMarkers, ExtractNameFromFootnote } from "../src/insert-or-navigate-footnotes";
+import {
+    AllMarkers,
+    ExtractNameFromFootnote,
+    footnoteMarkerMatches,
+} from "../src/insert-or-navigate-footnotes";
 
 // AllMarkers is a /g regex: matchAll (used everywhere in src) is stateless,
 // but .test()/.exec() would advance lastIndex between calls — these tests
@@ -14,8 +18,13 @@ describe("AllMarkers", () => {
         expect(markerNames("alpha[^1] bravo[^note]")).toEqual(["1", "note"]);
     });
 
-    it("does not match detail lines (marker followed by a colon)", () => {
-        expect(markerNames("[^1]: the detail")).toEqual([]);
+    it("matches the marker shape even before a colon (definitions are excluded positionally, not by the colon)", () => {
+        // grammar change 2026-07-17: the old (?!:) lookahead also dropped a
+        // genuine mid-line reference sitting before a literal colon
+        // ("noted[^3]: prose"). AllMarkers now matches the raw marker shape;
+        // a definition's column-0 "[^id]:" label is excluded by
+        // footnoteMarkerMatches (see below), not by the regex.
+        expect(markerNames("[^1]: the detail")).toEqual(["1"]);
     });
 
     it("does not match an empty marker", () => {
@@ -36,6 +45,25 @@ describe("AllMarkers", () => {
 
     it("matches a marker at the very start and end of a line", () => {
         expect(markerNames("[^a] middle [^b]")).toEqual(["a", "b"]);
+    });
+});
+
+describe("footnoteMarkerMatches", () => {
+    const names = (line: string) =>
+        footnoteMarkerMatches(line).map((m) => m[1]);
+
+    it("excludes a definition's own column-0 label", () => {
+        expect(names("[^1]: the detail")).toEqual([]);
+    });
+
+    it("keeps a mid-line marker that happens to precede a colon", () => {
+        // "noted[^3]: prose" renders as a live reference plus a literal
+        // colon; only a column-0 "[^id]:" is a definition
+        expect(names("as noted[^3]: more prose")).toEqual(["3"]);
+    });
+
+    it("keeps markers in a definition body after the label", () => {
+        expect(names("[^1]: see also[^2]")).toEqual(["2"]);
     });
 });
 

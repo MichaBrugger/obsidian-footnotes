@@ -12,7 +12,8 @@ import { reindexFootnotes } from "../../src/reindex-footnotes";
 // re-derives order after orphan removal for the same class of reason, but not
 // after block permutation.
 // Scenario: reindex churns nested-in-definition marker numbers on a second run.
-// pinned 2026-07-17, hunt-bugs consolidation.
+// fixed 2026-07-17: reindexFootnotes re-runs reindexOnce to a fixpoint, so the
+// post-permutation nested-marker order settles within a single call.
 // Provenance: iteration-1/eval-0/with_skill/run-1 (transforms hunt), lens: properties.
 
 describe("bug: reindex not idempotent with markers nested in reordered definitions", () => {
@@ -26,7 +27,7 @@ describe("bug: reindex not idempotent with markers nested in reordered definitio
         "[^2]: two",
     ].join("\n");
 
-    it.fails("reindex(reindex(doc)) === reindex(doc)", () => {
+    it("reindex(reindex(doc)) === reindex(doc)", () => {
         const once = reindexFootnotes(doc);
         expect(reindexFootnotes(once)).toBe(once);
     });

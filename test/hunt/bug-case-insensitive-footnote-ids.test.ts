@@ -18,7 +18,9 @@ import { reindexFootnotes } from "../../src/reindex-footnotes";
 //     already present, the named command creates a second detail instead of
 //     navigating to the existing one.
 // Scenario: markers/definitions differing only in letter case are treated as unrelated.
-// pinned 2026-07-17, hunt-bugs consolidation.
+// fixed 2026-07-17: ids are folded to lowercase for identity everywhere they
+// are compared (reindex pairing/orphans/numbering, detail scans, jump logic),
+// while original casing is preserved in untouched output text.
 // Provenance: iteration-1/eval-1/without_skill/run-1 (bug sweep, BUG 1).
 
 interface FakeDoc extends Editor {
@@ -57,7 +59,7 @@ function fakePlugin(overrides: Record<string, unknown> = {}): FootnotePlugin {
 }
 
 describe("bug: footnote ids compared case-sensitively", () => {
-    it.fails("reindex must not delete a definition referenced with different casing", () => {
+    it("reindex must not delete a definition referenced with different casing", () => {
         const result = reindexFootnotes(
             "Alpha[^Note].\n\n[^note]: the detail text",
             { keepOrphanedDefinitions: false },
@@ -65,7 +67,7 @@ describe("bug: footnote ids compared case-sensitively", () => {
         expect(result).toContain("the detail text");
     });
 
-    it.fails("renumbering named footnotes keeps marker and definition paired", () => {
+    it("renumbering named footnotes keeps marker and definition paired", () => {
         const result = reindexFootnotes(
             "Alpha[^Note].\n\n[^note]: the detail text",
             { renumberNamedFootnotes: true },
@@ -73,7 +75,7 @@ describe("bug: footnote ids compared case-sensitively", () => {
         expect(result).toBe("Alpha[^1].\n\n[^1]: the detail text");
     });
 
-    it.fails("the named command must not create a duplicate case-variant detail", () => {
+    it("the named command must not create a duplicate case-variant detail", () => {
         const doc = fakeEditor([
             "Alpha[^Note].",
             "",

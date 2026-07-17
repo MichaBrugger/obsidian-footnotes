@@ -12,12 +12,14 @@ import { reindexFootnotes } from "../../src/reindex-footnotes";
 // body". A convergent transform must reach its orphan fixpoint in one run.
 // (Reached identically via tidy with keepOrphanedDefinitions:false.)
 // Hunt: 2026-07-17. Lens: properties. Severity: data-loss.
+// fixed 2026-07-17: reindexFootnotes now re-runs reindexOnce to a fixpoint,
+// so all transitive orphans are removed within a single call.
 
 describe("bug: reindex orphan deletion needs two runs (destroys text on the 2nd)", () => {
     const doc = "para.\n\n[^1]: uses[^2] inside\n[^2]: two body";
     const f = (d: string) => reindexFootnotes(d, { keepOrphanedDefinitions: false });
 
-    it.fails("deleting orphans is idempotent (f(f(doc)) === f(doc))", () => {
+    it("deleting orphans is idempotent (f(f(doc)) === f(doc))", () => {
         const once = f(doc);
         expect(f(once)).toBe(once);
     });

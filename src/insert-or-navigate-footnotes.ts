@@ -22,14 +22,40 @@ import { activeTableCellEditor, resolveTableCellCursor, TableCellEditor } from "
 // edited table cell, reads use the position resolved from the cell's
 // sub-editor and marker writes are dispatched INTO that sub-editor.
 
-/** Every footnote marker (numbered or named) — the (?!:) excludes details. /g: read with matchAll, never test/exec (lastIndex is stateful). */
-export const AllMarkers = /\[\^([^[\]]+)\](?!:)/g;
+/** Every footnote marker SHAPE (numbered or named); the definition-label exclusion is positional — see footnoteMarkerMatches. /g: read with matchAll, never test/exec (lastIndex is stateful). */
+export const AllMarkers = /\[\^([^[\]]+)\]/g;
 /** Numbered markers AND numbered details — both reserve their number for autonumbering. */
 const AllNumberedMarkers = /\[\^(\d+)\]/g;
 // anchored: a detail only counts at the start of a line, same as markdown
 const DetailInLine = /^\[\^([^[\]]+)\]:/;
 /** Pulls the name out of a single marker string; the name is match[2]. */
 export const ExtractNameFromFootnote = /(\[\^)([^[\]]+)(?=\])/;
+
+/**
+ * Marker occurrences on a single line — every "[^id]" EXCEPT a definition's
+ * own "[^id]:" label at column 0. A "[^id]:" appearing MID-line is a live
+ * reference followed by a literal colon (exactly how Obsidian renders it),
+ * so it counts as a marker; only a column-0 label is a definition. Excluding
+ * definitions positionally (rather than by the old `(?!:)` lookahead, which
+ * also dropped genuine mid-line references sitting before a colon) is the
+ * whole point. Pass the line already code-masked when code must be ignored.
+ * Footnote ids are case-insensitive in Obsidian, but casing is preserved
+ * here — callers fold case only when comparing identities.
+ */
+export function footnoteMarkerMatches(line: string): RegExpMatchArray[] {
+    const matches: RegExpMatchArray[] = [];
+    for (const match of line.matchAll(AllMarkers)) {
+        if ((match.index ?? 0) === 0 && line[match[0].length] === ":") continue;
+        matches.push(match);
+    }
+    return matches;
+}
+
+/** Case-insensitive membership: footnote ids differing only in letter case are the same footnote (Obsidian folds them, and the metadata cache lowercases). */
+function idListIncludes(ids: string[], id: string): boolean {
+    const lower = id.toLowerCase();
+    return ids.some((name) => name.toLowerCase() === lower);
+}
 
 // Obsidian won't render a footnote whose name contains whitespace; the
 // marker regexes stay permissive so such names can be caught and warned
@@ -57,10 +83,16 @@ export function listExistingFootnoteDetails(
     const detailNames: string[] = [];
 
     //search each line for footnote details and add their names to the list
-    for (const line of maskProtectedLines(docLines(doc))) {
-        const match = line.match(DetailInLine);
+    const lines = docLines(doc);
+    const masked = maskProtectedLines(lines);
+    for (let i = 0; i < lines.length; i++) {
+        const match = masked[i].match(DetailInLine);
         if (match) {
-            detailNames.push(match[1]);
+            // re-slice the ORIGINAL line: a code span inside the name masks
+            // to NULs, and the masked name would otherwise leak them into
+            // saved output (its marker sibling re-slices for the same reason).
+            // The name always starts at index 2 (past the "[^").
+            detailNames.push(lines[i].slice(2, 2 + match[1].length));
         }
     }
     return detailNames;
@@ -77,7 +109,7 @@ export function listExistingFootnoteMarkersAndLocations(
     const lines = docLines(doc);
     const masked = maskProtectedLines(lines);
     for (let i = 0; i < lines.length; i++) {
-        for (const match of masked[i].matchAll(AllMarkers)) {
+        for (const match of footnoteMarkerMatches(masked[i])) {
             const start = match.index ?? 0;
             markers.push({
                 // slice the original: the masked match text could carry
@@ -161,10 +193,14 @@ export function shouldJumpFromDetailToMarker(
     const match = (masked[cursorPosition.line] ?? "").match(DetailInLine);
     if (match) {
         const footnote = `[^${match[1]}]`;
+        // ids are case-insensitive, so the marker may differ in casing from
+        // the detail's label ("[^Note]" ↔ "[^note]:") — fold both to compare;
+        // positions line up because lowercasing preserves length
+        const needle = footnote.toLowerCase();
 
         // find the FIRST OCCURENCE where this footnote exists in the text
         for (let i = 0; i < masked.length; i++) {
-            const ch = masked[i].indexOf(footnote);
+            const ch = masked[i].toLowerCase().indexOf(needle);
             if (ch !== -1) {
                 const newCursorPos = { line: i, ch: ch + footnote.length };
                 moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos, plugin, undefined, true);
@@ -187,7 +223,9 @@ export function jumpToFootnoteDetail(
     const masked = maskProtectedLines(docLines(doc));
     for (let i = 0; i < masked.length; i++) {
         const lineMatch = masked[i].match(DetailInLine);
-        if (lineMatch && lineMatch[1] === footnoteName) {
+        // ids are case-insensitive: the detail label may differ in casing
+        // from the marker name that sent us here
+        if (lineMatch && lineMatch[1].toLowerCase() === footnoteName.toLowerCase()) {
             // land at the END of the detail (indented lines belong to
             // it) so the user can backspace/type without arrow keys
             let endLine = i;
@@ -234,7 +272,7 @@ export function shouldJumpFromMarkerToDetail(
     // measurable on large notes, so the raw line gates first — masking
     // (which needs the whole document for fence state) only runs when
     // the caret actually sits on something marker-shaped.
-    const rawMarkers = [...lineText.matchAll(AllMarkers)].map((match) => ({
+    const rawMarkers = footnoteMarkerMatches(lineText).map((match) => ({
         footnote: match[0],
         startIndex: match.index ?? 0,
     }));
@@ -244,7 +282,7 @@ export function shouldJumpFromMarkerToDetail(
     // inline code is plain text, so the press falls through to insertion
     const maskedLine =
         maskProtectedLines(docLines(doc))[cursorPosition.line] ?? "";
-    const markersOnLine = [...maskedLine.matchAll(AllMarkers)].map((match) => ({
+    const markersOnLine = footnoteMarkerMatches(maskedLine).map((match) => ({
         footnote: match[0],
         startIndex: match.index ?? 0,
     }));
@@ -257,8 +295,8 @@ export function shouldJumpFromMarkerToDetail(
             const footnoteName = match[2];
 
             // markers without a detail line fall through to the
-            // detail-creation paths
-            if (!listExistingFootnoteDetails(doc).includes(footnoteName)) {
+            // detail-creation paths (ids compared case-insensitively)
+            if (!idListIncludes(listExistingFootnoteDetails(doc), footnoteName)) {
                 return false;
             }
 
@@ -814,7 +852,7 @@ export function shouldCreateMatchingFootnoteDetail(
     // if not, create it and place cursor there
     // (raw-line gate first, masked re-check after — same rationale and
     // #41 semantics as shouldJumpFromMarkerToDetail above)
-    const rawMarkers = [...lineText.matchAll(AllMarkers)].map((match) => ({
+    const rawMarkers = footnoteMarkerMatches(lineText).map((match) => ({
         footnote: match[0],
         startIndex: match.index ?? 0,
     }));
@@ -822,7 +860,7 @@ export function shouldCreateMatchingFootnoteDetail(
 
     const maskedLine =
         maskProtectedLines(docLines(doc))[cursorPosition.line] ?? "";
-    const markersOnLine = [...maskedLine.matchAll(AllMarkers)].map((match) => ({
+    const markersOnLine = footnoteMarkerMatches(maskedLine).map((match) => ({
         footnote: match[0],
         startIndex: match.index ?? 0,
     }));
@@ -846,9 +884,11 @@ export function shouldCreateMatchingFootnoteDetail(
 
             const list = listExistingFootnoteDetails(doc);
 
-            // Check if the list doesn't include current footnote
+            // Check if the list doesn't include current footnote (ids are
+            // case-insensitive — a "[^note]:" detail already covers a
+            // "[^Note]" marker, so this must navigate, not create a duplicate)
             // if so, add detail for the current footnote
-            if (!list.includes(footnoteId)) {
+            if (!idListIncludes(list, footnoteId)) {
                 const detail = buildDetailAppend(doc, footnoteId, list.length === 0, plugin);
 
                 if (popupEditingAvailable(plugin)) {

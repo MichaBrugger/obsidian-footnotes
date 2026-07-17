@@ -1,4 +1,4 @@
-import { AllMarkers } from "./insert-or-navigate-footnotes";
+import { footnoteMarkerMatches } from "./insert-or-navigate-footnotes";
 import {
     DefinitionStart,
     findDefinitionBlocks,
@@ -24,7 +24,13 @@ export interface ReindexOptions {
     renumberNamedFootnotes?: boolean;
 }
 
-/** Distinct marker names by first appearance in the (unprotected) text. */
+/**
+ * Distinct marker names by first appearance in the (unprotected) text,
+ * folded to lowercase — footnote ids are case-insensitive in Obsidian, so
+ * "[^Note]" and "[^note]" are one footnote for ordering and identity. A
+ * definition's own "[^id]:" label is not a reference (footnoteMarkerMatches
+ * excludes it positionally), but a marker nested in a definition body is.
+ */
 function markerAppearanceOrder(
     lines: string[],
     isProtected: boolean[],
@@ -33,23 +39,24 @@ function markerAppearanceOrder(
     const seen = new Set<string>();
     for (let i = 0; i < lines.length; i++) {
         if (isProtected[i]) continue;
-        for (const match of maskInlineCode(lines[i]).matchAll(AllMarkers)) {
-            if (!seen.has(match[1])) {
-                seen.add(match[1]);
-                order.push(match[1]);
+        for (const match of footnoteMarkerMatches(maskInlineCode(lines[i]))) {
+            const id = match[1].toLowerCase();
+            if (!seen.has(id)) {
+                seen.add(id);
+                order.push(id);
             }
         }
     }
     return order;
 }
 
-/** All markers on the line rewritten through `renames` (code spans skipped); the map is complete, so swaps can't collide. */
+/** All markers on the line rewritten through `renames` (code spans and the definition label skipped; ids matched case-insensitively); the map is complete, so swaps can't collide. */
 function rewriteMarkers(line: string, renames: Map<string, string>): string {
     const masked = maskInlineCode(line);
     let out = "";
     let copied = 0;
-    for (const match of masked.matchAll(AllMarkers)) {
-        const newName = renames.get(match[1]);
+    for (const match of footnoteMarkerMatches(masked)) {
+        const newName = renames.get(match[1].toLowerCase());
         if (newName === undefined) continue;
         const start = match.index ?? 0;
         out += line.slice(copied, start) + `[^${newName}]`;
@@ -71,6 +78,28 @@ export function reindexFootnotes(
     markdown: string,
     options: ReindexOptions = {},
 ): string {
+    // A single pass can leave the result not-yet-stable, so re-run to a
+    // fixpoint — this makes one call idempotent (f(f(x)) === f(x)):
+    //  - permuting definition blocks changes the appearance order of markers
+    //    NESTED in their bodies, which a second pass would renumber (churn);
+    //  - with orphan deletion on, cutting an orphan can strand a definition
+    //    that only the orphan's body referenced (a transitive orphan), which
+    //    a second pass would delete — destroying user text on the later run.
+    // Both converge in a couple of iterations; the cap only guards a
+    // theoretical non-convergent document (best-effort, never loops forever).
+    let current = markdown;
+    for (let i = 0; i < 20; i++) {
+        const next = reindexOnce(current, options);
+        if (next === current) return current;
+        current = next;
+    }
+    return current;
+}
+
+function reindexOnce(
+    markdown: string,
+    options: ReindexOptions = {},
+): string {
     const keepOrphans = options.keepOrphanedDefinitions ?? true;
     const renumberNamed = options.renumberNamedFootnotes ?? false;
 
@@ -81,8 +110,12 @@ export function reindexFootnotes(
     let markerOrder = markerAppearanceOrder(lines, isProtected);
 
     if (!keepOrphans) {
+        // markerOrder is lowercased (ids are case-insensitive), so a
+        // definition referenced only with different casing is NOT an orphan
         const referenced = new Set(markerOrder);
-        const orphans = blocks.filter((block) => !referenced.has(block.name));
+        const orphans = blocks.filter(
+            (block) => !referenced.has(block.name.toLowerCase()),
+        );
         if (orphans.length > 0) {
             // cut the orphan blocks out, then re-derive everything — line
             // numbers shifted, and a cut can even change fence pairing
@@ -95,12 +128,15 @@ export function reindexFootnotes(
 
     // referenced names first (by first marker appearance), then whatever
     // orphaned definitions remain, in definition order
+    // all names are canonical (lowercased) here so case-variant markers and
+    // definitions share one identity throughout ordering and numbering
     const order = [...markerOrder];
     const seen = new Set(order);
     for (const block of blocks) {
-        if (!seen.has(block.name)) {
-            seen.add(block.name);
-            order.push(block.name);
+        const name = block.name.toLowerCase();
+        if (!seen.has(name)) {
+            seen.add(name);
+            order.push(name);
         }
     }
 
@@ -119,7 +155,7 @@ export function reindexFootnotes(
         let result = rewriteMarkers(line, renames);
         const definition = line.match(DefinitionStart);
         if (definition) {
-            const newName = renames.get(definition[1]);
+            const newName = renames.get(definition[1].toLowerCase());
             if (newName !== undefined) {
                 result = `[^${newName}]:` + result.slice(definition[0].length);
             }
@@ -134,8 +170,8 @@ export function reindexFootnotes(
         .map((block, i) => ({ block, i }))
         .sort(
             (a, b) =>
-                (orderIndex.get(a.block.name) ?? 0) -
-                    (orderIndex.get(b.block.name) ?? 0) || a.i - b.i,
+                (orderIndex.get(a.block.name.toLowerCase()) ?? 0) -
+                    (orderIndex.get(b.block.name.toLowerCase()) ?? 0) || a.i - b.i,
         )
         .map((entry) => entry.block);
 

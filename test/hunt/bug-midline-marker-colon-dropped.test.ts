@@ -13,6 +13,8 @@ import { listExistingFootnoteMarkersAndLocations } from "../../src/insert-or-nav
 // A caret on that [^3] is therefore invisible to navigation and the cascade
 // falls through to inserting a new marker on top of it.
 // Hunt: 2026-07-17. Lens: grammar. Severity: wrong-output.
+// fixed 2026-07-17: AllMarkers no longer carries (?!:); definitions are
+// excluded positionally (column 0) via footnoteMarkerMatches.
 
 function fakeEditor(lines: string[]): Editor {
     return {
@@ -22,7 +24,7 @@ function fakeEditor(lines: string[]): Editor {
 }
 
 describe("bug: mid-line marker followed by a colon is dropped", () => {
-    it.fails("a mid-line [^3] before a literal colon is still a marker occurrence", () => {
+    it("a mid-line [^3] before a literal colon is still a marker occurrence", () => {
         const doc = fakeEditor(["as noted[^3]: more prose", "[^3]: the detail"]);
         expect(listExistingFootnoteMarkersAndLocations(doc)).toEqual([
             { footnote: "[^3]", lineNum: 0, startIndex: 8 },
