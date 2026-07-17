@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { tidyFootnotes } from "../src/tidy-footnotes";
+import { tidyFootnotes } from "../src/linting/linter";
 
 // The composed cleanup: punctuation → move to bottom → reindex, each step
 // individually skippable (the settings tab exposes the toggles). The three

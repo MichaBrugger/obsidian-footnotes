@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { reindexFootnotes } from "../../src/reindex-footnotes";
+import { reindexFootnotes } from "../../src/linting/rules/re-index-footnotes";
 
 // BUG: reindex orphan-deletion is non-transitive (single pass). Two definitions
 // that only reference EACH OTHER ("[^1]: uses[^2] inside" / "[^2]: two body",

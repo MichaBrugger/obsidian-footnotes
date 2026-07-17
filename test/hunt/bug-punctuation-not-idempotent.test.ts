@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { footnoteAfterPunctuation } from "../../src/footnote-after-punctuation";
+import { footnoteAfterPunctuation } from "../../src/linting/rules/footnote-after-punctuation";
 
 // BUG: footnoteAfterPunctuation is not idempotent on an interleaved
 // marker-punctuation-marker-punctuation chain. On "word[^1].[^2],", the first

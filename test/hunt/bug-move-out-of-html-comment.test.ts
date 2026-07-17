@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { moveFootnoteDefinitionsToBottom } from "../../src/move-footnotes-to-bottom";
-import { reindexFootnotes } from "../../src/reindex-footnotes";
+import { moveFootnoteDefinitionsToBottom } from "../../src/linting/rules/move-footnotes-to-the-bottom";
+import { reindexFootnotes } from "../../src/linting/rules/re-index-footnotes";
 
 // BUG (data loss): protectedLines/findDefinitionBlocks have no awareness of HTML
 // comments, so a definition-shaped line inside a multi-line <!-- --> block is

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { moveFootnoteDefinitionsToBottom } from "../src/move-footnotes-to-bottom";
+import { moveFootnoteDefinitionsToBottom } from "../src/linting/rules/move-footnotes-to-the-bottom";
 
 // Linter's "move footnotes to the bottom", integrated with this plugin's
 // section-heading setting. Policy pinned here:

@@ -4,7 +4,9 @@ import {
     normalizeEol,
     protectedLines,
     restoreEol,
-} from "./markdown-scan";
+} from "../../markdown-scan";
+import { IgnoreType } from "../ignore-types";
+import { FootnoteRule } from "../rule";
 
 // Linter's "footnote after punctuation" as a pure transform. Policy pinned
 // in test/footnote-after-punctuation.test.ts.
@@ -60,3 +62,35 @@ export function footnoteAfterPunctuation(markdown: string): string {
     });
     return restoreEol(result.join("\n"), eol);
 }
+
+/** Linter-shaped wrapper: id matches Linter's rule filename. */
+export const footnoteAfterPunctuationRule: FootnoteRule = {
+    id: "footnote-after-punctuation",
+    name: "Footnote after punctuation",
+    description:
+        'Move footnote markers that sit before punctuation to sit after it ("word[^1]." → "word.[^1]").',
+    ignoreTypes: [
+        IgnoreType.Code,
+        IgnoreType.InlineCode,
+        IgnoreType.Math,
+        IgnoreType.Yaml,
+    ],
+    examples: [
+        {
+            description: "Marker before a period moves after it",
+            before: "word[^1].",
+            after: "word.[^1]",
+        },
+        {
+            description: "A run of markers crosses a run of punctuation as one unit",
+            before: "wait[^1]?!",
+            after: "wait?![^1]",
+        },
+        {
+            description: "Markers inside inline code are left alone",
+            before: "use `x[^1].` as-is",
+            after: "use `x[^1].` as-is",
+        },
+    ],
+    apply: (text) => footnoteAfterPunctuation(text),
+};

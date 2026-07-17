@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { reindexFootnotes } from "../../src/reindex-footnotes";
+import { reindexFootnotes } from "../../src/linting/rules/re-index-footnotes";
 
 // BUG: reindexFootnotes is not idempotent when definition BODIES contain nested
 // numbered markers whose first appearance is inside a definition. The marker

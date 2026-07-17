@@ -1,23 +1,24 @@
 import { Editor, MarkdownView, Notice, TFile } from "obsidian";
 
-import FootnotePlugin from "./main";
+import FootnotePlugin from "../main";
 import {
     footnotePopupBusy,
     settleFootnotePopupWithFeedback,
     toggleCloseFootnotePopup,
-} from "./footnote-popup";
-import { runOutsideTableCell } from "./insert-or-navigate-footnotes";
-import { footnoteAfterPunctuation } from "./footnote-after-punctuation";
-import { normalizeEol, restoreEol } from "./markdown-scan";
-import { moveFootnoteDefinitionsToBottom } from "./move-footnotes-to-bottom";
-import { AppWithCommands, EditorWithCm } from "./obsidian-internals";
-import { reindexFootnotes, ReindexOptions } from "./reindex-footnotes";
-import { activeTableCellEditor } from "./table-cursor";
+} from "../footnote-popup";
+import { runOutsideTableCell } from "../insert-or-navigate-footnotes";
+import { normalizeEol, restoreEol } from "../markdown-scan";
+import { AppWithCommands, EditorWithCm } from "../obsidian-internals";
+import { activeTableCellEditor } from "../table-cursor";
+import { footnoteAfterPunctuation } from "./rules/footnote-after-punctuation";
+import { moveFootnoteDefinitionsToBottom } from "./rules/move-footnotes-to-the-bottom";
+import { reindexFootnotes, ReindexOptions } from "./rules/re-index-footnotes";
 
-// The whole-document cleanup commands: each pure transform (see its own
-// module) gets a command, plus one "tidy" command composing all three. This
-// module owns the editor plumbing they share and the mapping from plugin
-// settings to the transforms' options.
+// The whole-document footnote linter: each pure rule (see src/linting/rules/)
+// gets a command, plus one "tidy" command composing all three. This module
+// owns the editor plumbing they share, the mapping from plugin settings to
+// the rules' options, and the automatic-tidy trigger machinery (tidy on save
+// and on focused-file change).
 
 function configuredSectionHeading(plugin: FootnotePlugin): string {
     return plugin.settings.enableFootnoteSectionHeading
@@ -85,6 +86,9 @@ export function tidyFootnotes(
     }
     return restoreEol(result, eol);
 }
+
+/** Linter-shaped alias for {@link tidyFootnotes} (same pipeline, same behavior). */
+export const lintFootnotes = tidyFootnotes;
 
 // Replace only the changed middle of the document, so the cursor and the
 // scroll position map through the edit instead of resetting to the top.

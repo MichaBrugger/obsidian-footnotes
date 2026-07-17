@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { moveFootnoteDefinitionsToBottom } from "../../src/move-footnotes-to-bottom";
+import { moveFootnoteDefinitionsToBottom } from "../../src/linting/rules/move-footnotes-to-the-bottom";
 
 // BUG: moveFootnoteDefinitionsToBottom's `base.endsWith(sectionHeading)` check
 // is a naive string-suffix test standing in for "does the doc already end with

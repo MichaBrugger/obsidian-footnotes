@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { moveFootnoteDefinitionsToBottom } from "../../src/move-footnotes-to-bottom";
-import { tidyFootnotes } from "../../src/tidy-footnotes";
+import { moveFootnoteDefinitionsToBottom } from "../../src/linting/rules/move-footnotes-to-the-bottom";
+import { tidyFootnotes } from "../../src/linting/linter";
 
 // BUG: moveFootnoteDefinitionsToBottom duplicates a footnote-section heading
 // that already sits mid-document above the definitions. The presence check is

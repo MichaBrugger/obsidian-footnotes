@@ -1,4 +1,4 @@
-import { footnoteMarkerMatches } from "./insert-or-navigate-footnotes";
+import { footnoteMarkerMatches } from "../../insert-or-navigate-footnotes";
 import {
     DefinitionStart,
     findDefinitionBlocks,
@@ -7,7 +7,9 @@ import {
     protectedLines,
     removeLineRanges,
     restoreEol,
-} from "./markdown-scan";
+} from "../../markdown-scan";
+import { IgnoreType } from "../ignore-types";
+import { FootnoteRule } from "../rule";
 
 // The reindex algorithm: a pure markdown → markdown transform, no Editor.
 // Policy (pinned in test/reindex-footnotes.test.ts): numbered footnotes are
@@ -189,3 +191,30 @@ function reindexOnce(
     }
     return restoreEol(out.join("\n"), eol);
 }
+
+/** Linter-shaped wrapper: id matches Linter's rule filename. */
+export const reIndexFootnotesRule: FootnoteRule<ReindexOptions> = {
+    id: "re-index-footnotes",
+    name: "Re-index footnotes",
+    description:
+        "Renumber numbered footnotes 1..n by first marker appearance and reorder their definitions to match.",
+    ignoreTypes: [
+        IgnoreType.Code,
+        IgnoreType.InlineCode,
+        IgnoreType.Math,
+        IgnoreType.Yaml,
+    ],
+    examples: [
+        {
+            description: "Renumbers by first marker appearance",
+            before: "bravo[^2] alpha[^1].\n\n[^1]: one\n[^2]: two",
+            after: "bravo[^1] alpha[^2].\n\n[^1]: two\n[^2]: one",
+        },
+        {
+            description: "Closes gaps in the numbering",
+            before: "a[^3] b[^7].\n\n[^3]: three\n[^7]: seven",
+            after: "a[^1] b[^2].\n\n[^1]: three\n[^2]: seven",
+        },
+    ],
+    apply: (text, options = {}) => reindexFootnotes(text, options),
+};

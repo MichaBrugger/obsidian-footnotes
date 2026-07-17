@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { moveFootnoteDefinitionsToBottom } from "../../src/move-footnotes-to-bottom";
+import { moveFootnoteDefinitionsToBottom } from "../../src/linting/rules/move-footnotes-to-the-bottom";
 import { findDefinitionBlocks, protectedLines } from "../../src/markdown-scan";
 
 // BUG: moveFootnoteDefinitionsToBottom relocates a valid definition INTO an

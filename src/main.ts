@@ -2,7 +2,7 @@
 // named footnotes — each one "insert OR navigate", see
 // insert-or-navigate-footnotes.ts for the decision cascade — the two
 // inline-footnote inserts, and the whole-document cleanups from
-// tidy-footnotes.ts), the settings tab, and the popup-dismissal hook.
+// src/linting/), the settings tab, and the popup-dismissal hook.
 // Also owns settings load/save plus one-time migrations of legacy values.
 import {
   addIcon,
@@ -18,9 +18,9 @@ import {
   insertNamedFootnote,
   pasteInlineFootnote,
 } from "./insert-or-navigate-footnotes";
-import { footnoteAfterPunctuation } from "./footnote-after-punctuation";
-import { moveFootnoteDefinitionsToBottom } from "./move-footnotes-to-bottom";
-import { reindexFootnotes } from "./reindex-footnotes";
+import { footnoteAfterPunctuation } from "./linting/rules/footnote-after-punctuation";
+import { moveFootnoteDefinitionsToBottom } from "./linting/rules/move-footnotes-to-the-bottom";
+import { reindexFootnotes } from "./linting/rules/re-index-footnotes";
 import {
   installTidyOnSave,
   noteActiveLeafForAutoTidy,
@@ -29,7 +29,7 @@ import {
   runFootnoteTransformCommand,
   tidyFootnotes,
   tidyOptionsFromSettings,
-} from "./tidy-footnotes";
+} from "./linting/linter";
 
 export default class FootnotePlugin extends Plugin {
   // `declare`: refine the base Plugin.settings type (Obsidian 1.13+)
@@ -92,7 +92,7 @@ export default class FootnotePlugin extends Plugin {
     });
   
     // Whole-document cleanup commands (Linter's footnote rules, rebuilt —
-    // see tidy-footnotes.ts). Icons are stock Lucide until the hand-drawn
+    // see src/linting/). Icons are stock Lucide until the hand-drawn
     // set grows matching ones.
     this.addCommand({
       id: "reindex-footnotes",

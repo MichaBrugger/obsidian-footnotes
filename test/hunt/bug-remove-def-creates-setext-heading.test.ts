@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { moveFootnoteDefinitionsToBottom } from "../../src/move-footnotes-to-bottom";
-import { reindexFootnotes } from "../../src/reindex-footnotes";
+import { moveFootnoteDefinitionsToBottom } from "../../src/linting/rules/move-footnotes-to-the-bottom";
+import { reindexFootnotes } from "../../src/linting/rules/re-index-footnotes";
 
 // BUG (turns body prose into an h2): "prose\n---" is a setext H2. Removing or
 // moving the definition line(s) that sat between a paragraph line and a "---"

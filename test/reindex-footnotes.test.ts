@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { reindexFootnotes } from "../src/reindex-footnotes";
+import { reindexFootnotes } from "../src/linting/rules/re-index-footnotes";
 
 // The full spec of the reindex algorithm, pinned as tests. Policy decisions
 // made here (and nowhere else):

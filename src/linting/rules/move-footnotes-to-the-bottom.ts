@@ -4,7 +4,9 @@ import {
     protectedLines,
     removeLineRanges,
     restoreEol,
-} from "./markdown-scan";
+} from "../../markdown-scan";
+import { IgnoreType } from "../ignore-types";
+import { FootnoteRule } from "../rule";
 
 // Linter's "move footnotes to the bottom" as a pure transform, integrated
 // with the plugin's section-heading setting. Policy pinned in
@@ -93,3 +95,34 @@ export function moveFootnoteDefinitionsToBottom(
             : base + headingPart + "\n\n" + definitions;
     return restoreEol(result + "\n".repeat(trailingNewlines), eol);
 }
+
+/**
+ * Linter-shaped wrapper: id matches Linter's rule filename. The option is the
+ * raw section-heading setting value (empty = no heading).
+ */
+export const moveFootnotesToTheBottomRule: FootnoteRule<string> = {
+    id: "move-footnotes-to-the-bottom",
+    name: "Move footnotes to the bottom",
+    description:
+        "Relocate every footnote definition block to the end of the note, keeping the blocks' relative order.",
+    ignoreTypes: [
+        IgnoreType.Code,
+        IgnoreType.InlineCode,
+        IgnoreType.Math,
+        IgnoreType.Yaml,
+    ],
+    examples: [
+        {
+            description: "A mid-document definition moves to the bottom",
+            before: "para one[^1].\n\n[^1]: def\n\npara two",
+            after: "para one[^1].\n\npara two\n\n[^1]: def",
+        },
+        {
+            description: "Definitions keep their relative order",
+            before: "a[^2].\n\n[^2]: two\n\nb[^1].\n\n[^1]: one",
+            after: "a[^2].\n\nb[^1].\n\n[^2]: two\n[^1]: one",
+        },
+    ],
+    apply: (text, sectionHeading = "") =>
+        moveFootnoteDefinitionsToBottom(text, sectionHeading),
+};

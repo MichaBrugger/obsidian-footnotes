@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import FootnotePlugin from "../../src/main";
 import { shouldCreateMatchingFootnoteDetail } from "../../src/insert-or-navigate-footnotes";
-import { reindexFootnotes } from "../../src/reindex-footnotes";
+import { reindexFootnotes } from "../../src/linting/rules/re-index-footnotes";
 
 // BUG: Obsidian footnote labels are case-insensitive — "[^Note]" and "[^note]:"
 // are the SAME footnote, and the metadata cache lowercases ids. The plugin's own

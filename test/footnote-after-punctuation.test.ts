@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { footnoteAfterPunctuation } from "../src/footnote-after-punctuation";
+import { footnoteAfterPunctuation } from "../src/linting/rules/footnote-after-punctuation";
 
 // Linter's "footnote after punctuation": a marker sitting BEFORE
 // punctuation swaps to sit after it ("word[^1]." → "word.[^1]"). Policy

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { computeNextFootnoteNumber } from "../../src/insert-or-navigate-footnotes";
-import { reindexFootnotes } from "../../src/reindex-footnotes";
+import { reindexFootnotes } from "../../src/linting/rules/re-index-footnotes";
 
 // Spec questions surfaced by the hunt: the code is self-consistent, but the
 // behavior is surprising/undocumented. Each is pinned as it.fails so it flips
