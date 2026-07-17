@@ -1,6 +1,8 @@
 # Attack surface — obsidian-footnotes
 
-Last verified against the code: 2026-07-16 (commit a236e5c). If `git log`
+Last verified against the code: 2026-07-17 (commit a0b8c30 — linting now
+lives in src/linting/ as Linter-shaped rules; the 22 bugs from the first
+hunt are fixed and their pins are green regression tests in test/hunt/). If `git log`
 shows newer feature commits, treat their modules as prime hunting ground and
 update this file at the end of the hunt.
 
@@ -12,10 +14,11 @@ Pure modules (unit-probeable, the hunt's home turf):
 | --- | --- | --- |
 | `src/markdown-scan.ts` | `DefinitionStart`, `protectedLines`, `maskInlineCode`, `maskProtectedLines`, `removeLineRanges`, `findDefinitionBlocks` | Deciding which lines/spans are "protected" (code fences, inline code) and locating definition blocks |
 | `src/insert-or-navigate-footnotes.ts` (892 lines — the big one) | `AllMarkers`, `ExtractNameFromFootnote`, `isValidFootnoteName`, `listExistingFootnoteDetails`, `listExistingFootnoteMarkersAndLocations`, `shouldJumpFromDetailToMarker`, `markerAtCursor`, `addFootnoteSectionHeader`, `buildDetailAppend`, `endOfWordOffset`, `footnotePrefix`, `computeNextFootnoteNumber`, `sanitizeInlineFootnoteContent`, `inlineFootnoteExitCh` | Marker grammar, autonumbering, insertion points, inline-footnote handling |
-| `src/reindex-footnotes.ts` | `reindexFootnotes`, `ReindexOptions` | Renumbering markers + definitions in reading order |
-| `src/tidy-footnotes.ts` | `tidyFootnotes`, `TidyOptions`, `reindexOptionsFromSettings`, `tidyOptionsFromSettings` | Composed cleanup transforms (ported from Linter) |
-| `src/move-footnotes-to-bottom.ts` | `moveFootnoteDefinitionsToBottom` | Relocating definition blocks |
-| `src/footnote-after-punctuation.ts` | `footnoteAfterPunctuation` | Swapping marker/punctuation order |
+| `src/linting/rules/re-index-footnotes.ts` | `reindexFootnotes`, `ReindexOptions` | Renumbering markers + definitions in reading order |
+| `src/linting/linter.ts` | `tidyFootnotes` (alias `lintFootnotes`), `TidyOptions`, `reindexOptionsFromSettings`, `tidyOptionsFromSettings`, auto-tidy triggers (`installTidyOnSave`, `noteActiveLeafForAutoTidy`) | Composed lint pipeline + editor runner + save/file-change triggers |
+| `src/linting/rules/move-footnotes-to-the-bottom.ts` | `moveFootnoteDefinitionsToBottom` | Relocating definition blocks |
+| `src/linting/rules/footnote-after-punctuation.ts` | `footnoteAfterPunctuation` | Swapping marker/punctuation order |
+| `src/linting/ignore-types.ts` | `IgnoreType`, `applyIgnored` | Linter-parity mask/restore vocabulary (declaration-only so far — transforms still self-protect via markdown-scan) |
 | `src/table-cursor.ts` | `tableRowCellSpans`, `resolveTableCellCursor` | Escape-aware table cell spans |
 
 Editor-bound (needs the live app — report hypotheses, don't probe):
