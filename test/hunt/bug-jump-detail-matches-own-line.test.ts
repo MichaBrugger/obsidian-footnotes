@@ -35,7 +35,7 @@ const fakePlugin = {
 } as unknown as FootnotePlugin;
 
 describe("bug: detail->marker jump matches the definition's own line", () => {
-    it.fails("does not jump to its own detail line when the definition sits above the marker", () => {
+    it("does not jump to its own detail line when the definition sits above the marker", () => {
         const { doc, cursorMoves } = fakeEditor([
             "[^1]: detail",
             "text[^1] here",
@@ -51,7 +51,7 @@ describe("bug: detail->marker jump matches the definition's own line", () => {
         expect(cursorMoves).toEqual([{ line: 1, ch: 8 }]);
     });
 
-    it.fails("returns false for an orphan detail with no marker to jump to", () => {
+    it("returns false for an orphan detail with no marker to jump to", () => {
         const { doc } = fakeEditor(["[^orphan]: text", "unrelated prose"]);
         const handled = shouldJumpFromDetailToMarker(
             "[^orphan]: text",

@@ -18,7 +18,7 @@ describe("bug: move-to-bottom buries a definition inside an unclosed fence", () 
     // trapped inside the unclosed fence in the input (that part is pre-existing).
     const doc = "a[^1].\n\n[^1]: def\n\n```\nfake[^2]\n[^2]: unreachable";
 
-    it.fails("the relocated [^1] definition is still a recognized definition", () => {
+    it("the relocated [^1] definition is still a recognized definition", () => {
         const out = moveFootnoteDefinitionsToBottom(doc);
         const lines = out.split("\n");
         const blocks = findDefinitionBlocks(lines, protectedLines(lines));

@@ -15,7 +15,7 @@ import { moveFootnoteDefinitionsToBottom } from "../../src/move-footnotes-to-bot
 // Provenance: iteration-1/eval-0/with_skill/run-1 (transforms hunt), lens: interactions/contexts.
 
 describe("bug: move-to-bottom endsWith heading check false-positives", () => {
-    it.fails("'## Footnotes' does not satisfy a configured '# Footnotes'", () => {
+    it("'## Footnotes' does not satisfy a configured '# Footnotes'", () => {
         const out = moveFootnoteDefinitionsToBottom(
             "body[^1].\n## Footnotes\n\n[^1]: def",
             "# Footnotes",
@@ -23,7 +23,7 @@ describe("bug: move-to-bottom endsWith heading check false-positives", () => {
         expect(out.split("\n")).toContain("# Footnotes");
     });
 
-    it.fails("prose ending in the heading text does not satisfy the check", () => {
+    it("prose ending in the heading text does not satisfy the check", () => {
         const out = moveFootnoteDefinitionsToBottom(
             "body[^1].\nprose about the # Footnotes\n\n[^1]: def",
             "# Footnotes",
@@ -31,7 +31,7 @@ describe("bug: move-to-bottom endsWith heading check false-positives", () => {
         expect(out.split("\n")).toContain("# Footnotes");
     });
 
-    it.fails("divider heading is added even when body ends with frontmatter close ---", () => {
+    it("divider heading is added even when body ends with frontmatter close ---", () => {
         // body ends with the frontmatter's own closing "---", so endsWith("---")
         // is true and the configured divider is skipped
         const out = moveFootnoteDefinitionsToBottom(

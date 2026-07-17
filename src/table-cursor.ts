@@ -57,19 +57,24 @@ export function activeTableCellEditor(editor: Editor): TableCellEditor | null {
 /** Cell spans of a table row line, aware of `\|` escapes. */
 export function tableRowCellSpans(lineText: string): { from: number; to: number }[] {
     const spans: { from: number; to: number }[] = [];
-    let start = -1;
-    for (let i = 0; i < lineText.length; i++) {
+    // the leading pipe is optional in GFM ("A | B" is a valid row) — without
+    // one the first cell starts at column 0 instead of after a "|"
+    const leadingPipe = lineText.match(/^\s*\|/);
+    let start = leadingPipe ? leadingPipe[0].length : 0;
+    let sawPipe = leadingPipe !== null;
+    for (let i = start; i < lineText.length; i++) {
         const c = lineText[i];
         if (c === "\\") {
             i++;
         } else if (c === "|") {
-            if (start !== -1) {
-                spans.push({ from: start, to: i });
-            }
+            sawPipe = true;
+            spans.push({ from: start, to: i });
             start = i + 1;
         }
     }
-    if (start !== -1 && start < lineText.length) {
+    // a line with no unescaped pipe at all isn't a table row — no cells
+    if (!sawPipe) return [];
+    if (start < lineText.length) {
         spans.push({ from: start, to: lineText.length });
     }
     return spans;

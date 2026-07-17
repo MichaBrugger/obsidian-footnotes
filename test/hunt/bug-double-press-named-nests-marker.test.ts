@@ -52,7 +52,7 @@ function fakePlugin(overrides: Record<string, unknown> = {}): FootnotePlugin {
 }
 
 describe("bug: double-pressing the named hotkey nests [^] markers", () => {
-    it.fails("does not insert a second [^] inside the empty marker", () => {
+    it("does not insert a second [^] inside the empty marker", () => {
         const line = "[^]";
         const doc = fakeEditor([line]);
         // caret between the brackets, where the first press left it

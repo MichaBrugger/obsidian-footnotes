@@ -17,13 +17,13 @@ import { tidyFootnotes } from "../../src/tidy-footnotes";
 describe("bug: move-to-bottom duplicates a mid-document footnote heading", () => {
     const input = "body[^1].\n# Footnotes\n\n[^1]: def\n\ntrailing prose";
 
-    it.fails("does not duplicate a heading that sits mid-document", () => {
+    it("does not duplicate a heading that sits mid-document", () => {
         const out = moveFootnoteDefinitionsToBottom(input, "# Footnotes");
         const count = out.split("\n").filter((l) => l === "# Footnotes").length;
         expect(count).toBe(1);
     });
 
-    it.fails("tidy does not leave an orphaned heading behind", () => {
+    it("tidy does not leave an orphaned heading behind", () => {
         const out = tidyFootnotes(input, { sectionHeading: "# Footnotes" });
         const count = out.split("\n").filter((l) => l === "# Footnotes").length;
         expect(count).toBe(1);

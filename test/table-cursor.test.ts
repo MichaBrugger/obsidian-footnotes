@@ -30,8 +30,13 @@ describe("tableRowCellSpans", () => {
         ]);
     });
 
-    it("ignores text before the first pipe", () => {
+    // spec changed 2026-07-17: the leading pipe is optional in GFM, so text
+    // before the first pipe IS the first cell (was a characterization test
+    // pinning the old dropped-cell behavior — see
+    // test/hunt/bug-table-row-leading-pipe-missing.test.ts)
+    it("treats text before the first pipe as the first cell", () => {
         expect(tableRowCellSpans("x | y |")).toEqual([
+            { from: 0, to: 2 },
             { from: 3, to: 6 },
         ]);
     });

@@ -13,7 +13,7 @@ import { computeNextFootnoteNumber } from "../../src/insert-or-navigate-footnote
 // Provenance: iteration-1/eval-1/without_skill/run-1 (bug sweep, BUG 7).
 
 describe("bug: absurdly large footnote numbers break autonumbering", () => {
-    it.fails("the next footnote number formats as a plain integer", () => {
+    it("the next footnote number formats as a plain integer", () => {
         const next = computeNextFootnoteNumber(
             "Alpha[^99999999999999999999999].",
         );

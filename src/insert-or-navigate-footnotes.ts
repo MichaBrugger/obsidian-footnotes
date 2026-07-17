@@ -192,17 +192,18 @@ export function shouldJumpFromDetailToMarker(
     const masked = maskProtectedLines(docLines(doc));
     const match = (masked[cursorPosition.line] ?? "").match(DetailInLine);
     if (match) {
-        const footnote = `[^${match[1]}]`;
         // ids are case-insensitive, so the marker may differ in casing from
-        // the detail's label ("[^Note]" ↔ "[^note]:") — fold both to compare;
-        // positions line up because lowercasing preserves length
-        const needle = footnote.toLowerCase();
+        // the detail's label ("[^Note]" ↔ "[^note]:") — fold both to compare
+        const name = match[1].toLowerCase();
 
-        // find the FIRST OCCURENCE where this footnote exists in the text
+        // find the FIRST marker use of this footnote. footnoteMarkerMatches
+        // skips a definition's own column-0 label, so a detail line — this
+        // one included — is never its own jump target: an orphan detail
+        // falls through to false instead of "jumping" onto itself
         for (let i = 0; i < masked.length; i++) {
-            const ch = masked[i].toLowerCase().indexOf(needle);
-            if (ch !== -1) {
-                const newCursorPos = { line: i, ch: ch + footnote.length };
+            for (const use of footnoteMarkerMatches(masked[i])) {
+                if (use[1].toLowerCase() !== name) continue;
+                const newCursorPos = { line: i, ch: (use.index ?? 0) + use[0].length };
                 moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos, plugin, undefined, true);
                 return true;
             }
@@ -385,20 +386,26 @@ export function buildDetailAppend(
     return { change: { from, to, text }, cursor };
 }
 
+// the trailing punctuation the marker hops over — the same class the
+// footnote-after-punctuation tidy reorders, so the two features can't
+// disagree about where a marker belongs
+const TrailingPunctuation = [".", ",", ":", ";", "!", "?"];
+
 /**
  * The end-of-word insertion point within plain text: from `offset`, the end
  * of the word under (or just before) the cursor, plus one trailing
- * `.,:;`. Offsets with no word touching them are returned unchanged. This is
- * `adjustFootnotePosition` for table cells, where the main editor's
- * `wordAt` can't see the cell sub-editor's text. Word characters are `\w`
- * (ASCII), matching the marker insertion behavior users already have.
+ * punctuation mark. Offsets with no word touching them are returned
+ * unchanged. This is `adjustFootnotePosition` for table cells, where the
+ * main editor's `wordAt` can't see the cell sub-editor's text. Word
+ * characters are unicode letters/numbers/marks — combining accents belong
+ * to the word they follow, matching the grapheme-aware `wordAt`.
  */
 export function endOfWordOffset(text: string, offset: number): number {
-    const isWord = (c: string | undefined) => !!c && /\w/.test(c);
+    const isWord = (c: string | undefined) => !!c && /[\p{L}\p{N}\p{M}_]/u.test(c);
     if (!isWord(text[offset]) && !isWord(text[offset - 1])) return offset;
     let end = offset;
     while (isWord(text[end])) end++;
-    if ([".", ",", ":", ";"].includes(text[end] ?? "")) end++;
+    if (TrailingPunctuation.includes(text[end] ?? "")) end++;
     return end;
 }
 
@@ -415,7 +422,7 @@ function adjustFootnotePosition(
 
     // adjust cursor position to insert a footnote only at the end of word
     const nextChar = lineText.charAt(endOfWordUnderCursor.ch);
-    if ([".", ",", ":", ";"].includes(nextChar)) endOfWordUnderCursor.ch++;
+    if (TrailingPunctuation.includes(nextChar)) endOfWordUnderCursor.ch++;
     cursorPosition = endOfWordUnderCursor;
     return cursorPosition;
 }
@@ -533,7 +540,12 @@ export function computeNextFootnoteNumber(markdownText: string, prefix = ""): nu
         : AllNumberedMarkers;
     let currentMax = 1;
     for (const match of masked.matchAll(numberedMarkers)) {
-        currentMax = Math.max(currentMax, Number(match[1]) + 1);
+        const value = Number(match[1]);
+        // a digit run too large to round-trip through Number would push the
+        // next id into scientific notation ("[^1e+23]"); such a marker is
+        // treated as named, not numbered
+        if (!Number.isSafeInteger(value)) continue;
+        currentMax = Math.max(currentMax, value + 1);
     }
     return currentMax;
 }
@@ -734,8 +746,10 @@ export function inlineFootnoteExitCh(lineText: string, ch: number): number | nul
                 }
             }
         }
-        // unclosed footnote: no exit position exists on this line at all
-        if (close === -1) return null;
+        // this candidate never closes, so it isn't an inline footnote — a
+        // LATER "^[" on the line may still close (its opening "[" was
+        // counted as nesting above), so keep scanning instead of bailing
+        if (close === -1) continue;
         if (ch > i && ch <= close) return close + 1;
         i = close; // cursor isn't in this one — keep scanning after it
     }
@@ -909,7 +923,18 @@ export function shouldCreateMatchingFootnoteDetail(
     }
 }
 
-/** Cascade step 4 (named): insert an empty "[^]" (through `cell` when in a table) with the caret between the brackets, ready for name entry. */
+// The start index of an empty "[^]" whose brackets strictly contain `ch`,
+// or null. The marker regexes require a non-empty name, so the placeholder
+// a first press just inserted is invisible to every earlier cascade step —
+// this is the only guard between a second press and a nested "[^[^]]".
+function emptyMarkerStart(text: string, ch: number): number | null {
+    for (let i = 0; (i = text.indexOf("[^]", i)) !== -1; i += 3) {
+        if (ch > i && ch < i + 3) return i;
+    }
+    return null;
+}
+
+/** Cascade step 4 (named): insert an empty "[^]" (through `cell` when in a table) with the caret between the brackets, ready for name entry. A second press while the caret is still inside the empty marker hops it out past the bracket instead — same second-press rule as inline footnotes. */
 export function shouldCreateFootnoteMarker(
     lineText: string,
     cursorPosition: EditorPosition,
@@ -921,10 +946,22 @@ export function shouldCreateFootnoteMarker(
     const emptyMarker = `[^]`;
 
     if (cell) {
+        const cellText = cell.state.doc.toString();
+        const inEmpty = emptyMarkerStart(cellText, cell.state.selection.main.head);
+        if (inEmpty !== null) {
+            cell.dispatch({ selection: { anchor: inEmpty + emptyMarker.length } });
+            return;
+        }
         // through the cell's own editor (never the main editor — that races
         // the cell's sync-back and corrupts the table); the caret lands
         // between the brackets and focus stays in the cell for name entry
         insertInTableCell(cell, plugin, emptyMarker, 2);
+        return;
+    }
+
+    const inEmpty = emptyMarkerStart(lineText, cursorPosition.ch);
+    if (inEmpty !== null) {
+        doc.setCursor({ line: cursorPosition.line, ch: inEmpty + emptyMarker.length });
         return;
     }
 

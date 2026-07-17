@@ -15,16 +15,20 @@ import {
 /**
  * Relocate every footnote definition block to the end of the note, keeping
  * the blocks' relative order (reordering is reindexFootnotes' job). When
- * `sectionHeading` is given (the raw setting value) and not already sitting
- * at the end of the body, it is inserted above the definitions — dividers
- * get a separating blank line so they can't form a setext heading.
+ * `sectionHeading` is given (the raw setting value), a copy sitting directly
+ * above the first definition block moves along with the definitions; if no
+ * unprotected line in the note already equals the heading, one is inserted
+ * above the moved definitions — dividers get a separating blank line so they
+ * can't form a setext heading. A note whose end sits inside an unclosed
+ * fence or comment is returned unchanged: appending there would turn the
+ * definitions into inert code.
  */
 export function moveFootnoteDefinitionsToBottom(
     markdown: string,
     sectionHeading = "",
 ): string {
     const { text, eol } = normalizeEol(markdown);
-    let lines = text.split("\n");
+    const lines = text.split("\n");
 
     // remember the document's trailing newlines; they go back on at the end
     let trailingNewlines = 0;
@@ -37,9 +41,36 @@ export function moveFootnoteDefinitionsToBottom(
     const blocks = findDefinitionBlocks(lines, isProtected);
     if (blocks.length === 0) return markdown;
 
-    // everything that isn't a definition block, in place (removeLineRanges
-    // collapses the blank lines a cut leaves meeting each other)
-    const body = removeLineRanges(lines, blocks);
+    // probe whether a line appended at EOF would itself be protected (an
+    // unclosed fence or comment runs to EOF) — relocating definitions into
+    // such a region would sever them from their markers
+    const probe = protectedLines([...lines, "", "probe"]);
+    if (probe[probe.length - 1]) return markdown;
+
+    // a heading directly above the first definition block (blanks only in
+    // between) owns the definitions and moves with them; any other exact
+    // unprotected occurrence means the note already has the heading and
+    // appending another would duplicate it
+    const ranges: { start: number; end: number }[] = [...blocks];
+    let headingMoved = false;
+    let headingPresent = false;
+    if (sectionHeading) {
+        for (let i = 0; i < lines.length; i++) {
+            if (isProtected[i] || lines[i] !== sectionHeading) continue;
+            let j = i + 1;
+            while (j < blocks[0].start && lines[j] === "") j++;
+            if (!headingMoved && i < blocks[0].start && j === blocks[0].start) {
+                ranges.unshift({ start: i, end: i });
+                headingMoved = true;
+            } else {
+                headingPresent = true;
+            }
+        }
+    }
+
+    // everything that isn't moving, in place (removeLineRanges collapses
+    // the blank lines a cut leaves meeting each other)
+    const body = removeLineRanges(lines, ranges);
     while (body.length > 0 && body[body.length - 1] === "") body.pop();
 
     const definitions = blocks
@@ -47,8 +78,9 @@ export function moveFootnoteDefinitionsToBottom(
         .join("\n");
 
     const base = body.join("\n");
+    const includeHeading = sectionHeading !== "" && !headingPresent;
     let headingPart = "";
-    if (sectionHeading && !base.endsWith(sectionHeading)) {
+    if (includeHeading && base !== "") {
         // same layout rule as addFootnoteSectionHeader: a divider needs a
         // blank line above it, a text heading sits right under the body
         const divider = /^(---|\*\*\*|___)/.test(sectionHeading);
@@ -57,7 +89,7 @@ export function moveFootnoteDefinitionsToBottom(
 
     const result =
         base === ""
-            ? (sectionHeading ? sectionHeading + "\n\n" : "") + definitions
+            ? (includeHeading ? sectionHeading + "\n\n" : "") + definitions
             : base + headingPart + "\n\n" + definitions;
     return restoreEol(result + "\n".repeat(trailingNewlines), eol);
 }

@@ -16,11 +16,11 @@ import { endOfWordOffset } from "../../src/insert-or-navigate-footnotes";
 // Provenance: iteration-1/eval-1/without_skill/run-1 (bug sweep, BUG 3).
 
 describe("bug: end-of-word insertion skips . , : ; but not ! ?", () => {
-    it.fails("skips past a terminal exclamation mark", () => {
+    it("skips past a terminal exclamation mark", () => {
         expect(endOfWordOffset("Hello!", 2)).toBe(6);
     });
 
-    it.fails("skips past a terminal question mark", () => {
+    it("skips past a terminal question mark", () => {
         expect(endOfWordOffset("Really?", 2)).toBe(7);
     });
 });

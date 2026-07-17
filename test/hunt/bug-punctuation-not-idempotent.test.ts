@@ -16,7 +16,7 @@ import { footnoteAfterPunctuation } from "../../src/footnote-after-punctuation";
 describe("bug: footnoteAfterPunctuation not idempotent on a punctuation chain", () => {
     const doc = "word[^1].[^2],\n\n[^1]: one\n[^2]: two";
 
-    it.fails("f(f(doc)) === f(doc) on an interleaved marker/punct chain", () => {
+    it("f(f(doc)) === f(doc) on an interleaved marker/punct chain", () => {
         const once = footnoteAfterPunctuation(doc);
         expect(footnoteAfterPunctuation(once)).toBe(once);
     });

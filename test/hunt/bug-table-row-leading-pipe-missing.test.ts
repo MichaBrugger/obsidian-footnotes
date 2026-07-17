@@ -13,7 +13,7 @@ import { tableRowCellSpans } from "../../src/table-cursor";
 // Provenance: iteration-1/eval-1/without_skill/run-1 (bug sweep, BUG 8).
 
 describe("bug: table rows without a leading pipe lose their first cell", () => {
-    it.fails("returns both cells of 'A | B'", () => {
+    it("returns both cells of 'A | B'", () => {
         expect(tableRowCellSpans("A | B")).toEqual([
             { from: 0, to: 2 },
             { from: 3, to: 5 },

@@ -13,7 +13,7 @@ import { inlineFootnoteExitCh } from "../../src/insert-or-navigate-footnotes";
 // Hunt: 2026-07-17. Lens: offsets. Severity: wrong-output.
 
 describe("bug: unclosed inline footnote strands a later closed one", () => {
-    it.fails("a caret inside a later closed ^[...] still finds its exit", () => {
+    it("a caret inside a later closed ^[...] still finds its exit", () => {
         //            0         1
         //            0123456789012345678
         const line = "a^[open b^[closed] c";

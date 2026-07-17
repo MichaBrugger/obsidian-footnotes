@@ -21,6 +21,10 @@ function swapInSegment(original: string, masked: string): string {
     let copied = 0;
     for (const match of masked.matchAll(MarkersBeforePunctuation)) {
         const start = match.index ?? 0;
+        // a marker run already sitting AFTER punctuation is settled — the
+        // punctuation following it belongs to the next clause, and swapping
+        // again would drift it away from its text (idempotence)
+        if (start > 0 && /[.,;:!?]/.test(masked[start - 1])) continue;
         const punctuationStart = start + match[1].length;
         const end = start + match[0].length;
         out +=
