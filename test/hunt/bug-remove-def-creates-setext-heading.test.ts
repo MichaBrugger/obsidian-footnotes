@@ -10,11 +10,12 @@ import { reindexFootnotes } from "../../src/reindex-footnotes";
 // orphan cut and by move-to-bottom) and move-to-bottom's re-layout only collapse
 // doubled blank lines; neither checks what its cut leaves adjacent.
 // Scenario: cutting/moving a definition strands a paragraph atop a "---" -> setext heading.
-// pinned 2026-07-17, hunt-bugs consolidation.
+// fixed 2026-07-17: removeLineRanges reinstates a blank line when a cut would
+// drop a paragraph directly onto a "---"/"===" setext underline.
 // Provenance: iteration-1/eval-0/without_skill/run-1 (transform bug hunt, Bug 2).
 
 describe("bug: removing definition lines can silently create a setext heading", () => {
-    it.fails("reindex drop-orphans does not strand a paragraph above a thematic break", () => {
+    it("reindex drop-orphans does not strand a paragraph above a thematic break", () => {
         const input = "closing words[^1]\n[^9]: orphan\n---\n\n[^1]: def";
         const out = reindexFootnotes(input, { keepOrphanedDefinitions: false });
         // cutting the orphan must not leave the paragraph sitting directly above
@@ -22,7 +23,7 @@ describe("bug: removing definition lines can silently create a setext heading", 
         expect(out).not.toContain("closing words[^1]\n---");
     });
 
-    it.fails("move-to-bottom does not strand a paragraph above a thematic break", () => {
+    it("move-to-bottom does not strand a paragraph above a thematic break", () => {
         const input = "para one[^1] here\n[^1]: def\n---\npara two";
         const out = moveFootnoteDefinitionsToBottom(input);
         expect(out).not.toContain("para one[^1] here\n---");

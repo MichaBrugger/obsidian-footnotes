@@ -1,7 +1,9 @@
 import {
     DefinitionStart,
     maskInlineCode,
+    normalizeEol,
     protectedLines,
+    restoreEol,
 } from "./markdown-scan";
 
 // Linter's "footnote after punctuation" as a pure transform. Policy pinned
@@ -37,7 +39,8 @@ function swapInSegment(original: string, masked: string): string {
  * inline code, and frontmatter are left alone.
  */
 export function footnoteAfterPunctuation(markdown: string): string {
-    const lines = markdown.split("\n");
+    const { text, eol } = normalizeEol(markdown);
+    const lines = text.split("\n");
     const isProtected = protectedLines(lines);
 
     const result = lines.map((line, i) => {
@@ -51,5 +54,5 @@ export function footnoteAfterPunctuation(markdown: string): string {
             swapInSegment(line.slice(prefixLength), masked.slice(prefixLength))
         );
     });
-    return result.join("\n");
+    return restoreEol(result.join("\n"), eol);
 }

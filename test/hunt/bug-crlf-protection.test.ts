@@ -14,20 +14,22 @@ import {
 // rewritten by reindex/tidy/move — and the documented footnote-prefix property
 // (issue #31) is ignored entirely.
 // Hunt: 2026-07-17. Lenses: contexts / interactions / regressions. Severity: data-loss.
+// fixed 2026-07-17: protectedLines/footnotePrefix strip a trailing "\r"; the
+// whole-document transforms normalize CRLF->LF on entry and restore on exit.
 
 describe("bug: CRLF defeats frontmatter protection and footnote-prefix", () => {
-    it.fails("protectedLines marks CRLF frontmatter lines as protected", () => {
+    it("protectedLines marks CRLF frontmatter lines as protected", () => {
         const flags = protectedLines(["---\r", "a: b\r", "---\r", "x[^1]\r"]);
         expect(flags).toEqual([true, true, true, false]);
     });
 
-    it.fails("a marker inside CRLF frontmatter does not reserve a number", () => {
+    it("a marker inside CRLF frontmatter does not reserve a number", () => {
         expect(
             computeNextFootnoteNumber("---\r\nnum: [^9]\r\n---\r\nreal[^1]"),
         ).toBe(2);
     });
 
-    it.fails("footnote-prefix is read from a CRLF frontmatter note", () => {
+    it("footnote-prefix is read from a CRLF frontmatter note", () => {
         expect(
             footnotePrefix("---\r\nfootnote-prefix: 2.\r\n---\r\nbody"),
         ).toBe("2.");

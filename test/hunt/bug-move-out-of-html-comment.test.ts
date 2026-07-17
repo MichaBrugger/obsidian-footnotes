@@ -12,7 +12,8 @@ import { reindexFootnotes } from "../../src/reindex-footnotes";
 //    "[^9]:" never counts as a reference thanks to AllMarkers' (?!:)) and
 //    permanently DELETES the commented-out text — silent content loss.
 // Scenario: a footnote definition inside an HTML comment is relocated / deleted.
-// pinned 2026-07-17, hunt-bugs consolidation.
+// fixed 2026-07-17: protectedLines treats a multi-line <!-- --> comment as a
+// protected region, so findDefinitionBlocks never sees the commented def.
 // Provenance: iteration-1/eval-0/with_skill/run-1 (transforms hunt), lens: contexts.
 
 describe("bug: HTML-comment definition mishandled by the transforms", () => {
@@ -26,11 +27,11 @@ describe("bug: HTML-comment definition mishandled by the transforms", () => {
         "[^1]: def",
     ].join("\n");
 
-    it.fails("move-to-bottom leaves a commented-out definition inside its comment", () => {
+    it("move-to-bottom leaves a commented-out definition inside its comment", () => {
         expect(moveFootnoteDefinitionsToBottom(input)).toBe(input);
     });
 
-    it.fails("reindex drop-orphans does not delete a commented-out definition", () => {
+    it("reindex drop-orphans does not delete a commented-out definition", () => {
         expect(
             reindexFootnotes(input, { keepOrphanedDefinitions: false }),
         ).toBe(input);

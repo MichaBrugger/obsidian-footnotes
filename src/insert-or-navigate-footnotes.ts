@@ -446,7 +446,11 @@ export function insertInTableCell(
  * (issue #31).
  */
 export function footnotePrefix(markdownText: string): string {
-    const lines = markdownText.split("\n");
+    // strip trailing "\r" so CRLF notes match the exact "---" fence and the
+    // "$"-anchored property regex below (a "\r" defeats both otherwise)
+    const lines = markdownText
+        .split("\n")
+        .map((line) => (line.endsWith("\r") ? line.slice(0, -1) : line));
     if (lines[0] !== "---") return "";
     for (let i = 1; i < lines.length; i++) {
         if (/^(---|\.\.\.)\s*$/.test(lines[i])) break;

@@ -14,9 +14,12 @@ import { computeNextFootnoteNumber } from "../../src/insert-or-navigate-footnote
 //     [^3] between them (unlike inlineFootnoteExitCh / sanitizeInlineFootnoteContent
 //     elsewhere, which are escape-aware).
 // Hunt: 2026-07-17. Lens: contexts. Severity: wrong-output.
+// fixed 2026-07-17: (a) protectedLines rejects a backtick fence whose info
+// string contains a backtick; (b) maskInlineCode skips escaped backticks when
+// opening a span.
 
 describe("bug: backtick fine print swallows real markers", () => {
-    it.fails(
+    it(
         "a backtick line whose info string contains backticks is inline code, not a fence",
         () => {
             expect(
@@ -25,7 +28,7 @@ describe("bug: backtick fine print swallows real markers", () => {
         },
     );
 
-    it.fails("escaped backticks do not open an inline code span", () => {
+    it("escaped backticks do not open an inline code span", () => {
         expect(computeNextFootnoteNumber("a \\` b [^3] c \\` d")).toBe(4);
     });
 });

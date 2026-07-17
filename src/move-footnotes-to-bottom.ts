@@ -1,7 +1,9 @@
 import {
     findDefinitionBlocks,
+    normalizeEol,
     protectedLines,
     removeLineRanges,
+    restoreEol,
 } from "./markdown-scan";
 
 // Linter's "move footnotes to the bottom" as a pure transform, integrated
@@ -21,7 +23,8 @@ export function moveFootnoteDefinitionsToBottom(
     markdown: string,
     sectionHeading = "",
 ): string {
-    let lines = markdown.split("\n");
+    const { text, eol } = normalizeEol(markdown);
+    let lines = text.split("\n");
 
     // remember the document's trailing newlines; they go back on at the end
     let trailingNewlines = 0;
@@ -56,5 +59,5 @@ export function moveFootnoteDefinitionsToBottom(
         base === ""
             ? (sectionHeading ? sectionHeading + "\n\n" : "") + definitions
             : base + headingPart + "\n\n" + definitions;
-    return result + "\n".repeat(trailingNewlines);
+    return restoreEol(result + "\n".repeat(trailingNewlines), eol);
 }

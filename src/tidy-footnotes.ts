@@ -7,6 +7,7 @@ import {
 } from "./footnote-popup";
 import { runOutsideTableCell } from "./insert-or-navigate-footnotes";
 import { footnoteAfterPunctuation } from "./footnote-after-punctuation";
+import { normalizeEol, restoreEol } from "./markdown-scan";
 import { moveFootnoteDefinitionsToBottom } from "./move-footnotes-to-bottom";
 import { reindexFootnotes, ReindexOptions } from "./reindex-footnotes";
 
@@ -63,7 +64,10 @@ export function tidyFootnotes(
     markdown: string,
     options: TidyOptions = {},
 ): string {
-    let result = markdown;
+    // normalize once here so the composed steps all see LF and the note's
+    // original endings are restored a single time on the way out
+    const { text, eol } = normalizeEol(markdown);
+    let result = text;
     if (options.fixPunctuation ?? true) {
         result = footnoteAfterPunctuation(result);
     }
@@ -76,7 +80,7 @@ export function tidyFootnotes(
     if (options.reindex ?? true) {
         result = reindexFootnotes(result, options.reindexOptions);
     }
-    return result;
+    return restoreEol(result, eol);
 }
 
 // Replace only the changed middle of the document, so the cursor and the

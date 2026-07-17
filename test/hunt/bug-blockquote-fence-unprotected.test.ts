@@ -10,15 +10,17 @@ import { computeNextFootnoteNumber } from "../../src/insert-or-navigate-footnote
 // gets rewritten by reindex/tidy (the exact class issue #41 fixed for
 // top-level fences).
 // Hunt: 2026-07-17. Lens: contexts / regressions. Severity: data-loss.
+// fixed 2026-07-17: protectedLines strips a leading blockquote/callout prefix
+// before testing the fence delimiters.
 
 describe("bug: fenced code inside a blockquote/callout is not protected", () => {
-    it.fails("a fenced block inside a blockquote is protected", () => {
+    it("a fenced block inside a blockquote is protected", () => {
         expect(
             computeNextFootnoteNumber("> ```\n> fake[^7]\n> ```\nreal[^1]"),
         ).toBe(2);
     });
 
-    it.fails("a fenced block inside a callout is protected", () => {
+    it("a fenced block inside a callout is protected", () => {
         expect(
             computeNextFootnoteNumber(
                 "> [!note]\n> ```\n> fake[^7]\n> ```\nreal[^1]",

@@ -15,17 +15,68 @@ export interface DefinitionBlock {
 }
 
 /**
- * Lines the transforms must not read or touch: YAML frontmatter and fenced
- * code blocks (both fence delimiter lines included). Indented code blocks
- * are NOT detected — indentation is how definition continuations work.
+ * A trailing "\r" stripped from each line so a CRLF document split on "\n"
+ * satisfies the same exact-string line checks ("---", fence delimiters) as an
+ * LF one — the array's length and indices are unchanged. Windows/synced notes
+ * arrive as CRLF, and without this the frontmatter/fence scans silently miss.
+ */
+function stripCr(lines: string[]): string[] {
+    return lines.map((line) =>
+        line.endsWith("\r") ? line.slice(0, -1) : line,
+    );
+}
+
+/**
+ * `text` with CRLF newlines flattened to LF, plus the EOL to restore. The
+ * whole-document transforms work in LF and put the note's original endings
+ * back on the way out — Obsidian edits notes in place, so we must not
+ * silently flip a synced CRLF file to LF the way a strip-and-forget would.
+ */
+export function normalizeEol(text: string): {
+    text: string;
+    eol: "\n" | "\r\n";
+} {
+    return text.includes("\r\n")
+        ? { text: text.replace(/\r\n/g, "\n"), eol: "\r\n" }
+        : { text, eol: "\n" };
+}
+
+/** Re-apply the original EOL to an LF-normalized transform result. */
+export function restoreEol(text: string, eol: "\n" | "\r\n"): string {
+    return eol === "\r\n" ? text.replace(/\n/g, "\r\n") : text;
+}
+
+// A leading blockquote/callout prefix ("> ", "> > ", …): a fenced code block
+// can sit inside a blockquote/callout, and its delimiters carry that prefix.
+const BlockquotePrefix = /^(?: {0,3}>)+ ?/;
+
+/**
+ * Whether a line already known to start with a fence delimiter actually opens
+ * a fence. Per CommonMark a backtick fence's info string may not contain a
+ * backtick — "```[^1]``` x" is an inline code span in a paragraph, not a
+ * fence — so opening one there would run unclosed to EOF. Tilde fences have
+ * no such rule.
+ */
+function isFenceOpener(bareLine: string, delim: string): boolean {
+    if (delim[0] !== "`") return true;
+    const rest = bareLine.slice(bareLine.indexOf(delim) + delim.length);
+    return !rest.includes("`");
+}
+
+/**
+ * Lines the transforms must not read or touch: YAML frontmatter, fenced
+ * code blocks (both fence delimiter lines included, including fences nested
+ * in blockquotes/callouts), and multi-line HTML comments. Indented code
+ * blocks are NOT detected — indentation is how definition continuations work.
  */
 export function protectedLines(lines: string[]): boolean[] {
+    const src = stripCr(lines);
     const isProtected = new Array<boolean>(lines.length).fill(false);
     let i = 0;
 
-    if (lines[0] === "---") {
-        for (let j = 1; j < lines.length; j++) {
-            if (/^(---|\.\.\.)\s*$/.test(lines[j])) {
+    if (src[0] === "---") {
+        for (let j = 1; j < src.length; j++) {
+            if (/^(---|\.\.\.)\s*$/.test(src[j])) {
                 for (let k = 0; k <= j; k++) isProtected[k] = true;
                 i = j + 1;
                 break;
@@ -34,10 +85,18 @@ export function protectedLines(lines: string[]): boolean[] {
     }
 
     let fence: { char: string; length: number } | null = null;
-    for (; i < lines.length; i++) {
+    let inComment = false;
+    for (; i < src.length; i++) {
+        if (inComment) {
+            isProtected[i] = true;
+            if (src[i].includes("-->")) inComment = false;
+            continue;
+        }
+        // blockquote/callout markers don't change the fence delimiters
+        const bareLine = src[i].replace(BlockquotePrefix, "");
         if (fence) {
             isProtected[i] = true;
-            const close = lines[i].match(/^ {0,3}(`{3,}|~{3,})\s*$/);
+            const close = bareLine.match(/^ {0,3}(`{3,}|~{3,})\s*$/);
             if (
                 close &&
                 close[1][0] === fence.char &&
@@ -45,12 +104,24 @@ export function protectedLines(lines: string[]): boolean[] {
             ) {
                 fence = null;
             }
-        } else {
-            const open = lines[i].match(/^ {0,3}(`{3,}|~{3,})/);
-            if (open) {
-                fence = { char: open[1][0], length: open[1].length };
-                isProtected[i] = true;
-            }
+            continue;
+        }
+        const open = bareLine.match(/^ {0,3}(`{3,}|~{3,})/);
+        if (open && isFenceOpener(bareLine, open[1])) {
+            fence = { char: open[1][0], length: open[1].length };
+            isProtected[i] = true;
+            continue;
+        }
+        // a multi-line HTML comment (an opener with no closer on its own
+        // line) hides everything through its closing line — a "[^x]:" inside
+        // it is commented-out text, not a live definition
+        const commentOpen = src[i].indexOf("<!--");
+        if (
+            commentOpen !== -1 &&
+            src[i].indexOf("-->", commentOpen + 4) === -1
+        ) {
+            inComment = true;
+            isProtected[i] = true;
         }
     }
     return isProtected;
@@ -65,6 +136,10 @@ export function maskInlineCode(line: string): string {
     const chars = line.split("");
     let i = 0;
     while (i < line.length) {
+        if (line[i] === "\\") {
+            i += 2; // a backslash escape can't open a code span (\` is literal)
+            continue;
+        }
         if (line[i] !== "`") {
             i++;
             continue;
@@ -73,7 +148,9 @@ export function maskInlineCode(line: string): string {
         while (line[i] === "`") i++;
         const runLength = i - runStart;
 
-        // find the next backtick run of exactly the same length
+        // find the next backtick run of exactly the same length. Backslashes
+        // are literal inside a code span, so the closing search does NOT skip
+        // escapes — only the opening run must be unescaped.
         let close = -1;
         for (let j = i; j < line.length; ) {
             if (line[j] !== "`") {
@@ -133,6 +210,18 @@ export function removeLineRanges(
             (out.length === 0 || out[out.length - 1] === "")
         ) {
             continue; // still merging until a non-blank line arrives
+        }
+        // a cut must not drop a paragraph directly onto a "---"/"===" line:
+        // that would turn the stranded text into a setext heading. Only when
+        // the adjacency is new (mergeBlanks — no blank line survived the cut
+        // between them) do we reinstate a blank separator.
+        if (
+            mergeBlanks &&
+            out.length > 0 &&
+            out[out.length - 1] !== "" &&
+            /^\s{0,3}(-+|=+)\s*$/.test(lines[i])
+        ) {
+            out.push("");
         }
         mergeBlanks = false;
         out.push(lines[i]);

@@ -3,8 +3,10 @@ import {
     DefinitionStart,
     findDefinitionBlocks,
     maskInlineCode,
+    normalizeEol,
     protectedLines,
     removeLineRanges,
+    restoreEol,
 } from "./markdown-scan";
 
 // The reindex algorithm: a pure markdown → markdown transform, no Editor.
@@ -72,7 +74,8 @@ export function reindexFootnotes(
     const keepOrphans = options.keepOrphanedDefinitions ?? true;
     const renumberNamed = options.renumberNamedFootnotes ?? false;
 
-    let lines = markdown.split("\n");
+    const { text, eol } = normalizeEol(markdown);
+    let lines = text.split("\n");
     let isProtected = protectedLines(lines);
     let blocks = findDefinitionBlocks(lines, isProtected);
     let markerOrder = markerAppearanceOrder(lines, isProtected);
@@ -148,5 +151,5 @@ export function reindexFootnotes(
         for (let j = block.start; j <= block.end; j++) out.push(rewritten[j]);
         i = blocks[slot].end;
     }
-    return out.join("\n");
+    return restoreEol(out.join("\n"), eol);
 }
