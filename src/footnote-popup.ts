@@ -27,6 +27,11 @@ export function whenFootnotePopupSettled(): Promise<void> {
     return pendingTeardown ?? Promise.resolve();
 }
 
+/** Whether a popup is open or a closed one's save is still in flight — automatic edits must stay away while true. */
+export function footnotePopupBusy(): boolean {
+    return activePopup !== null || pendingTeardown !== null;
+}
+
 /**
  * whenFootnotePopupSettled, plus user feedback: when the wait is long
  * enough to feel like a dropped keypress, a notice explains what's

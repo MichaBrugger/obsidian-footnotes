@@ -140,6 +140,8 @@ const BASELINE_SETTINGS = {
     tidyFixPunctuation: true,
     tidyMoveToBottom: true,
     tidyReindex: true,
+    tidyOnSave: false,
+    tidyOnFileChange: false,
 };
 function resetSettings(overrides = {}) {
     setSettings({ ...BASELINE_SETTINGS, ...overrides });
@@ -805,6 +807,37 @@ async function main() {
                 !v.includes("\\|") &&
                 (v.match(/\|/g) ?? []).length === 9,
         );
+    });
+
+    await test("tidy on save tidies before the write when enabled", async () => {
+        resetSettings({ tidyOnSave: true });
+        await setupNote("Beta[^2] alpha[^1] end\n\n[^1]: one\n[^2]: two");
+        setCursorAndRun(0, 0, "editor:save-file");
+        await expectEditorText("Beta[^1] alpha[^2] end\n\n[^1]: two\n[^2]: one");
+    });
+
+    await test("saving does not tidy while the toggle is off (the default)", async () => {
+        resetSettings();
+        const note = "Beta[^2] alpha[^1] end\n\n[^1]: one\n[^2]: two";
+        await setupNote(note);
+        setCursorAndRun(0, 0, "editor:save-file");
+        await sleep(800);
+        const text = readJson(`(${EDITOR}).editor.getValue()`);
+        if (text !== note) {
+            throw new Error(`save tidied anyway: ${JSON.stringify(text)}`);
+        }
+    });
+
+    await test("switching notes tidies the one you left when enabled", async () => {
+        resetSettings({ tidyOnFileChange: true });
+        await setupNote("Beta[^2] alpha[^1] end\n\n[^1]: one\n[^2]: two");
+        // switching to another note must tidy the smoke note behind us
+        ob("create", "name=Smoke Test - second", "content=other note", "overwrite", "silent");
+        ob("open", "file=Smoke Test - second");
+        await sleep(1200);
+        ob("open", `file=${NOTE}`);
+        await expectEditorText("Beta[^1] alpha[^2] end\n\n[^1]: two\n[^2]: one");
+        ob("delete", "path=Smoke Test - second.md");
     });
 
     // restore state and clean up

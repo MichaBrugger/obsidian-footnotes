@@ -22,7 +22,10 @@ import { footnoteAfterPunctuation } from "./footnote-after-punctuation";
 import { moveFootnoteDefinitionsToBottom } from "./move-footnotes-to-bottom";
 import { reindexFootnotes } from "./reindex-footnotes";
 import {
+  installTidyOnSave,
+  noteActiveLeafForAutoTidy,
   reindexOptionsFromSettings,
+  resetAutoTidyTracking,
   runFootnoteTransformCommand,
   tidyFootnotes,
   tidyOptionsFromSettings,
@@ -161,12 +164,20 @@ export default class FootnotePlugin extends Plugin {
     this.addSettingTab(new FootnotePluginSettingTab(this.app, this));
 
     this.registerEvent(
-      this.app.workspace.on("active-leaf-change", () => dismissFootnotePopup())
+      this.app.workspace.on("active-leaf-change", () => {
+        dismissFootnotePopup();
+        noteActiveLeafForAutoTidy(this);
+      })
     );
+    // "Tidy on save" wraps the core save command (restored on unload);
+    // layout-ready seeds the focus tracker with the note open at startup
+    installTidyOnSave(this);
+    this.app.workspace.onLayoutReady(() => noteActiveLeafForAutoTidy(this));
   }
 
   onunload() {
     dismissFootnotePopup();
+    resetAutoTidyTracking();
   }
 
   async loadSettings() {

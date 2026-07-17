@@ -20,6 +20,8 @@ export interface FootnotePluginSettings {
     tidyFixPunctuation: boolean;
     tidyMoveToBottom: boolean;
     tidyReindex: boolean;
+    tidyOnSave: boolean;
+    tidyOnFileChange: boolean;
 }
 
 export const DEFAULT_SETTINGS: FootnotePluginSettings = {
@@ -37,6 +39,8 @@ export const DEFAULT_SETTINGS: FootnotePluginSettings = {
     tidyFixPunctuation: true,
     tidyMoveToBottom: true,
     tidyReindex: true,
+    tidyOnSave: false,
+    tidyOnFileChange: false,
 };
 
 export class FootnotePluginSettingTab extends PluginSettingTab {
@@ -111,6 +115,16 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                         name: "Reindex",
                         desc: "The tidy command also renumbers footnotes and reorders their definitions, following the reindexing options below.",
                         control: { type: "toggle", key: "tidyReindex" },
+                    },
+                    {
+                        name: "Tidy on save",
+                        desc: "Automatically tidy the note you're editing whenever you save it.",
+                        control: { type: "toggle", key: "tidyOnSave" },
+                    },
+                    {
+                        name: "Tidy on focused file change",
+                        desc: "Automatically tidy a note when you switch from it to another note.",
+                        control: { type: "toggle", key: "tidyOnFileChange" },
                     },
                 ],
             },
@@ -256,6 +270,30 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                 .setValue(this.plugin.settings.tidyReindex)
                 .onChange(async (value) => {
                     this.plugin.settings.tidyReindex = value;
+                    await this.plugin.saveSettings();
+                })
+        );
+
+        new Setting(containerEl)
+        .setName("Tidy on save")
+        .setDesc("Automatically tidy the note you're editing whenever you save it.")
+        .addToggle((toggle) =>
+            toggle
+                .setValue(this.plugin.settings.tidyOnSave)
+                .onChange(async (value) => {
+                    this.plugin.settings.tidyOnSave = value;
+                    await this.plugin.saveSettings();
+                })
+        );
+
+        new Setting(containerEl)
+        .setName("Tidy on focused file change")
+        .setDesc("Automatically tidy a note when you switch from it to another note.")
+        .addToggle((toggle) =>
+            toggle
+                .setValue(this.plugin.settings.tidyOnFileChange)
+                .onChange(async (value) => {
+                    this.plugin.settings.tidyOnFileChange = value;
                     await this.plugin.saveSettings();
                 })
         );

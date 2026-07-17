@@ -64,6 +64,16 @@ export interface AppWithEmbedRegistry extends App {
     };
 }
 
+/** The command registry, used to wrap the core save command ("Tidy on save"). */
+export interface AppWithCommands extends App {
+    commands?: {
+        commands?: Record<
+            string,
+            { checkCallback?: (checking: boolean) => boolean | void } | undefined
+        >;
+    };
+}
+
 /** `Vault.getConfig` reads editor config like `vimMode`. */
 export interface VaultWithConfig extends Vault {
     getConfig?(key: string): unknown;
