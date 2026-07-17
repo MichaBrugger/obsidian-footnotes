@@ -16,3 +16,7 @@ data.json
 **.DS_Store
 # Inkscape auto-backup copies (timestamped crash-recovery files)
 icons/*.svg.*.svg
+
+# claude skill-eval scaffolding and agent worktrees
+.claude/skills/hunt-bugs-workspace/
+.claude/worktrees/

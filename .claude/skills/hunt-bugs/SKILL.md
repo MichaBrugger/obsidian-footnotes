@@ -49,7 +49,19 @@ mostly fished out already — the survivors live between modules.
 
 ### 2. Fan out hunters (parallel, one message)
 
-Spawn one subagent per lens with the Agent tool, all in a single message.
+Spawn one subagent per lens with the Agent tool, all in a single message,
+with **`run_in_background: false`** on every call — parallel tool calls in one
+message still run concurrently, and blocking on them matters: if the
+orchestrator idles waiting for background children it can miss their results
+(when this skill itself runs inside a subagent, background-child notifications
+bubble past it) and, in a worktree, the idle orchestrator's still-clean tree
+gets auto-cleaned out from under the hunters.
+
+Set **`model: "opus"`** (or `"sonnet"`) on every hunter and skeptic — hunting
+is breadth work that doesn't need the top-tier model, and per-lens agents burn
+tokens fast (Jason's standing rule: bug-testing subagents run on Opus or
+Sonnet, never Fable).
+
 Lenses, from `references/attack-surface.md`:
 
 1. **grammar** — marker/definition parsing vs. what Obsidian actually accepts
