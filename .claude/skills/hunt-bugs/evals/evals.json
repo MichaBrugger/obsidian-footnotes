@@ -1,0 +1,33 @@
+{
+  "skill_name": "hunt-bugs",
+  "evals": [
+    {
+      "id": 0,
+      "prompt": "I don't fully trust the reindex / tidy / move-to-bottom transforms — they were ported from Linter specs rather than battle-tested. Hunt for bugs in them. I want actual proof — failing tests — not a list of 'this looks suspicious'.",
+      "expected_output": "A bug-hunt report where every claimed bug is demonstrated by an executed failing vitest test; covers all three named transforms; distinguishes confirmed bugs from spec questions; leaves the existing suite green; lists what came up clean.",
+      "files": [],
+      "assertions": [
+        "The report distinguishes bugs proven by an executed failing test from unproven suspicions or open spec questions",
+        "Every claimed bug is backed by a saved test file that demonstrates it",
+        "There is evidence tests were actually executed (vitest run output present and consistent with the claims)",
+        "The repo's pre-existing test suite is left green — pinned bug tests are quarantined (e.g. it.fails) rather than left red",
+        "The report says which areas were probed and came up clean, not only what failed",
+        "Probes cover all three requested transforms: reindexFootnotes, tidyFootnotes, and moveFootnoteDefinitionsToBottom"
+      ]
+    },
+    {
+      "id": 1,
+      "prompt": "Before I tag 0.2.0 I want a full bug sweep of this footnotes plugin. My own manual testing never covers the weird edge cases — force-find whatever is lurking.",
+      "expected_output": "A broad multi-dimension sweep (marker grammar, protected contexts like code/math/frontmatter, cursor/offset arithmetic, transform invariants, historical-bug variants) with every finding proven by an executed failing test, confirmed bugs separated from spec questions, suite left green, clean areas listed.",
+      "files": [],
+      "assertions": [
+        "The report distinguishes bugs proven by an executed failing test from unproven suspicions or open spec questions",
+        "Every claimed bug is backed by a saved test file that demonstrates it",
+        "There is evidence tests were actually executed (vitest run output present and consistent with the claims)",
+        "The repo's pre-existing test suite is left green — pinned bug tests are quarantined (e.g. it.fails) rather than left red",
+        "The report says which areas were probed and came up clean, not only what failed",
+        "The sweep covers multiple distinct dimensions (parsing/grammar, protected contexts, cursor/offset math, transform properties, historical regression variants), not just one module"
+      ]
+    }
+  ]
+}

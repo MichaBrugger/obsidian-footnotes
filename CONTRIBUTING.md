@@ -15,7 +15,7 @@ with:
 
 A note on how fixes land here: **every reported bug gets pinned by a failing
 test before the fix** (see [TESTING.md](TESTING.md)). A crisp reproduction in
-the issue makes that test — and therefore the fix — much faster to write.
+the issue makes that test, and therefore the fix, much faster to write.
 
 ## Development setup
 
