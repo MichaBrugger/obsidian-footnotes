@@ -104,7 +104,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                 items: [
                     {
                         name: "Lint on save",
-                        desc: "Lint the file on manual save (when `ctrl + s` is pressed or when `:w` is executed while using vim keybindings)",
+                        desc: "Lint the file on manual save (when ctrl+s is pressed or when :w is executed while using vim keybindings)",
                         control: { type: "toggle", key: "lintOnSave" },
                     },
                     {
