@@ -408,16 +408,26 @@ async function main() {
         // Obsidian's renderer), so stub the read at the platform boundary —
         // the command path from clipboard text to editor is still exercised.
         // The stub content needs sanitizing (newline) to prove that runs too.
+        // Stub + command run in ONE eval: something on this machine restores
+        // readText to native between CLI invocations (observed 2026-07-17,
+        // likely a clipboard-monitoring agent), so a stub installed in a
+        // separate call can vanish before the command reads it. The delayed
+        // delete restores the native method after the command has finished.
         action(
+            `(() => { window.__pasteCalls = 0; ` +
             `Object.defineProperty(navigator.clipboard, 'readText', ` +
-            `{ value: async () => ${JSON.stringify("pasted\nsource")}, configurable: true });`,
+            `{ value: async () => { window.__pasteCalls++; return ${JSON.stringify("pasted\nsource")}; }, configurable: true }); ` +
+            `const v=${EDITOR}; v.editor.setCursor({line:0,ch:8}); ` +
+            `app.commands.executeCommandById('${CMD_PASTE_INLINE}'); ` +
+            `setTimeout(() => { delete navigator.clipboard.readText; }, 3000); })();`,
         );
         try {
-            setCursorAndRun(0, 8, CMD_PASTE_INLINE);
             await expectEditorText("Alpha bravo^[pasted source] charlie");
-        } finally {
-            // restore the real prototype method for whatever runs next
-            action(`delete navigator.clipboard.readText;`);
+        } catch (e) {
+            // 0 calls = the command stalled before the clipboard (popup
+            // settle, view lookup); undefined = the stub eval never ran
+            const calls = readJson("window.__pasteCalls");
+            throw new Error(`${e.message} (readText calls: ${JSON.stringify(calls)})`);
         }
     });
 
