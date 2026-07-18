@@ -6,7 +6,11 @@ import {
     settleFootnotePopupWithFeedback,
     toggleCloseFootnotePopup,
 } from "../footnote-popup";
-import { runOutsideTableCell } from "../insert-or-navigate-footnotes";
+import {
+    footnotePrefix,
+    footnotePrefixProblem,
+    runOutsideTableCell,
+} from "../insert-or-navigate-footnotes";
 import { normalizeEol, restoreEol } from "../markdown-scan";
 import { AppWithCommands, EditorWithCm, WindowWithVim } from "../obsidian-internals";
 import { activeTableCellEditor } from "../table-cursor";
@@ -131,6 +135,18 @@ function subEditorOwnsFocus(doc: Editor): boolean {
     );
 }
 
+/**
+ * The alert blocking a lint of `markdown`, or null when linting may
+ * proceed. A digit-ending footnote-prefix makes prefixed markers
+ * indistinguishable from plain numbers, so reindexing would collapse the
+ * chapter namespace — the lint is refused until the property is fixed.
+ */
+export function lintBlockedByPrefix(markdown: string): string | null {
+    const prefix = footnotePrefix(markdown);
+    if (!prefix || footnotePrefixProblem(prefix) === null) return null;
+    return `Linting canceled: this note's footnote-prefix ("${prefix}") is invalid. ${footnotePrefixProblem(prefix)}`;
+}
+
 // Lint the active note synchronously when it's safe to; the save hook calls
 // this right before delegating, so the save writes the linted text.
 function lintActiveNoteIfSafe(plugin: FootnotePlugin) {
@@ -140,6 +156,11 @@ function lintActiveNoteIfSafe(plugin: FootnotePlugin) {
     const doc = mdView.editor;
     if (activeTableCellEditor(doc) || subEditorOwnsFocus(doc)) return;
     const before = doc.getValue();
+    const blocked = lintBlockedByPrefix(before);
+    if (blocked) {
+        new Notice(blocked);
+        return;
+    }
     const after = lintFootnotes(
         before,
         lintOptionsFromSettings(plugin, configuredSectionHeading(plugin)),
@@ -236,6 +257,11 @@ async function lintLeftNote(
         const doc = previous.view.editor;
         if (activeTableCellEditor(doc)) return;
         const before = doc.getValue();
+        const blocked = lintBlockedByPrefix(before);
+        if (blocked) {
+            new Notice(blocked);
+            return;
+        }
         const after = lintFootnotes(before, options);
         if (after === before) return;
         replaceMinimal(doc, before, after);
@@ -246,12 +272,17 @@ async function lintLeftNote(
     // so transform the file atomically on disk
     try {
         let changed = false;
+        let blocked: string | null = null;
         await plugin.app.vault.process(previous.file, (data) => {
+            blocked = lintBlockedByPrefix(data);
+            if (blocked) return data;
             const after = lintFootnotes(data, options);
             changed = after !== data;
             return after;
         });
-        if (changed) {
+        if (blocked) {
+            new Notice(blocked);
+        } else if (changed) {
             new Notice(`Linted footnotes in "${previous.file.basename}".`);
         }
     } catch {
@@ -280,6 +311,13 @@ export async function runFootnoteTransformCommand(
     // from pre-edit state (issue #28 family)
     runOutsideTableCell(doc, () => {
         const before = doc.getValue();
+        // an invalid footnote-prefix cancels the lint outright — reindexing
+        // would otherwise renumber the prefixed markers as plain ones
+        const blocked = lintBlockedByPrefix(before);
+        if (blocked) {
+            new Notice(blocked);
+            return;
+        }
         const after = transform(before, configuredSectionHeading(plugin));
         if (after === before) {
             new Notice(notices.noop);

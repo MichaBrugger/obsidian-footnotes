@@ -559,16 +559,36 @@ export function footnotePrefix(markdownText: string): string {
 }
 
 // The prefix the autonumbered command should actually use: nothing unless
-// the feature is enabled in settings, and a prefix that can't form a
-// renderable footnote name is dropped with an explanation instead of
-// silently producing broken markers.
+/**
+ * Why `prefix` can't be used as a footnote prefix, or null when it can.
+ * Shared by the Set-footnote-prefix modal, the insert path, and the lint
+ * guard. Digit-ending prefixes are the dangerous case: with prefix "10"
+ * the first footnote is [^101] — indistinguishable from a plain numbered
+ * footnote, which reindexing then renumbers, collapsing the namespace the
+ * prefix exists to preserve.
+ */
+export function footnotePrefixProblem(prefix: string): string | null {
+    if (!prefix) return null;
+    if (!isValidFootnoteName(prefix) || /[[\]]/.test(prefix)) {
+        return "A footnote prefix can't contain spaces or brackets.";
+    }
+    if (/\d$/.test(prefix)) {
+        return "A footnote prefix can't end in a number: its footnotes would be indistinguishable from plain numbered ones and get renumbered by linting.";
+    }
+    return null;
+}
+
+// the feature is enabled in settings, and a prefix that can't work is
+// dropped with an explanation instead of silently producing broken or
+// ambiguous markers
 function activeFootnotePrefix(plugin: FootnotePlugin, markdownText: string): string {
     if (!plugin.settings.enableFootnotePrefix) return "";
     const prefix = footnotePrefix(markdownText);
     if (!prefix) return "";
-    if (!isValidFootnoteName(prefix) || /[[\]]/.test(prefix)) {
+    const problem = footnotePrefixProblem(prefix);
+    if (problem) {
         new Notice(
-            `The note's footnote-prefix ("${prefix}") contains spaces or brackets, so it was ignored.`,
+            `The note's footnote-prefix ("${prefix}") was ignored. ${problem}`,
         );
         return "";
     }
