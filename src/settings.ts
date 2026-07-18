@@ -104,7 +104,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                 items: [
                     {
                         name: "Lint on save",
-                        desc: "Automatically lint the note you're editing when you save it manually — when Ctrl+S (Cmd+S on macOS) is pressed, or when :w is executed in vim mode. Background autosave never triggers it.",
+                        desc: "Lint the file on manual save (when `ctrl + s` is pressed or when `:w` is executed while using vim keybindings)",
                         control: { type: "toggle", key: "lintOnSave" },
                     },
                     {
@@ -244,7 +244,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
         .setName("Lint on save")
-        .setDesc("Automatically lint the note you're editing when you save it manually — when Ctrl+S (Cmd+S on macOS) is pressed, or when :w is executed in vim mode. Background autosave never triggers it.")
+        .setDesc("Lint the file on manual save (when `ctrl + s` is pressed or when `:w` is executed while using vim keybindings)")
         .addToggle((toggle) =>
             toggle
                 .setValue(this.plugin.settings.lintOnSave)
