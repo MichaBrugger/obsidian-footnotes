@@ -102,6 +102,16 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                 heading: "Linting",
                 items: [
                     {
+                        name: "Lint on save",
+                        desc: "Automatically lint the note you're editing whenever you save it.",
+                        control: { type: "toggle", key: "lintOnSave" },
+                    },
+                    {
+                        name: "Lint on focused file change",
+                        desc: "Automatically lint a note when you switch from it to another note.",
+                        control: { type: "toggle", key: "lintOnFileChange" },
+                    },
+                    {
                         name: "Move markers after punctuation",
                         desc: "The lint command moves footnote markers that sit before punctuation to sit after it.",
                         control: { type: "toggle", key: "lintFixPunctuation" },
@@ -117,24 +127,14 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                         control: { type: "toggle", key: "lintReindex" },
                     },
                     {
-                        name: "Keep orphaned definitions",
+                        name: "When reindexing, keep orphaned definitions",
                         desc: "The lint reindex step keeps definitions that no marker references, numbering them after everything else. Turn off to delete them instead.",
                         control: { type: "toggle", key: "keepOrphanedDefinitions" },
                     },
                     {
-                        name: "Renumber named footnotes",
+                        name: "When reindexing, renumber named footnotes",
                         desc: "The lint reindex step gives named footnotes (like [^note]) numbers by order of appearance instead of preserving their names.",
                         control: { type: "toggle", key: "renumberNamedFootnotes" },
-                    },
-                    {
-                        name: "Lint on save",
-                        desc: "Automatically lint the note you're editing whenever you save it.",
-                        control: { type: "toggle", key: "lintOnSave" },
-                    },
-                    {
-                        name: "Lint on focused file change",
-                        desc: "Automatically lint a note when you switch from it to another note.",
-                        control: { type: "toggle", key: "lintOnFileChange" },
                     },
                 ],
             },
