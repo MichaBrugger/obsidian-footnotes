@@ -2,7 +2,7 @@ import { footnoteMarkerMatches } from "../../insert-or-navigate-footnotes";
 import {
     DefinitionStart,
     findDefinitionBlocks,
-    maskInlineCode,
+    maskInlineRegions,
     normalizeEol,
     protectedLines,
     removeLineRanges,
@@ -41,7 +41,7 @@ function markerAppearanceOrder(
     const seen = new Set<string>();
     for (let i = 0; i < lines.length; i++) {
         if (isProtected[i]) continue;
-        for (const match of footnoteMarkerMatches(maskInlineCode(lines[i]))) {
+        for (const match of footnoteMarkerMatches(maskInlineRegions(lines[i]))) {
             const id = match[1].toLowerCase();
             if (!seen.has(id)) {
                 seen.add(id);
@@ -54,7 +54,7 @@ function markerAppearanceOrder(
 
 /** All markers on the line rewritten through `renames` (code spans and the definition label skipped; ids matched case-insensitively); the map is complete, so swaps can't collide. */
 function rewriteMarkers(line: string, renames: Map<string, string>): string {
-    const masked = maskInlineCode(line);
+    const masked = maskInlineRegions(line);
     let out = "";
     let copied = 0;
     for (const match of footnoteMarkerMatches(masked)) {

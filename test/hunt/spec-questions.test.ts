@@ -19,11 +19,10 @@ describe("spec questions (Jason decides: bug or intended?)", () => {
         ).toBe(2);
     });
 
-    // spec question: HTML comments are not a protected region. A marker inside
-    // "<!-- ... -->" renders as nothing but still reserves a number. The plugin
-    // only ever documented frontmatter + fenced/inline code as protected.
-    // Lens: contexts. Currently returns 8.
-    it.fails("a marker inside an HTML comment does not reserve a number", () => {
+    // RESOLVED 2026-07-17: single-line HTML comments are protected now
+    // (maskCommentSpans in markdown-scan; multi-line comments were already
+    // whole-line protected) — a commented-out marker is invisible.
+    it("a marker inside an HTML comment does not reserve a number", () => {
         expect(computeNextFootnoteNumber("<!-- old[^7] -->\nreal[^1]")).toBe(2);
     });
 

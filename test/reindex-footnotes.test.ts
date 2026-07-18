@@ -336,3 +336,20 @@ describe("reindexFootnotes with renumberNamedFootnotes: true", () => {
         expect(reindexFootnotes(once, renumberNamed)).toBe(once);
     });
 });
+
+describe("reindexFootnotes and single-line HTML comments", () => {
+    // found live 2026-07-17: a one-line <!-- [^66]: ... --> was renumbered
+    // and its colon swapped — only MULTI-line comments were protected
+    it("ignores markers inside a single-line HTML comment", () => {
+        const input = "text[^5]\n<!-- [^2]: commented out -->\n\n[^5]: five";
+        const expected =
+            "text[^1]\n<!-- [^2]: commented out -->\n\n[^1]: five";
+        expect(reindexFootnotes(input)).toBe(expected);
+    });
+
+    it("ignores a comment span in the middle of a prose line", () => {
+        const input = "a[^7] <!-- fake[^1] --> b[^7]\n\n[^7]: seven";
+        const expected = "a[^1] <!-- fake[^1] --> b[^1]\n\n[^1]: seven";
+        expect(reindexFootnotes(input)).toBe(expected);
+    });
+});

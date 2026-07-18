@@ -76,3 +76,18 @@ describe("footnoteAfterPunctuation", () => {
         expect(footnoteAfterPunctuation(once)).toBe(once);
     });
 });
+
+describe("footnoteAfterPunctuation and single-line HTML comments", () => {
+    // found live 2026-07-17: "<!-- [^66]: x -->" had its colon swapped to
+    // ":[^66]" — the rule masked inline code but not one-line comments
+    it("never touches a marker-colon pair inside a comment", () => {
+        const text = "<!-- [^66]: a commented-out definition -->";
+        expect(footnoteAfterPunctuation(text)).toBe(text);
+    });
+
+    it("still fixes real markers on a line that also has a comment", () => {
+        const input = "word[^1]. <!-- [^9]: leave me -->";
+        const expected = "word.[^1] <!-- [^9]: leave me -->";
+        expect(footnoteAfterPunctuation(input)).toBe(expected);
+    });
+});

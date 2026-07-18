@@ -173,15 +173,45 @@ export function maskInlineCode(line: string): string {
 }
 
 /**
- * Every line with code and frontmatter blotted out: protected lines become
- * all-NUL strings, inline code spans are masked in the rest. Lengths and
- * indices line up with the originals, so scans over these see no code
- * while every match position stays valid in the real line.
+ * Every single-line HTML comment span ("<!-- … -->") in the line blotted to
+ * NULs, same length. protectedLines only guards MULTI-line comments (an
+ * opener with no closer on its line); the one-line form was invisible to it
+ * — found live 2026-07-17 when a commented-out "[^66]: …" had its colon
+ * swapped and its number reindexed. Pass the code-masked line: delimiters
+ * inside a code span are already NULs, so they can't open a comment here.
+ */
+export function maskCommentSpans(line: string): string {
+    const chars = line.split("");
+    let i = 0;
+    while (i < line.length) {
+        const open = line.indexOf("<!--", i);
+        if (open === -1) break;
+        const close = line.indexOf("-->", open + 4);
+        // opener without a closer on the line belongs to protectedLines'
+        // multi-line handling
+        if (close === -1) break;
+        for (let k = open; k < close + 3; k++) chars[k] = "\0";
+        i = close + 3;
+    }
+    return chars.join("");
+}
+
+/** Inline code spans and single-line HTML comments blotted out, indices preserved. */
+export function maskInlineRegions(line: string): string {
+    return maskCommentSpans(maskInlineCode(line));
+}
+
+/**
+ * Every line with code, comments, and frontmatter blotted out: protected
+ * lines become all-NUL strings, inline code spans and one-line HTML
+ * comments are masked in the rest. Lengths and indices line up with the
+ * originals, so scans over these see no code while every match position
+ * stays valid in the real line.
  */
 export function maskProtectedLines(lines: string[]): string[] {
     const isProtected = protectedLines(lines);
     return lines.map((line, i) =>
-        isProtected[i] ? "\0".repeat(line.length) : maskInlineCode(line),
+        isProtected[i] ? "\0".repeat(line.length) : maskInlineRegions(line),
     );
 }
 

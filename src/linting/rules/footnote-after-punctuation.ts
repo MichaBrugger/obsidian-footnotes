@@ -1,6 +1,6 @@
 import {
     DefinitionStart,
-    maskInlineCode,
+    maskInlineRegions,
     normalizeEol,
     protectedLines,
     restoreEol,
@@ -51,7 +51,7 @@ export function footnoteAfterPunctuation(markdown: string): string {
 
     const result = lines.map((line, i) => {
         if (isProtected[i]) return line;
-        const masked = maskInlineCode(line);
+        const masked = maskInlineRegions(line);
         // a definition's own "[^x]:" prefix must not be treated as a
         // marker-before-colon — skip past it
         const prefixLength = line.match(DefinitionStart)?.[0].length ?? 0;
