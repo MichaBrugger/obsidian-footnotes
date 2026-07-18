@@ -52,21 +52,38 @@ export function moveFootnoteDefinitionsToBottom(
     // a heading directly above the first definition block (blanks only in
     // between) owns the definitions and moves with them; any other exact
     // unprotected occurrence means the note already has the heading and
-    // appending another would duplicate it
+    // appending another would duplicate it. The setting is markdown that
+    // can span MULTIPLE lines ("---\n## Footnotes"), so matching compares
+    // line runs — single-line comparison kept re-adding multi-line
+    // headings on every lint (bug reported 2026-07-17)
     const ranges: { start: number; end: number }[] = [...blocks];
     let headingMoved = false;
     let headingPresent = false;
     if (sectionHeading) {
-        for (let i = 0; i < lines.length; i++) {
-            if (isProtected[i] || lines[i] !== sectionHeading) continue;
-            let j = i + 1;
+        const headingLines = sectionHeading.split("\n");
+        const headingRunAt = (start: number): boolean =>
+            headingLines.every(
+                (headingLine, k) =>
+                    start + k < lines.length &&
+                    !isProtected[start + k] &&
+                    lines[start + k] === headingLine,
+            );
+        for (let i = 0; i + headingLines.length <= lines.length; i++) {
+            if (!headingRunAt(i)) continue;
+            const runEnd = i + headingLines.length - 1;
+            let j = runEnd + 1;
             while (j < blocks[0].start && lines[j] === "") j++;
-            if (!headingMoved && i < blocks[0].start && j === blocks[0].start) {
-                ranges.unshift({ start: i, end: i });
+            if (
+                !headingMoved &&
+                runEnd < blocks[0].start &&
+                j === blocks[0].start
+            ) {
+                ranges.unshift({ start: i, end: runEnd });
                 headingMoved = true;
             } else {
                 headingPresent = true;
             }
+            i = runEnd; // never re-match inside this run
         }
     }
 

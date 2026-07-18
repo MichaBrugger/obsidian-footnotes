@@ -180,21 +180,31 @@ export function shouldJumpFromDetailToMarker(
     doc: Editor,
     plugin: FootnotePlugin
 ) {
-    // check if we're in a footnote detail line ("[^1]: footnote")
-    // if so, jump cursor back to the footnote in the text
+    // check if we're in a footnote detail line ("[^1]: footnote") or one of
+    // its continuation lines; if so, jump back to the footnote in the text
 
-    // cheap pre-check on the raw line; the whole-document masking below
-    // only runs when the caret actually sits on something detail-shaped
-    if (!DetailInLine.test(lineText)) return false;
+    // cheap pre-check on the raw line; the whole-document scanning below
+    // only runs when the caret sits on something detail-shaped — the
+    // "[^x]:" line itself, or an indented line that MIGHT be a continuation
+    // (jump-to-detail deliberately parks the caret on the LAST continuation
+    // line, and the hotkey there used to insert a new footnote instead of
+    // jumping back — bug reported 2026-07-17)
+    if (!DetailInLine.test(lineText) && !/^\s+\S/.test(lineText)) return false;
 
     // #41: a "[^x]:" inside a code block is not a detail, and a marker
-    // inside code is not a jump target — scan the masked twin instead
-    const masked = maskProtectedLines(docLines(doc));
-    const match = (masked[cursorPosition.line] ?? "").match(DetailInLine);
-    if (match) {
+    // inside code is not a jump target — resolve against protected-aware
+    // definition blocks and scan the masked twin
+    const lines = docLines(doc);
+    const block = findDefinitionBlocks(lines, protectedLines(lines)).find(
+        (candidate) =>
+            cursorPosition.line >= candidate.start &&
+            cursorPosition.line <= candidate.end,
+    );
+    if (block) {
         // ids are case-insensitive, so the marker may differ in casing from
         // the detail's label ("[^Note]" ↔ "[^note]:") — fold both to compare
-        const name = match[1].toLowerCase();
+        const name = block.name.toLowerCase();
+        const masked = maskProtectedLines(lines);
 
         // find the FIRST marker use of this footnote. footnoteMarkerMatches
         // skips a definition's own column-0 label, so a detail line — this

@@ -121,3 +121,31 @@ describe("moveFootnoteDefinitionsToBottom", () => {
         );
     });
 });
+
+describe("multi-line section headings (bug reported 2026-07-17)", () => {
+    // repeated linting kept re-adding the heading: the present-check
+    // compared single lines against the whole multi-line setting value
+    const HEADING = "---\n## Footnotes";
+
+    it("adds a multi-line heading once", () => {
+        const input = "body[^1].\n\n[^1]: def";
+        const expected = "body[^1].\n\n---\n## Footnotes\n\n[^1]: def";
+        expect(moveFootnoteDefinitionsToBottom(input, HEADING)).toBe(expected);
+    });
+
+    it("does not duplicate an existing multi-line heading", () => {
+        const once = moveFootnoteDefinitionsToBottom(
+            "body[^1].\n\n[^1]: def",
+            HEADING,
+        );
+        expect(moveFootnoteDefinitionsToBottom(once, HEADING)).toBe(once);
+    });
+
+    it("moves an existing multi-line heading along with the definitions", () => {
+        const input =
+            "body[^1].\n\n---\n## Footnotes\n\n[^1]: def\n\ntrailing prose";
+        const expected =
+            "body[^1].\n\ntrailing prose\n\n---\n## Footnotes\n\n[^1]: def";
+        expect(moveFootnoteDefinitionsToBottom(input, HEADING)).toBe(expected);
+    });
+});

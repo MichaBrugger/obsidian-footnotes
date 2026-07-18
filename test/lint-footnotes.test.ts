@@ -81,3 +81,23 @@ describe("lintFootnotes", () => {
         expect(lintFootnotes(once, options)).toBe(once);
     });
 });
+
+describe("repeated linting with a section heading (bug reported 2026-07-17)", () => {
+    it("never duplicates a single-line heading", () => {
+        const options = { sectionHeading: "# Footnotes" };
+        const once = lintFootnotes("b[^2] a[^1].\n\n[^1]: one\n[^2]: two", options);
+        const twice = lintFootnotes(once, options);
+        expect(twice).toBe(once);
+        expect(twice.split("# Footnotes").length - 1).toBe(1);
+    });
+
+    it("never duplicates a multi-line divider heading", () => {
+        const options = { sectionHeading: "---\n## Footnotes" };
+        const once = lintFootnotes("b[^2] a[^1].\n\n[^1]: one\n[^2]: two", options);
+        const twice = lintFootnotes(once, options);
+        const thrice = lintFootnotes(twice, options);
+        expect(twice).toBe(once);
+        expect(thrice).toBe(once);
+        expect(thrice.split("## Footnotes").length - 1).toBe(1);
+    });
+});
