@@ -359,7 +359,8 @@ export function buildDetailAppend(
     plugin: FootnotePlugin,
 ): { change: EditorChange; cursor: EditorPosition } {
     const lines = docLines(doc);
-    const blocks = findDefinitionBlocks(lines, protectedLines(lines));
+    const isProtected = protectedLines(lines);
+    const blocks = findDefinitionBlocks(lines, isProtected);
     if (blocks.length > 0) {
         const lastLine = blocks[blocks.length - 1].end;
         const text = `\n[^${footnoteId}]: `;
@@ -370,6 +371,43 @@ export function buildDetailAppend(
             },
             cursor: { line: lastLine + 1, ch: text.length - 1 },
         };
+    }
+
+    // no definitions yet — but an existing section heading in the note
+    // claims the first footnote (QOL follow-up to issue #55): slot the
+    // detail under it instead of appending a second heading at the end.
+    // The setting is markdown that can span multiple lines, so match runs.
+    if (
+        plugin.settings.enableFootnoteSectionHeading &&
+        plugin.settings.footnoteSectionHeading
+    ) {
+        const headingLines = plugin.settings.footnoteSectionHeading.split("\n");
+        for (let i = 0; i + headingLines.length <= lines.length; i++) {
+            const matches = headingLines.every(
+                (headingLine, k) =>
+                    !isProtected[i + k] && lines[i + k] === headingLine,
+            );
+            if (!matches) continue;
+            let fromLine = i + headingLines.length - 1;
+            let slotText = `\n\n[^${footnoteId}]: `;
+            // reuse a blank line already separating the heading from what
+            // follows, instead of doubling it
+            if (fromLine + 1 < lines.length && lines[fromLine + 1] === "") {
+                fromLine += 1;
+                slotText = `\n[^${footnoteId}]: `;
+            }
+            const slotLinesAdded = slotText.split("\n").length - 1;
+            return {
+                change: {
+                    from: { line: fromLine, ch: doc.getLine(fromLine).length },
+                    text: slotText,
+                },
+                cursor: {
+                    line: fromLine + slotLinesAdded,
+                    ch: slotText.length - slotText.lastIndexOf("\n") - 1,
+                },
+            };
+        }
     }
 
     let text = `\n[^${footnoteId}]: `;
