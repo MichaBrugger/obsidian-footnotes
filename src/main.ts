@@ -10,6 +10,7 @@ import {
   Plugin
 } from "obsidian";
 
+import { VaultWithConfigEvents } from "./obsidian-internals";
 import { FootnotePluginSettingTab, FootnotePluginSettings, DEFAULT_SETTINGS } from "./settings";
 import { dismissFootnotePopup } from "./footnote-popup";
 import {
@@ -20,6 +21,7 @@ import {
 } from "./insert-or-navigate-footnotes";
 import {
   installLintOnSave,
+  installVimWriteHook,
   noteActiveLeafForAutoLint,
   resetAutoLintTracking,
   runFootnoteTransformCommand,
@@ -116,12 +118,26 @@ export default class FootnotePlugin extends Plugin {
       this.app.workspace.on("active-leaf-change", () => {
         dismissFootnotePopup();
         noteActiveLeafForAutoLint(this);
+        // vim mode can be switched on at any time, and its ":w" bypasses
+        // the save command until hooked — re-check on every leaf change
+        installVimWriteHook(this);
       })
     );
     // "Lint on save" wraps the core save command (restored on unload);
     // layout-ready seeds the focus tracker with the note open at startup
     installLintOnSave(this);
-    this.app.workspace.onLayoutReady(() => noteActiveLeafForAutoLint(this));
+    this.app.workspace.onLayoutReady(() => {
+      noteActiveLeafForAutoLint(this);
+      installVimWriteHook(this);
+    });
+    // enabling vim mode mid-session loads the adapter without any leaf
+    // change — config-changed catches that moment
+    this.registerEvent(
+      (this.app.vault as unknown as VaultWithConfigEvents).on(
+        "config-changed",
+        () => installVimWriteHook(this),
+      ),
+    );
   }
 
   onunload() {

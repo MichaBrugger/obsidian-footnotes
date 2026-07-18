@@ -8,7 +8,7 @@ import {
 } from "../footnote-popup";
 import { runOutsideTableCell } from "../insert-or-navigate-footnotes";
 import { normalizeEol, restoreEol } from "../markdown-scan";
-import { AppWithCommands, EditorWithCm } from "../obsidian-internals";
+import { AppWithCommands, EditorWithCm, WindowWithVim } from "../obsidian-internals";
 import { activeTableCellEditor } from "../table-cursor";
 import { footnoteAfterPunctuation } from "./rules/footnote-after-punctuation";
 import { moveFootnoteDefinitionsToBottom } from "./rules/move-footnotes-to-the-bottom";
@@ -169,6 +169,31 @@ export function installLintOnSave(plugin: FootnotePlugin) {
     plugin.register(() => {
         command.checkCallback = original;
     });
+}
+
+// vim's ":w" saves through the CM5 vim adapter, NOT the core save command,
+// so the wrapper above never sees it (verified live: handleEx("w") leaves
+// editor:save-file uninvoked). Linter parity means ":w" must lint too.
+let vimWriteHooked = false;
+
+/**
+ * Redefine vim's "write"/":w" ex command to route through the core save
+ * command — the one path "Lint on save" already wraps. Behavior with the
+ * toggle off is unchanged (the command just saves). The adapter only exists
+ * while vim mode is on and it can be toggled anytime, so this is safe and
+ * cheap to call repeatedly; the first call that finds the adapter wins.
+ * The override deliberately survives plugin unload: it delegates to the
+ * app's own save command, which is exactly what ":w" does anyway.
+ */
+export function installVimWriteHook(plugin: FootnotePlugin) {
+    if (vimWriteHooked) return;
+    const vim = (activeWindow as WindowWithVim).CodeMirrorAdapter?.Vim;
+    if (!vim?.defineEx) return;
+    const app = plugin.app as AppWithCommands;
+    vim.defineEx("write", "w", () => {
+        app.commands?.executeCommandById?.("editor:save-file");
+    });
+    vimWriteHooked = true;
 }
 
 // the last markdown file that held focus — sidebars and modals don't count,

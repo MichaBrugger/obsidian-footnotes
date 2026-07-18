@@ -830,6 +830,39 @@ async function main() {
         }
     });
 
+    await test("vim :w routes through the save command and lints (Linter parity)", async () => {
+        resetSettings({ lintOnSave: true });
+        // enabling vim loads the CM5 adapter; the plugin's leaf-change hook
+        // then redefines :w — reopening the note fires that hook
+        action(`app.vault.setConfig('vimMode', true);`);
+        await sleep(600);
+        await setupNote("Beta[^2] alpha[^1] end\n\n[^1]: one\n[^2]: two");
+        try {
+            action(
+                `(() => { const v=${EDITOR}; const cm5 = v.editor.cm?.cm; ` +
+                `if (cm5) window.CodeMirrorAdapter.Vim.handleEx(cm5, 'w'); })();`,
+            );
+            await expectEditorText(
+                "Beta[^1] alpha[^2] end\n\n[^1]: two\n[^2]: one",
+            );
+        } finally {
+            action(`app.vault.setConfig('vimMode', false);`);
+        }
+    });
+
+    await test("autosave alone never triggers lint on save", async () => {
+        // the hook wraps the SAVE COMMAND: Obsidian's background autosave
+        // writes through the view directly and must not lint
+        resetSettings({ lintOnSave: true });
+        const note = "Beta[^2] alpha[^1] end\n\n[^1]: one\n[^2]: two";
+        await setupNote(note);
+        await sleep(3500); // well past the ~2s autosave debounce
+        const text = readJson(`(${EDITOR}).editor.getValue()`);
+        if (text !== note) {
+            throw new Error(`autosave linted: ${JSON.stringify(text)}`);
+        }
+    });
+
     await test("switching notes lints the one you left when enabled", async () => {
         resetSettings({ lintOnFileChange: true });
         await setupNote("Beta[^2] alpha[^1] end\n\n[^1]: one\n[^2]: two");

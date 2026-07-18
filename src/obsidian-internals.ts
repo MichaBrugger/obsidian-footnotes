@@ -1,4 +1,4 @@
-import { App, Editor, EditorPosition, TFile, Vault } from "obsidian";
+import { App, Editor, EditorPosition, EventRef, TFile, Vault } from "obsidian";
 
 // Typed views of the undocumented Obsidian / CodeMirror internals this plugin
 // relies on. Only the members actually used are declared, and every entry
@@ -71,12 +71,23 @@ export interface AppWithCommands extends App {
             string,
             { checkCallback?: (checking: boolean) => boolean | void } | undefined
         >;
+        executeCommandById?(id: string): boolean;
     };
 }
 
 /** `Vault.getConfig` reads editor config like `vimMode`. */
 export interface VaultWithConfig extends Vault {
     getConfig?(key: string): unknown;
+}
+
+/**
+ * Vault's undocumented "config-changed" event (fires when e.g. vim mode is
+ * toggled). A standalone shape rather than a Vault extension: adding the
+ * overload to an interface extending Vault conflicts with the typed event
+ * overloads it inherits.
+ */
+export interface VaultWithConfigEvents {
+    on(name: "config-changed", callback: () => void): EventRef;
 }
 
 /** The vim CM5-adapter global, present when vim mode is active. */
@@ -88,6 +99,12 @@ export interface WindowWithVim extends Window {
                     add(cm: unknown, from: EditorPosition, to: EditorPosition): void;
                 };
             };
+            /** Register (or override) an ex command like ":w". */
+            defineEx?(
+                name: string,
+                shortName: string,
+                handler: () => void,
+            ): void;
         };
     };
 }

@@ -98,8 +98,9 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                 ],
             },
             {
-                type: "group",
-                heading: "Linting",
+                type: "page",
+                name: "Linting",
+                desc: "Cleanup rules, automatic lint triggers, and reindexing behavior.",
                 items: [
                     {
                         name: "Lint on save",
@@ -123,18 +124,24 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                     },
                     {
                         name: "Reindex",
-                        desc: "The lint command also renumbers footnotes and reorders their definitions, following the two reindexing options below.",
+                        desc: "The lint command also renumbers footnotes and reorders their definitions, following the options in the reindexing section below.",
                         control: { type: "toggle", key: "lintReindex" },
                     },
                     {
-                        name: "When reindexing, keep orphaned definitions",
-                        desc: "The lint reindex step keeps definitions that no marker references, numbering them after everything else. Turn off to delete them instead.",
-                        control: { type: "toggle", key: "keepOrphanedDefinitions" },
-                    },
-                    {
-                        name: "When reindexing, renumber named footnotes",
-                        desc: "The lint reindex step gives named footnotes (like [^note]) numbers by order of appearance instead of preserving their names.",
-                        control: { type: "toggle", key: "renumberNamedFootnotes" },
+                        type: "group",
+                        heading: "Reindexing",
+                        items: [
+                            {
+                                name: "Keep orphaned definitions",
+                                desc: "Reindexing keeps definitions that no marker references, numbering them after everything else. Turn off to delete them instead.",
+                                control: { type: "toggle", key: "keepOrphanedDefinitions" },
+                            },
+                            {
+                                name: "Renumber named footnotes",
+                                desc: "Reindexing gives named footnotes (like [^note]) numbers by order of appearance instead of preserving their names.",
+                                control: { type: "toggle", key: "renumberNamedFootnotes" },
+                            },
+                        ],
                     },
                 ],
             },
@@ -228,9 +235,36 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                 })
         );
 
+        // pre-1.13 Obsidian has no settings sub-pages, so the Linting page
+        // renders flat here: a Linting heading, then a Reindexing heading
+        // standing in for the page's Reindexing section
         new Setting(containerEl)
         .setName("Linting")
         .setHeading();
+
+        new Setting(containerEl)
+        .setName("Lint on save")
+        .setDesc("Automatically lint the note you're editing whenever you save it.")
+        .addToggle((toggle) =>
+            toggle
+                .setValue(this.plugin.settings.lintOnSave)
+                .onChange(async (value) => {
+                    this.plugin.settings.lintOnSave = value;
+                    await this.plugin.saveSettings();
+                })
+        );
+
+        new Setting(containerEl)
+        .setName("Lint on focused file change")
+        .setDesc("Automatically lint a note when you switch from it to another note.")
+        .addToggle((toggle) =>
+            toggle
+                .setValue(this.plugin.settings.lintOnFileChange)
+                .onChange(async (value) => {
+                    this.plugin.settings.lintOnFileChange = value;
+                    await this.plugin.saveSettings();
+                })
+        );
 
         new Setting(containerEl)
         .setName("Move markers after punctuation")
@@ -258,7 +292,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
         .setName("Reindex")
-        .setDesc("The lint command also renumbers footnotes and reorders their definitions, following the two reindexing options below.")
+        .setDesc("The lint command also renumbers footnotes and reorders their definitions, following the options in the reindexing section below.")
         .addToggle((toggle) =>
             toggle
                 .setValue(this.plugin.settings.lintReindex)
@@ -269,8 +303,12 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
         );
 
         new Setting(containerEl)
+        .setName("Reindexing")
+        .setHeading();
+
+        new Setting(containerEl)
         .setName("Keep orphaned definitions")
-        .setDesc("The lint reindex step keeps definitions that no marker references, numbering them after everything else. Turn off to delete them instead.")
+        .setDesc("Reindexing keeps definitions that no marker references, numbering them after everything else. Turn off to delete them instead.")
         .addToggle((toggle) =>
             toggle
                 .setValue(this.plugin.settings.keepOrphanedDefinitions)
@@ -282,7 +320,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
         .setName("Renumber named footnotes")
-        .setDesc("The lint reindex step gives named footnotes (like [^note]) numbers by order of appearance instead of preserving their names.")
+        .setDesc("Reindexing gives named footnotes (like [^note]) numbers by order of appearance instead of preserving their names.")
         .addToggle((toggle) =>
             toggle
                 .setValue(this.plugin.settings.renumberNamedFootnotes)
@@ -291,30 +329,5 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 })
         );
-
-        new Setting(containerEl)
-        .setName("Lint on save")
-        .setDesc("Automatically lint the note you're editing whenever you save it.")
-        .addToggle((toggle) =>
-            toggle
-                .setValue(this.plugin.settings.lintOnSave)
-                .onChange(async (value) => {
-                    this.plugin.settings.lintOnSave = value;
-                    await this.plugin.saveSettings();
-                })
-        );
-
-        new Setting(containerEl)
-        .setName("Lint on focused file change")
-        .setDesc("Automatically lint a note when you switch from it to another note.")
-        .addToggle((toggle) =>
-            toggle
-                .setValue(this.plugin.settings.lintOnFileChange)
-                .onChange(async (value) => {
-                    this.plugin.settings.lintOnFileChange = value;
-                    await this.plugin.saveSettings();
-                })
-        );
-
     }
 }
