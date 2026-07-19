@@ -124,7 +124,7 @@ export default class FootnotePlugin extends Plugin {
             lintFootnotes(markdown, lintOptionsFromSettings(this, sectionHeading)),
           {
             done: "Footnotes linted.",
-            noop: "Footnotes are already clean.",
+            noop: "No linting needed.",
           },
         );
       },

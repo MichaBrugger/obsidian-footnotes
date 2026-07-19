@@ -638,6 +638,8 @@ export async function insertAutonumFootnote(plugin: FootnotePlugin) {
     // stale there, and editing the row via the main editor corrupts the
     // table — reads use the resolved position, writes go through the cell
     const cell = activeTableCellEditor(doc);
+    // inside an inline footnote, hop out instead of nesting a marker in it
+    if (exitInlineFootnoteIfInside(doc, cell)) return;
     const run = (cursorPosition: EditorPosition) => {
         const lineText = doc.getLine(cursorPosition.line);
 
@@ -841,25 +843,39 @@ export async function insertInlineFootnote(plugin: FootnotePlugin) {
     const doc = mdView.editor;
 
     const cell = activeTableCellEditor(doc);
+    if (exitInlineFootnoteIfInside(doc, cell)) return;
+
+    insertInlineText(plugin, "^[]", 2);
+}
+
+/**
+ * When the caret sits inside an inline footnote ("^[...]"), hop it just
+ * past the closing bracket and report true. Shared by every insert
+ * command: for the numbered/named ones this prevents nesting a "[^x]"
+ * marker inside the inline footnote's brackets, which would end the inline
+ * footnote early and corrupt it ("^[in [^named]line]").
+ */
+export function exitInlineFootnoteIfInside(
+    doc: Editor,
+    cell: TableCellEditor | null,
+): boolean {
     if (cell) {
         const exit = inlineFootnoteExitCh(
             cell.state.doc.toString(),
             cell.state.selection.main.head,
         );
-        if (exit !== null) {
-            cell.dispatch({ selection: { anchor: exit } });
-            return;
-        }
-    } else {
-        const cursorPosition = doc.getCursor();
-        const exit = inlineFootnoteExitCh(doc.getLine(cursorPosition.line), cursorPosition.ch);
-        if (exit !== null) {
-            doc.setCursor({ line: cursorPosition.line, ch: exit });
-            return;
-        }
+        if (exit === null) return false;
+        cell.dispatch({ selection: { anchor: exit } });
+        return true;
     }
-
-    insertInlineText(plugin, "^[]", 2);
+    const cursorPosition = doc.getCursor();
+    const exit = inlineFootnoteExitCh(
+        doc.getLine(cursorPosition.line),
+        cursorPosition.ch,
+    );
+    if (exit === null) return false;
+    doc.setCursor({ line: cursorPosition.line, ch: exit });
+    return true;
 }
 
 /** Inline-footnote paste command: inserts `^[<clipboard>]` with the caret after it. */
@@ -904,6 +920,8 @@ export async function insertNamedFootnote(plugin: FootnotePlugin) {
     // stale there, and editing the row via the main editor corrupts the
     // table — reads use the resolved position, writes go through the cell
     const cell = activeTableCellEditor(doc);
+    // inside an inline footnote, hop out instead of nesting a marker in it
+    if (exitInlineFootnoteIfInside(doc, cell)) return;
     const run = (cursorPosition: EditorPosition) => {
         const lineText = doc.getLine(cursorPosition.line);
 
