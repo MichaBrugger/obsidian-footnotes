@@ -14,11 +14,13 @@ import { VaultWithConfigEvents } from "./obsidian-internals";
 import { FootnotePluginSettingTab, FootnotePluginSettings, DEFAULT_SETTINGS } from "./settings";
 import { dismissFootnotePopup } from "./footnote-popup";
 import {
+  footnotePrefix,
   insertAutonumFootnote,
   insertInlineFootnote,
   insertNamedFootnote,
   pasteInlineFootnote,
 } from "./insert-or-navigate-footnotes";
+import { SetFootnotePrefixModal } from "./set-footnote-prefix";
 import {
   installLintOnSave,
   installVimWriteHook,
@@ -88,6 +90,22 @@ export default class FootnotePlugin extends Plugin {
         void pasteInlineFootnote(this);
       }
     });
+    this.addCommand({
+      id: "set-footnote-prefix",
+      name: "Set footnote prefix",
+      icon: "hash",
+      checkCallback: (checking: boolean) => {
+        const mdView = this.app.workspace.getActiveViewOfType(MarkdownView);
+        if (checking) return !!mdView?.file;
+        if (!mdView?.file) return;
+        // prefill with the note's current prefix so editing is one step
+        new SetFootnotePrefixModal(
+          this,
+          mdView.file,
+          footnotePrefix(mdView.editor?.getValue() ?? ""),
+        ).open();
+      },
+    });
   
     // The ONE whole-document cleanup command, like Linter's (the individual
     // rules are settings toggles, not separate commands — palette stays
@@ -106,7 +124,7 @@ export default class FootnotePlugin extends Plugin {
             lintFootnotes(markdown, lintOptionsFromSettings(this, sectionHeading)),
           {
             done: "Footnotes linted.",
-            noop: "Footnotes are already clean.",
+            noop: "No linting needed.",
           },
         );
       },

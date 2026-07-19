@@ -116,3 +116,79 @@ describe("buildDetailAppend", () => {
         expect(change.from).toEqual({ line: 2, ch: "[^1]: one".length });
     });
 });
+
+describe("slotting under an existing section heading (QOL follow-up to #55)", () => {
+    const headingOn = () =>
+        fakePlugin({ enableFootnoteSectionHeading: true });
+
+    it("the first detail goes under an existing heading, not to EOF", () => {
+        const doc = fakeEditor([
+            "Intro[^1] text",
+            "",
+            "# Footnotes",
+            "",
+            "## Other section",
+            "other stuff",
+        ]);
+        const { change, cursor } = buildDetailAppend(doc, "1", true, headingOn());
+        // the blank line after the heading is reused, not doubled
+        expect(change).toEqual({
+            from: { line: 3, ch: 0 },
+            text: "\n[^1]: ",
+        });
+        expect(cursor).toEqual({ line: 4, ch: 6 });
+    });
+
+    it("inserts its own blank line when none follows the heading", () => {
+        const doc = fakeEditor(["Intro[^1]", "# Footnotes", "## Other"]);
+        const { change, cursor } = buildDetailAppend(doc, "1", true, headingOn());
+        expect(change).toEqual({
+            from: { line: 1, ch: "# Footnotes".length },
+            text: "\n\n[^1]: ",
+        });
+        expect(cursor).toEqual({ line: 3, ch: 6 });
+    });
+
+    it("matches a multi-line heading", () => {
+        const doc = fakeEditor([
+            "Intro[^1]",
+            "",
+            "---",
+            "## Footnotes",
+            "",
+            "tail",
+        ]);
+        const plugin = fakePlugin({
+            enableFootnoteSectionHeading: true,
+            footnoteSectionHeading: "---\n## Footnotes",
+        });
+        const { change } = buildDetailAppend(doc, "1", true, plugin);
+        expect(change).toEqual({ from: { line: 4, ch: 0 }, text: "\n[^1]: " });
+    });
+
+    it("with definitions present, the after-last-block rule still wins", () => {
+        const doc = fakeEditor([
+            "A[^1] b",
+            "",
+            "# Footnotes",
+            "[^1]: one",
+            "",
+            "tail",
+        ]);
+        const { change } = buildDetailAppend(doc, "2", false, headingOn());
+        expect(change.from).toEqual({ line: 3, ch: "[^1]: one".length });
+    });
+
+    it("a heading line inside a fence does not count", () => {
+        const doc = fakeEditor(["A[^1] b", "```", "# Footnotes", "```"]);
+        const { change } = buildDetailAppend(doc, "1", true, headingOn());
+        // falls through to the EOF path, which adds the real heading
+        expect(change.text).toBe("\n# Footnotes\n\n[^1]: ");
+    });
+
+    it("with the heading feature off, nothing slots", () => {
+        const doc = fakeEditor(["A[^1] b", "", "# Footnotes", "", "tail"]);
+        const { change } = buildDetailAppend(doc, "1", true, fakePlugin());
+        expect(change.from.line).toBe(4); // EOF path
+    });
+});

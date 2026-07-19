@@ -359,7 +359,8 @@ export function buildDetailAppend(
     plugin: FootnotePlugin,
 ): { change: EditorChange; cursor: EditorPosition } {
     const lines = docLines(doc);
-    const blocks = findDefinitionBlocks(lines, protectedLines(lines));
+    const isProtected = protectedLines(lines);
+    const blocks = findDefinitionBlocks(lines, isProtected);
     if (blocks.length > 0) {
         const lastLine = blocks[blocks.length - 1].end;
         const text = `\n[^${footnoteId}]: `;
@@ -370,6 +371,43 @@ export function buildDetailAppend(
             },
             cursor: { line: lastLine + 1, ch: text.length - 1 },
         };
+    }
+
+    // no definitions yet — but an existing section heading in the note
+    // claims the first footnote (QOL follow-up to issue #55): slot the
+    // detail under it instead of appending a second heading at the end.
+    // The setting is markdown that can span multiple lines, so match runs.
+    if (
+        plugin.settings.enableFootnoteSectionHeading &&
+        plugin.settings.footnoteSectionHeading
+    ) {
+        const headingLines = plugin.settings.footnoteSectionHeading.split("\n");
+        for (let i = 0; i + headingLines.length <= lines.length; i++) {
+            const matches = headingLines.every(
+                (headingLine, k) =>
+                    !isProtected[i + k] && lines[i + k] === headingLine,
+            );
+            if (!matches) continue;
+            let fromLine = i + headingLines.length - 1;
+            let slotText = `\n\n[^${footnoteId}]: `;
+            // reuse a blank line already separating the heading from what
+            // follows, instead of doubling it
+            if (fromLine + 1 < lines.length && lines[fromLine + 1] === "") {
+                fromLine += 1;
+                slotText = `\n[^${footnoteId}]: `;
+            }
+            const slotLinesAdded = slotText.split("\n").length - 1;
+            return {
+                change: {
+                    from: { line: fromLine, ch: doc.getLine(fromLine).length },
+                    text: slotText,
+                },
+                cursor: {
+                    line: fromLine + slotLinesAdded,
+                    ch: slotText.length - slotText.lastIndexOf("\n") - 1,
+                },
+            };
+        }
     }
 
     let text = `\n[^${footnoteId}]: `;
@@ -521,16 +559,36 @@ export function footnotePrefix(markdownText: string): string {
 }
 
 // The prefix the autonumbered command should actually use: nothing unless
-// the feature is enabled in settings, and a prefix that can't form a
-// renderable footnote name is dropped with an explanation instead of
-// silently producing broken markers.
+/**
+ * Why `prefix` can't be used as a footnote prefix, or null when it can.
+ * Shared by the Set-footnote-prefix modal, the insert path, and the lint
+ * guard. Digit-ending prefixes are the dangerous case: with prefix "10"
+ * the first footnote is [^101] — indistinguishable from a plain numbered
+ * footnote, which reindexing then renumbers, collapsing the namespace the
+ * prefix exists to preserve.
+ */
+export function footnotePrefixProblem(prefix: string): string | null {
+    if (!prefix) return null;
+    if (!isValidFootnoteName(prefix) || /[[\]]/.test(prefix)) {
+        return "A footnote prefix can't contain spaces or brackets.";
+    }
+    if (/\d$/.test(prefix)) {
+        return "A footnote prefix can't end in a number: its footnotes would be indistinguishable from plain numbered ones and get renumbered by linting.";
+    }
+    return null;
+}
+
+// the feature is enabled in settings, and a prefix that can't work is
+// dropped with an explanation instead of silently producing broken or
+// ambiguous markers
 function activeFootnotePrefix(plugin: FootnotePlugin, markdownText: string): string {
     if (!plugin.settings.enableFootnotePrefix) return "";
     const prefix = footnotePrefix(markdownText);
     if (!prefix) return "";
-    if (!isValidFootnoteName(prefix) || /[[\]]/.test(prefix)) {
+    const problem = footnotePrefixProblem(prefix);
+    if (problem) {
         new Notice(
-            `The note's footnote-prefix ("${prefix}") contains spaces or brackets, so it was ignored.`,
+            `The note's footnote-prefix ("${prefix}") was ignored. ${problem}`,
         );
         return "";
     }
@@ -580,6 +638,8 @@ export async function insertAutonumFootnote(plugin: FootnotePlugin) {
     // stale there, and editing the row via the main editor corrupts the
     // table — reads use the resolved position, writes go through the cell
     const cell = activeTableCellEditor(doc);
+    // inside an inline footnote, hop out instead of nesting a marker in it
+    if (exitInlineFootnoteIfInside(doc, cell)) return;
     const run = (cursorPosition: EditorPosition) => {
         const lineText = doc.getLine(cursorPosition.line);
 
@@ -783,25 +843,39 @@ export async function insertInlineFootnote(plugin: FootnotePlugin) {
     const doc = mdView.editor;
 
     const cell = activeTableCellEditor(doc);
+    if (exitInlineFootnoteIfInside(doc, cell)) return;
+
+    insertInlineText(plugin, "^[]", 2);
+}
+
+/**
+ * When the caret sits inside an inline footnote ("^[...]"), hop it just
+ * past the closing bracket and report true. Shared by every insert
+ * command: for the numbered/named ones this prevents nesting a "[^x]"
+ * marker inside the inline footnote's brackets, which would end the inline
+ * footnote early and corrupt it ("^[in [^named]line]").
+ */
+export function exitInlineFootnoteIfInside(
+    doc: Editor,
+    cell: TableCellEditor | null,
+): boolean {
     if (cell) {
         const exit = inlineFootnoteExitCh(
             cell.state.doc.toString(),
             cell.state.selection.main.head,
         );
-        if (exit !== null) {
-            cell.dispatch({ selection: { anchor: exit } });
-            return;
-        }
-    } else {
-        const cursorPosition = doc.getCursor();
-        const exit = inlineFootnoteExitCh(doc.getLine(cursorPosition.line), cursorPosition.ch);
-        if (exit !== null) {
-            doc.setCursor({ line: cursorPosition.line, ch: exit });
-            return;
-        }
+        if (exit === null) return false;
+        cell.dispatch({ selection: { anchor: exit } });
+        return true;
     }
-
-    insertInlineText(plugin, "^[]", 2);
+    const cursorPosition = doc.getCursor();
+    const exit = inlineFootnoteExitCh(
+        doc.getLine(cursorPosition.line),
+        cursorPosition.ch,
+    );
+    if (exit === null) return false;
+    doc.setCursor({ line: cursorPosition.line, ch: exit });
+    return true;
 }
 
 /** Inline-footnote paste command: inserts `^[<clipboard>]` with the caret after it. */
@@ -846,6 +920,8 @@ export async function insertNamedFootnote(plugin: FootnotePlugin) {
     // stale there, and editing the row via the main editor corrupts the
     // table — reads use the resolved position, writes go through the cell
     const cell = activeTableCellEditor(doc);
+    // inside an inline footnote, hop out instead of nesting a marker in it
+    if (exitInlineFootnoteIfInside(doc, cell)) return;
     const run = (cursorPosition: EditorPosition) => {
         const lineText = doc.getLine(cursorPosition.line);
 

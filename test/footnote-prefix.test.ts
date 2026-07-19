@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
     computeNextFootnoteNumber,
     footnotePrefix,
+    footnotePrefixProblem,
 } from "../src/insert-or-navigate-footnotes";
+import { lintBlockedByPrefix } from "../src/linting/linter";
 
 // Issue #31: notes that are chapters of a larger document need their
 // numbered footnotes namespaced (e.g. [^2.1] in chapter 2) so the combined
@@ -73,5 +75,50 @@ describe("computeNextFootnoteNumber with a prefix", () => {
 
     it("counts prefixed details as reserving their number", () => {
         expect(computeNextFootnoteNumber("[^2.7]: orphan", "2.")).toBe(8);
+    });
+});
+
+describe("footnotePrefixProblem (QOL: prefix validation)", () => {
+    it("accepts a normal prefix", () => {
+        expect(footnotePrefixProblem("2.")).toBeNull();
+        expect(footnotePrefixProblem("ch-")).toBeNull();
+        expect(footnotePrefixProblem("arXiv:")).toBeNull();
+    });
+
+    it("accepts empty (it clears the property)", () => {
+        expect(footnotePrefixProblem("")).toBeNull();
+    });
+
+    it("rejects spaces and brackets", () => {
+        expect(footnotePrefixProblem("a b")).toMatch(/spaces or brackets/);
+        expect(footnotePrefixProblem("a[b]")).toMatch(/spaces or brackets/);
+    });
+
+    it("rejects a trailing digit: [^101] would be ambiguous", () => {
+        expect(footnotePrefixProblem("10")).toMatch(/end in a number/);
+        expect(footnotePrefixProblem("ch2")).toMatch(/end in a number/);
+    });
+
+    it("allows digits that are not trailing", () => {
+        expect(footnotePrefixProblem("2a-")).toBeNull();
+        expect(footnotePrefixProblem("10.")).toBeNull();
+    });
+});
+
+describe("lintBlockedByPrefix (QOL: lint cancels on bad prefix)", () => {
+    it("does not block without a prefix property", () => {
+        expect(lintBlockedByPrefix("plain[^1] note\n\n[^1]: x")).toBeNull();
+    });
+
+    it("does not block a valid prefix", () => {
+        expect(
+            lintBlockedByPrefix("---\nfootnote-prefix: 2.\n---\nbody"),
+        ).toBeNull();
+    });
+
+    it("blocks a digit-ending prefix with the alert text", () => {
+        expect(
+            lintBlockedByPrefix("---\nfootnote-prefix: 10\n---\nbody"),
+        ).toMatch(/canceled.*"10"/);
     });
 });
