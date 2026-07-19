@@ -95,7 +95,7 @@ export default class FootnotePlugin extends Plugin {
     // matching one.
     this.addCommand({
       id: "lint-footnotes",
-      name: "Lint footnotes (punctuation, move to bottom, reindex)",
+      name: "Lint footnotes",
       icon: "sparkles",
       checkCallback: (checking: boolean) => {
         if (checking)
