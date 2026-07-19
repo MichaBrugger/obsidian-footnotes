@@ -885,6 +885,100 @@ async function main() {
         ob("delete", "path=Smoke Test - second.md");
     });
 
+    await test("first footnote slots under an existing section heading (QOL)", async () => {
+        resetSettings({
+            enableFootnoteSectionHeading: true,
+            footnoteSectionHeading: "# Footnotes",
+        });
+        await setupNote("Alpha bravo\n\n# Footnotes\n\ntail here");
+        setCursorAndRun(0, 8, CMD_AUTONUM); // mid "bravo"
+        await expectEditorText(
+            "Alpha bravo[^1]\n\n# Footnotes\n\n[^1]: \ntail here",
+        );
+    });
+
+    await test("numbered hotkey inside an inline footnote hops out (QOL)", async () => {
+        resetSettings();
+        const note = "text ^[inline note] more";
+        await setupNote(note);
+        setCursorAndRun(0, 9, CMD_AUTONUM); // inside the inline footnote
+        await pollUntil(
+            "caret just past the closing bracket",
+            `(${EDITOR}).editor.getCursor()`,
+            (c) => c && c.line === 0 && c.ch === note.indexOf("]") + 1,
+        );
+        const text = readJson(`(${EDITOR}).editor.getValue()`);
+        if (text !== note) {
+            throw new Error(`hop changed the text: ${JSON.stringify(text)}`);
+        }
+    });
+
+    await test("clean note lint reports 'No linting needed.'", async () => {
+        resetSettings();
+        await setupNote("Alpha.[^1] done\n\n[^1]: one");
+        setCursorAndRun(0, 0, "obsidian-footnotes:lint-footnotes");
+        await pollUntil(
+            "the no-op notice",
+            `[...document.querySelectorAll('.notice')].map(n => n.textContent).join('|')`,
+            (v) => typeof v === "string" && v.includes("No linting needed."),
+        );
+    });
+
+    await test("lint cancels on a digit-ending footnote-prefix (QOL)", async () => {
+        resetSettings();
+        const note =
+            "---\nfootnote-prefix: 10\n---\nb[^2] a[^1] end\n\n[^1]: one\n[^2]: two";
+        await setupNote(note);
+        setCursorAndRun(3, 0, "obsidian-footnotes:lint-footnotes");
+        await pollUntil(
+            "the cancellation alert",
+            `[...document.querySelectorAll('.notice')].map(n => n.textContent).join('|')`,
+            (v) => typeof v === "string" && v.includes("Linting canceled"),
+        );
+        const text = readJson(`(${EDITOR}).editor.getValue()`);
+        if (text !== note) {
+            throw new Error(`canceled lint still changed text: ${JSON.stringify(text)}`);
+        }
+    });
+
+    await test("set-footnote-prefix modal validates, then writes the property", async () => {
+        resetSettings();
+        await setupNote("Modal target note");
+        action(`app.commands.executeCommandById('obsidian-footnotes:set-footnote-prefix');`);
+        await pollUntil(
+            "the modal's text input",
+            `!!document.querySelector('.modal-container input[type=\"text\"]')`,
+            (v) => v === true,
+        );
+        // a digit-ending prefix is refused: inline error, modal stays open
+        action(
+            `(() => { const input = document.querySelector('.modal-container input[type=\"text\"]'); ` +
+            `input.value = '10'; input.dispatchEvent(new Event('input', {bubbles: true})); ` +
+            `input.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter'})); })();`,
+        );
+        await pollUntil(
+            "the inline validation error",
+            `(() => { const err = document.querySelector('.footnote-shortcut-prefix-error'); ` +
+            `return { open: !!document.querySelector('.modal-container'), error: err ? err.textContent : '' }; })()`,
+            (s) => s && s.open && s.error.includes("end in a number"),
+        );
+        // a valid prefix closes the modal and lands in the frontmatter
+        action(
+            `(() => { const input = document.querySelector('.modal-container input[type=\"text\"]'); ` +
+            `input.value = '5.'; input.dispatchEvent(new Event('input', {bubbles: true})); ` +
+            `input.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter'})); })();`,
+        );
+        await pollUntil(
+            "the property in the note",
+            `(${EDITOR}).editor.getValue()`,
+            // processFrontMatter may quote the YAML value; the plugin's
+            // parser strips symmetric quotes, so both forms are fine
+            (v) =>
+                typeof v === "string" &&
+                /footnote-prefix: "?5\."?/.test(v),
+        );
+    });
+
     // restore state and clean up
     setSettings(savedSettings);
     ob("delete", `path=${NOTE}.md`);
