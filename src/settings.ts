@@ -123,14 +123,14 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                         control: { type: "toggle", key: "lintMoveToBottom" },
                     },
                     {
-                        name: "Reindex",
-                        desc: "The lint command also renumbers footnotes and reorders their definitions, following the options in the reindexing section below.",
-                        control: { type: "toggle", key: "lintReindex" },
-                    },
-                    {
                         type: "group",
                         heading: "Reindexing",
                         items: [
+                            {
+                                name: "Reindex",
+                                desc: "The lint command also renumbers footnotes and reorders their definitions, following the options in this reindexing section below.",
+                                control: { type: "toggle", key: "lintReindex" },
+                            },
                             {
                                 name: "Keep orphaned definitions",
                                 desc: "Reindexing keeps definitions that no marker references, numbering them after everything else. Turn off to delete them instead.",
