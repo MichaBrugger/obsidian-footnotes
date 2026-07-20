@@ -20,6 +20,7 @@ export interface FootnotePluginSettings {
     lintFixPunctuation: boolean;
     lintMoveToBottom: boolean;
     lintReindex: boolean;
+    lintApplyPrefix: boolean;
     lintOnSave: boolean;
     lintOnFileChange: boolean;
 }
@@ -39,6 +40,7 @@ export const DEFAULT_SETTINGS: FootnotePluginSettings = {
     lintFixPunctuation: true,
     lintMoveToBottom: true,
     lintReindex: true,
+    lintApplyPrefix: true,
     lintOnSave: false,
     lintOnFileChange: false,
 };
@@ -121,6 +123,11 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                         name: "Move definitions to the bottom",
                         desc: "The lint command gathers all footnote definitions at the end of the note.",
                         control: { type: "toggle", key: "lintMoveToBottom" },
+                    },
+                    {
+                        name: "Apply the note's footnote prefix",
+                        desc: "When the per-note footnote prefix feature is on and the note has a footnote-prefix property, linting renames plain numbered footnotes to carry the prefix.",
+                        control: { type: "toggle", key: "lintApplyPrefix" },
                     },
                     {
                         type: "group",
@@ -286,6 +293,18 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                 .setValue(this.plugin.settings.lintMoveToBottom)
                 .onChange(async (value) => {
                     this.plugin.settings.lintMoveToBottom = value;
+                    await this.plugin.saveSettings();
+                })
+        );
+
+        new Setting(containerEl)
+        .setName("Apply the note's footnote prefix")
+        .setDesc("When the per-note footnote prefix feature is on and the note has a footnote-prefix property, linting renames plain numbered footnotes to carry the prefix.")
+        .addToggle((toggle) =>
+            toggle
+                .setValue(this.plugin.settings.lintApplyPrefix)
+                .onChange(async (value) => {
+                    this.plugin.settings.lintApplyPrefix = value;
                     await this.plugin.saveSettings();
                 })
         );

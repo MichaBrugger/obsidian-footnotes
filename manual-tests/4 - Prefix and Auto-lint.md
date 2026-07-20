@@ -12,6 +12,7 @@ This note's frontmatter sets `footnote-prefix: 3.` and already contains one pref
 - [ ] Another press right after that marker chains `[^3.3]`
 - [ ] With the toggle OFF: the same hotkey inserts plain `[^1]` (the property is ignored)
 - [ ] Reindexing treats prefixed footnotes as NAMED, so linting never renumbers them across chapters
+- [ ] With `Apply the note's footnote prefix` ON (Linting page): running **Lint footnotes** converts the plain footnotes in the Lint-on-save section below into `3.`-prefixed ones (undo afterwards)
 
 [^3.1]: the first prefixed footnote
 

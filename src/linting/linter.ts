@@ -14,6 +14,7 @@ import {
 import { normalizeEol, restoreEol } from "../markdown-scan";
 import { AppWithCommands, EditorWithCm, WindowWithVim } from "../obsidian-internals";
 import { activeTableCellEditor } from "../table-cursor";
+import { applyFootnotePrefix } from "./rules/apply-footnote-prefix";
 import { footnoteAfterPunctuation } from "./rules/footnote-after-punctuation";
 import { moveFootnoteDefinitionsToBottom } from "./rules/move-footnotes-to-the-bottom";
 import { reindexFootnotes, ReindexOptions } from "./rules/re-index-footnotes";
@@ -51,6 +52,10 @@ export function lintOptionsFromSettings(
         moveDefinitionsToBottom: plugin.settings.lintMoveToBottom,
         reindex: plugin.settings.lintReindex,
         reindexOptions: reindexOptionsFromSettings(plugin),
+        // gated on the whole per-note prefix feature being enabled
+        applyNotePrefix:
+            plugin.settings.enableFootnotePrefix &&
+            plugin.settings.lintApplyPrefix,
     };
 }
 
@@ -65,6 +70,8 @@ export interface LintOptions {
     reindex?: boolean;
     /** Passed through to reindexFootnotes. */
     reindexOptions?: ReindexOptions;
+    /** Rename plain numbered footnotes to carry the note's own footnote-prefix property (default off; the caller gates on settings). */
+    applyNotePrefix?: boolean;
 }
 
 /** The enabled cleanups in dependency order: fix punctuation, gather definitions at the bottom, then renumber and reorder. */
@@ -87,6 +94,15 @@ export function lintFootnotes(
     }
     if (options.reindex ?? true) {
         result = reindexFootnotes(result, options.reindexOptions);
+    }
+    if (options.applyNotePrefix) {
+        // AFTER reindex, so the converted numbers follow reading order. The
+        // prefix is the note's own property; an invalid one changed nothing
+        // here even before the lint guard started canceling those outright.
+        const prefix = footnotePrefix(result);
+        if (prefix && footnotePrefixProblem(prefix) === null) {
+            result = applyFootnotePrefix(result, prefix);
+        }
     }
     return restoreEol(result, eol);
 }

@@ -137,6 +137,7 @@ const BASELINE_SETTINGS = {
     lintFixPunctuation: true,
     lintMoveToBottom: true,
     lintReindex: true,
+    lintApplyPrefix: true,
     lintOnSave: false,
     lintOnFileChange: false,
 };
@@ -939,6 +940,17 @@ async function main() {
         if (text !== note) {
             throw new Error(`canceled lint still changed text: ${JSON.stringify(text)}`);
         }
+    });
+
+    await test("lint applies the note's footnote prefix to plain footnotes (QOL)", async () => {
+        resetSettings({ enableFootnotePrefix: true });
+        await setupNote(
+            "---\nfootnote-prefix: 2.\n---\nb[^2] a[^1] end\n\n[^1]: one\n[^2]: two",
+        );
+        setCursorAndRun(3, 0, CMD_LINT);
+        await expectEditorText(
+            "---\nfootnote-prefix: 2.\n---\nb[^2.1] a[^2.2] end\n\n[^2.1]: two\n[^2.2]: one",
+        );
     });
 
     await test("set-footnote-prefix modal validates, then writes the property", async () => {

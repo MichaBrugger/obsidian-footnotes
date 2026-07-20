@@ -570,10 +570,10 @@ export function footnotePrefix(markdownText: string): string {
 export function footnotePrefixProblem(prefix: string): string | null {
     if (!prefix) return null;
     if (!isValidFootnoteName(prefix) || /[[\]]/.test(prefix)) {
-        return "A footnote prefix can't contain spaces or brackets.";
+        return "The footnote prefix can't contain spaces or brackets.";
     }
     if (/\d$/.test(prefix)) {
-        return "A footnote prefix can't end in a number: its footnotes would be indistinguishable from plain numbered ones and get renumbered by linting.";
+        return "The footnote prefix can't end in a number. Its footnotes would be indistinguishable from plain numbered ones.";
     }
     return null;
 }
