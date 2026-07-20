@@ -943,13 +943,16 @@ async function main() {
     });
 
     await test("lint applies the note's footnote prefix to plain footnotes (QOL)", async () => {
+        // plain strays adopt the prefix AND the whole namespace renumbers
+        // by reading order — the pre-existing [^2.5] is a numbered
+        // footnote of the namespace, not a named one
         resetSettings({ enableFootnotePrefix: true });
         await setupNote(
-            "---\nfootnote-prefix: 2.\n---\nb[^2] a[^1] end\n\n[^1]: one\n[^2]: two",
+            "---\nfootnote-prefix: 2.\n---\nb[^2] a[^1] pre[^2.5] end\n\n[^1]: one\n[^2]: two\n[^2.5]: already prefixed",
         );
         setCursorAndRun(3, 0, CMD_LINT);
         await expectEditorText(
-            "---\nfootnote-prefix: 2.\n---\nb[^2.1] a[^2.2] end\n\n[^2.1]: two\n[^2.2]: one",
+            "---\nfootnote-prefix: 2.\n---\nb[^2.1] a[^2.2] pre[^2.3] end\n\n[^2.1]: two\n[^2.2]: one\n[^2.3]: already prefixed",
         );
     });
 

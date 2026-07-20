@@ -16,15 +16,15 @@ b[^2] a[^1] pre[^2.5] end
 [^2]: two
 [^2.5]: already prefixed
 
-Expected (plain ones reindex to reading order, then take the prefix CONTINUING after `2.5`; the prefixed one is untouched):
+Expected (plain ones adopt the prefix, then the WHOLE namespace renumbers by reading order; prefixed footnotes are numbered footnotes, so `2.5` becomes `2.3`):
 
 ```
-b[^2.6] a[^2.7] pre[^2.5] end
+b[^2.1] a[^2.2] pre[^2.3] end
 
-[^2.6]: two
-[^2.7]: one
-[^2.5]: already prefixed
+[^2.1]: two
+[^2.2]: one
+[^2.3]: already prefixed
 ```
 
 - [ ] Running lint again shows "No linting needed." (idempotent)
-- [ ] With `Apply the note's footnote prefix` OFF, plain footnotes only reindex to `[^1]`/`[^2]` and keep no prefix
+- [ ] With `Apply the note's footnote prefix` OFF, plain footnotes reindex to `[^1]`/`[^2]` and the prefixed one still renumbers within its namespace

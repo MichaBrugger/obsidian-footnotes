@@ -1,4 +1,7 @@
-import { footnoteMarkerMatches } from "../../insert-or-navigate-footnotes";
+import {
+    footnoteMarkerMatches,
+    footnotePrefixProblem,
+} from "../../insert-or-navigate-footnotes";
 import {
     DefinitionStart,
     findDefinitionBlocks,
@@ -24,6 +27,14 @@ export interface ReindexOptions {
     keepOrphanedDefinitions?: boolean;
     /** Give named footnotes numbers by appearance order instead of preserving their names (default off). */
     renumberNamedFootnotes?: boolean;
+    /**
+     * The note's own footnote-prefix: names matching `<prefix><digits>` are
+     * NUMBERED footnotes of that namespace, renumbered `<prefix>1..n` by
+     * appearance with their own counter — the same reordering behavior as
+     * plain numbered footnotes (QOL, 2026-07-18). Other prefixes stay
+     * named. Invalid prefixes (digit-ending) are ignored defensively.
+     */
+    prefix?: string;
 }
 
 /**
@@ -104,6 +115,17 @@ function reindexOnce(
 ): string {
     const keepOrphans = options.keepOrphanedDefinitions ?? true;
     const renumberNamed = options.renumberNamedFootnotes ?? false;
+    // the namespace prefix, kept in its original casing for output but
+    // matched case-insensitively (ids are case-folded throughout)
+    const prefixOut =
+        options.prefix && footnotePrefixProblem(options.prefix) === null
+            ? options.prefix
+            : "";
+    const prefixFolded = prefixOut.toLowerCase();
+    const isPrefixedNumbered = (name: string) =>
+        prefixFolded !== "" &&
+        name.startsWith(prefixFolded) &&
+        /^\d+$/.test(name.slice(prefixFolded.length));
 
     const { text, eol } = normalizeEol(markdown);
     let lines = text.split("\n");
@@ -142,12 +164,16 @@ function reindexOnce(
         }
     }
 
-    // numbered names → their new number, in appearance order; named
-    // footnotes only consume a number when they're being renumbered too
+    // numbered names → their new number, in appearance order; the prefix
+    // namespace runs its own independent counter; named footnotes only
+    // consume a number when they're being renumbered too
     const renames = new Map<string, string>();
     let nextNumber = 1;
+    let nextPrefixed = 1;
     for (const name of order) {
-        if (renumberNamed || /^\d+$/.test(name)) {
+        if (isPrefixedNumbered(name)) {
+            renames.set(name, `${prefixOut}${nextPrefixed++}`);
+        } else if (renumberNamed || /^\d+$/.test(name)) {
             renames.set(name, String(nextNumber++));
         }
     }

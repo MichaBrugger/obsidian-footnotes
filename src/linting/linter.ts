@@ -52,10 +52,11 @@ export function lintOptionsFromSettings(
         moveDefinitionsToBottom: plugin.settings.lintMoveToBottom,
         reindex: plugin.settings.lintReindex,
         reindexOptions: reindexOptionsFromSettings(plugin),
-        // gated on the whole per-note prefix feature being enabled
+        // both gated on the whole per-note prefix feature being enabled
         applyNotePrefix:
             plugin.settings.enableFootnotePrefix &&
             plugin.settings.lintApplyPrefix,
+        prefixAware: plugin.settings.enableFootnotePrefix,
     };
 }
 
@@ -72,6 +73,8 @@ export interface LintOptions {
     reindexOptions?: ReindexOptions;
     /** Rename plain numbered footnotes to carry the note's own footnote-prefix property (default off; the caller gates on settings). */
     applyNotePrefix?: boolean;
+    /** Treat footnotes matching the note's own footnote-prefix as NUMBERED — reindex renumbers them within the namespace like plain ones (default off; set when the per-note prefix feature is on). */
+    prefixAware?: boolean;
 }
 
 /** The enabled cleanups in dependency order: fix punctuation, gather definitions at the bottom, then renumber and reorder. */
@@ -92,17 +95,31 @@ export function lintFootnotes(
             options.sectionHeading ?? "",
         );
     }
-    if (options.reindex ?? true) {
-        result = reindexFootnotes(result, options.reindexOptions);
+    // the note's own valid footnote-prefix, when any prefix behavior is on
+    // (an invalid property changes nothing here — the lint guard cancels
+    // those runs outright anyway)
+    const notePrefix =
+        options.applyNotePrefix || options.prefixAware
+            ? footnotePrefix(result)
+            : "";
+    const validPrefix =
+        notePrefix && footnotePrefixProblem(notePrefix) === null
+            ? notePrefix
+            : "";
+    if (options.applyNotePrefix && validPrefix) {
+        // BEFORE reindex: plain strays adopt the prefix (numbered past the
+        // existing maximum so nothing collides), and the prefix-aware
+        // reindex below then renumbers the WHOLE namespace by reading
+        // order — one lint converges instead of needing a second pass
+        result = applyFootnotePrefix(result, validPrefix);
     }
-    if (options.applyNotePrefix) {
-        // AFTER reindex, so the converted numbers follow reading order. The
-        // prefix is the note's own property; an invalid one changed nothing
-        // here even before the lint guard started canceling those outright.
-        const prefix = footnotePrefix(result);
-        if (prefix && footnotePrefixProblem(prefix) === null) {
-            result = applyFootnotePrefix(result, prefix);
-        }
+    if (options.reindex ?? true) {
+        result = reindexFootnotes(result, {
+            ...options.reindexOptions,
+            // matching-prefixed footnotes are numbered footnotes (QOL):
+            // reindex renumbers them within the namespace like plain ones
+            prefix: options.prefixAware ? validPrefix : "",
+        });
     }
     return restoreEol(result, eol);
 }
