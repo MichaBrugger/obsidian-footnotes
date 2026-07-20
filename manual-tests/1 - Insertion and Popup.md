@@ -26,6 +26,24 @@ Place the cursor in the middle of the word markers below and press the auto-numb
 - [ ] Copy this sentence, then use the paste-inline hotkey: The clipboard text
   spans two lines and should collapse to one.
 
+## Hotkeys inside an inline footnote (QOL)
+
+Place the caret inside this inline footnote^[press the numbered or named hotkey while in here] and:
+
+- [ ] The NUMBERED hotkey hops the caret just past the closing bracket, no marker is nested inside
+- [ ] The NAMED hotkey does the same
+- [ ] The inline hotkey still exits too (its original second-press behavior)
+
+## Existing heading claims the first footnote (QOL)
+
+Turn on `Enable section heading` (heading `# Footnotes`), then insert a footnote into this sentence.
+
+- [ ] The detail lands under the heading below, NOT at the end of the note, and no second heading appears
+
+# Footnotes
+
+Content after the heading stays below the new detail.
+
 ## Popup editor
 
 Turn on `Edit footnotes in a popup`, then:

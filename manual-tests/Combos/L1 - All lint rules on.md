@@ -17,3 +17,5 @@ Beta[^1] alpha,[^2] end.
 [^1]: two
 [^2]: one
 ```
+
+- [ ] Running lint a second time shows "No linting needed." (QOL)

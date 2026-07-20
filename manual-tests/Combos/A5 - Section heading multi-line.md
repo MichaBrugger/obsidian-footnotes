@@ -6,3 +6,7 @@ Settings: `Enable section heading` ON, heading set to the two lines `---` + `## 
 - [ ] Second footnote appends below the first detail, no second divider or heading
 
 Insert into this sentence twice.
+
+QOL: undo everything, type the divider + heading pair yourself mid-note with prose after it, then insert again.
+
+- [ ] The first detail slots under YOUR divider + heading, no duplicate pair at the end

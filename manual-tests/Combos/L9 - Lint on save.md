@@ -10,6 +10,7 @@ messy[^20] markers[^10] here
 [^10]: ten, used second
 
 - [ ] Ctrl+S lints (then undo restores the mess in one step)
+- [ ] Saving again right away shows "No linting needed." (QOL)
 - [ ] With vim keybindings on, `:w` lints identically
 - [ ] Waiting with the note open does nothing (background autosave never lints)
 - [ ] With `Lint on save` OFF again, Ctrl+S leaves the mess alone
