@@ -893,8 +893,32 @@ async function main() {
         });
         await setupNote("Alpha bravo\n\n# Footnotes\n\ntail here");
         setCursorAndRun(0, 8, CMD_AUTONUM); // mid "bravo"
+        // a blank line separates the detail from "tail here" — otherwise
+        // Obsidian lazily pulls the prose into the footnote (A4 bug)
         await expectEditorText(
-            "Alpha bravo[^1]\n\n# Footnotes\n\n[^1]: \ntail here",
+            "Alpha bravo[^1]\n\n# Footnotes\n\n[^1]: \n\ntail here",
+        );
+    });
+
+    await test("detail slotted above prose keeps a blank line between them (A4 bug)", async () => {
+        resetSettings({
+            enableFootnoteSectionHeading: true,
+            footnoteSectionHeading: "# Footnotes",
+        });
+        // the heading has prose DIRECTLY below it, no blank line at all
+        await setupNote("Alpha bravo\n\n# Footnotes\nprose right after");
+        setCursorAndRun(0, 8, CMD_AUTONUM); // mid "bravo"
+        await expectEditorText(
+            "Alpha bravo[^1]\n\n# Footnotes\n\n[^1]: \n\nprose right after",
+        );
+    });
+
+    await test("named footnote creation applies the note's prefix (A6 bug)", async () => {
+        resetSettings({ enableFootnotePrefix: true });
+        await setupNote("---\nfootnote-prefix: 2.\n---\nAlpha [^tag] bravo");
+        setCursorAndRun(3, 8, CMD_NAMED); // caret inside [^tag]
+        await expectEditorText(
+            "---\nfootnote-prefix: 2.\n---\nAlpha [^2.tag] bravo\n\n[^2.tag]: ",
         );
     });
 
@@ -945,14 +969,15 @@ async function main() {
     await test("lint applies the note's footnote prefix to plain footnotes (QOL)", async () => {
         // plain strays adopt the prefix AND the whole namespace renumbers
         // by reading order — the pre-existing [^2.5] is a numbered
-        // footnote of the namespace, not a named one
+        // footnote of the namespace, not a named one; named footnotes
+        // keep their name behind the prefix (A6 bug)
         resetSettings({ enableFootnotePrefix: true });
         await setupNote(
-            "---\nfootnote-prefix: 2.\n---\nb[^2] a[^1] pre[^2.5] end\n\n[^1]: one\n[^2]: two\n[^2.5]: already prefixed",
+            "---\nfootnote-prefix: 2.\n---\nb[^2] a[^1] pre[^2.5] n[^note] end\n\n[^1]: one\n[^2]: two\n[^2.5]: already prefixed\n[^note]: named",
         );
         setCursorAndRun(3, 0, CMD_LINT);
         await expectEditorText(
-            "---\nfootnote-prefix: 2.\n---\nb[^2.1] a[^2.2] pre[^2.3] end\n\n[^2.1]: two\n[^2.2]: one\n[^2.3]: already prefixed",
+            "---\nfootnote-prefix: 2.\n---\nb[^2.1] a[^2.2] pre[^2.3] n[^2.note] end\n\n[^2.1]: two\n[^2.2]: one\n[^2.3]: already prefixed\n[^2.note]: named",
         );
     });
 
