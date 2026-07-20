@@ -34,6 +34,14 @@ Place the caret inside this inline footnote^[press the numbered or named hotkey 
 - [ ] The NAMED hotkey does the same
 - [ ] The inline hotkey still exits too (its original second-press behavior)
 
+## Inline hotkey inside a regular footnote (QOL, the reverse)
+
+Insert a numbered footnote into this sentence, put the caret back INSIDE its `[^1]` marker, then press the INLINE hotkey:
+
+- [ ] It jumps to the footnote's detail (or opens the popup) exactly like the numbered/named hotkeys, no `^[]` nested into the marker
+- [ ] Type a bare `[^tag]` by hand, caret inside, inline hotkey → the detail is created like the named hotkey would
+- [ ] The paste-inline hotkey navigates the same way, and the clipboard stays untouched for the next real paste
+
 ## Existing heading claims the first footnote (QOL)
 
 Turn on `Enable section heading` (heading `# Footnotes`), then insert a footnote into this sentence.

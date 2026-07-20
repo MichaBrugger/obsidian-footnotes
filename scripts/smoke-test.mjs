@@ -939,6 +939,29 @@ async function main() {
         }
     });
 
+    await test("inline hotkey inside a marker navigates like the named key (QOL)", async () => {
+        resetSettings();
+        const note = "Alpha [^1] end.\n\n[^1]: one";
+        await setupNote(note);
+        setCursorAndRun(0, 8, CMD_INLINE); // inside the [^1] marker
+        await pollUntil(
+            "caret at the end of the detail",
+            `(${EDITOR}).editor.getCursor()`,
+            (c) => c && c.line === 2 && c.ch === "[^1]: one".length,
+        );
+        const text = readJson(`(${EDITOR}).editor.getValue()`);
+        if (text !== note) {
+            throw new Error(`navigation changed the text: ${JSON.stringify(text)}`);
+        }
+    });
+
+    await test("inline hotkey on a detail-less marker creates its detail (QOL)", async () => {
+        resetSettings();
+        await setupNote("Alpha [^tag] end.");
+        setCursorAndRun(0, 8, CMD_INLINE); // inside the [^tag] marker
+        await expectEditorText("Alpha [^tag] end.\n\n[^tag]: ");
+    });
+
     await test("clean note lint reports 'No linting needed.'", async () => {
         resetSettings();
         await setupNote("Alpha.[^1] done\n\n[^1]: one");

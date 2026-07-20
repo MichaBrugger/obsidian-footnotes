@@ -840,10 +840,56 @@ export function inlineFootnoteExitCh(lineText: string, ch: number): number | nul
 }
 
 /**
+ * When the caret sits strictly inside a "[^x]" marker, handle the press the
+ * way the numbered/named commands would — jump to (or popup-edit) the
+ * marker's detail, creating it when missing — and report true. The reverse
+ * of exitInlineFootnoteIfInside (QOL, 2026-07-20), shared by both inline
+ * commands: inserting "^[…]" into a marker would corrupt it ("[^na^[]med]"),
+ * so the inline hotkeys navigate there instead.
+ */
+export function navigateMarkerIfInside(
+    plugin: FootnotePlugin,
+    doc: Editor,
+    cell: TableCellEditor | null,
+): boolean {
+    const cursorPosition =
+        (cell ? resolveTableCellCursor(doc) : null) ?? doc.getCursor();
+    const lineText = doc.getLine(cursorPosition.line);
+    // raw-line gate first — masking needs the whole document, and this runs
+    // on every inline-command press (same rationale as
+    // shouldJumpFromMarkerToDetail)
+    const rawMarkers = footnoteMarkerMatches(lineText).map((match) => ({
+        footnote: match[0],
+        startIndex: match.index ?? 0,
+    }));
+    if (markerAtCursor(rawMarkers, cursorPosition.ch) === null) return false;
+
+    // the masked twin decides for real: a "[^x]" inside code is plain text,
+    // and inserting an inline footnote there is fine (#41 semantics)
+    const maskedLine =
+        maskProtectedLines(docLines(doc))[cursorPosition.line] ?? "";
+    const markersOnLine = footnoteMarkerMatches(maskedLine).map((match) => ({
+        footnote: match[0],
+        startIndex: match.index ?? 0,
+    }));
+    if (markerAtCursor(markersOnLine, cursorPosition.ch) === null) return false;
+
+    if (shouldJumpFromMarkerToDetail(lineText, cursorPosition, doc, plugin))
+        return true;
+    if (shouldCreateMatchingFootnoteDetail(lineText, cursorPosition, plugin, doc, cell))
+        return true;
+    // however the cascade resolved (e.g. an invalid name's warning), the
+    // press is handled — "^[…]" must never land inside the marker
+    return true;
+}
+
+/**
  * Inline-footnote command: inserts `^[]` with the caret between the
  * brackets for quick writing. A second press while the cursor is still
  * inside an inline footnote instead hops it just past the closing bracket,
- * so typing continues without reaching for the arrow keys.
+ * so typing continues without reaching for the arrow keys. Inside a
+ * regular "[^x]" marker the press navigates like the numbered/named
+ * commands instead of nesting.
  */
 export async function insertInlineFootnote(plugin: FootnotePlugin) {
     // settle before toggle — same ordering rationale as insertAutonumFootnote
@@ -857,6 +903,7 @@ export async function insertInlineFootnote(plugin: FootnotePlugin) {
 
     const cell = activeTableCellEditor(doc);
     if (exitInlineFootnoteIfInside(doc, cell)) return;
+    if (navigateMarkerIfInside(plugin, doc, cell)) return;
 
     insertInlineText(plugin, "^[]", 2);
 }
@@ -891,11 +938,23 @@ export function exitInlineFootnoteIfInside(
     return true;
 }
 
-/** Inline-footnote paste command: inserts `^[<clipboard>]` with the caret after it. */
+/** Inline-footnote paste command: inserts `^[<clipboard>]` with the caret after it. Inside a "[^x]" marker it navigates like the named command instead (the clipboard stays untouched). */
 export async function pasteInlineFootnote(plugin: FootnotePlugin) {
     // settle before toggle — same ordering rationale as insertAutonumFootnote
     await settleFootnotePopupWithFeedback();
     if (toggleCloseFootnotePopup()) return;
+
+    const mdView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
+    if (!mdView || !mdView.editor) return;
+    if (
+        navigateMarkerIfInside(
+            plugin,
+            mdView.editor,
+            activeTableCellEditor(mdView.editor),
+        )
+    ) {
+        return;
+    }
 
     // read the clipboard BEFORE resolving positions — it's the only await,
     // and everything position-dependent should happen after it
