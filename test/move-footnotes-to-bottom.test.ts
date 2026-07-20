@@ -69,16 +69,22 @@ describe("moveFootnoteDefinitionsToBottom", () => {
 
     it("adds the section heading when configured and missing", () => {
         const input = "body[^1].\n\n[^1]: def";
-        const expected = "body[^1].\n# Footnotes\n\n[^1]: def";
+        // a blank line always separates the heading from the body above
+        const expected = "body[^1].\n\n# Footnotes\n\n[^1]: def";
         expect(moveFootnoteDefinitionsToBottom(input, "# Footnotes")).toBe(
             expected,
         );
     });
 
-    it("does not duplicate an existing section heading", () => {
-        const text = "body[^1].\n# Footnotes\n\n[^1]: def";
-        expect(moveFootnoteDefinitionsToBottom(text, "# Footnotes")).toBe(
-            text,
+    it("does not duplicate an existing section heading, normalizing its spacing", () => {
+        const tight = "body[^1].\n# Footnotes\n\n[^1]: def";
+        const spaced = "body[^1].\n\n# Footnotes\n\n[^1]: def";
+        expect(moveFootnoteDefinitionsToBottom(tight, "# Footnotes")).toBe(
+            spaced,
+        );
+        // the spaced layout is a fixed point
+        expect(moveFootnoteDefinitionsToBottom(spaced, "# Footnotes")).toBe(
+            spaced,
         );
     });
 

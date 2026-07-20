@@ -20,8 +20,8 @@ import { FootnoteRule } from "../rule";
  * `sectionHeading` is given (the raw setting value), a copy sitting directly
  * above the first definition block moves along with the definitions; if no
  * unprotected line in the note already equals the heading, one is inserted
- * above the moved definitions — dividers get a separating blank line so they
- * can't form a setext heading. A note whose end sits inside an unclosed
+ * above the moved definitions, always separated from the body by a blank
+ * line. A note whose end sits inside an unclosed
  * fence or comment is returned unchanged: appending there would turn the
  * definitions into inert code.
  */
@@ -100,10 +100,11 @@ export function moveFootnoteDefinitionsToBottom(
     const includeHeading = sectionHeading !== "" && !headingPresent;
     let headingPart = "";
     if (includeHeading && base !== "") {
-        // same layout rule as addFootnoteSectionHeader: a divider needs a
-        // blank line above it, a text heading sits right under the body
-        const divider = /^(---|\*\*\*|___)/.test(sectionHeading);
-        headingPart = (divider ? "\n\n" : "\n") + sectionHeading;
+        // same layout rule as addFootnoteSectionHeader: a blank line always
+        // separates the heading from the body above it (markdown block
+        // convention; it also keeps a divider heading from turning the last
+        // body line into a setext heading)
+        headingPart = "\n\n" + sectionHeading;
     }
 
     const result =

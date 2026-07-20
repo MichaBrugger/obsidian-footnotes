@@ -331,15 +331,12 @@ export function addFootnoteSectionHeader(
     // else, return ""
 
     if (plugin.settings.enableFootnoteSectionHeading) {
-        const returnHeading = plugin.settings.footnoteSectionHeading;
         // the setting holds literal markdown (legacy plain-text values are
-        // migrated on load); a divider directly below a text line would turn
-        // that line into a setext heading, so keep a blank line in between
-        const dividerRegex = /^(---|\*\*\*|___)/;
-        if (dividerRegex.test(returnHeading)) {
-            return `\n\n${returnHeading}`;
-        }
-        return `\n${returnHeading}`;
+        // migrated on load); a blank line ALWAYS separates the heading from
+        // the content above it — markdown block convention (requested
+        // 2026-07-20), and it keeps a heading starting with a divider from
+        // turning the line above into a setext heading
+        return `\n\n${plugin.settings.footnoteSectionHeading}`;
     }
     return "";
 }
@@ -420,11 +417,6 @@ export function buildDetailAppend(
         }
     }
 
-    let text = `\n[^${footnoteId}]: `;
-    if (isFirstFootnote) {
-        text = addFootnoteSectionHeader(plugin) + "\n" + text;
-    }
-
     let fromLine = doc.lastLine();
     let to: EditorPosition | undefined;
     if (plugin.settings.enableRemoveBlankLastLines === true) {
@@ -434,6 +426,17 @@ export function buildDetailAppend(
         to = { line: doc.lastLine(), ch: doc.getLine(doc.lastLine()).length };
     }
     const from = { line: fromLine, ch: doc.getLine(fromLine).length };
+
+    let text = `\n[^${footnoteId}]: `;
+    if (isFirstFootnote) {
+        let heading = addFootnoteSectionHeader(plugin);
+        // the heading carries its own blank line above; a blank insertion
+        // line (trimming off, note ends empty) already supplies it
+        if (heading && doc.getLine(fromLine).trim() === "") {
+            heading = heading.slice(1);
+        }
+        text = heading + "\n" + text;
+    }
 
     // cursor lands at the end of the inserted detail line
     const linesAdded = text.split("\n").length - 1;

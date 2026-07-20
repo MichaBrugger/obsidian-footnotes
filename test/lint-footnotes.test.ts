@@ -18,7 +18,7 @@ describe("lintFootnotes", () => {
 
     it("adds the section heading when given", () => {
         const input = "Word[^1].\n\n[^1]: def";
-        const expected = "Word.[^1]\n# Footnotes\n\n[^1]: def";
+        const expected = "Word.[^1]\n\n# Footnotes\n\n[^1]: def";
         expect(lintFootnotes(input, { sectionHeading: "# Footnotes" })).toBe(
             expected,
         );

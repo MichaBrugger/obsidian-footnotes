@@ -58,7 +58,27 @@ describe("buildDetailAppend", () => {
             true,
             fakePlugin({ enableFootnoteSectionHeading: true }),
         );
-        expect(change.text).toBe("\n# Footnotes\n\n[^1]: ");
+        // a blank line always separates the heading from the content above
+        expect(change.text).toBe("\n\n# Footnotes\n\n[^1]: ");
+    });
+
+    it("a blank insertion line already supplies the heading's blank line", () => {
+        // trimming off, note ends with an empty line: inserting there must
+        // not stack a second blank above the heading
+        const doc = fakeEditor(["Alpha", ""]);
+        const { change } = buildDetailAppend(
+            doc,
+            "1",
+            true,
+            fakePlugin({
+                enableFootnoteSectionHeading: true,
+                enableRemoveBlankLastLines: false,
+            }),
+        );
+        expect(change).toEqual({
+            from: { line: 1, ch: 0 },
+            text: "\n# Footnotes\n\n[^1]: ",
+        });
     });
 
     it("appends after the last detail when definitions end the note", () => {
@@ -251,7 +271,7 @@ describe("slotting under an existing section heading (QOL follow-up to #55)", ()
         const doc = fakeEditor(["A[^1] b", "```", "# Footnotes", "```"]);
         const { change } = buildDetailAppend(doc, "1", true, headingOn());
         // falls through to the EOF path, which adds the real heading
-        expect(change.text).toBe("\n# Footnotes\n\n[^1]: ");
+        expect(change.text).toBe("\n\n# Footnotes\n\n[^1]: ");
     });
 
     it("with the heading feature off, nothing slots", () => {

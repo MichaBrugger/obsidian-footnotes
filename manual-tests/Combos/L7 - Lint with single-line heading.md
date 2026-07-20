@@ -9,10 +9,11 @@ body[^2] text[^1] end
 [^1]: one
 [^2]: two
 
-Expected after the first lint, and UNCHANGED after the second (exactly one heading, ever):
+Expected after the first lint, and UNCHANGED after the second (exactly one heading, ever; a blank line always separates the heading from the text above):
 
 ```
 body[^1] text[^2] end
+
 # Footnotes
 
 [^1]: two

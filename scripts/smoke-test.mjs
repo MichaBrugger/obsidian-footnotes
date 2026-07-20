@@ -643,9 +643,10 @@ async function main() {
         await setupNote("Alpha[^2], bravo[^1].\n\n[^2]: two\n\nCharlie tail.");
         setCursorAndRun(0, 0, CMD_LINT);
         // punctuation fixed, definition gathered under the heading at the
-        // bottom, numbering redone by appearance ([^2]→[^1], [^1]→[^2])
+        // bottom (blank line above the heading), numbering redone by
+        // appearance ([^2]→[^1], [^1]→[^2])
         await expectEditorText(
-            "Alpha,[^1] bravo.[^2]\n\nCharlie tail.\n# Footnotes\n\n[^1]: two",
+            "Alpha,[^1] bravo.[^2]\n\nCharlie tail.\n\n# Footnotes\n\n[^1]: two",
         );
     });
 
