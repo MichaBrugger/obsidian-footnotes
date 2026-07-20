@@ -361,15 +361,23 @@ export function buildDetailAppend(
     const lines = docLines(doc);
     const isProtected = protectedLines(lines);
     const blocks = findDefinitionBlocks(lines, isProtected);
+    // a non-blank line directly below the new detail would be pulled INTO
+    // it — Obsidian lazily continues a definition into the next line — so
+    // insertions with content below them add a trailing blank separator
+    // (A4 bug, 2026-07-20). The cursor still lands on the detail line.
+    const needsSeparator = (insertLine: number) =>
+        insertLine + 1 < lines.length && lines[insertLine + 1].trim() !== "";
     if (blocks.length > 0) {
         const lastLine = blocks[blocks.length - 1].end;
-        const text = `\n[^${footnoteId}]: `;
+        let text = `\n[^${footnoteId}]: `;
+        const cursor = { line: lastLine + 1, ch: text.length - 1 };
+        if (needsSeparator(lastLine)) text += "\n";
         return {
             change: {
                 from: { line: lastLine, ch: doc.getLine(lastLine).length },
                 text,
             },
-            cursor: { line: lastLine + 1, ch: text.length - 1 },
+            cursor,
         };
     }
 
@@ -397,15 +405,17 @@ export function buildDetailAppend(
                 slotText = `\n[^${footnoteId}]: `;
             }
             const slotLinesAdded = slotText.split("\n").length - 1;
+            const cursor = {
+                line: fromLine + slotLinesAdded,
+                ch: slotText.length - slotText.lastIndexOf("\n") - 1,
+            };
+            if (needsSeparator(fromLine)) slotText += "\n";
             return {
                 change: {
                     from: { line: fromLine, ch: doc.getLine(fromLine).length },
                     text: slotText,
                 },
-                cursor: {
-                    line: fromLine + slotLinesAdded,
-                    ch: slotText.length - slotText.lastIndexOf("\n") - 1,
-                },
+                cursor,
             };
         }
     }
@@ -930,7 +940,7 @@ export async function insertNamedFootnote(plugin: FootnotePlugin) {
         if (shouldJumpFromMarkerToDetail(lineText, cursorPosition, doc, plugin))
             return;
 
-        if (shouldCreateMatchingFootnoteDetail(lineText, cursorPosition, plugin, doc))
+        if (shouldCreateMatchingFootnoteDetail(lineText, cursorPosition, plugin, doc, cell))
             return;
         shouldCreateFootnoteMarker(lineText, cursorPosition, doc, plugin, cell);
     };
@@ -938,12 +948,13 @@ export async function insertNamedFootnote(plugin: FootnotePlugin) {
     else runOutsideTableCell(doc, run);
 }
 
-/** Cascade step 3 (named only): caret on a marker with no detail → append the matching detail (or warn on an invalid name). Returns true when it handled the press. */
+/** Cascade step 3 (named only): caret on a marker with no detail → append the matching detail (or warn on an invalid name), applying the note's footnote-prefix to the name first. Returns true when it handled the press. */
 export function shouldCreateMatchingFootnoteDetail(
     lineText: string,
     cursorPosition: EditorPosition,
     plugin: FootnotePlugin,
-    doc: Editor
+    doc: Editor,
+    cell: TableCellEditor | null = null
 ) {
     // Create matching footnote detail for footnote marker
 
@@ -982,26 +993,74 @@ export function shouldCreateMatchingFootnoteDetail(
                 return true;
             }
 
+            // the note's footnote-prefix applies to named footnotes too
+            // (A6 bug, 2026-07-20): "[^tag]" under prefix "7." becomes
+            // "[^7.tag]" — every occurrence renamed so the detail matches.
+            // Skipped inside a table cell: the marker sits in the row, and
+            // main-editor edits there race the cell's sync-back (issue #28
+            // family) — the lint pass picks the rename up later instead.
+            const prefix =
+                cell || !plugin.settings.enableFootnotePrefix
+                    ? ""
+                    : activeFootnotePrefix(plugin, doc.getValue());
+            const renameChanges: EditorChange[] = [];
+            let effectiveId = footnoteId;
+            if (
+                prefix &&
+                !footnoteId.toLowerCase().startsWith(prefix.toLowerCase())
+            ) {
+                effectiveId = `${prefix}${footnoteId}`;
+                for (const marker of listExistingFootnoteMarkersAndLocations(doc)) {
+                    const name = marker.footnote.match(ExtractNameFromFootnote)?.[2];
+                    if (name?.toLowerCase() !== footnoteId.toLowerCase()) continue;
+                    renameChanges.push({
+                        from: { line: marker.lineNum, ch: marker.startIndex },
+                        to: {
+                            line: marker.lineNum,
+                            ch: marker.startIndex + marker.footnote.length,
+                        },
+                        // each occurrence keeps its own casing — ids are
+                        // case-insensitive, so identity is preserved
+                        text: `[^${prefix}${name}]`,
+                    });
+                }
+            }
+
             const list = listExistingFootnoteDetails(doc);
 
             // Check if the list doesn't include current footnote (ids are
             // case-insensitive — a "[^note]:" detail already covers a
             // "[^Note]" marker, so this must navigate, not create a duplicate)
             // if so, add detail for the current footnote
-            if (!idListIncludes(list, footnoteId)) {
-                const detail = buildDetailAppend(doc, footnoteId, list.length === 0, plugin);
+            if (!idListIncludes(list, effectiveId)) {
+                const detail = buildDetailAppend(doc, effectiveId, list.length === 0, plugin);
+                const changes = [...renameChanges, detail.change];
 
                 if (popupEditingAvailable(plugin)) {
                     // type the detail in a popup instead of jumping to the
                     // bottom; the cursor stays on the marker
-                    doc.transaction({ changes: [detail.change] });
-                    void openFootnotePopup(plugin, footnoteId, () =>
+                    doc.transaction({ changes });
+                    void openFootnotePopup(plugin, effectiveId, () =>
                         moveCursorAndSetJumpPoint(doc, cursorPosition, detail.cursor, plugin, undefined, true)
                     );
                 } else {
-                    moveCursorAndSetJumpPoint(doc, cursorPosition, detail.cursor, plugin, [detail.change], true);
+                    moveCursorAndSetJumpPoint(doc, cursorPosition, detail.cursor, plugin, changes, true);
                 }
 
+                return true;
+            }
+            // the plain marker had no detail (step 2 fell through), but the
+            // PREFIXED name already has one — rename the markers onto it
+            // and navigate as step 2 would have
+            if (renameChanges.length > 0) {
+                doc.transaction({ changes: renameChanges });
+                if (popupEditingAvailable(plugin)) {
+                    void openFootnotePopup(plugin, effectiveId, () =>
+                        jumpToFootnoteDetail(effectiveId, cursorPosition, doc, plugin)
+                    );
+                } else {
+                    jumpToFootnoteDetail(effectiveId, cursorPosition, doc, plugin);
+                }
                 return true;
             }
             return;

@@ -4,12 +4,15 @@ import { applyFootnotePrefix } from "../src/linting/rules/apply-footnote-prefix"
 import { lintFootnotes } from "../src/linting/linter";
 
 // QOL (2026-07-18): footnotes written BEFORE the note got its
-// footnote-prefix property stay plain-numbered; the new lint rule renames
-// them to carry the prefix. Policy pinned here:
+// footnote-prefix property stay unprefixed; the lint rule renames them to
+// carry the prefix. Policy pinned here:
 //   - plain numbered footnotes convert in first-appearance order
 //   - numbering continues after the highest existing prefixed footnote, so
 //     nothing collides
-//   - named footnotes and already-prefixed footnotes are untouched
+//   - named footnotes get the prefix too, keeping their name (A6 bug,
+//     2026-07-20) — unless the prefixed name already exists as another
+//     footnote, which a rename would silently merge
+//   - already-prefixed footnotes are untouched
 //   - protected regions (code, comments, frontmatter) are invisible
 //   - an invalid prefix (defensive: the lint guard cancels earlier anyway)
 //     changes nothing
@@ -33,9 +36,39 @@ describe("applyFootnotePrefix", () => {
         expect(applyFootnotePrefix(input, "2.")).toBe(expected);
     });
 
-    it("leaves named footnotes alone", () => {
+    it("prefixes named footnotes, keeping their names (A6 bug)", () => {
         const input = "x[^note] y[^1] end\n\n[^note]: n\n[^1]: one";
-        const expected = "x[^note] y[^2.1] end\n\n[^note]: n\n[^2.1]: one";
+        const expected = "x[^2.note] y[^2.1] end\n\n[^2.note]: n\n[^2.1]: one";
+        expect(applyFootnotePrefix(input, "2.")).toBe(expected);
+    });
+
+    it("leaves already-prefixed named footnotes alone", () => {
+        const text = "x[^2.note] end\n\n[^2.note]: n";
+        expect(applyFootnotePrefix(text, "2.")).toBe(text);
+    });
+
+    it("matches an existing prefix case-insensitively", () => {
+        const text = "x[^ch-note] y[^Ch-3] end\n\n[^ch-note]: n\n[^Ch-3]: t";
+        expect(applyFootnotePrefix(text, "Ch-")).toBe(text);
+    });
+
+    it("prefixes a named orphan definition", () => {
+        const input = "no markers here\n\n[^lonely]: orphan";
+        const expected = "no markers here\n\n[^2.lonely]: orphan";
+        expect(applyFootnotePrefix(input, "2.")).toBe(expected);
+    });
+
+    it("skips a named rename that would merge two footnotes", () => {
+        // renaming [^note] to [^2.note] would collide with the existing
+        // [^2.note] and silently fuse their contents — leave it alone
+        const input =
+            "x[^note] y[^2.note] end\n\n[^note]: a\n[^2.note]: b";
+        expect(applyFootnotePrefix(input, "2.")).toBe(input);
+    });
+
+    it("prefixes a foreign-prefixed name like any other named footnote", () => {
+        const input = "a[^3.5] end\n\n[^3.5]: other chapter";
+        const expected = "a[^2.3.5] end\n\n[^2.3.5]: other chapter";
         expect(applyFootnotePrefix(input, "2.")).toBe(expected);
     });
 

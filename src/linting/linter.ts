@@ -71,7 +71,7 @@ export interface LintOptions {
     reindex?: boolean;
     /** Passed through to reindexFootnotes. */
     reindexOptions?: ReindexOptions;
-    /** Rename plain numbered footnotes to carry the note's own footnote-prefix property (default off; the caller gates on settings). */
+    /** Rename plain numbered AND named footnotes to carry the note's own footnote-prefix property (default off; the caller gates on settings). */
     applyNotePrefix?: boolean;
     /** Treat footnotes matching the note's own footnote-prefix as NUMBERED — reindex renumbers them within the namespace like plain ones (default off; set when the per-note prefix feature is on). */
     prefixAware?: boolean;
@@ -107,10 +107,10 @@ export function lintFootnotes(
             ? notePrefix
             : "";
     if (options.applyNotePrefix && validPrefix) {
-        // BEFORE reindex: plain strays adopt the prefix (numbered past the
-        // existing maximum so nothing collides), and the prefix-aware
-        // reindex below then renumbers the WHOLE namespace by reading
-        // order — one lint converges instead of needing a second pass
+        // BEFORE reindex: strays adopt the prefix (plain numbers slot past
+        // the existing maximum, names keep their name behind it), and the
+        // prefix-aware reindex below then renumbers the WHOLE namespace by
+        // reading order — one lint converges instead of needing a second pass
         result = applyFootnotePrefix(result, validPrefix);
     }
     if (options.reindex ?? true) {

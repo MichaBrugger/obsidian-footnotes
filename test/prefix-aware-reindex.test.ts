@@ -59,6 +59,28 @@ describe("reindexFootnotes with a prefix namespace", () => {
         const expected = "a[^Ch-1] end\n\n[^Ch-1]: four";
         expect(reindexFootnotes(input, { prefix: "Ch-" })).toBe(expected);
     });
+
+    it("renumberNamedFootnotes sends named footnotes into the namespace", () => {
+        // with an active prefix the note's footnotes belong to its
+        // namespace, so renumbering a named one yields <prefix>N, not a
+        // plain number the next apply-prefix pass would rename again
+        const input = "a[^note] b[^2-3] end\n\n[^note]: n\n[^2-3]: t";
+        const expected = "a[^2-1] b[^2-2] end\n\n[^2-1]: n\n[^2-2]: t";
+        expect(
+            reindexFootnotes(input, {
+                renumberNamedFootnotes: true,
+                prefix: "2-",
+            }),
+        ).toBe(expected);
+    });
+
+    it("renumberNamedFootnotes still goes plain without a prefix", () => {
+        const input = "a[^note] b[^5] end\n\n[^note]: n\n[^5]: t";
+        const expected = "a[^1] b[^2] end\n\n[^1]: n\n[^2]: t";
+        expect(
+            reindexFootnotes(input, { renumberNamedFootnotes: true }),
+        ).toBe(expected);
+    });
 });
 
 describe("lintFootnotes prefix awareness (prefixAware)", () => {
@@ -96,6 +118,33 @@ describe("lintFootnotes prefix awareness (prefixAware)", () => {
             "---\nfootnote-prefix: 2.\n---\nc[^9], b[^2.4] a[^1]\n\n[^1]: one\n[^9]: nine\n[^2.4]: pre";
         const options = { applyNotePrefix: true, prefixAware: true };
         const once = lintFootnotes(messy, options);
+        expect(lintFootnotes(once, options)).toBe(once);
+    });
+
+    it("prefixes named footnotes through the pipeline (A6 bug)", () => {
+        const input =
+            "---\nfootnote-prefix: 2.\n---\nx[^note] y[^1] end\n\n[^note]: n\n[^1]: one";
+        const expected =
+            "---\nfootnote-prefix: 2.\n---\nx[^2.note] y[^2.1] end\n\n[^2.note]: n\n[^2.1]: one";
+        expect(
+            lintFootnotes(input, { applyNotePrefix: true, prefixAware: true }),
+        ).toBe(expected);
+    });
+
+    it("is idempotent with renumberNamedFootnotes on as well", () => {
+        // named strays adopt the prefix, then reindex renumbers them INTO
+        // the namespace — one lint converges, a second changes nothing
+        const messy =
+            "---\nfootnote-prefix: 2.\n---\na[^note] b[^1] c[^2.7]\n\n[^note]: n\n[^1]: one\n[^2.7]: pre";
+        const options = {
+            applyNotePrefix: true,
+            prefixAware: true,
+            reindexOptions: { renumberNamedFootnotes: true },
+        };
+        const once = lintFootnotes(messy, options);
+        expect(once).toBe(
+            "---\nfootnote-prefix: 2.\n---\na[^2.1] b[^2.2] c[^2.3]\n\n[^2.1]: n\n[^2.2]: one\n[^2.3]: pre",
+        );
         expect(lintFootnotes(once, options)).toBe(once);
     });
 });

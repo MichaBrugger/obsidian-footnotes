@@ -117,6 +117,73 @@ describe("buildDetailAppend", () => {
     });
 });
 
+// Bug (A4, reported 2026-07-20): a detail inserted directly above prose gets
+// that prose pulled INTO the footnote — Obsidian lazily continues a
+// definition into the next non-blank line. Every insertion point that can
+// have content below it must keep a blank line between the detail and it.
+describe("blank line between the new detail and following content", () => {
+    it("separates the detail from prose right below the heading slot (A4)", () => {
+        const doc = fakeEditor([
+            "Intro[^1] text",
+            "",
+            "# Footnotes",
+            "prose right after",
+        ]);
+        const { change, cursor } = buildDetailAppend(
+            doc,
+            "1",
+            true,
+            fakePlugin({ enableFootnoteSectionHeading: true }),
+        );
+        expect(change).toEqual({
+            from: { line: 2, ch: "# Footnotes".length },
+            text: "\n\n[^1]: \n",
+        });
+        // the cursor still lands at the end of the detail line itself
+        expect(cursor).toEqual({ line: 4, ch: 6 });
+    });
+
+    it("separates the detail from prose below a reused blank line", () => {
+        const doc = fakeEditor(["Intro[^1]", "", "# Footnotes", "", "prose"]);
+        const { change, cursor } = buildDetailAppend(
+            doc,
+            "1",
+            true,
+            fakePlugin({ enableFootnoteSectionHeading: true }),
+        );
+        expect(change).toEqual({ from: { line: 3, ch: 0 }, text: "\n[^1]: \n" });
+        expect(cursor).toEqual({ line: 4, ch: 6 });
+    });
+
+    it("separates a detail appended after the last block from prose below", () => {
+        const doc = fakeEditor([
+            "Alpha[^1] bravo.",
+            "",
+            "#### Citations",
+            "[^1]: one",
+            "#### Images",
+        ]);
+        const { change, cursor } = buildDetailAppend(doc, "2", false, fakePlugin());
+        expect(change).toEqual({
+            from: { line: 3, ch: "[^1]: one".length },
+            text: "\n[^2]: \n",
+        });
+        expect(cursor).toEqual({ line: 4, ch: 6 });
+    });
+
+    it("adds no separator when a blank line already follows", () => {
+        const doc = fakeEditor([
+            "Alpha[^1] bravo.",
+            "",
+            "[^1]: one",
+            "",
+            "tail prose",
+        ]);
+        const { change } = buildDetailAppend(doc, "2", false, fakePlugin());
+        expect(change.text).toBe("\n[^2]: ");
+    });
+});
+
 describe("slotting under an existing section heading (QOL follow-up to #55)", () => {
     const headingOn = () =>
         fakePlugin({ enableFootnoteSectionHeading: true });
@@ -131,10 +198,11 @@ describe("slotting under an existing section heading (QOL follow-up to #55)", ()
             "other stuff",
         ]);
         const { change, cursor } = buildDetailAppend(doc, "1", true, headingOn());
-        // the blank line after the heading is reused, not doubled
+        // the blank line after the heading is reused, not doubled; the
+        // trailing "\n" keeps "## Other section" out of the footnote
         expect(change).toEqual({
             from: { line: 3, ch: 0 },
-            text: "\n[^1]: ",
+            text: "\n[^1]: \n",
         });
         expect(cursor).toEqual({ line: 4, ch: 6 });
     });
@@ -144,7 +212,7 @@ describe("slotting under an existing section heading (QOL follow-up to #55)", ()
         const { change, cursor } = buildDetailAppend(doc, "1", true, headingOn());
         expect(change).toEqual({
             from: { line: 1, ch: "# Footnotes".length },
-            text: "\n\n[^1]: ",
+            text: "\n\n[^1]: \n",
         });
         expect(cursor).toEqual({ line: 3, ch: 6 });
     });
@@ -163,7 +231,7 @@ describe("slotting under an existing section heading (QOL follow-up to #55)", ()
             footnoteSectionHeading: "---\n## Footnotes",
         });
         const { change } = buildDetailAppend(doc, "1", true, plugin);
-        expect(change).toEqual({ from: { line: 4, ch: 0 }, text: "\n[^1]: " });
+        expect(change).toEqual({ from: { line: 4, ch: 0 }, text: "\n[^1]: \n" });
     });
 
     it("with definitions present, the after-last-block rule still wins", () => {

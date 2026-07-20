@@ -25,7 +25,7 @@ import { FootnoteRule } from "../rule";
 export interface ReindexOptions {
     /** Keep definitions no marker references, numbering them after everything referenced (default). Off deletes them. */
     keepOrphanedDefinitions?: boolean;
-    /** Give named footnotes numbers by appearance order instead of preserving their names (default off). */
+    /** Give named footnotes numbers by appearance order instead of preserving their names (default off). With an active `prefix` they renumber into its namespace. */
     renumberNamedFootnotes?: boolean;
     /**
      * The note's own footnote-prefix: names matching `<prefix><digits>` are
@@ -166,15 +166,25 @@ function reindexOnce(
 
     // numbered names → their new number, in appearance order; the prefix
     // namespace runs its own independent counter; named footnotes only
-    // consume a number when they're being renumbered too
+    // consume a number when they're being renumbered too — and with an
+    // active prefix they renumber INTO its namespace (they're this note's
+    // footnotes), which also keeps the lint pipeline idempotent: a plain
+    // number here would be re-prefixed by the next apply-prefix pass
     const renames = new Map<string, string>();
     let nextNumber = 1;
     let nextPrefixed = 1;
     for (const name of order) {
         if (isPrefixedNumbered(name)) {
             renames.set(name, `${prefixOut}${nextPrefixed++}`);
-        } else if (renumberNamed || /^\d+$/.test(name)) {
+        } else if (/^\d+$/.test(name)) {
             renames.set(name, String(nextNumber++));
+        } else if (renumberNamed) {
+            renames.set(
+                name,
+                prefixOut
+                    ? `${prefixOut}${nextPrefixed++}`
+                    : String(nextNumber++),
+            );
         }
     }
 

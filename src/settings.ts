@@ -69,7 +69,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
             },
             {
                 name: "Per-note footnote prefix",
-                desc: "Numbered footnotes respect a footnote-prefix property in the note's frontmatter: with \"footnote-prefix: 2.\" the command inserts [^2.1], then [^2.2], and so on. Useful when chapter notes are combined into one document.",
+                desc: "Footnotes respect a footnote-prefix property in the note's frontmatter: with \"footnote-prefix: 2.\" the numbered command inserts [^2.1], then [^2.2], and the named command prefixes new names ([^2.tag]). Useful when chapter notes are combined into one document.",
                 control: { type: "toggle", key: "enableFootnotePrefix" },
             },
             {
@@ -126,7 +126,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                     },
                     {
                         name: "Apply the note's footnote prefix",
-                        desc: "When the per-note footnote prefix feature is on and the note has a footnote-prefix property, linting renames plain numbered footnotes to carry the prefix.",
+                        desc: "When the per-note footnote prefix feature is on and the note has a footnote-prefix property, linting renames plain numbered and named footnotes to carry the prefix.",
                         control: { type: "toggle", key: "lintApplyPrefix" },
                     },
                     {
@@ -187,7 +187,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
         .setName("Per-note footnote prefix")
-        .setDesc("Numbered footnotes respect a footnote-prefix property in the note's frontmatter: with \"footnote-prefix: 2.\" the command inserts [^2.1], then [^2.2], and so on. Useful when chapter notes are combined into one document.")
+        .setDesc("Footnotes respect a footnote-prefix property in the note's frontmatter: with \"footnote-prefix: 2.\" the numbered command inserts [^2.1], then [^2.2], and the named command prefixes new names ([^2.tag]). Useful when chapter notes are combined into one document.")
         .addToggle((toggle) =>
             toggle
                 .setValue(this.plugin.settings.enableFootnotePrefix)
@@ -299,7 +299,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
         .setName("Apply the note's footnote prefix")
-        .setDesc("When the per-note footnote prefix feature is on and the note has a footnote-prefix property, linting renames plain numbered footnotes to carry the prefix.")
+        .setDesc("When the per-note footnote prefix feature is on and the note has a footnote-prefix property, linting renames plain numbered and named footnotes to carry the prefix.")
         .addToggle((toggle) =>
             toggle
                 .setValue(this.plugin.settings.lintApplyPrefix)
