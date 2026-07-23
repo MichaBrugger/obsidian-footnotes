@@ -69,7 +69,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
             },
             {
                 name: "Per-note footnote prefix",
-                desc: "Footnotes respect a footnote-prefix property in the note's frontmatter: with \"footnote-prefix: 2.\" the numbered command inserts [^2.1], then [^2.2], and the named command prefixes new names ([^2.tag]). Useful when chapter notes are combined into one document.",
+                desc: "Footnotes respect a footnote-prefix property in the note's frontmatter: with \"footnote-prefix: 2.\" the numbered command inserts [^2.1], then [^2.2], and the named command starts its new marker with the prefix filled in ([^2.]). Useful when chapter notes are combined into one document.",
                 control: { type: "toggle", key: "enableFootnotePrefix" },
             },
             {
@@ -187,7 +187,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
         .setName("Per-note footnote prefix")
-        .setDesc("Footnotes respect a footnote-prefix property in the note's frontmatter: with \"footnote-prefix: 2.\" the numbered command inserts [^2.1], then [^2.2], and the named command prefixes new names ([^2.tag]). Useful when chapter notes are combined into one document.")
+        .setDesc("Footnotes respect a footnote-prefix property in the note's frontmatter: with \"footnote-prefix: 2.\" the numbered command inserts [^2.1], then [^2.2], and the named command starts its new marker with the prefix filled in ([^2.]). Useful when chapter notes are combined into one document.")
         .addToggle((toggle) =>
             toggle
                 .setValue(this.plugin.settings.enableFootnotePrefix)

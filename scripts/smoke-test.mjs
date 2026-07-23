@@ -914,13 +914,42 @@ async function main() {
         );
     });
 
-    await test("named footnote creation applies the note's prefix (A6 bug)", async () => {
+    await test("named command prefills the note's prefix into the marker (QOL)", async () => {
         resetSettings({ enableFootnotePrefix: true });
-        await setupNote("---\nfootnote-prefix: 2.\n---\nAlpha [^tag] bravo");
-        setCursorAndRun(3, 8, CMD_NAMED); // caret inside [^tag]
+        await setupNote("---\nfootnote-prefix: 2.\n---\nAlpha bravo");
+        setCursorAndRun(3, 8, CMD_NAMED); // mid "bravo" → end of word
         await expectEditorText(
-            "---\nfootnote-prefix: 2.\n---\nAlpha [^2.tag] bravo\n\n[^2.tag]: ",
+            "---\nfootnote-prefix: 2.\n---\nAlpha bravo[^2.]",
         );
+        await pollUntil(
+            "caret between the prefix and the bracket",
+            `(${EDITOR}).editor.getCursor()`,
+            (c) => c && c.line === 3 && c.ch === "Alpha bravo[^2.".length,
+        );
+        // type the name, press again inside → detail for the full name
+        action(
+            `const v=${EDITOR}; v.editor.replaceRange('tag', v.editor.getCursor());`,
+        );
+        setCursorAndRun(3, "Alpha bravo[^2.ta".length, CMD_NAMED);
+        await expectEditorText(
+            "---\nfootnote-prefix: 2.\n---\nAlpha bravo[^2.tag]\n\n[^2.tag]: ",
+        );
+    });
+
+    await test("second press inside the untouched [^2.] placeholder hops out (QOL)", async () => {
+        resetSettings({ enableFootnotePrefix: true });
+        const note = "---\nfootnote-prefix: 2.\n---\nAlpha [^2.] bravo";
+        await setupNote(note);
+        setCursorAndRun(3, 8, CMD_NAMED); // inside the placeholder
+        await pollUntil(
+            "caret just past the placeholder",
+            `(${EDITOR}).editor.getCursor()`,
+            (c) => c && c.line === 3 && c.ch === "Alpha [^2.]".length,
+        );
+        const text = readJson(`(${EDITOR}).editor.getValue()`);
+        if (text !== note) {
+            throw new Error(`hop changed the text: ${JSON.stringify(text)}`);
+        }
     });
 
     await test("numbered hotkey inside an inline footnote hops out (QOL)", async () => {

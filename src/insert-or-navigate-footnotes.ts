@@ -653,6 +653,8 @@ export async function insertAutonumFootnote(plugin: FootnotePlugin) {
     const cell = activeTableCellEditor(doc);
     // inside an inline footnote, hop out instead of nesting a marker in it
     if (exitInlineFootnoteIfInside(doc, cell)) return;
+    // inside an untouched "[^7-]" placeholder, hop out the same way
+    if (exitPrefilledMarkerIfInside(plugin, doc, cell)) return;
     const run = (cursorPosition: EditorPosition) => {
         const lineText = doc.getLine(cursorPosition.line);
 
@@ -876,7 +878,7 @@ export function navigateMarkerIfInside(
 
     if (shouldJumpFromMarkerToDetail(lineText, cursorPosition, doc, plugin))
         return true;
-    if (shouldCreateMatchingFootnoteDetail(lineText, cursorPosition, plugin, doc, cell))
+    if (shouldCreateMatchingFootnoteDetail(lineText, cursorPosition, plugin, doc))
         return true;
     // however the cascade resolved (e.g. an invalid name's warning), the
     // press is handled — "^[…]" must never land inside the marker
@@ -903,6 +905,9 @@ export async function insertInlineFootnote(plugin: FootnotePlugin) {
 
     const cell = activeTableCellEditor(doc);
     if (exitInlineFootnoteIfInside(doc, cell)) return;
+    // the untouched "[^7-]" placeholder hops out (it is not a real
+    // footnote to navigate to) — checked before navigateMarkerIfInside
+    if (exitPrefilledMarkerIfInside(plugin, doc, cell)) return;
     if (navigateMarkerIfInside(plugin, doc, cell)) return;
 
     insertInlineText(plugin, "^[]", 2);
@@ -946,15 +951,9 @@ export async function pasteInlineFootnote(plugin: FootnotePlugin) {
 
     const mdView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
     if (!mdView || !mdView.editor) return;
-    if (
-        navigateMarkerIfInside(
-            plugin,
-            mdView.editor,
-            activeTableCellEditor(mdView.editor),
-        )
-    ) {
-        return;
-    }
+    const pasteCell = activeTableCellEditor(mdView.editor);
+    if (exitPrefilledMarkerIfInside(plugin, mdView.editor, pasteCell)) return;
+    if (navigateMarkerIfInside(plugin, mdView.editor, pasteCell)) return;
 
     // read the clipboard BEFORE resolving positions — it's the only await,
     // and everything position-dependent should happen after it
@@ -994,6 +993,9 @@ export async function insertNamedFootnote(plugin: FootnotePlugin) {
     const cell = activeTableCellEditor(doc);
     // inside an inline footnote, hop out instead of nesting a marker in it
     if (exitInlineFootnoteIfInside(doc, cell)) return;
+    // inside an untouched "[^7-]" placeholder, hop out — a second press
+    // must not create a footnote named after the bare prefix
+    if (exitPrefilledMarkerIfInside(plugin, doc, cell)) return;
     const run = (cursorPosition: EditorPosition) => {
         const lineText = doc.getLine(cursorPosition.line);
 
@@ -1002,7 +1004,7 @@ export async function insertNamedFootnote(plugin: FootnotePlugin) {
         if (shouldJumpFromMarkerToDetail(lineText, cursorPosition, doc, plugin))
             return;
 
-        if (shouldCreateMatchingFootnoteDetail(lineText, cursorPosition, plugin, doc, cell))
+        if (shouldCreateMatchingFootnoteDetail(lineText, cursorPosition, plugin, doc))
             return;
         shouldCreateFootnoteMarker(lineText, cursorPosition, doc, plugin, cell);
     };
@@ -1010,13 +1012,12 @@ export async function insertNamedFootnote(plugin: FootnotePlugin) {
     else runOutsideTableCell(doc, run);
 }
 
-/** Cascade step 3 (named only): caret on a marker with no detail → append the matching detail (or warn on an invalid name), applying the note's footnote-prefix to the name first. Returns true when it handled the press. */
+/** Cascade step 3 (named only): caret on a marker with no detail → append the matching detail (or warn on an invalid name). Returns true when it handled the press. The note's footnote-prefix is NOT applied here — it goes in at bracket creation (shouldCreateFootnoteMarker), where the user can see it. */
 export function shouldCreateMatchingFootnoteDetail(
     lineText: string,
     cursorPosition: EditorPosition,
     plugin: FootnotePlugin,
-    doc: Editor,
-    cell: TableCellEditor | null = null
+    doc: Editor
 ) {
     // Create matching footnote detail for footnote marker
 
@@ -1055,74 +1056,26 @@ export function shouldCreateMatchingFootnoteDetail(
                 return true;
             }
 
-            // the note's footnote-prefix applies to named footnotes too
-            // (A6 bug, 2026-07-20): "[^tag]" under prefix "7." becomes
-            // "[^7.tag]" — every occurrence renamed so the detail matches.
-            // Skipped inside a table cell: the marker sits in the row, and
-            // main-editor edits there race the cell's sync-back (issue #28
-            // family) — the lint pass picks the rename up later instead.
-            const prefix =
-                cell || !plugin.settings.enableFootnotePrefix
-                    ? ""
-                    : activeFootnotePrefix(plugin, doc.getValue());
-            const renameChanges: EditorChange[] = [];
-            let effectiveId = footnoteId;
-            if (
-                prefix &&
-                !footnoteId.toLowerCase().startsWith(prefix.toLowerCase())
-            ) {
-                effectiveId = `${prefix}${footnoteId}`;
-                for (const marker of listExistingFootnoteMarkersAndLocations(doc)) {
-                    const name = marker.footnote.match(ExtractNameFromFootnote)?.[2];
-                    if (name?.toLowerCase() !== footnoteId.toLowerCase()) continue;
-                    renameChanges.push({
-                        from: { line: marker.lineNum, ch: marker.startIndex },
-                        to: {
-                            line: marker.lineNum,
-                            ch: marker.startIndex + marker.footnote.length,
-                        },
-                        // each occurrence keeps its own casing — ids are
-                        // case-insensitive, so identity is preserved
-                        text: `[^${prefix}${name}]`,
-                    });
-                }
-            }
-
             const list = listExistingFootnoteDetails(doc);
 
             // Check if the list doesn't include current footnote (ids are
             // case-insensitive — a "[^note]:" detail already covers a
             // "[^Note]" marker, so this must navigate, not create a duplicate)
             // if so, add detail for the current footnote
-            if (!idListIncludes(list, effectiveId)) {
-                const detail = buildDetailAppend(doc, effectiveId, list.length === 0, plugin);
-                const changes = [...renameChanges, detail.change];
+            if (!idListIncludes(list, footnoteId)) {
+                const detail = buildDetailAppend(doc, footnoteId, list.length === 0, plugin);
 
                 if (popupEditingAvailable(plugin)) {
                     // type the detail in a popup instead of jumping to the
                     // bottom; the cursor stays on the marker
-                    doc.transaction({ changes });
-                    void openFootnotePopup(plugin, effectiveId, () =>
+                    doc.transaction({ changes: [detail.change] });
+                    void openFootnotePopup(plugin, footnoteId, () =>
                         moveCursorAndSetJumpPoint(doc, cursorPosition, detail.cursor, plugin, undefined, true)
                     );
                 } else {
-                    moveCursorAndSetJumpPoint(doc, cursorPosition, detail.cursor, plugin, changes, true);
+                    moveCursorAndSetJumpPoint(doc, cursorPosition, detail.cursor, plugin, [detail.change], true);
                 }
 
-                return true;
-            }
-            // the plain marker had no detail (step 2 fell through), but the
-            // PREFIXED name already has one — rename the markers onto it
-            // and navigate as step 2 would have
-            if (renameChanges.length > 0) {
-                doc.transaction({ changes: renameChanges });
-                if (popupEditingAvailable(plugin)) {
-                    void openFootnotePopup(plugin, effectiveId, () =>
-                        jumpToFootnoteDetail(effectiveId, cursorPosition, doc, plugin)
-                    );
-                } else {
-                    jumpToFootnoteDetail(effectiveId, cursorPosition, doc, plugin);
-                }
                 return true;
             }
             return;
@@ -1130,18 +1083,65 @@ export function shouldCreateMatchingFootnoteDetail(
     }
 }
 
-// The start index of an empty "[^]" whose brackets strictly contain `ch`,
-// or null. The marker regexes require a non-empty name, so the placeholder
-// a first press just inserted is invisible to every earlier cascade step —
-// this is the only guard between a second press and a nested "[^[^]]".
-function emptyMarkerStart(text: string, ch: number): number | null {
-    for (let i = 0; (i = text.indexOf("[^]", i)) !== -1; i += 3) {
-        if (ch > i && ch < i + 3) return i;
+// The start index of a placeholder `marker` occurrence whose brackets
+// strictly contain `ch`, or null. For the empty "[^]": the marker regexes
+// require a non-empty name, so the placeholder a first press just inserted
+// is invisible to every earlier cascade step — this is the only guard
+// between a second press and a nested "[^[^]]". The prefilled "[^7-]"
+// placeholder reuses the same containment scan via exitPrefilledMarkerIfInside.
+function emptyMarkerStart(
+    text: string,
+    ch: number,
+    marker = "[^]",
+): number | null {
+    for (let i = 0; (i = text.indexOf(marker, i)) !== -1; i += marker.length) {
+        if (ch > i && ch < i + marker.length) return i;
     }
     return null;
 }
 
-/** Cascade step 4 (named): insert an empty "[^]" (through `cell` when in a table) with the caret between the brackets, ready for name entry. A second press while the caret is still inside the empty marker hops it out past the bracket instead — same second-press rule as inline footnotes. */
+/**
+ * When the caret sits inside an untouched prefilled marker — "[^7-]",
+ * exactly the note's footnote-prefix with no name typed yet — hop it just
+ * past the closing bracket and report true. The prefilled marker is the
+ * prefix-era twin of the empty "[^]" placeholder, so every insert command
+ * gives a second press inside it the same "move on" meaning instead of
+ * treating it as a footnote named after the bare prefix.
+ */
+export function exitPrefilledMarkerIfInside(
+    plugin: FootnotePlugin,
+    doc: Editor,
+    cell: TableCellEditor | null,
+): boolean {
+    if (!plugin.settings.enableFootnotePrefix) return false;
+    const prefix = footnotePrefix(doc.getValue());
+    // silent validity check — the invalid-prefix Notice belongs to the
+    // insert path, not to every caret movement guard
+    if (!prefix || footnotePrefixProblem(prefix) !== null) return false;
+    const placeholder = `[^${prefix}]`;
+
+    if (cell) {
+        const at = emptyMarkerStart(
+            cell.state.doc.toString(),
+            cell.state.selection.main.head,
+            placeholder,
+        );
+        if (at === null) return false;
+        cell.dispatch({ selection: { anchor: at + placeholder.length } });
+        return true;
+    }
+    const cursorPosition = doc.getCursor();
+    const at = emptyMarkerStart(
+        doc.getLine(cursorPosition.line),
+        cursorPosition.ch,
+        placeholder,
+    );
+    if (at === null) return false;
+    doc.setCursor({ line: cursorPosition.line, ch: at + placeholder.length });
+    return true;
+}
+
+/** Cascade step 4 (named): insert an empty marker (through `cell` when in a table) ready for name entry — "[^]" with the caret between the brackets, or "[^7-]" with the caret after the prefix when the note's footnote-prefix is active, so the namespace is visible while the name is typed (requested 2026-07-20). A second press while the caret is still inside the empty "[^]" hops it out past the bracket instead — same second-press rule as inline footnotes (the prefilled placeholder's hop lives in exitPrefilledMarkerIfInside). */
 export function shouldCreateFootnoteMarker(
     lineText: string,
     cursorPosition: EditorPosition,
@@ -1149,31 +1149,35 @@ export function shouldCreateFootnoteMarker(
     plugin: FootnotePlugin,
     cell: TableCellEditor | null = null
 ) {
-    //create empty footnote marker for name input, cursor in between [^ and ]
-    const emptyMarker = `[^]`;
+    //create empty footnote marker for name input, cursor after [^ and any prefix
+    const prefix = plugin.settings.enableFootnotePrefix
+        ? activeFootnotePrefix(plugin, doc.getValue())
+        : "";
+    const emptyMarker = `[^${prefix}]`;
+    const caretInMarker = 2 + prefix.length;
 
     if (cell) {
         const cellText = cell.state.doc.toString();
         const inEmpty = emptyMarkerStart(cellText, cell.state.selection.main.head);
         if (inEmpty !== null) {
-            cell.dispatch({ selection: { anchor: inEmpty + emptyMarker.length } });
+            cell.dispatch({ selection: { anchor: inEmpty + "[^]".length } });
             return;
         }
         // through the cell's own editor (never the main editor — that races
         // the cell's sync-back and corrupts the table); the caret lands
-        // between the brackets and focus stays in the cell for name entry
-        insertInTableCell(cell, plugin, emptyMarker, 2);
+        // inside the brackets and focus stays in the cell for name entry
+        insertInTableCell(cell, plugin, emptyMarker, caretInMarker);
         return;
     }
 
     const inEmpty = emptyMarkerStart(lineText, cursorPosition.ch);
     if (inEmpty !== null) {
-        doc.setCursor({ line: cursorPosition.line, ch: inEmpty + emptyMarker.length });
+        doc.setCursor({ line: cursorPosition.line, ch: inEmpty + "[^]".length });
         return;
     }
 
     cursorPosition = adjustFootnotePosition(cursorPosition, doc, lineText, plugin);
-    const newCursorPos = { line: cursorPosition.line, ch: cursorPosition.ch + 2 };
+    const newCursorPos = { line: cursorPosition.line, ch: cursorPosition.ch + caretInMarker };
     moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos, plugin, [
         { from: cursorPosition, text: emptyMarker },
     ]);

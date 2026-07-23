@@ -10,7 +10,7 @@ This note's frontmatter sets `footnote-prefix: 3.` and already contains one pref
 
 - [ ] With `Per-note footnote prefix` ON: the auto-numbered hotkey inserts `[^3.2]` here (counting continues within the prefix)
 - [ ] Another press right after that marker chains `[^3.3]`
-- [ ] Named footnotes get the prefix too: type `[^tag]`, press the named hotkey inside it — marker becomes `[^3.tag]` with a `[^3.tag]:` detail (bug fixed 2026-07-20)
+- [ ] Named hotkey prefills the prefix: it creates `[^3.]` with the caret after the prefix; type the name, press again inside to create the detail (a second press inside the untouched `[^3.]` hops out instead)
 - [ ] With the toggle OFF: the same hotkey inserts plain `[^1]` (the property is ignored)
 - [ ] Linting renumbers prefixed footnotes WITHIN their namespace (e.g. `[^3.5]` can become `[^3.2]`) but always keeps the prefix, so merged chapters never collide
 - [ ] With `Apply the note's footnote prefix` ON (Linting page): running **Lint footnotes** converts the plain footnotes in the Lint-on-save section below into `3.`-prefixed ones, and would rename a named `[^tag]` to `[^3.tag]` (undo afterwards)
