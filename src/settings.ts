@@ -20,7 +20,7 @@ export interface FootnotePluginSettings {
     lintReindex: boolean;
     lintApplyPrefix: boolean;
     lintOnSave: boolean;
-    lintOnFileChange: boolean;
+    lintOnFootnoteCreation: boolean;
 }
 
 export const DEFAULT_SETTINGS: FootnotePluginSettings = {
@@ -40,7 +40,7 @@ export const DEFAULT_SETTINGS: FootnotePluginSettings = {
     lintReindex: true,
     lintApplyPrefix: true,
     lintOnSave: false,
-    lintOnFileChange: false,
+    lintOnFootnoteCreation: false,
 };
 
 export class FootnotePluginSettingTab extends PluginSettingTab {
@@ -107,9 +107,9 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                         control: { type: "toggle", key: "lintOnSave" },
                     },
                     {
-                        name: "Lint on focused file change",
-                        desc: "Automatically lint a note when you switch from it to another note.",
-                        control: { type: "toggle", key: "lintOnFileChange" },
+                        name: "Lint on footnote creation",
+                        desc: "Lint the note right after a new footnote detail is created in it.",
+                        control: { type: "toggle", key: "lintOnFootnoteCreation" },
                     },
                     {
                         type: "group",

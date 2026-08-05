@@ -1,19 +1,25 @@
-import { Editor, EditorChange, EditorPosition } from "obsidian";
-import { describe, expect, it } from "vitest";
+import { Editor, EditorChange, EditorPosition, Notice } from "obsidian";
+import { describe, expect, it, vi } from "vitest";
 
 import FootnotePlugin from "../src/main";
 import {
-    exitPrefilledMarkerIfInside,
     shouldCreateFootnoteMarker,
     shouldCreateMatchingFootnoteDetail,
+    warnPrefilledMarkerIfInside,
 } from "../src/insert-or-navigate-footnotes";
+
+vi.mock("obsidian", async (importOriginal) => ({
+    ...(await importOriginal<typeof import("obsidian")>()),
+    Notice: vi.fn(),
+}));
 
 // Prefix-at-bracket-creation (requested 2026-07-20, replacing the
 // detail-time rename): with an active footnote-prefix the named command
 // creates "[^7-]" with the caret right after the prefix — the user SEES
-// the namespace while typing the name. The untouched placeholder behaves
-// like the empty "[^]": a second press inside it hops the caret out past
-// the bracket. Detail creation no longer renames anything.
+// the namespace while typing the name. A press inside the untouched
+// placeholder keeps the caret where it is and asks for a suffix instead
+// (2026-08-05; it used to hop out, which was harder to understand).
+// Detail creation no longer renames anything.
 
 interface FakeDoc extends Editor {
     appliedChanges: EditorChange[];
@@ -113,17 +119,22 @@ describe("named command prefills the footnote-prefix into the new marker", () =>
     });
 });
 
-describe("exitPrefilledMarkerIfInside (the [^7-] placeholder hop)", () => {
-    it("hops the caret past the untouched placeholder", () => {
+describe("warnPrefilledMarkerIfInside (the [^7-] placeholder toast)", () => {
+    it("keeps the caret in place and asks for a suffix", () => {
         const doc = fakeEditor([...FRONTMATTER, "Alpha [^7-] bravo"], {
             line: 3,
             ch: 9,
         });
-        expect(exitPrefilledMarkerIfInside(fakePlugin(true), doc, null)).toBe(
+        vi.mocked(Notice).mockClear();
+        expect(warnPrefilledMarkerIfInside(fakePlugin(true), doc, null)).toBe(
             true,
         );
-        expect(doc.cursor).toEqual({ line: 3, ch: 6 + "[^7-]".length });
+        // the caret does NOT move — the toast is the whole response
+        expect(doc.cursor).toEqual({ line: 3, ch: 9 });
         expect(doc.appliedChanges).toEqual([]);
+        expect(Notice).toHaveBeenCalledWith(
+            expect.stringContaining("suffix"),
+        );
     });
 
     it("reports false once a name has been typed after the prefix", () => {
@@ -131,7 +142,7 @@ describe("exitPrefilledMarkerIfInside (the [^7-] placeholder hop)", () => {
             line: 3,
             ch: 9,
         });
-        expect(exitPrefilledMarkerIfInside(fakePlugin(true), doc, null)).toBe(
+        expect(warnPrefilledMarkerIfInside(fakePlugin(true), doc, null)).toBe(
             false,
         );
     });
@@ -141,7 +152,7 @@ describe("exitPrefilledMarkerIfInside (the [^7-] placeholder hop)", () => {
             line: 3,
             ch: 9,
         });
-        expect(exitPrefilledMarkerIfInside(fakePlugin(false), doc, null)).toBe(
+        expect(warnPrefilledMarkerIfInside(fakePlugin(false), doc, null)).toBe(
             false,
         );
     });
@@ -151,7 +162,7 @@ describe("exitPrefilledMarkerIfInside (the [^7-] placeholder hop)", () => {
             line: 3,
             ch: 2,
         });
-        expect(exitPrefilledMarkerIfInside(fakePlugin(true), doc, null)).toBe(
+        expect(warnPrefilledMarkerIfInside(fakePlugin(true), doc, null)).toBe(
             false,
         );
     });

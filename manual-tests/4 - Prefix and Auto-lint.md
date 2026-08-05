@@ -10,7 +10,7 @@ This note's frontmatter sets `footnote-prefix: 3.` and already contains one pref
 
 - [ ] With `Per-note footnote prefix` ON: the auto-numbered hotkey inserts `[^3.2]` here (counting continues within the prefix)
 - [ ] Another press right after that marker chains `[^3.3]`
-- [ ] Named hotkey prefills the prefix: it creates `[^3.]` with the caret after the prefix; type the name, press again inside to create the detail (a second press inside the untouched `[^3.]` hops out instead)
+- [ ] Named hotkey prefills the prefix: it creates `[^3.]` with the caret after the prefix; type the name, press again inside to create the detail (a second press inside the untouched `[^3.]` keeps the caret put and asks for a suffix)
 - [ ] With the toggle OFF: the same hotkey inserts plain `[^1]` (the property is ignored)
 - [ ] Linting renumbers prefixed footnotes WITHIN their namespace (e.g. `[^3.5]` can become `[^3.2]`) but always keeps the prefix, so merged chapters never collide
 - [ ] With `Apply the note's footnote prefix` ON (Linting page): running **Lint footnotes** converts the plain footnotes in the Lint-on-save section below into `3.`-prefixed ones, and would rename a named `[^tag]` to `[^3.tag]` (undo afterwards)
@@ -49,11 +49,11 @@ Turn on `Lint on save` (Linting settings page), make a mess of the line below by
 [^20]: twenty, used first
 [^10]: ten, used second
 
-## Lint on focused file change
+## Lint on footnote creation
 
-Turn on `Lint on focused file change`, re-mess this note, then click over to any other note:
+Turn on `Lint on footnote creation` (it replaced `Lint on focused file change`), then insert a NEW auto-numbered footnote into the messy Lint-on-save line above:
 
-- [ ] A notice reports this note was linted the moment you left it
-- [ ] Coming back shows the linted result
-- [ ] Leaving again without re-messing shows "No linting needed in …" instead (QOL)
-- [ ] Switching to a sidebar (search, file explorer) does NOT count as leaving the note
+- [ ] Creating the footnote lints the whole note immediately ("Footnotes linted." notice) and the caret lands on the new empty detail
+- [ ] Creating a footnote in an already-clean spot shows NO notice (silent when nothing changes)
+- [ ] With the popup editor ON, the lint runs after the popup closes instead
+- [ ] Switching between notes never triggers a lint anymore

@@ -24,8 +24,6 @@ import { SetFootnotePrefixModal } from "./set-footnote-prefix";
 import {
   installLintOnSave,
   installVimWriteHook,
-  noteActiveLeafForAutoLint,
-  resetAutoLintTracking,
   runFootnoteTransformCommand,
   lintFootnotes,
   lintOptionsFromSettings,
@@ -135,17 +133,14 @@ export default class FootnotePlugin extends Plugin {
     this.registerEvent(
       this.app.workspace.on("active-leaf-change", () => {
         dismissFootnotePopup();
-        noteActiveLeafForAutoLint(this);
         // vim mode can be switched on at any time, and its ":w" bypasses
         // the save command until hooked — re-check on every leaf change
         installVimWriteHook(this);
       })
     );
-    // "Lint on save" wraps the core save command (restored on unload);
-    // layout-ready seeds the focus tracker with the note open at startup
+    // "Lint on save" wraps the core save command (restored on unload)
     installLintOnSave(this);
     this.app.workspace.onLayoutReady(() => {
-      noteActiveLeafForAutoLint(this);
       installVimWriteHook(this);
     });
     // enabling vim mode mid-session loads the adapter without any leaf
@@ -160,7 +155,6 @@ export default class FootnotePlugin extends Plugin {
 
   onunload() {
     dismissFootnotePopup();
-    resetAutoLintTracking();
   }
 
   async loadSettings() {
@@ -204,7 +198,6 @@ export default class FootnotePlugin extends Plugin {
       tidyMoveToBottom: "lintMoveToBottom",
       tidyReindex: "lintReindex",
       tidyOnSave: "lintOnSave",
-      tidyOnFileChange: "lintOnFileChange",
     };
     const withTidyKeys = this.settings as FootnotePluginSettings &
       Record<string, unknown>;
@@ -215,6 +208,15 @@ export default class FootnotePlugin extends Plugin {
         // sets the real lint* setting
         withTidyKeys[newKey] = withTidyKeys[oldKey];
         delete withTidyKeys[oldKey];
+        migratedTidyKeys = true;
+      }
+    }
+    // the lint-on-focused-file-change trigger was replaced by lint on
+    // footnote creation (2026-08-05) — its saved keys are dropped rather
+    // than carried over, since the semantics are different
+    for (const staleKey of ["lintOnFileChange", "tidyOnFileChange"]) {
+      if (staleKey in withTidyKeys) {
+        delete withTidyKeys[staleKey];
         migratedTidyKeys = true;
       }
     }

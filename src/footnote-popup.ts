@@ -23,6 +23,20 @@ let activePopup: ActivePopup | null = null;
 // edit the document await this before touching anything.
 let pendingTeardown: Promise<void> | null = null;
 
+// One-shot callback fired after the NEXT popup teardown fully settles (its
+// detail save landed). "Lint on footnote creation" uses this: a footnote
+// created with the popup open must not be linted until the popup closes —
+// linting earlier could renumber the very id the popup is bound to.
+let afterSettleOnce: (() => void) | null = null;
+
+/** Register `callback` to run once after the next popup teardown settles. Returns a canceller (a no-op once the callback has fired or been replaced). */
+export function runAfterNextPopupSettle(callback: () => void): () => void {
+    afterSettleOnce = callback;
+    return () => {
+        if (afterSettleOnce === callback) afterSettleOnce = null;
+    };
+}
+
 export function whenFootnotePopupSettled(): Promise<void> {
     return pendingTeardown ?? Promise.resolve();
 }
@@ -321,6 +335,11 @@ export async function openFootnotePopup(
                 win.setTimeout(() => {
                     pendingTeardown = null;
                     settle();
+                    // after-settle work (lint-on-footnote-creation) runs
+                    // only now, when the saved detail is fully reconciled
+                    const callback = afterSettleOnce;
+                    afterSettleOnce = null;
+                    callback?.();
                 }, 50);
             };
             teardown();

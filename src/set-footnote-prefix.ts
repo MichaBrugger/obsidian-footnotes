@@ -1,4 +1,4 @@
-import { Modal, Notice, Setting, TFile } from "obsidian";
+import { MarkdownView, Modal, Notice, Setting, TFile } from "obsidian";
 
 import FootnotePlugin from "./main";
 import { footnotePrefixProblem } from "./insert-or-navigate-footnotes";
@@ -72,6 +72,12 @@ export class SetFootnotePrefixModal extends Modal {
             this.showProblem(problem);
             return;
         }
+        // flush any unsaved editor changes to this file first:
+        // processFrontMatter edits the FILE, and a pending autosave of a
+        // stale buffer would silently overwrite the property right after
+        // (races lost intermittently until pinned by the smoke suite)
+        const view = this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
+        if (view?.file === this.file) await view.save();
         await this.plugin.app.fileManager.processFrontMatter(
             this.file,
             (frontmatter: Record<string, unknown>) => {

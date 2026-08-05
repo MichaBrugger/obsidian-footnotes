@@ -1,4 +1,4 @@
-import { Editor, MarkdownView, Notice, TFile } from "obsidian";
+import { Editor, MarkdownView, Notice } from "obsidian";
 
 import FootnotePlugin from "../main";
 import {
@@ -9,9 +9,10 @@ import {
 import {
     footnotePrefix,
     footnotePrefixProblem,
+    jumpToFootnoteDetail,
     runOutsideTableCell,
 } from "../insert-or-navigate-footnotes";
-import { normalizeEol, restoreEol } from "../markdown-scan";
+import { maskProtectedLines, normalizeEol, restoreEol } from "../markdown-scan";
 import { AppWithCommands, EditorWithCm, WindowWithVim } from "../obsidian-internals";
 import { activeTableCellEditor } from "../table-cursor";
 import { applyFootnotePrefix } from "./rules/apply-footnote-prefix";
@@ -23,7 +24,7 @@ import { reindexFootnotes, ReindexOptions } from "./rules/re-index-footnotes";
 // gets a command, plus one "lint" command composing all three. This module
 // owns the editor plumbing they share, the mapping from plugin settings to
 // the rules' options, and the automatic-lint trigger machinery (lint on save
-// and on focused-file change).
+// and on footnote creation).
 
 function configuredSectionHeading(plugin: FootnotePlugin): string {
     return plugin.settings.enableFootnoteSectionHeading
@@ -253,81 +254,72 @@ export function installVimWriteHook(plugin: FootnotePlugin) {
     vimWriteHooked = true;
 }
 
-// the last markdown file that held focus — sidebars and modals don't count,
-// so flicking through them never looks like a file change
-let lastFocused: { view: MarkdownView; file: TFile } | null = null;
+// masked-line shape of a footnote definition with NOTHING typed yet
+const EmptyDetailLine = /^\[\^([^[\]]+)\]:[ \t]*$/;
 
-/** Forget the focus tracking state (plugin unload). */
-export function resetAutoLintTracking() {
-    lastFocused = null;
+// The name of the note's single empty detail ("[^x]: " with no content),
+// or null when there are none or several. Linting a note right after a
+// footnote was created can RENAME the new footnote (reindex swaps ids by
+// appearance order), so the id alone can't relocate it — but the fresh
+// detail is empty, and as long as it is the only empty one, it is
+// unambiguously the footnote just created.
+function uniqueEmptyDetailName(doc: Editor): string | null {
+    const lines: string[] = [];
+    for (let i = 0; i < doc.lineCount(); i++) lines.push(doc.getLine(i));
+    let found: string | null = null;
+    for (const line of maskProtectedLines(lines)) {
+        const match = line.match(EmptyDetailLine);
+        if (!match) continue;
+        if (found !== null) return null; // ambiguous
+        found = match[1];
+    }
+    return found;
 }
 
 /**
- * Feed active-leaf changes to "Lint on focused file change": when the
- * focused markdown FILE changes, the note the user just left gets linted.
- * Call on every active-leaf-change and once at layout-ready (to seed the
- * tracker with the note open at startup).
+ * "Lint on footnote creation" (replacing lint-on-focused-file-change,
+ * 2026-08-05): lint the active note right after a new footnote detail was
+ * created there. Quiet by design — a clean creation (the usual case) shows
+ * no notice at all; only an actual cleanup announces itself, and it happens
+ * in the note the user is LOOKING AT, unlike the old file-change trigger.
+ *
+ * The creation sites call this directly on the jump-to-detail path (and
+ * `relandCursor` puts the caret back on the new — possibly renumbered —
+ * empty detail afterwards). On the popup path they defer it through
+ * runAfterNextPopupSettle instead: linting under a live popup could
+ * renumber the id the popup is bound to. Table-cell creations skip the
+ * trigger entirely (editing the document while a cell sub-editor owns
+ * focus is the issue #28 corruption family).
  */
-export function noteActiveLeafForAutoLint(plugin: FootnotePlugin) {
-    const current = plugin.app.workspace.getActiveViewOfType(MarkdownView);
-    if (!current || !current.file) return;
-    const previous = lastFocused;
-    lastFocused = { view: current, file: current.file };
-    if (!plugin.settings.lintOnFileChange) return;
-    if (!previous || previous.file.path === current.file.path) return;
-    if (footnotePopupBusy()) return; // its pending save owns that file
-    void lintLeftNote(plugin, previous);
-}
-
-async function lintLeftNote(
+export function lintAfterFootnoteCreation(
     plugin: FootnotePlugin,
-    previous: { view: MarkdownView; file: TFile },
+    relandCursor: boolean,
+    expectedFilePath?: string,
 ) {
-    const options = lintOptionsFromSettings(
-        plugin,
-        configuredSectionHeading(plugin),
+    if (!plugin.settings.lintOnFootnoteCreation) return;
+    const mdView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
+    if (!mdView || !mdView.editor) return;
+    // a deferred (popup-path) lint must not fire on some OTHER note the
+    // user has since switched to
+    if (expectedFilePath && mdView.file?.path !== expectedFilePath) return;
+    if (footnotePopupBusy()) return;
+    const doc = mdView.editor;
+    if (activeTableCellEditor(doc) || subEditorOwnsFocus(doc)) return;
+    const before = doc.getValue();
+    // silent on a blocked prefix: the insert path already explained it
+    if (lintBlockedByPrefix(before)) return;
+    const after = lintFootnotes(
+        before,
+        lintOptionsFromSettings(plugin, configuredSectionHeading(plugin)),
     );
-    // the note may still be open in another pane — there its (possibly
-    // unsaved) editor buffer is the source of truth, not the file
-    if (previous.view.file === previous.file && previous.view.editor) {
-        const doc = previous.view.editor;
-        if (activeTableCellEditor(doc)) return;
-        const before = doc.getValue();
-        const blocked = lintBlockedByPrefix(before);
-        if (blocked) {
-            new Notice(blocked);
-            return;
+    if (after === before) return;
+    replaceMinimal(doc, before, after);
+    new Notice("Footnotes linted.");
+    if (relandCursor) {
+        const target = uniqueEmptyDetailName(doc);
+        if (target !== null) {
+            jumpToFootnoteDetail(target, doc.getCursor(), doc, plugin);
         }
-        const after = lintFootnotes(before, options);
-        if (after === before) {
-            new Notice(`No linting needed in "${previous.file.basename}".`);
-            return;
-        }
-        replaceMinimal(doc, before, after);
-        new Notice(`Linted footnotes in "${previous.file.basename}".`);
-        return;
-    }
-    // the leaf navigated away or closed — Obsidian has flushed the buffer,
-    // so transform the file atomically on disk
-    try {
-        let changed = false;
-        let blocked: string | null = null;
-        await plugin.app.vault.process(previous.file, (data) => {
-            blocked = lintBlockedByPrefix(data);
-            if (blocked) return data;
-            const after = lintFootnotes(data, options);
-            changed = after !== data;
-            return after;
-        });
-        if (blocked) {
-            new Notice(blocked);
-        } else if (changed) {
-            new Notice(`Linted footnotes in "${previous.file.basename}".`);
-        } else {
-            new Notice(`No linting needed in "${previous.file.basename}".`);
-        }
-    } catch {
-        // the file vanished between the switch and the lint — nothing to do
     }
 }
 

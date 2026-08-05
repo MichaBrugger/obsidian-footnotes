@@ -139,7 +139,7 @@ const BASELINE_SETTINGS = {
     lintReindex: true,
     lintApplyPrefix: true,
     lintOnSave: false,
-    lintOnFileChange: false,
+    lintOnFootnoteCreation: false,
 };
 function resetSettings(overrides = {}) {
     setSettings({ ...BASELINE_SETTINGS, ...overrides });
@@ -875,16 +875,28 @@ async function main() {
         }
     });
 
-    await test("switching notes lints the one you left when enabled", async () => {
-        resetSettings({ lintOnFileChange: true });
-        await setupNote("Beta[^2] alpha[^1] end\n\n[^1]: one\n[^2]: two");
-        // switching to another note must lint the smoke note behind us
-        ob("create", "name=Smoke Test - second", "content=other note", "overwrite", "silent");
-        ob("open", "file=Smoke Test - second");
-        await sleep(1200);
-        ob("open", `file=${NOTE}`);
-        await expectEditorText("Beta[^1] alpha[^2] end\n\n[^1]: two\n[^2]: one");
-        ob("delete", "path=Smoke Test - second.md");
+    await test("creating a footnote lints the note when enabled", async () => {
+        resetSettings({ lintOnFootnoteCreation: true });
+        // inserting mid "alpha" puts the new marker BEFORE [^1] in reading
+        // order — the creation-time lint renumbers everything and the
+        // caret still lands on the (renamed) new empty detail
+        await setupNote("alpha bravo[^1] end.\n\n[^1]: one");
+        setCursorAndRun(0, 3, CMD_AUTONUM); // mid "alpha"
+        await expectEditorText(
+            "alpha[^1] bravo[^2] end.\n\n[^1]: \n[^2]: one",
+        );
+        await pollUntil(
+            "caret at the end of the new empty detail",
+            `(${EDITOR}).editor.getCursor()`,
+            (c) => c && c.line === 2 && c.ch === "[^1]: ".length,
+        );
+    });
+
+    await test("creating a footnote in a clean note lints nothing, silently", async () => {
+        resetSettings({ lintOnFootnoteCreation: true });
+        await setupNote("Alpha bravo\n\n");
+        setCursorAndRun(0, 8, CMD_AUTONUM); // mid "bravo"
+        await expectEditorText("Alpha bravo[^1]\n\n[^1]: ");
     });
 
     await test("first footnote slots under an existing section heading (QOL)", async () => {
@@ -936,19 +948,24 @@ async function main() {
         );
     });
 
-    await test("second press inside the untouched [^2.] placeholder hops out (QOL)", async () => {
+    await test("press inside the untouched [^2.] placeholder asks for a suffix (QOL)", async () => {
         resetSettings({ enableFootnotePrefix: true });
         const note = "---\nfootnote-prefix: 2.\n---\nAlpha [^2.] bravo";
         await setupNote(note);
         setCursorAndRun(3, 8, CMD_NAMED); // inside the placeholder
         await pollUntil(
-            "caret just past the placeholder",
-            `(${EDITOR}).editor.getCursor()`,
-            (c) => c && c.line === 3 && c.ch === "Alpha [^2.]".length,
+            "the add-a-suffix toast",
+            `[...document.querySelectorAll('.notice')].map(n => n.textContent).join('|')`,
+            (v) => typeof v === "string" && v.includes("footnote suffix"),
         );
+        // the caret stays put and nothing was inserted
+        const cursor = readJson(`(${EDITOR}).editor.getCursor()`);
+        if (!cursor || cursor.line !== 3 || cursor.ch !== 8) {
+            throw new Error(`caret moved: ${JSON.stringify(cursor)}`);
+        }
         const text = readJson(`(${EDITOR}).editor.getValue()`);
         if (text !== note) {
-            throw new Error(`hop changed the text: ${JSON.stringify(text)}`);
+            throw new Error(`the toast changed the text: ${JSON.stringify(text)}`);
         }
     });
 
