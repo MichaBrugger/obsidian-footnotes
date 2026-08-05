@@ -112,19 +112,25 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                         control: { type: "toggle", key: "lintOnFileChange" },
                     },
                     {
-                        name: "Move markers after punctuation",
-                        desc: "The lint command moves footnote markers that sit before punctuation to sit after it.",
-                        control: { type: "toggle", key: "lintFixPunctuation" },
-                    },
-                    {
-                        name: "Move definitions to the bottom",
-                        desc: "The lint command gathers all footnote definitions at the end of the note.",
-                        control: { type: "toggle", key: "lintMoveToBottom" },
-                    },
-                    {
-                        name: "Apply the note's footnote prefix",
-                        desc: "When the per-note footnote prefix feature is on and the note has a footnote-prefix property, linting renames plain numbered and named footnotes to carry the prefix.",
-                        control: { type: "toggle", key: "lintApplyPrefix" },
+                        type: "group",
+                        heading: "Rules",
+                        items: [
+                            {
+                                name: "Move markers after punctuation",
+                                desc: "The lint command moves footnote markers that sit before punctuation to sit after it.",
+                                control: { type: "toggle", key: "lintFixPunctuation" },
+                            },
+                            {
+                                name: "Move definitions to the bottom",
+                                desc: "The lint command gathers all footnote definitions at the end of the note.",
+                                control: { type: "toggle", key: "lintMoveToBottom" },
+                            },
+                            {
+                                name: "Apply the note's footnote prefix",
+                                desc: "When the per-note footnote prefix feature is on and the note has a footnote-prefix property, linting renames plain numbered and named footnotes to carry the prefix.",
+                                control: { type: "toggle", key: "lintApplyPrefix" },
+                            },
+                        ],
                     },
                     {
                         type: "group",
