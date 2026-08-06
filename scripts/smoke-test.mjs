@@ -232,7 +232,23 @@ async function main() {
             if (existsSync(src) && resolve(src) !== resolve(dest)) copyFileSync(src, dest);
         }
         console.log(`deployed build to ${pluginDir}; waiting for hot-reload...`);
+        // let hot-reload's own cycle finish first — then reload explicitly
+        // anyway: hot-reload has repeatedly left a STALE or DEAD instance
+        // behind after a deploy (whole-suite failures, 2026-08-05), and an
+        // explicit disable/enable cycle re-evaluates main.js from disk
+        // deterministically
         await sleep(2500);
+        action(
+            `(async () => { await app.plugins.disablePlugin('${PLUGIN_ID}'); ` +
+            `await app.plugins.enablePlugin('${PLUGIN_ID}'); })();`,
+        );
+        await pollUntil(
+            "the reloaded plugin's commands",
+            `!!app.commands.commands['${CMD_AUTONUM}']`,
+            (v) => v === true,
+            10000,
+        );
+        await sleep(300);
     }
 
     const savedSettings = readJson(`app.plugins.plugins['${PLUGIN_ID}'].settings`);
@@ -897,6 +913,23 @@ async function main() {
         await setupNote("Alpha bravo\n\n");
         setCursorAndRun(0, 8, CMD_AUTONUM); // mid "bravo"
         await expectEditorText("Alpha bravo[^1]\n\n[^1]: ");
+    });
+
+    await test("lint gathers definitions under the existing heading, not at EOF (issue #55)", async () => {
+        resetSettings({
+            enableFootnoteSectionHeading: true,
+            footnoteSectionHeading: "# Footnotes",
+        });
+        // the section lives MID-NOTE with a stray definition at the end;
+        // lint pulls the stray UP under the heading and leaves the
+        // section where the user put it
+        await setupNote(
+            "Intro[^2] a[^1]\n\n# Footnotes\n\n[^1]: one\n\n## Other\nstuff\n\n[^2]: two",
+        );
+        setCursorAndRun(0, 0, CMD_LINT);
+        await expectEditorText(
+            "Intro[^1] a[^2]\n\n# Footnotes\n\n[^1]: two\n[^2]: one\n\n## Other\nstuff",
+        );
     });
 
     await test("first footnote slots under an existing section heading (QOL)", async () => {

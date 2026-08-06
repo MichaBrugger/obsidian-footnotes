@@ -122,7 +122,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                             },
                             {
                                 name: "Move definitions to the bottom",
-                                desc: "The lint command gathers all footnote definitions at the end of the note.",
+                                desc: "The lint command gathers all footnote definitions under the note's existing section heading, or at the end of the note when there is none.",
                                 control: { type: "toggle", key: "lintMoveToBottom" },
                             },
                             {

@@ -147,11 +147,62 @@ describe("multi-line section headings (bug reported 2026-07-17)", () => {
         expect(moveFootnoteDefinitionsToBottom(once, HEADING)).toBe(once);
     });
 
-    it("moves an existing multi-line heading along with the definitions", () => {
-        const input =
+    it("a mid-note multi-line heading keeps its section in place", () => {
+        // it used to MOVE the heading (and definitions) to the bottom,
+        // pulling the section out of the spot the user chose (issue #55
+        // follow-up, reported 2026-08-05)
+        const text =
             "body[^1].\n\n---\n## Footnotes\n\n[^1]: def\n\ntrailing prose";
+        expect(moveFootnoteDefinitionsToBottom(text, HEADING)).toBe(text);
+    });
+});
+
+describe("the existing heading anchors the section (issue #55 follow-up)", () => {
+    // reported 2026-08-05: linting sometimes disobeyed the existing
+    // footnote section location. The FIRST exact occurrence of the
+    // configured heading anchors the section: definitions gather UNDER
+    // it, wherever it is; the bottom is only for headingless notes.
+    const HEADING = "# Footnotes";
+
+    it("a mid-document section already in shape is a fixed point", () => {
+        const text =
+            "Intro[^1] text\n\n# Footnotes\n\n[^1]: one\n\n## Other\nother stuff";
+        expect(moveFootnoteDefinitionsToBottom(text, HEADING)).toBe(text);
+    });
+
+    it("a stray definition moves UP under the mid-document heading", () => {
+        const input =
+            "Intro[^1] a[^2]\n\n# Footnotes\n\n[^1]: one\n\n## Other\nstuff\n\n[^2]: two";
         const expected =
-            "body[^1].\n\ntrailing prose\n\n---\n## Footnotes\n\n[^1]: def";
+            "Intro[^1] a[^2]\n\n# Footnotes\n\n[^1]: one\n[^2]: two\n\n## Other\nstuff";
+        expect(moveFootnoteDefinitionsToBottom(input, HEADING)).toBe(expected);
+    });
+
+    it("definitions ABOVE the heading move down under it", () => {
+        const input =
+            "a[^1] text\n\n[^1]: one\n\n# Footnotes\n\n## Other\nstuff";
+        const expected =
+            "a[^1] text\n\n# Footnotes\n\n[^1]: one\n\n## Other\nstuff";
+        expect(moveFootnoteDefinitionsToBottom(input, HEADING)).toBe(expected);
+    });
+
+    it("keeps a blank line between the gathered section and prose below", () => {
+        const input = "a[^1] text\n# Footnotes\nprose after\n\n[^1]: one";
+        const expected = "a[^1] text\n\n# Footnotes\n\n[^1]: one\n\nprose after";
+        expect(moveFootnoteDefinitionsToBottom(input, HEADING)).toBe(expected);
+    });
+
+    it("a heading at the bottom behaves exactly like before", () => {
+        const input = "body[^1].\n\n[^1]: def\n\n# Footnotes";
+        const expected = "body[^1].\n\n# Footnotes\n\n[^1]: def";
+        expect(moveFootnoteDefinitionsToBottom(input, HEADING)).toBe(expected);
+    });
+
+    it("a heading inside a fence does not anchor anything", () => {
+        const input =
+            "body[^1].\n\n```\n# Footnotes\n```\n\n[^1]: def\n\ntail";
+        const expected =
+            "body[^1].\n\n```\n# Footnotes\n```\n\ntail\n\n# Footnotes\n\n[^1]: def";
         expect(moveFootnoteDefinitionsToBottom(input, HEADING)).toBe(expected);
     });
 });
