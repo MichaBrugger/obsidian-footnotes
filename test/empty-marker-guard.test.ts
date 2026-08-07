@@ -108,4 +108,18 @@ describe("footnote commands inside an empty [^] marker", () => {
         await insertAutonumFootnote(fakePlugin(doc));
         expect(doc.appliedChanges.length).toBeGreaterThan(0);
     });
+
+    it("a [^] inside inline code is plain text and does not block (#41 parity)", async () => {
+        // "use `x [^] y` here" with the caret between the code span's brackets
+        const line = "use `x [^] y` here";
+        const doc = fakeEditor([line], { line: 0, ch: 9 });
+        await insertAutonumFootnote(fakePlugin(doc));
+        expect(doc.appliedChanges.length).toBeGreaterThan(0);
+    });
+
+    it("a [^] inside a code fence does not block either", async () => {
+        const doc = fakeEditor(["```", "a [^] b", "```"], { line: 1, ch: 4 });
+        await insertAutonumFootnote(fakePlugin(doc));
+        expect(doc.appliedChanges.length).toBeGreaterThan(0);
+    });
 });

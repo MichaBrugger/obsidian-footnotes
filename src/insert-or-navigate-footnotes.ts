@@ -9,7 +9,7 @@ import {
 import FootnotePlugin from "./main";
 import { openFootnotePopup, popupEditingAvailable, runAfterNextPopupSettle, settleFootnotePopupWithFeedback, toggleCloseFootnotePopup } from "./footnote-popup";
 import { lintAfterFootnoteCreation } from "./linting/linter";
-import { findDefinitionBlocks, maskProtectedLines, protectedLines } from "./markdown-scan";
+import { findDefinitionBlocks, maskInlineRegions, maskProtectedLines, protectedLines } from "./markdown-scan";
 import { EditorWithCm, VaultWithConfig, WindowWithVim } from "./obsidian-internals";
 import { activeTableCellEditor, resolveTableCellCursor, TableCellEditor } from "./table-cursor";
 
@@ -224,7 +224,8 @@ export function shouldJumpFromDetailToMarker(
         // have since deleted; explain and stand still instead (QOL sweep,
         // 2026-08-07)
         new Notice(
-            `No marker references this footnote — add a [^${block.name}] marker in the text, or delete the definition.`,
+            `No marker references this footnote. Add a [^${block.name}] marker in the text, or delete the definition.`,
+            8000,
         );
         return true;
     }
@@ -634,6 +635,7 @@ function activeFootnotePrefix(
     if (problem) {
         new Notice(
             `No footnote was created: this note's footnote-prefix ("${prefix}") is invalid. ${problem}`,
+            8000,
         );
         return null;
     }
@@ -1015,7 +1017,7 @@ export async function pasteInlineFootnote(plugin: FootnotePlugin) {
     }
     const content = sanitizeInlineFootnoteContent(raw);
     if (!content) {
-        new Notice("Clipboard is empty — nothing to put in an inline footnote.");
+        new Notice("The clipboard is empty, so there is nothing to put in an inline footnote.");
         return;
     }
     const text = `^[${content}]`;
@@ -1104,6 +1106,7 @@ export function shouldCreateMatchingFootnoteDetail(
             if (!isValidFootnoteName(footnoteId)) {
                 new Notice(
                     `Footnote name "${footnoteId}" contains spaces, so Obsidian won't render it as a footnote. Remove the spaces.`,
+                    8000,
                 );
                 return true;
             }
@@ -1176,21 +1179,39 @@ export function warnPrefilledMarkerIfInside(
     // insert path, not to every caret movement guard
     if (!prefix || footnotePrefixProblem(prefix) !== null) return false;
     const placeholder = `[^${prefix}]`;
-
-    const at = cell
-        ? emptyMarkerStart(
-              cell.state.doc.toString(),
-              cell.state.selection.main.head,
-              placeholder,
-          )
-        : emptyMarkerStart(
-              doc.getLine(doc.getCursor().line),
-              doc.getCursor().ch,
-              placeholder,
-          );
-    if (at === null) return false;
+    if (!caretInsidePlaceholder(doc, cell, placeholder)) return false;
     new Notice("Please add a footnote suffix after the prefix.");
     return true;
+}
+
+/**
+ * Whether the caret sits strictly inside a live occurrence of `placeholder`
+ * ("[^]" or the prefilled "[^7-]"), in the cell's text or the caret's line.
+ * A raw hit is confirmed against the code-masked text — a placeholder-shaped
+ * fragment inside inline code or a fence is plain text (#41 semantics), and
+ * warning there would block a legitimate insert. The raw gate keeps the
+ * whole-document masking off the hot path (this runs on every press).
+ */
+function caretInsidePlaceholder(
+    doc: Editor,
+    cell: TableCellEditor | null,
+    placeholder: string,
+): boolean {
+    if (cell) {
+        const head = cell.state.selection.main.head;
+        const cellText = cell.state.doc.toString();
+        if (emptyMarkerStart(cellText, head, placeholder) === null) return false;
+        // cell text is a single line, so line-local masking suffices
+        return emptyMarkerStart(maskInlineRegions(cellText), head, placeholder) !== null;
+    }
+    const cursorPosition = doc.getCursor();
+    const lineText = doc.getLine(cursorPosition.line);
+    if (emptyMarkerStart(lineText, cursorPosition.ch, placeholder) === null) {
+        return false;
+    }
+    const maskedLine =
+        maskProtectedLines(docLines(doc))[cursorPosition.line] ?? "";
+    return emptyMarkerStart(maskedLine, cursorPosition.ch, placeholder) !== null;
 }
 
 /**
@@ -1207,18 +1228,10 @@ export function warnEmptyMarkerIfInside(
     doc: Editor,
     cell: TableCellEditor | null,
 ): boolean {
-    const at = cell
-        ? emptyMarkerStart(
-              cell.state.doc.toString(),
-              cell.state.selection.main.head,
-          )
-        : emptyMarkerStart(
-              doc.getLine(doc.getCursor().line),
-              doc.getCursor().ch,
-          );
-    if (at === null) return false;
+    if (!caretInsidePlaceholder(doc, cell, "[^]")) return false;
     new Notice(
-        "This footnote marker is empty — type a name between the brackets.",
+        "This footnote marker is empty. Type a name between the brackets.",
+        8000,
     );
     return true;
 }

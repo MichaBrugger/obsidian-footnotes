@@ -17,7 +17,7 @@ b[^2] a[^1] pre[^2.5] n[^note] end
 [^2.5]: already prefixed
 [^note]: named
 
-Expected (plain ones adopt the prefix and named ones keep their name behind it — bug fixed 2026-07-20 — then the WHOLE namespace renumbers by reading order; prefixed footnotes are numbered footnotes, so `2.5` becomes `2.3`):
+Expected (plain ones adopt the prefix and named ones keep their name behind it, bug fixed 2026-07-20, then the WHOLE namespace renumbers by reading order; prefixed footnotes are numbered footnotes, so `2.5` becomes `2.3`):
 
 ```
 b[^2.1] a[^2.2] pre[^2.3] n[^2.note] end

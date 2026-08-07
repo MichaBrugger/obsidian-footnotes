@@ -122,7 +122,7 @@ export default class FootnotePlugin extends Plugin {
         // instead of a misleading "No linting needed."
         if (lintRulesAllDisabled(this)) {
           new Notice(
-            "All lint rules are turned off in the plugin settings — nothing to lint.",
+            "All lint rules are turned off in the plugin settings, so there is nothing to lint.",
           );
           return;
         }

@@ -119,8 +119,10 @@ describe("named command prefills the footnote-prefix into the new marker", () =>
         );
         expect(doc.appliedChanges).toEqual([]);
         expect(doc.cursor).toEqual({ line: 3, ch: 5 });
+        // warning toasts carry a longer display duration (QOL 2026-08-07)
         expect(Notice).toHaveBeenCalledWith(
             expect.stringContaining("No footnote was created"),
+            expect.any(Number),
         );
     });
 
@@ -139,6 +141,7 @@ describe("named command prefills the footnote-prefix into the new marker", () =>
         expect(doc.appliedChanges).toEqual([]);
         expect(Notice).toHaveBeenCalledWith(
             expect.stringContaining("No footnote was created"),
+            expect.any(Number),
         );
     });
 

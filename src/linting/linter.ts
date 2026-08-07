@@ -191,8 +191,9 @@ function noticeEmptyMarkers(markdown: string) {
     if (count === 0) return;
     new Notice(
         count === 1
-            ? 'This note has an empty footnote marker ("[^]") that won\'t render — give it a name or delete it.'
-            : `This note has ${count} empty footnote markers ("[^]") that won't render — give them names or delete them.`,
+            ? 'This note has an empty footnote marker ("[^]") that won\'t render. Give it a name or delete it.'
+            : `This note has ${count} empty footnote markers ("[^]") that won't render. Give them names or delete them.`,
+        8000,
     );
 }
 
@@ -236,7 +237,7 @@ function lintActiveNoteIfSafe(plugin: FootnotePlugin) {
     const before = doc.getValue();
     const blocked = lintBlockedByPrefix(before);
     if (blocked) {
-        new Notice(blocked);
+        new Notice(blocked, 8000);
         return;
     }
     const after = lintFootnotes(
@@ -398,7 +399,7 @@ export async function runFootnoteTransformCommand(
         // would otherwise renumber the prefixed markers as plain ones
         const blocked = lintBlockedByPrefix(before);
         if (blocked) {
-            new Notice(blocked);
+            new Notice(blocked, 8000);
             return;
         }
         const after = transform(before, configuredSectionHeading(plugin));

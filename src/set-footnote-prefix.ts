@@ -91,7 +91,8 @@ export class SetFootnotePrefixModal extends Modal {
             // feature is off — without this warning the insert commands
             // just silently ignore the prefix the user set
             new Notice(
-                `Footnote prefix set to "${prefix}" — but the "Per-note footnote prefix" setting is turned off, so it won't be used until you enable it.`,
+                `Footnote prefix set to "${prefix}", but the "Per-note footnote prefix" setting is turned off, so it won't be used until you enable it.`,
+                8000,
             );
         } else {
             new Notice(
