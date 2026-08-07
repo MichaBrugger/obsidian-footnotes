@@ -66,18 +66,13 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
             },
             {
                 name: "Per-note footnote prefix",
-                desc: "Footnotes respect a footnote-prefix property in the note's frontmatter: with \"footnote-prefix: 2.\" the numbered command inserts [^2.1], then [^2.2], and the named command starts its new marker with the prefix filled in ([^2.]). Useful when chapter notes are combined into one document.",
+                desc: "Footnotes respect a footnote-prefix property in the note's frontmatter: with \"footnote-prefix: 2.\" the numbered command inserts [^2.1], then [^2.2], and the named command starts its new marker with the prefix filled in ([^2.]). Useful when chapter notes are combined into one document. The \"Set footnote prefix\" command edits the property for you.",
                 control: { type: "toggle", key: "enableFootnotePrefix" },
             },
             {
                 type: "group",
                 heading: "Footnotes section",
                 items: [
-                    {
-                        name: "Trim blank lines",
-                        desc: "Remove blank lines from the end of the note when inserting a new footnotes section.",
-                        control: { type: "toggle", key: "enableRemoveBlankLastLines" },
-                    },
                     {
                         name: "Enable section heading",
                         desc: "Automatically adds a heading separating footnotes at the bottom of the note from the rest of the text. If the section heading is already present, it will be used instead of adding a new one.",
@@ -93,6 +88,11 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                             placeholder: "Ex: '# Footnotes'",
                             disabled: () => !this.plugin.settings.enableFootnoteSectionHeading,
                         },
+                    },
+                    {
+                        name: "Trim blank lines",
+                        desc: "Remove blank lines from the end of the note when the first footnote (and its section heading, if enabled) is added at the bottom.",
+                        control: { type: "toggle", key: "enableRemoveBlankLastLines" },
                     },
                 ],
             },
@@ -128,7 +128,11 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                             {
                                 name: "Apply the note's footnote prefix",
                                 desc: "When the per-note footnote prefix feature is on and the note has a footnote-prefix property, linting renames plain numbered and named footnotes to carry the prefix.",
-                                control: { type: "toggle", key: "lintApplyPrefix" },
+                                control: {
+                                    type: "toggle",
+                                    key: "lintApplyPrefix",
+                                    disabled: () => !this.plugin.settings.enableFootnotePrefix,
+                                },
                             },
                         ],
                     },
@@ -144,12 +148,20 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                             {
                                 name: "Keep orphaned definitions",
                                 desc: "Reindexing keeps definitions that no marker references, numbering them after everything else. Turn off to delete them instead.",
-                                control: { type: "toggle", key: "keepOrphanedDefinitions" },
+                                control: {
+                                    type: "toggle",
+                                    key: "keepOrphanedDefinitions",
+                                    disabled: () => !this.plugin.settings.lintReindex,
+                                },
                             },
                             {
                                 name: "Renumber named footnotes",
                                 desc: "Reindexing gives named footnotes (like [^note]) numbers by order of appearance instead of preserving their names.",
-                                control: { type: "toggle", key: "renumberNamedFootnotes" },
+                                control: {
+                                    type: "toggle",
+                                    key: "renumberNamedFootnotes",
+                                    disabled: () => !this.plugin.settings.lintReindex,
+                                },
                             },
                         ],
                     },

@@ -331,7 +331,13 @@ export function addFootnoteSectionHeader(
     //if so, return the "Footnote Section Heading"
     // else, return ""
 
-    if (plugin.settings.enableFootnoteSectionHeading) {
+    // a cleared-out heading value counts as no heading — the lint path
+    // already treats "" that way, and "\n\n" + "" would otherwise strand
+    // stray blank lines above the first footnote
+    if (
+        plugin.settings.enableFootnoteSectionHeading &&
+        plugin.settings.footnoteSectionHeading
+    ) {
         // the setting holds literal markdown (legacy plain-text values are
         // migrated on load); a blank line ALWAYS separates the heading from
         // the content above it — markdown block convention (requested
@@ -977,6 +983,10 @@ export async function pasteInlineFootnote(plugin: FootnotePlugin) {
     const mdView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
     if (!mdView || !mdView.editor) return;
     const pasteCell = activeTableCellEditor(mdView.editor);
+    // inside an inline footnote, hop out instead of nesting "^[...]" in it —
+    // the same guard every other insert command runs (missed here until the
+    // 2026-08-07 QOL sweep; pinned by test/paste-inline-in-inline.test.ts)
+    if (exitInlineFootnoteIfInside(mdView.editor, pasteCell)) return;
     if (warnPrefilledMarkerIfInside(plugin, mdView.editor, pasteCell)) return;
     if (navigateMarkerIfInside(plugin, mdView.editor, pasteCell)) return;
 

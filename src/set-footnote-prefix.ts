@@ -86,11 +86,20 @@ export class SetFootnotePrefixModal extends Modal {
             },
         );
         this.close();
-        new Notice(
-            prefix
-                ? `Footnote prefix set to "${prefix}".`
-                : "Footnote prefix removed.",
-        );
+        if (prefix && !this.plugin.settings.enableFootnotePrefix) {
+            // the property was written but nothing reads it while the
+            // feature is off — without this warning the insert commands
+            // just silently ignore the prefix the user set
+            new Notice(
+                `Footnote prefix set to "${prefix}" — but the "Per-note footnote prefix" setting is turned off, so it won't be used until you enable it.`,
+            );
+        } else {
+            new Notice(
+                prefix
+                    ? `Footnote prefix set to "${prefix}".`
+                    : "Footnote prefix removed.",
+            );
+        }
     }
 
     onClose() {

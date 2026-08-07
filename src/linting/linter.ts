@@ -199,10 +199,10 @@ function lintActiveNoteIfSafe(plugin: FootnotePlugin) {
         before,
         lintOptionsFromSettings(plugin, configuredSectionHeading(plugin)),
     );
-    if (after === before) {
-        new Notice("No linting needed.");
-        return;
-    }
+    // quiet on a clean note — this runs on EVERY save, and a "no linting
+    // needed" toast each Ctrl+S is pure noise (lint on footnote creation
+    // is quiet the same way); only an actual cleanup announces itself
+    if (after === before) return;
     replaceMinimal(doc, before, after);
     new Notice("Footnotes linted.");
 }
