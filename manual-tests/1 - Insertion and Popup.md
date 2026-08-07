@@ -19,12 +19,22 @@ Place the cursor in the middle of the word markers below and press the auto-numb
 - [ ] Type a name, press the hotkey again with the caret still inside → the detail is created
 - [ ] Try a name with a space in it → the plugin warns instead of creating a broken detail
 
+## Empty marker guard (QOL 2026-08-07)
+
+Press the named hotkey to get `[^]`, type NOTHING, and with the caret still between the brackets:
+
+- [ ] Pressing the NAMED hotkey again toasts "type a name between the brackets" and the caret stays put (it used to silently hop out)
+- [ ] The NUMBERED hotkey shows the same toast, nothing is nested into the brackets
+- [ ] The INLINE and paste-inline hotkeys do the same
+- [ ] Clicking elsewhere and leaving the `[^]` behind: running **Lint footnotes** alerts that the note has an empty marker (see note 3)
+
 ## Inline footnotes
 
 - [ ] Inline hotkey inserts `^[]` with the caret inside
 - [ ] Second press while still inside hops the caret past the closing bracket
 - [ ] Copy this sentence, then use the paste-inline hotkey: The clipboard text
   spans two lines and should collapse to one.
+- [ ] With the caret inside an EXISTING inline footnote, the paste-inline hotkey hops out past the closing bracket instead of nesting the clipboard into it (fixed 2026-08-07)
 
 ## Hotkeys inside an inline footnote (QOL)
 
@@ -47,6 +57,7 @@ Insert a numbered footnote into this sentence, put the caret back INSIDE its `[^
 Turn on `Enable section heading` (heading `# Footnotes`), then insert a footnote into this sentence.
 
 - [ ] The detail lands under the heading below, NOT at the end of the note, and no second heading appears
+- [ ] With the toggle still ON but the heading textarea CLEARED, inserting a first footnote adds no stray blank lines above the detail (empty heading counts as no heading, QOL 2026-08-07)
 
 # Footnotes
 

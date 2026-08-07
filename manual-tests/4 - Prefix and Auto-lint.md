@@ -27,6 +27,7 @@ Run **Set footnote prefix** from the command palette:
 - [ ] Fixing it to `4.` and pressing Enter closes the modal and updates the property in the frontmatter
 - [ ] Running the command again and clearing the field removes the property entirely
 - [ ] Escape still cancels without changes
+- [ ] With `Per-note footnote prefix` turned OFF, saving a prefix warns that the feature toggle is off, so the prefix won't be used yet (QOL 2026-08-07)
 
 ## Digit-ending prefix guards (QOL)
 
@@ -34,7 +35,7 @@ Set the property to a digit-ending value (e.g. `10`) by hand in the frontmatter,
 
 - [ ] The auto-numbered hotkey (with the prefix toggle ON) shows a "No footnote was created" toast and inserts NOTHING (same for the named hotkey — no cleanup needed, fixed 2026-08-07)
 - [ ] **Lint footnotes** alerts "Linting canceled" and changes NOTHING
-- [ ] Lint on save / on file change cancel with the same alert
+- [ ] Lint on save / on footnote creation cancel with the same alert
 - [ ] Restoring `3.` makes everything work again
 
 ## Lint on save
@@ -42,7 +43,7 @@ Set the property to a digit-ending value (e.g. `10`) by hand in the frontmatter,
 Turn on `Lint on save` (Linting settings page), make a mess of the line below by hand (or just trust it), then:
 
 - [ ] Ctrl+S lints this note before the write, messy[^20] markers[^10] reorder to `[^1]`/`[^2]`
-- [ ] Saving AGAIN right away shows "No linting needed." (QOL)
+- [ ] Saving AGAIN right away shows NO notice at all (clean saves are silent — QOL 2026-08-07; the manual **Lint footnotes** command still says "No linting needed.")
 - [ ] With vim keybindings enabled (Settings → Editor), `:w` lints exactly the same way
 - [ ] Doing nothing and waiting does NOT lint, background autosave never triggers it
 

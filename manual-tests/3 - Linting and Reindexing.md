@@ -57,3 +57,9 @@ Prose AFTER the definitions, so "move to the bottom" has real work: after lintin
 - [ ] Running lint a second time reports nothing to do (idempotent)
 - [ ] With `Keep orphaned definitions` off: both orphans are deleted instead
 - [ ] With `Renumber named footnotes` on: the named footnotes get numbers by appearance order too
+
+## Lint notices (QOL 2026-08-07)
+
+- [ ] Type a bare `[^]` into the mess above and run **Lint footnotes**: an extra alert says the note has an empty footnote marker that won't render (it fires alongside the normal lint notice, and also when the lint otherwise had nothing to do — undo afterwards)
+- [ ] Turn OFF all three rules AND Reindex on the Linting page, then run **Lint footnotes**: it says all lint rules are turned off, instead of the misleading "No linting needed."
+- [ ] On the Linting page, `Keep orphaned definitions` and `Renumber named footnotes` are greyed out while `Reindex` is off, and `Apply the note's footnote prefix` is greyed out while the prefix feature is off (main tab)

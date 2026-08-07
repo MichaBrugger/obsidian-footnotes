@@ -13,6 +13,13 @@ Named footnotes navigate too: a plain name[^plain], an uppercase name[^Chapter],
 - [ ] Colon and uppercase names open the popup bound to the right detail (popup on)
 - [ ] With the caret just AFTER a marker's closing bracket, the hotkey inserts a new footnote instead of navigating
 
+## Orphaned definition (QOL 2026-08-07)
+
+The definition at the very bottom of this note has NO marker anywhere. Put the caret on it and press a footnote hotkey:
+
+- [ ] A "No marker references this footnote" toast appears, the caret stays put, and NOTHING is inserted (it used to insert a brand-new footnote right into the definitions)
+- [ ] The same happens with the caret on its indented continuation line
+
 Filler so the jumps actually travel, scroll matters here.
 
 Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
@@ -38,3 +45,6 @@ At vero eos et accusamus et iusto odio dignissimos ducimus qui blanditiis praese
     of this very last line, right here
 
 A trailing marker so the multi-line detail has a use: jump from me[^multiline].
+
+[^orphan]: no marker anywhere uses this definition, on purpose
+    its continuation line behaves the same way
