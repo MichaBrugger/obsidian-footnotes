@@ -3,7 +3,7 @@
   "name": "Footnote Shortcut",
   "version": "0.1.3",
   "minAppVersion": "1.13.0",
-  "description": "Insert and write footnotes faster!",
+  "description": "Footnotes without the mouse: insert, navigate, and popup-edit them where you're typing, with a built-in linter that keeps numbering and placement tidy.",
   "author": "Alexis Rondeau, Micha Brugger, Jason Qin",
   "authorUrl": "https://github.com/Comprehensive-Jason",
   "isDesktopOnly": false
