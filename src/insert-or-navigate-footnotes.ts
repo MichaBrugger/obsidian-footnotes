@@ -606,19 +606,22 @@ export function footnotePrefixProblem(prefix: string): string | null {
     return null;
 }
 
-// the feature is enabled in settings, and a prefix that can't work is
-// dropped with an explanation instead of silently producing broken or
-// ambiguous markers
-function activeFootnotePrefix(plugin: FootnotePlugin, markdownText: string): string {
+// the feature is enabled in settings, and a prefix that can't work BLOCKS
+// the insert (null) with an explanation — falling back to an unprefixed
+// footnote just left the user something to delete (reported 2026-08-07)
+function activeFootnotePrefix(
+    plugin: FootnotePlugin,
+    markdownText: string,
+): string | null {
     if (!plugin.settings.enableFootnotePrefix) return "";
     const prefix = footnotePrefix(markdownText);
     if (!prefix) return "";
     const problem = footnotePrefixProblem(prefix);
     if (problem) {
         new Notice(
-            `The note's footnote-prefix ("${prefix}") was ignored. ${problem}`,
+            `No footnote was created: this note's footnote-prefix ("${prefix}") is invalid. ${problem}`,
         );
-        return "";
+        return null;
     }
     return prefix;
 }
@@ -699,6 +702,9 @@ export function shouldCreateAutonumFootnote(
     // can't be trusted here)
     const markdownText = doc.getValue();
     const prefix = activeFootnotePrefix(plugin, markdownText);
+    // an invalid prefix blocks the insert outright (the Notice already
+    // explained why) — no unprefixed fallback footnote to clean up
+    if (prefix === null) return;
     const currentMax = computeNextFootnoteNumber(markdownText, prefix);
 
     const footnoteId = `${prefix}${currentMax}`;
@@ -1168,12 +1174,14 @@ export function shouldCreateFootnoteMarker(
     plugin: FootnotePlugin,
     cell: TableCellEditor | null = null
 ) {
-    //create empty footnote marker for name input, cursor after [^ and any prefix
-    const prefix = plugin.settings.enableFootnotePrefix
-        ? activeFootnotePrefix(plugin, doc.getValue())
-        : "";
-    const emptyMarker = `[^${prefix}]`;
-    const caretInMarker = 2 + prefix.length;
+    //create empty footnote marker for name input, cursor after [^ and any
+    //prefix. The prefix gate runs AFTER the second-press hop checks: an
+    //invalid prefix blocks marker CREATION (toast only, nothing to clean
+    //up — reported 2026-08-07), but never plain caret navigation.
+    const resolvePrefix = () =>
+        plugin.settings.enableFootnotePrefix
+            ? activeFootnotePrefix(plugin, doc.getValue())
+            : "";
 
     if (cell) {
         const cellText = cell.state.doc.toString();
@@ -1182,10 +1190,12 @@ export function shouldCreateFootnoteMarker(
             cell.dispatch({ selection: { anchor: inEmpty + "[^]".length } });
             return;
         }
+        const prefix = resolvePrefix();
+        if (prefix === null) return;
         // through the cell's own editor (never the main editor — that races
         // the cell's sync-back and corrupts the table); the caret lands
         // inside the brackets and focus stays in the cell for name entry
-        insertInTableCell(cell, plugin, emptyMarker, caretInMarker);
+        insertInTableCell(cell, plugin, `[^${prefix}]`, 2 + prefix.length);
         return;
     }
 
@@ -1195,8 +1205,14 @@ export function shouldCreateFootnoteMarker(
         return;
     }
 
+    const prefix = resolvePrefix();
+    if (prefix === null) return;
+    const emptyMarker = `[^${prefix}]`;
     cursorPosition = adjustFootnotePosition(cursorPosition, doc, lineText, plugin);
-    const newCursorPos = { line: cursorPosition.line, ch: cursorPosition.ch + caretInMarker };
+    const newCursorPos = {
+        line: cursorPosition.line,
+        ch: cursorPosition.ch + 2 + prefix.length,
+    };
     moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos, plugin, [
         { from: cursorPosition, text: emptyMarker },
     ]);

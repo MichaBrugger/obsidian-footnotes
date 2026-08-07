@@ -1,7 +1,6 @@
 ---
 footnote-prefix: 6.
 ---
-
 # A7: set footnote prefix command and validation
 
 Settings: `Per-note footnote prefix` ON. This note starts with prefix `6.` and one prefixed footnote[^6.1].
@@ -17,7 +16,7 @@ Run **Set footnote prefix** from the command palette:
 
 Digit-ending guard, end to end: set the property back to `10` by hand, then
 
-- [ ] The auto-numbered hotkey alerts that the prefix was ignored and inserts a plain number
+- [ ] The auto-numbered hotkey shows a "No footnote was created" toast and inserts nothing (fixed 2026-08-07)
 - [ ] **Lint footnotes** alerts "Linting canceled" and leaves the note untouched
 
 [^6.1]: the first prefixed footnote

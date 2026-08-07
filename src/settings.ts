@@ -80,7 +80,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                     },
                     {
                         name: "Enable section heading",
-                        desc: "Automatically adds a heading separating footnotes at the bottom of the note from the rest of the text.",
+                        desc: "Automatically adds a heading separating footnotes at the bottom of the note from the rest of the text. If the section heading is already present, it will be used instead of adding a new one.",
                         control: { type: "toggle", key: "enableFootnoteSectionHeading" },
                     },
                     {
@@ -121,7 +121,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                                 control: { type: "toggle", key: "lintFixPunctuation" },
                             },
                             {
-                                name: "Move definitions to the bottom",
+                                name: "Move definitions to existing footnote section heading, or to bottom",
                                 desc: "The lint command gathers all footnote definitions under the note's existing section heading, or at the end of the note when there is none.",
                                 control: { type: "toggle", key: "lintMoveToBottom" },
                             },

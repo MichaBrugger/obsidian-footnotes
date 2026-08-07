@@ -1052,6 +1052,24 @@ async function main() {
         );
     });
 
+    await test("an invalid footnote-prefix blocks the insert with a toast only", async () => {
+        // it used to fall back to an unprefixed footnote the user then
+        // had to delete (reported 2026-08-07)
+        resetSettings({ enableFootnotePrefix: true });
+        const note = "---\nfootnote-prefix: 10\n---\nAlpha bravo";
+        await setupNote(note);
+        setCursorAndRun(3, 8, CMD_AUTONUM); // mid "bravo"
+        await pollUntil(
+            "the no-footnote-created toast",
+            `[...document.querySelectorAll('.notice')].map(n => n.textContent).join('|')`,
+            (v) => typeof v === "string" && v.includes("No footnote was created"),
+        );
+        const text = readJson(`(${EDITOR}).editor.getValue()`);
+        if (text !== note) {
+            throw new Error(`insert still changed the text: ${JSON.stringify(text)}`);
+        }
+    });
+
     await test("lint cancels on a digit-ending footnote-prefix (QOL)", async () => {
         resetSettings();
         const note =

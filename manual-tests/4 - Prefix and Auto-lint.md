@@ -32,7 +32,7 @@ Run **Set footnote prefix** from the command palette:
 
 Set the property to a digit-ending value (e.g. `10`) by hand in the frontmatter, then:
 
-- [ ] The auto-numbered hotkey (with the prefix toggle ON) alerts that the prefix was ignored and inserts `[^1]`
+- [ ] The auto-numbered hotkey (with the prefix toggle ON) shows a "No footnote was created" toast and inserts NOTHING (same for the named hotkey — no cleanup needed, fixed 2026-08-07)
 - [ ] **Lint footnotes** alerts "Linting canceled" and changes NOTHING
 - [ ] Lint on save / on file change cancel with the same alert
 - [ ] Restoring `3.` makes everything work again

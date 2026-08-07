@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import FootnotePlugin from "../src/main";
 import {
+    shouldCreateAutonumFootnote,
     shouldCreateFootnoteMarker,
     shouldCreateMatchingFootnoteDetail,
     warnPrefilledMarkerIfInside,
@@ -102,7 +103,46 @@ describe("named command prefills the footnote-prefix into the new marker", () =>
         expect(doc.cursor).toEqual({ line: 3, ch: 13 });
     });
 
-    it("ignores an invalid digit-ending prefix (defensive)", () => {
+    it("an invalid digit-ending prefix aborts with a toast, creating nothing", () => {
+        // it used to fall back to a plain "[^]" the user then had to
+        // delete (reported 2026-08-07)
+        const doc = fakeEditor(["---", "footnote-prefix: 10", "---", "Alpha"], {
+            line: 3,
+            ch: 5,
+        });
+        vi.mocked(Notice).mockClear();
+        shouldCreateFootnoteMarker(
+            "Alpha",
+            { line: 3, ch: 5 },
+            doc,
+            fakePlugin(true),
+        );
+        expect(doc.appliedChanges).toEqual([]);
+        expect(doc.cursor).toEqual({ line: 3, ch: 5 });
+        expect(Notice).toHaveBeenCalledWith(
+            expect.stringContaining("No footnote was created"),
+        );
+    });
+
+    it("the auto-numbered command aborts the same way on an invalid prefix", () => {
+        const doc = fakeEditor(["---", "footnote-prefix: 10", "---", "Alpha"], {
+            line: 3,
+            ch: 5,
+        });
+        vi.mocked(Notice).mockClear();
+        shouldCreateAutonumFootnote(
+            "Alpha",
+            { line: 3, ch: 5 },
+            fakePlugin(true),
+            doc,
+        );
+        expect(doc.appliedChanges).toEqual([]);
+        expect(Notice).toHaveBeenCalledWith(
+            expect.stringContaining("No footnote was created"),
+        );
+    });
+
+    it("with the prefix feature OFF, a digit-ending property changes nothing", () => {
         const doc = fakeEditor(["---", "footnote-prefix: 10", "---", "Alpha"], {
             line: 3,
             ch: 5,
@@ -111,7 +151,7 @@ describe("named command prefills the footnote-prefix into the new marker", () =>
             "Alpha",
             { line: 3, ch: 5 },
             doc,
-            fakePlugin(true),
+            fakePlugin(false),
         );
         expect(doc.appliedChanges).toEqual([
             { from: { line: 3, ch: 5 }, text: "[^]" },
