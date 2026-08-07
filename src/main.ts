@@ -7,6 +7,7 @@
 import {
   addIcon,
   MarkdownView,
+  Notice,
   Plugin
 } from "obsidian";
 
@@ -24,6 +25,7 @@ import { SetFootnotePrefixModal } from "./set-footnote-prefix";
 import {
   installLintOnSave,
   installVimWriteHook,
+  lintRulesAllDisabled,
   runFootnoteTransformCommand,
   lintFootnotes,
   lintOptionsFromSettings,
@@ -116,6 +118,14 @@ export default class FootnotePlugin extends Plugin {
       checkCallback: (checking: boolean) => {
         if (checking)
           return !!this.app.workspace.getActiveViewOfType(MarkdownView);
+        // with every rule toggled off the pipeline is a no-op — say that,
+        // instead of a misleading "No linting needed."
+        if (lintRulesAllDisabled(this)) {
+          new Notice(
+            "All lint rules are turned off in the plugin settings — nothing to lint.",
+          );
+          return;
+        }
         void runFootnoteTransformCommand(
           this,
           (markdown, sectionHeading) =>

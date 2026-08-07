@@ -51,14 +51,22 @@ describe("bug: detail->marker jump matches the definition's own line", () => {
         expect(cursorMoves).toEqual([{ line: 1, ch: 8 }]);
     });
 
-    it("returns false for an orphan detail with no marker to jump to", () => {
-        const { doc } = fakeEditor(["[^orphan]: text", "unrelated prose"]);
-        const handled = shouldJumpFromDetailToMarker(
+    it("never jumps onto itself for an orphan detail with no marker", () => {
+        // the bug's other symptom: a bogus "successful" jump onto the
+        // definition's own line. Since the 2026-08-07 QOL sweep the orphan
+        // press is HANDLED (true) with an explanatory notice — see
+        // test/orphan-detail-press.test.ts — but it must still never move
+        // the cursor anywhere, least of all onto its own line.
+        const { doc, cursorMoves } = fakeEditor([
+            "[^orphan]: text",
+            "unrelated prose",
+        ]);
+        shouldJumpFromDetailToMarker(
             "[^orphan]: text",
             { line: 0, ch: 3 },
             doc,
             fakePlugin,
         );
-        expect(handled).toBe(false);
+        expect(cursorMoves).toEqual([]);
     });
 });

@@ -209,8 +209,7 @@ export function shouldJumpFromDetailToMarker(
 
         // find the FIRST marker use of this footnote. footnoteMarkerMatches
         // skips a definition's own column-0 label, so a detail line — this
-        // one included — is never its own jump target: an orphan detail
-        // falls through to false instead of "jumping" onto itself
+        // one included — is never its own jump target
         for (let i = 0; i < masked.length; i++) {
             for (const use of footnoteMarkerMatches(masked[i])) {
                 if (use[1].toLowerCase() !== name) continue;
@@ -219,6 +218,15 @@ export function shouldJumpFromDetailToMarker(
                 return true;
             }
         }
+        // an ORPHANED definition — no marker anywhere. Falling through used
+        // to insert a brand-new footnote INTO the definitions area, when the
+        // user almost certainly pressed the key to jump to the marker they
+        // have since deleted; explain and stand still instead (QOL sweep,
+        // 2026-08-07)
+        new Notice(
+            `No marker references this footnote — add a [^${block.name}] marker in the text, or delete the definition.`,
+        );
+        return true;
     }
     return false;
 }
@@ -677,6 +685,8 @@ export async function insertAutonumFootnote(plugin: FootnotePlugin) {
     const cell = activeTableCellEditor(doc);
     // inside an inline footnote, hop out instead of nesting a marker in it
     if (exitInlineFootnoteIfInside(doc, cell)) return;
+    // inside an abandoned "[^]", ask for a name instead of nesting "[^N]"
+    if (warnEmptyMarkerIfInside(doc, cell)) return;
     // inside an untouched "[^7-]" placeholder, ask for a suffix
     if (warnPrefilledMarkerIfInside(plugin, doc, cell)) return;
     const run = (cursorPosition: EditorPosition) => {
@@ -936,8 +946,10 @@ export async function insertInlineFootnote(plugin: FootnotePlugin) {
 
     const cell = activeTableCellEditor(doc);
     if (exitInlineFootnoteIfInside(doc, cell)) return;
-    // the untouched "[^7-]" placeholder hops out (it is not a real
-    // footnote to navigate to) — checked before navigateMarkerIfInside
+    // inside an abandoned "[^]", ask for a name instead of nesting "^[]"
+    if (warnEmptyMarkerIfInside(doc, cell)) return;
+    // the untouched "[^7-]" placeholder warns for a suffix (it is not a
+    // real footnote to navigate to) — checked before navigateMarkerIfInside
     if (warnPrefilledMarkerIfInside(plugin, doc, cell)) return;
     if (navigateMarkerIfInside(plugin, doc, cell)) return;
 
@@ -987,6 +999,8 @@ export async function pasteInlineFootnote(plugin: FootnotePlugin) {
     // the same guard every other insert command runs (missed here until the
     // 2026-08-07 QOL sweep; pinned by test/paste-inline-in-inline.test.ts)
     if (exitInlineFootnoteIfInside(mdView.editor, pasteCell)) return;
+    // inside an abandoned "[^]", ask for a name instead of nesting the paste
+    if (warnEmptyMarkerIfInside(mdView.editor, pasteCell)) return;
     if (warnPrefilledMarkerIfInside(plugin, mdView.editor, pasteCell)) return;
     if (navigateMarkerIfInside(plugin, mdView.editor, pasteCell)) return;
 
@@ -1028,7 +1042,10 @@ export async function insertNamedFootnote(plugin: FootnotePlugin) {
     const cell = activeTableCellEditor(doc);
     // inside an inline footnote, hop out instead of nesting a marker in it
     if (exitInlineFootnoteIfInside(doc, cell)) return;
-    // inside an untouched "[^7-]" placeholder, hop out — a second press
+    // inside an abandoned "[^]", ask for a name — a second press used to
+    // silently hop the caret out, leaving the fragment unexplained
+    if (warnEmptyMarkerIfInside(doc, cell)) return;
+    // inside an untouched "[^7-]" placeholder, warn — a second press
     // must not create a footnote named after the bare prefix
     if (warnPrefilledMarkerIfInside(plugin, doc, cell)) return;
     const run = (cursorPosition: EditorPosition) => {
@@ -1176,7 +1193,37 @@ export function warnPrefilledMarkerIfInside(
     return true;
 }
 
-/** Cascade step 4 (named): insert an empty marker (through `cell` when in a table) ready for name entry — "[^]" with the caret between the brackets, or "[^7-]" with the caret after the prefix when the note's footnote-prefix is active, so the namespace is visible while the name is typed (requested 2026-07-20). A second press while the caret is still inside the empty "[^]" hops it out past the bracket instead — same second-press rule as inline footnotes (the prefilled placeholder's hop lives in warnPrefilledMarkerIfInside). */
+/**
+ * When the caret sits inside an abandoned empty marker "[^]", leave it
+ * where it is, ask for a name via a Notice, and report true. Shared by
+ * every footnote command (QOL sweep, 2026-08-07): "[^]" is invisible to
+ * the marker regexes (they require a non-empty name), so without this
+ * guard the numbered/inline commands nested their insertion INTO the
+ * brackets ("[^[^1]]") and the named command silently hopped the caret
+ * out — a warning is the one response that tells the user what the
+ * fragment is and how to fix it.
+ */
+export function warnEmptyMarkerIfInside(
+    doc: Editor,
+    cell: TableCellEditor | null,
+): boolean {
+    const at = cell
+        ? emptyMarkerStart(
+              cell.state.doc.toString(),
+              cell.state.selection.main.head,
+          )
+        : emptyMarkerStart(
+              doc.getLine(doc.getCursor().line),
+              doc.getCursor().ch,
+          );
+    if (at === null) return false;
+    new Notice(
+        "This footnote marker is empty — type a name between the brackets.",
+    );
+    return true;
+}
+
+/** Cascade step 4 (named): insert an empty marker (through `cell` when in a table) ready for name entry — "[^]" with the caret between the brackets, or "[^7-]" with the caret after the prefix when the note's footnote-prefix is active, so the namespace is visible while the name is typed (requested 2026-07-20). A press with the caret still inside an empty "[^]" never reaches this step — warnEmptyMarkerIfInside claims it at the command entry — but the hop-out branches below stay as a last line of defense against nesting "[^[^]]". */
 export function shouldCreateFootnoteMarker(
     lineText: string,
     cursorPosition: EditorPosition,

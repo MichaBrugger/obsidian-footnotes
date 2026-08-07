@@ -152,6 +152,50 @@ function replaceMinimal(doc: Editor, before: string, after: string) {
     });
 }
 
+/**
+ * True when every lint step is toggled off — the pipeline is a no-op by
+ * construction, and the command should say so instead of implying the note
+ * was checked and found clean.
+ */
+export function lintRulesAllDisabled(plugin: FootnotePlugin): boolean {
+    const s = plugin.settings;
+    return (
+        !s.lintFixPunctuation &&
+        !s.lintMoveToBottom &&
+        !s.lintReindex &&
+        !(s.enableFootnotePrefix && s.lintApplyPrefix)
+    );
+}
+
+/**
+ * Occurrences of the abandoned empty marker "[^]" outside code and
+ * frontmatter. Every rule is blind to it (the marker regexes require a
+ * non-empty name) and Obsidian won't render it, so the lint paths alert on
+ * it instead — the user should name or delete the fragment ASAP.
+ */
+export function countEmptyFootnoteMarkers(markdown: string): number {
+    let count = 0;
+    const lines = maskProtectedLines(normalizeEol(markdown).text.split("\n"));
+    for (const line of lines) {
+        for (let i = 0; (i = line.indexOf("[^]", i)) !== -1; i += "[^]".length) {
+            count++;
+        }
+    }
+    return count;
+}
+
+// every lint entry point calls this with the post-lint text, so the alert
+// fires whether or not the rules changed anything
+function noticeEmptyMarkers(markdown: string) {
+    const count = countEmptyFootnoteMarkers(markdown);
+    if (count === 0) return;
+    new Notice(
+        count === 1
+            ? 'This note has an empty footnote marker ("[^]") that won\'t render — give it a name or delete it.'
+            : `This note has ${count} empty footnote markers ("[^]") that won't render — give them names or delete them.`,
+    );
+}
+
 // ---------- automatic linting (Linter-style triggers) ----------
 
 // A sub-editor (an actively edited table cell) owning focus means document
@@ -202,9 +246,11 @@ function lintActiveNoteIfSafe(plugin: FootnotePlugin) {
     // quiet on a clean note — this runs on EVERY save, and a "no linting
     // needed" toast each Ctrl+S is pure noise (lint on footnote creation
     // is quiet the same way); only an actual cleanup announces itself
-    if (after === before) return;
-    replaceMinimal(doc, before, after);
-    new Notice("Footnotes linted.");
+    if (after !== before) {
+        replaceMinimal(doc, before, after);
+        new Notice("Footnotes linted.");
+    }
+    noticeEmptyMarkers(after);
 }
 
 /**
@@ -312,9 +358,13 @@ export function lintAfterFootnoteCreation(
         before,
         lintOptionsFromSettings(plugin, configuredSectionHeading(plugin)),
     );
-    if (after === before) return;
+    if (after === before) {
+        noticeEmptyMarkers(after);
+        return;
+    }
     replaceMinimal(doc, before, after);
     new Notice("Footnotes linted.");
+    noticeEmptyMarkers(after);
     if (relandCursor) {
         const target = uniqueEmptyDetailName(doc);
         if (target !== null) {
@@ -354,9 +404,10 @@ export async function runFootnoteTransformCommand(
         const after = transform(before, configuredSectionHeading(plugin));
         if (after === before) {
             new Notice(notices.noop);
-            return;
+        } else {
+            replaceMinimal(doc, before, after);
+            new Notice(notices.done);
         }
-        replaceMinimal(doc, before, after);
-        new Notice(notices.done);
+        noticeEmptyMarkers(after);
     });
 }
