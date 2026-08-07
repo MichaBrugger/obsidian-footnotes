@@ -75,6 +75,15 @@ describe("footnoteAfterPunctuation", () => {
         const once = footnoteAfterPunctuation(messy);
         expect(footnoteAfterPunctuation(once)).toBe(once);
     });
+
+    it("is idempotent on an interleaved marker/punctuation chain", () => {
+        // hunt 2026-07-17: the first pass turns "word[^1].[^2]," into
+        // "word.[^1],[^2]"; a second pass must not swap [^1] with the comma
+        // that belongs to [^2] and drift the punctuation away from its text
+        const doc = "word[^1].[^2],\n\n[^1]: one\n[^2]: two";
+        const once = footnoteAfterPunctuation(doc);
+        expect(footnoteAfterPunctuation(once)).toBe(once);
+    });
 });
 
 describe("footnoteAfterPunctuation and single-line HTML comments", () => {

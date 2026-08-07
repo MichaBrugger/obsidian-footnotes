@@ -32,12 +32,9 @@ describe("exitInlineFootnoteIfInside", () => {
         expect(moves).toEqual([]);
     });
 
-    it("steps over nested balanced brackets", () => {
-        const line = "a ^[with [link](x) inside] b";
-        const { doc, moves } = fakeEditor(line, 6);
-        expect(exitInlineFootnoteIfInside(doc, null)).toBe(true);
-        expect(moves).toEqual([{ line: 0, ch: line.lastIndexOf("]") + 1 }]);
-    });
+    // bracket-walking details (nesting, escapes, unclosed) are the pure
+    // core's spec — see inline-footnote-exit.test.ts; this file only pins
+    // the wrapper's delegation and editor plumbing
 
     it("routes through the cell editor when a table cell is active", () => {
         const dispatches: unknown[] = [];

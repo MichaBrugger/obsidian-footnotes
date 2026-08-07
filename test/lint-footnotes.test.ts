@@ -91,6 +91,15 @@ describe("repeated linting with a section heading (bug reported 2026-07-17)", ()
         expect(twice.split("# Footnotes").length - 1).toBe(1);
     });
 
+    it("never duplicates a mid-document heading (hunt 2026-07-17)", () => {
+        // the old endsWith presence check only inspected the tail of the
+        // body, so a heading already sitting mid-document got a twin
+        const input = "body[^1].\n# Footnotes\n\n[^1]: def\n\ntrailing prose";
+        const out = lintFootnotes(input, { sectionHeading: "# Footnotes" });
+        const count = out.split("\n").filter((l) => l === "# Footnotes").length;
+        expect(count).toBe(1);
+    });
+
     it("never duplicates a multi-line divider heading", () => {
         const options = { sectionHeading: "---\n## Footnotes" };
         const once = lintFootnotes("b[^2] a[^1].\n\n[^1]: one\n[^2]: two", options);

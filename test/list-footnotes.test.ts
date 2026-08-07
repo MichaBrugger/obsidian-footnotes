@@ -84,4 +84,14 @@ describe("listExistingFootnoteMarkersAndLocations", () => {
             { footnote: "[^1]", lineNum: 0, startIndex: 15 },
         ]);
     });
+
+    it("keeps a mid-line marker followed by a literal colon", () => {
+        // hunt 2026-07-17: only a column-0 "[^id]:" is a definition; a
+        // mid-paragraph "noted[^3]: prose" is a live reference the old
+        // (?!:) lookahead used to drop (grammar spec: marker-regexes tests)
+        const doc = fakeEditor(["as noted[^3]: more prose", "[^3]: the detail"]);
+        expect(listExistingFootnoteMarkersAndLocations(doc)).toEqual([
+            { footnote: "[^3]", lineNum: 0, startIndex: 8 },
+        ]);
+    });
 });
