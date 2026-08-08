@@ -4,6 +4,8 @@ import { App, PluginSettingTab, SettingDefinitionItem } from "obsidian";
 import FootnotePlugin from "./main";
 
 export interface FootnotePluginSettings {
+    /** Marks saved data whose one-time migrations have run (see loadSettings). Not shown in the settings tab. */
+    settingsVersion: number;
     insertAtEndOfWord: boolean;
     enablePopupEditor: boolean;
     enableFootnotePrefix: boolean;
@@ -24,6 +26,10 @@ export interface FootnotePluginSettings {
 }
 
 export const DEFAULT_SETTINGS: FootnotePluginSettings = {
+    // 0 on purpose: saved data WITHOUT the key predates the flag and must
+    // run the one-time migrations (they no-op on a fresh install); the
+    // migration block stamps the current version and saves once
+    settingsVersion: 0,
     insertAtEndOfWord: true,
     enablePopupEditor: true,
     enableFootnotePrefix: false,
