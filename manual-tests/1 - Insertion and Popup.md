@@ -79,6 +79,7 @@ Turn on `Edit footnotes in a popup`, then:
 - [ ] The footnote hotkey toggles the popup closed; Escape and clicking outside close it too
 - [ ] Rapid double-press creates ONE footnote and toggles its popup
 - [ ] Type a detail, close, immediately insert the next footnote, the typed detail survives
+- [ ] Undo history stays clean (bug fixed 2026-08-08): type a detail, Ctrl+Z inside the popup, close, then Ctrl+Z in the main editor removes the FOOTNOTE INSERTION itself; the undone detail text never comes back (the popup now saves only when it closes, so a session reaches the note as at most one edit)
 
 ## Tables
 
