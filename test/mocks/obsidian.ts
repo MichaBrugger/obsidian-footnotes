@@ -4,6 +4,7 @@
 // values; the editor-driving code paths are covered by the smoke tests, not
 // unit tests, so these stubs are never exercised beyond existing.
 export class Plugin {}
+export class Modal {}
 export class MarkdownView {}
 export class PluginSettingTab {}
 export class Setting {}
