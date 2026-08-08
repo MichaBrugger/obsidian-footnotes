@@ -10,16 +10,16 @@ Footnotes in Obsidian normally mean a lot of jumping around: scroll to the botto
 
 <!-- GIF: hero. Press hotkey mid-sentence, popup opens at cursor, type the note, hotkey again to close -->
 
-## Hotkeys
+## First things first: set up your hotkeys
 
-The two core commands work out of the box:
+The plugin adds its commands **without hotkeys**, so assign your own right after installing. This is quick:
+
+`Settings → Hotkeys → search for "Footnote" → click the ⊕ next to a command → press your preferred keys`
+
+Recommended (what the maintainer uses):
 
 - <kbd>Alt</kbd>+<kbd>0</kbd> for Insert / navigate auto-numbered footnote
 - <kbd>Alt</kbd>+<kbd>-</kbd> for Insert / navigate named footnote
-
-To change them, or to give the other commands (inline footnotes, linting, prefix) hotkeys of their own:
-
-`Settings → Hotkeys → search for "Footnote" → click the ⊕ next to a command → press your preferred keys`
 
 <!-- GIF or screenshot: assigning a hotkey in the Hotkeys settings tab -->
 
