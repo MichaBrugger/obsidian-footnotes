@@ -50,10 +50,16 @@ export default class FootnotePlugin extends Plugin {
 
     await this.loadSettings();
 
+    // The two core commands ship with default hotkeys (Jason's own
+    // bindings, 2026-08-07) so the plugin works out of the box — users can
+    // rebind or clear them in Settings → Hotkeys as usual. The secondary
+    // commands stay unbound. NOTE: Obsidian's plugin guidelines discourage
+    // default hotkeys; shipping them anyway is a deliberate choice.
     this.addCommand({
       id: "insert-autonumbered-footnote",
       name: "Insert / navigate auto-numbered footnote",
       icon: "footnote-numbered",
+      hotkeys: [{ modifiers: ["Alt"], key: "0" }],
       checkCallback: (checking: boolean) => {
         if (checking)
           return !!this.app.workspace.getActiveViewOfType(MarkdownView);
@@ -64,6 +70,7 @@ export default class FootnotePlugin extends Plugin {
       id: "insert-named-footnote",
       name: "Insert / navigate named footnote",
       icon: "footnote-named",
+      hotkeys: [{ modifiers: ["Alt"], key: "-" }],
       checkCallback: (checking: boolean) => {
         if (checking)
           return !!this.app.workspace.getActiveViewOfType(MarkdownView);

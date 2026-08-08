@@ -14,6 +14,7 @@ This note's frontmatter sets `footnote-prefix: 3.` and already contains one pref
 - [ ] With the toggle OFF: the same hotkey inserts plain `[^1]` (the property is ignored)
 - [ ] Linting renumbers prefixed footnotes WITHIN their namespace (e.g. `[^3.5]` can become `[^3.2]`) but always keeps the prefix, so merged chapters never collide
 - [ ] With `Apply the note's footnote prefix` ON (Linting page): running **Lint footnotes** converts the plain footnotes in the Lint-on-save section below into `3.`-prefixed ones, and would rename a named `[^tag]` to `[^3.tag]` (undo afterwards)
+- [ ] Type an untouched placeholder `[^3.]` into a sentence and run **Lint footnotes**: the unnamed-marker alert counts it just like `[^]` (a bare prefix is an unfilled footnote, QOL 2026-08-07); remove it afterwards
 
 [^3.1]: the first prefixed footnote
 

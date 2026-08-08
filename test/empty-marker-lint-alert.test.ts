@@ -34,6 +34,24 @@ describe("countEmptyFootnoteMarkers", () => {
     it("handles CRLF notes", () => {
         expect(countEmptyFootnoteMarkers("a [^] b\r\nc [^] d")).toBe(2);
     });
+
+    it("counts the bare-prefix placeholder when a prefix is given", () => {
+        // "[^3.]" is the prefix-era twin of "[^]": a footnote the user
+        // started and never named (requested 2026-08-07)
+        expect(countEmptyFootnoteMarkers("a [^3.] b [^] c", "3.")).toBe(2);
+    });
+
+    it("without a prefix, a bare-prefix marker is just a named footnote", () => {
+        expect(countEmptyFootnoteMarkers("a [^3.] b")).toBe(0);
+    });
+
+    it("a NAMED prefixed footnote is not a placeholder", () => {
+        expect(countEmptyFootnoteMarkers("a [^3.note] b", "3.")).toBe(0);
+    });
+
+    it("bare-prefix placeholders inside code don't count either", () => {
+        expect(countEmptyFootnoteMarkers("use `x [^3.] y` here", "3.")).toBe(0);
+    });
 });
 
 function pluginWithLintSettings(

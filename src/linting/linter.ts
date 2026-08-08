@@ -168,31 +168,53 @@ export function lintRulesAllDisabled(plugin: FootnotePlugin): boolean {
 }
 
 /**
- * Occurrences of the abandoned empty marker "[^]" outside code and
- * frontmatter. Every rule is blind to it (the marker regexes require a
- * non-empty name) and Obsidian won't render it, so the lint paths alert on
- * it instead — the user should name or delete the fragment ASAP.
+ * Occurrences of unnamed footnote markers outside code and frontmatter: the
+ * abandoned empty "[^]", plus — when `prefix` is given — its prefix-era twin,
+ * the untouched bare-prefix placeholder ("[^3.]" under prefix "3."). Both
+ * are footnotes the user started and never named; the rules can't fix them
+ * ("[^]" is invisible to the marker regexes, and a bare prefix is
+ * indistinguishable from a deliberate name), so the lint paths alert
+ * instead — the user should name or delete the fragment ASAP.
  */
-export function countEmptyFootnoteMarkers(markdown: string): number {
+export function countEmptyFootnoteMarkers(
+    markdown: string,
+    prefix = "",
+): number {
+    const needles = prefix ? ["[^]", `[^${prefix}]`] : ["[^]"];
     let count = 0;
     const lines = maskProtectedLines(normalizeEol(markdown).text.split("\n"));
     for (const line of lines) {
-        for (let i = 0; (i = line.indexOf("[^]", i)) !== -1; i += "[^]".length) {
-            count++;
+        for (const needle of needles) {
+            for (
+                let i = 0;
+                (i = line.indexOf(needle, i)) !== -1;
+                i += needle.length
+            ) {
+                count++;
+            }
         }
     }
     return count;
 }
 
+/** The bare-prefix placeholder the alert should also count: the note's own valid prefix, only while the feature is on. */
+function alertPrefix(plugin: FootnotePlugin, markdown: string): string {
+    if (!plugin.settings.enableFootnotePrefix) return "";
+    const prefix = footnotePrefix(markdown);
+    return prefix && footnotePrefixProblem(prefix) === null ? prefix : "";
+}
+
 // every lint entry point calls this with the post-lint text, so the alert
 // fires whether or not the rules changed anything
-function noticeEmptyMarkers(markdown: string) {
-    const count = countEmptyFootnoteMarkers(markdown);
+function noticeEmptyMarkers(plugin: FootnotePlugin, markdown: string) {
+    const prefix = alertPrefix(plugin, markdown);
+    const count = countEmptyFootnoteMarkers(markdown, prefix);
     if (count === 0) return;
+    const hint = prefix ? `"[^]" or the bare prefix "[^${prefix}]"` : '"[^]"';
     new Notice(
         count === 1
-            ? 'This note has an empty footnote marker ("[^]") that won\'t render. Give it a name or delete it.'
-            : `This note has ${count} empty footnote markers ("[^]") that won't render. Give them names or delete them.`,
+            ? `This note has an unnamed footnote marker (${hint}). Give it a name or delete it.`
+            : `This note has ${count} unnamed footnote markers (${hint}). Give them names or delete them.`,
         8000,
     );
 }
@@ -251,7 +273,7 @@ function lintActiveNoteIfSafe(plugin: FootnotePlugin) {
         replaceMinimal(doc, before, after);
         new Notice("Footnotes linted.");
     }
-    noticeEmptyMarkers(after);
+    noticeEmptyMarkers(plugin, after);
 }
 
 /**
@@ -360,12 +382,12 @@ export function lintAfterFootnoteCreation(
         lintOptionsFromSettings(plugin, configuredSectionHeading(plugin)),
     );
     if (after === before) {
-        noticeEmptyMarkers(after);
+        noticeEmptyMarkers(plugin, after);
         return;
     }
     replaceMinimal(doc, before, after);
     new Notice("Footnotes linted.");
-    noticeEmptyMarkers(after);
+    noticeEmptyMarkers(plugin, after);
     if (relandCursor) {
         const target = uniqueEmptyDetailName(doc);
         if (target !== null) {
@@ -409,6 +431,6 @@ export async function runFootnoteTransformCommand(
             replaceMinimal(doc, before, after);
             new Notice(notices.done);
         }
-        noticeEmptyMarkers(after);
+        noticeEmptyMarkers(plugin, after);
     });
 }
