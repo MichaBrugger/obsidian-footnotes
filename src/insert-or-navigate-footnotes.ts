@@ -9,7 +9,7 @@ import {
 import FootnotePlugin from "./main";
 import { openFootnotePopup, popupEditingAvailable, runAfterNextPopupSettle, settleFootnotePopupWithFeedback, toggleCloseFootnotePopup } from "./footnote-popup";
 import { lintAfterFootnoteCreation } from "./linting/linter";
-import { findDefinitionBlocks, maskInlineRegions, maskProtectedLines, protectedLines } from "./markdown-scan";
+import { findDefinitionBlocks, maskInlineRegions, maskProtectedLines, maskedLineAt, protectedLines } from "./markdown-scan";
 import { EditorWithCm, VaultWithConfig, WindowWithVim } from "./obsidian-internals";
 import { activeTableCellEditor, resolveTableCellCursor, TableCellEditor } from "./table-cursor";
 
@@ -196,7 +196,9 @@ export function shouldJumpFromDetailToMarker(
     // inside code is not a jump target — resolve against protected-aware
     // definition blocks and scan the masked twin
     const lines = docLines(doc);
-    const block = findDefinitionBlocks(lines, protectedLines(lines)).find(
+    // one protection scan feeds both the block lookup and the masking below
+    const isProtected = protectedLines(lines);
+    const block = findDefinitionBlocks(lines, isProtected).find(
         (candidate) =>
             cursorPosition.line >= candidate.start &&
             cursorPosition.line <= candidate.end,
@@ -205,7 +207,7 @@ export function shouldJumpFromDetailToMarker(
         // ids are case-insensitive, so the marker may differ in casing from
         // the detail's label ("[^Note]" ↔ "[^note]:") — fold both to compare
         const name = block.name.toLowerCase();
-        const masked = maskProtectedLines(lines);
+        const masked = maskProtectedLines(lines, isProtected);
 
         // find the FIRST marker use of this footnote. footnoteMarkerMatches
         // skips a definition's own column-0 label, so a detail line — this
@@ -302,7 +304,7 @@ export function shouldJumpFromMarkerToDetail(
     // #41: re-check against the masked twin — a marker inside a fence or
     // inline code is plain text, so the press falls through to insertion
     const maskedLine =
-        maskProtectedLines(docLines(doc))[cursorPosition.line] ?? "";
+        maskedLineAt(docLines(doc), cursorPosition.line);
     const markersOnLine = footnoteMarkerMatches(maskedLine).map((match) => ({
         footnote: match[0],
         startIndex: match.index ?? 0,
@@ -599,6 +601,26 @@ export function footnotePrefix(markdownText: string): string {
         }
     }
     return "";
+}
+
+/**
+ * footnotePrefix, reading only the note's frontmatter block through the
+ * editor line API. The per-press guards used to call doc.getValue(), which
+ * materializes the whole document on every command press while the prefix
+ * feature is on (perf, 2026-08-07); this stops at the closing fence
+ * instead. Parsing is delegated to footnotePrefix so the two can't drift.
+ */
+export function footnotePrefixFromEditor(doc: Editor): string {
+    const stripCr = (line: string) =>
+        line.endsWith("\r") ? line.slice(0, -1) : line;
+    if (stripCr(doc.getLine(0) ?? "") !== "---") return "";
+    const lines = ["---"];
+    for (let i = 1; i < doc.lineCount(); i++) {
+        const line = stripCr(doc.getLine(i));
+        lines.push(line);
+        if (/^(---|\.\.\.)\s*$/.test(line)) break;
+    }
+    return footnotePrefix(lines.join("\n"));
 }
 
 // The prefix the autonumbered command should actually use: nothing unless
@@ -912,7 +934,7 @@ export function navigateMarkerIfInside(
     // the masked twin decides for real: a "[^x]" inside code is plain text,
     // and inserting an inline footnote there is fine (#41 semantics)
     const maskedLine =
-        maskProtectedLines(docLines(doc))[cursorPosition.line] ?? "";
+        maskedLineAt(docLines(doc), cursorPosition.line);
     const markersOnLine = footnoteMarkerMatches(maskedLine).map((match) => ({
         footnote: match[0],
         startIndex: match.index ?? 0,
@@ -1087,7 +1109,7 @@ export function shouldCreateMatchingFootnoteDetail(
     if (markerAtCursor(rawMarkers, cursorPosition.ch) === null) return;
 
     const maskedLine =
-        maskProtectedLines(docLines(doc))[cursorPosition.line] ?? "";
+        maskedLineAt(docLines(doc), cursorPosition.line);
     const markersOnLine = footnoteMarkerMatches(maskedLine).map((match) => ({
         footnote: match[0],
         startIndex: match.index ?? 0,
@@ -1174,7 +1196,13 @@ export function warnPrefilledMarkerIfInside(
     cell: TableCellEditor | null,
 ): boolean {
     if (!plugin.settings.enableFootnotePrefix) return false;
-    const prefix = footnotePrefix(doc.getValue());
+    // cheap gate before any document work: no "[^" near the caret means no
+    // placeholder to warn about, and this guard runs on EVERY command press
+    const rawText = cell
+        ? cell.state.doc.toString()
+        : doc.getLine(doc.getCursor().line);
+    if (!rawText.includes("[^")) return false;
+    const prefix = footnotePrefixFromEditor(doc);
     // silent validity check — the invalid-prefix Notice belongs to the
     // insert path, not to every caret movement guard
     if (!prefix || footnotePrefixProblem(prefix) !== null) return false;
@@ -1210,7 +1238,7 @@ function caretInsidePlaceholder(
         return false;
     }
     const maskedLine =
-        maskProtectedLines(docLines(doc))[cursorPosition.line] ?? "";
+        maskedLineAt(docLines(doc), cursorPosition.line);
     return emptyMarkerStart(maskedLine, cursorPosition.ch, placeholder) !== null;
 }
 

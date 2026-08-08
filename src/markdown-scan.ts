@@ -206,13 +206,31 @@ export function maskInlineRegions(line: string): string {
  * lines become all-NUL strings, inline code spans and one-line HTML
  * comments are masked in the rest. Lengths and indices line up with the
  * originals, so scans over these see no code while every match position
- * stays valid in the real line.
+ * stays valid in the real line. Pass a precomputed `isProtected` to avoid
+ * re-deriving it when the caller already ran protectedLines.
  */
-export function maskProtectedLines(lines: string[]): string[] {
-    const isProtected = protectedLines(lines);
+export function maskProtectedLines(
+    lines: string[],
+    isProtected: boolean[] = protectedLines(lines),
+): string[] {
     return lines.map((line, i) =>
         isProtected[i] ? "\0".repeat(line.length) : maskInlineRegions(line),
     );
+}
+
+/**
+ * Line `i` of the document's masked twin, without masking the other lines.
+ * The per-keypress paths need exactly the caret's line: protection state
+ * still requires the whole-document fence scan (cheap line-prefix checks),
+ * but the expensive inline-region masking runs on one line instead of all
+ * of them (perf, 2026-08-07). Out-of-range `i` returns "".
+ */
+export function maskedLineAt(lines: string[], i: number): string {
+    const line = lines[i];
+    if (line === undefined) return "";
+    return protectedLines(lines)[i]
+        ? "\0".repeat(line.length)
+        : maskInlineRegions(line);
 }
 
 /**
