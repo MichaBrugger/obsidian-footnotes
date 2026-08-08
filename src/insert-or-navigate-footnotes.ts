@@ -66,6 +66,11 @@ export function isValidFootnoteName(name: string): boolean {
 }
 
 
+/** Whether `mdView` is in Reading view — where every text-editing command must be inert (getMode is optionally called so bare test fakes count as editable). */
+export function readingViewActive(mdView: MarkdownView): boolean {
+    return mdView.getMode?.() === "preview";
+}
+
 // Scans run against the document's masked twin (code and frontmatter
 // blotted out, indices preserved): a "[^x]" inside a code sample is plain
 // text, not a footnote (issue #41).
@@ -701,6 +706,12 @@ export async function insertAutonumFootnote(plugin: FootnotePlugin) {
     const mdView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
 
     if (!mdView || !mdView.editor) return false;
+    // Reading view: the editor API happily edits the HIDDEN buffer — one
+    // press invisibly inserted "[^]" and the next press toasted about a
+    // marker the user could not see (reported 2026-08-08, probed live).
+    // Text-editing commands are inert there; main.ts also disables them
+    // in the palette, this guards programmatic invocation.
+    if (readingViewActive(mdView)) return;
 
     const doc = mdView.editor;
     // an actively edited table cell owns the real caret; getCursor() is
@@ -966,6 +977,8 @@ export async function insertInlineFootnote(plugin: FootnotePlugin) {
 
     const mdView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
     if (!mdView || !mdView.editor) return;
+    // inert in Reading view — see insertAutonumFootnote
+    if (readingViewActive(mdView)) return;
     const doc = mdView.editor;
 
     const cell = activeTableCellEditor(doc);
@@ -1018,6 +1031,8 @@ export async function pasteInlineFootnote(plugin: FootnotePlugin) {
 
     const mdView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
     if (!mdView || !mdView.editor) return;
+    // inert in Reading view — see insertAutonumFootnote
+    if (readingViewActive(mdView)) return;
     const pasteCell = activeTableCellEditor(mdView.editor);
     // inside an inline footnote, hop out instead of nesting "^[...]" in it —
     // the same guard every other insert command runs (missed here until the
@@ -1058,6 +1073,8 @@ export async function insertNamedFootnote(plugin: FootnotePlugin) {
     const mdView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
 
     if (!mdView || !mdView.editor) return false;
+    // inert in Reading view — see insertAutonumFootnote
+    if (readingViewActive(mdView)) return;
 
     const doc = mdView.editor;
     // an actively edited table cell owns the real caret; getCursor() is

@@ -20,6 +20,7 @@ import {
   insertInlineFootnote,
   insertNamedFootnote,
   pasteInlineFootnote,
+  readingViewActive,
 } from "./insert-or-navigate-footnotes";
 import { SetFootnotePrefixModal } from "./set-footnote-prefix";
 import {
@@ -38,6 +39,17 @@ export default class FootnotePlugin extends Plugin {
   // `declare`: refine the base Plugin.settings type (Obsidian 1.13+)
   // without emitting a class field that would shadow it
   declare settings: FootnotePluginSettings;
+
+  // The active markdown view, but only when its text can actually be
+  // edited on screen: the text-editing commands disappear from the palette
+  // in Reading view, where the editor API would edit the HIDDEN buffer —
+  // invisible insertions and toasts about markers the user can't see
+  // (reported 2026-08-08). "Set footnote prefix" deliberately stays
+  // available there; a frontmatter edit is legitimate in Reading view.
+  editableMarkdownView(): MarkdownView | null {
+    const mdView = this.app.workspace.getActiveViewOfType(MarkdownView);
+    return mdView && !readingViewActive(mdView) ? mdView : null;
+  }
 
   async onload() {
     // Jason's hand-drawn "action style" icon family (icons/action style/):
@@ -61,8 +73,7 @@ export default class FootnotePlugin extends Plugin {
       name: "Insert / navigate auto-numbered footnote",
       icon: "footnote-numbered",
       checkCallback: (checking: boolean) => {
-        if (checking)
-          return !!this.app.workspace.getActiveViewOfType(MarkdownView);
+        if (checking) return !!this.editableMarkdownView();
         void insertAutonumFootnote(this);
       },
     });
@@ -71,8 +82,7 @@ export default class FootnotePlugin extends Plugin {
       name: "Insert / navigate named footnote",
       icon: "footnote-named",
       checkCallback: (checking: boolean) => {
-        if (checking)
-          return !!this.app.workspace.getActiveViewOfType(MarkdownView);
+        if (checking) return !!this.editableMarkdownView();
         void insertNamedFootnote(this);
       }
     });
@@ -81,8 +91,7 @@ export default class FootnotePlugin extends Plugin {
       name: "Insert inline footnote",
       icon: "footnote-inline-cursor",
       checkCallback: (checking: boolean) => {
-        if (checking)
-          return !!this.app.workspace.getActiveViewOfType(MarkdownView);
+        if (checking) return !!this.editableMarkdownView();
         void insertInlineFootnote(this);
       }
     });
@@ -91,8 +100,7 @@ export default class FootnotePlugin extends Plugin {
       name: "Insert inline footnote from clipboard",
       icon: "footnote-inline-paste",
       checkCallback: (checking: boolean) => {
-        if (checking)
-          return !!this.app.workspace.getActiveViewOfType(MarkdownView);
+        if (checking) return !!this.editableMarkdownView();
         void pasteInlineFootnote(this);
       }
     });
@@ -122,8 +130,7 @@ export default class FootnotePlugin extends Plugin {
       name: "Lint footnotes",
       icon: "sparkles",
       checkCallback: (checking: boolean) => {
-        if (checking)
-          return !!this.app.workspace.getActiveViewOfType(MarkdownView);
+        if (checking) return !!this.editableMarkdownView();
         // with every rule toggled off the pipeline is a no-op — say that,
         // instead of a misleading "No linting needed."
         if (lintRulesAllDisabled(this)) {

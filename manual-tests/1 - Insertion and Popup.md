@@ -63,6 +63,14 @@ Turn on `Enable section heading` (heading `# Footnotes`), then insert a footnote
 
 Content after the heading stays below the new detail.
 
+## Reading view (bug fixed 2026-08-08)
+
+Switch this note to Reading view, then:
+
+- [ ] Pressing any footnote hotkey does nothing: no toast, and switching back to editing view shows NO stray `[^]` or `^[]` anywhere (one press used to invisibly edit the hidden buffer, and a second press toasted about the marker it planted)
+- [ ] The footnote commands are missing from the command palette while in Reading view
+- [ ] **Set footnote prefix** is still available there (a frontmatter edit is fine in Reading view)
+
 ## Popup editor
 
 Turn on `Edit footnotes in a popup`, then:

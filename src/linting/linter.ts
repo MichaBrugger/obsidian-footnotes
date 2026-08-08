@@ -10,6 +10,7 @@ import {
     footnotePrefix,
     footnotePrefixProblem,
     jumpToFootnoteDetail,
+    readingViewActive,
     runOutsideTableCell,
 } from "../insert-or-navigate-footnotes";
 import { maskProtectedLines, normalizeEol, restoreEol } from "../markdown-scan";
@@ -253,6 +254,8 @@ export function lintBlockedByPrefix(markdown: string): string | null {
 function lintActiveNoteIfSafe(plugin: FootnotePlugin) {
     const mdView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
     if (!mdView || !mdView.editor) return;
+    // Reading view: never edit the hidden buffer (2026-08-08)
+    if (readingViewActive(mdView)) return;
     if (footnotePopupBusy()) return; // a pending popup save owns the file
     const doc = mdView.editor;
     if (activeTableCellEditor(doc) || subEditorOwnsFocus(doc)) return;
@@ -410,6 +413,8 @@ export async function runFootnoteTransformCommand(
 
     const mdView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
     if (!mdView || !mdView.editor) return;
+    // Reading view: never edit the hidden buffer (2026-08-08)
+    if (readingViewActive(mdView)) return;
     const doc = mdView.editor;
 
     // same guard as the insert commands: never edit the document while a
