@@ -64,6 +64,13 @@ export interface AppWithEmbedRegistry extends App {
     };
 }
 
+/** The community-plugin registry: an id is present exactly while that plugin is enabled. Used to show the Linter-coexistence warning only to Linter users. */
+export interface AppWithPlugins extends App {
+    plugins?: {
+        plugins?: Record<string, unknown>;
+    };
+}
+
 /** The command registry, used to wrap the core save command ("Lint on save"). */
 export interface AppWithCommands extends App {
     commands?: {

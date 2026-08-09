@@ -2,6 +2,7 @@
 // the tab renders from getSettingDefinitions() (declarative, auto-saving).
 import { App, PluginSettingTab, SettingDefinitionItem } from "obsidian";
 import FootnotePlugin from "./main";
+import { AppWithPlugins } from "./obsidian-internals";
 
 export interface FootnotePluginSettings {
     /** Marks saved data whose one-time migrations have run (see loadSettings). Not shown in the settings tab. */
@@ -107,6 +108,19 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                 name: "Linting",
                 desc: "Cleanup rules, automatic lint triggers, and reindexing behavior.",
                 items: [
+                    {
+                        // control-less row: renders as plain information text.
+                        // Shown only while the Linter plugin is enabled —
+                        // Jason verified (2026-08-08) that the two plugins
+                        // coexist fine EXCEPT when Linter's own footnote
+                        // rules also rewrite the same footnotes.
+                        name: "Using the Linter plugin?",
+                        desc: "Turn off Linter's own footnote rules (move footnotes to the bottom, re-index footnote references, footnote after punctuation) so the two plugins don't fight over the same footnotes.",
+                        visible: () =>
+                            !!(this.app as AppWithPlugins).plugins?.plugins?.[
+                                "obsidian-linter"
+                            ],
+                    },
                     {
                         name: "Lint on save",
                         desc: "Lint the file on manual save (when ctrl+s is pressed or when :w is executed while using vim keybindings)",
