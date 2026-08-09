@@ -54,11 +54,17 @@ export function lintOptionsFromSettings(
         moveDefinitionsToBottom: plugin.settings.lintMoveToBottom,
         reindex: plugin.settings.lintReindex,
         reindexOptions: reindexOptionsFromSettings(plugin),
-        // both gated on the whole per-note prefix feature being enabled
+        // BOTH prefix behaviors ride the apply-prefix rule (and the whole
+        // feature toggle): with the rule off, footnotes carrying the
+        // note's prefix are treated as NAMED footnotes and keep their ids —
+        // renumbering them within the namespace while nothing else was
+        // being prefixed felt inconsistent (Jason, 2026-08-08)
         applyNotePrefix:
             plugin.settings.enableFootnotePrefix &&
             plugin.settings.lintApplyPrefix,
-        prefixAware: plugin.settings.enableFootnotePrefix,
+        prefixAware:
+            plugin.settings.enableFootnotePrefix &&
+            plugin.settings.lintApplyPrefix,
     };
 }
 
@@ -269,10 +275,14 @@ function lintActiveNoteIfSafe(plugin: FootnotePlugin) {
         before,
         lintOptionsFromSettings(plugin, configuredSectionHeading(plugin)),
     );
-    // quiet on a clean note — this runs on EVERY save, and a "no linting
-    // needed" toast each Ctrl+S is pure noise (lint on footnote creation
-    // is quiet the same way); only an actual cleanup announces itself
-    if (after !== before) {
+    // a manual save (Ctrl+S / vim :w) is an explicit user command, so it
+    // reports its outcome either way — same as the Lint footnotes command
+    // (Jason's call, 2026-08-08, revisiting an earlier quiet-on-clean
+    // change); only the lint-on-footnote-creation trigger stays silent
+    // when there is nothing to do
+    if (after === before) {
+        new Notice("No linting needed.");
+    } else {
         replaceMinimal(doc, before, after);
         new Notice("Footnotes linted.");
     }

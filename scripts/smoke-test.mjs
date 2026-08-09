@@ -399,20 +399,36 @@ async function main() {
         if (cursor.ch !== 13) throw new Error(`cursor at ch ${cursor.ch}, expected 13 (inside ^[])`);
     });
 
-    await test("second inline-footnote press exits past the closing bracket", async () => {
+    await test("second inline press warns while empty, hops once filled", async () => {
+        // empty half (Jason, 2026-08-08): the second press used to hop the
+        // caret out of the untouched ^[], stranding an empty inline
+        // footnote — it now warns like the empty [^] marker and stays put
         resetSettings();
         await setupNote("Alpha bravo charlie");
         setCursorAndRun(0, 8, CMD_INLINE); // creates ^[] with cursor inside
         await expectEditorText("Alpha bravo^[] charlie");
         action(`app.commands.executeCommandById('${CMD_INLINE}');`);
-        // exits to ch 14 (just past "]") without inserting anything new
         await pollUntil(
-            "cursor just past the inline footnote",
+            "the empty inline footnote warning",
+            `[...document.querySelectorAll('.notice')].map(n => n.textContent).join('|')`,
+            (v) => typeof v === "string" && v.includes("inline footnote is empty"),
+        );
+        const cursor = readJson(`(${EDITOR}).editor.getCursor()`);
+        if (!cursor || cursor.ch !== 13) {
+            throw new Error(`caret moved to ${JSON.stringify(cursor)}, expected ch 13 (inside ^[])`);
+        }
+        // filled half: with text between the brackets, the second press is
+        // the "done typing" hop past the closing bracket
+        action(`(${EDITOR}).editor.replaceRange('filled', {line:0,ch:13});`);
+        await expectEditorText("Alpha bravo^[filled] charlie");
+        action(`app.commands.executeCommandById('${CMD_INLINE}');`);
+        await pollUntil(
+            "cursor just past the filled inline footnote",
             `(${EDITOR}).editor.getCursor()`,
-            (c) => c && c.line === 0 && c.ch === 14,
+            (c) => c && c.line === 0 && c.ch === "Alpha bravo^[filled]".length,
         );
         const line = readJson(`(${EDITOR}).editor.getLine(0)`);
-        if (line !== "Alpha bravo^[] charlie") {
+        if (line !== "Alpha bravo^[filled] charlie") {
             throw new Error(`second press changed the text: ${JSON.stringify(line)}`);
         }
     });
@@ -886,6 +902,20 @@ async function main() {
         await setupNote("Beta[^2] alpha[^1] end\n\n[^1]: one\n[^2]: two");
         setCursorAndRun(0, 0, "editor:save-file");
         await expectEditorText("Beta[^1] alpha[^2] end\n\n[^1]: two\n[^2]: one");
+    });
+
+    await test("a clean manual save still reports 'No linting needed.'", async () => {
+        // a manual save is an explicit user command, so it reports its
+        // outcome either way (Jason, 2026-08-08, revisiting an earlier
+        // quiet-on-clean change); only lint-on-footnote-creation is silent
+        resetSettings({ lintOnSave: true });
+        await setupNote("Alpha[^1] end\n\n[^1]: one");
+        setCursorAndRun(0, 0, "editor:save-file");
+        await pollUntil(
+            "the no-op notice on a clean save",
+            `[...document.querySelectorAll('.notice')].map(n => n.textContent).join('|')`,
+            (v) => typeof v === "string" && v.includes("No linting needed."),
+        );
     });
 
     await test("saving does not lint while the toggle is off (the default)", async () => {

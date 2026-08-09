@@ -12,7 +12,8 @@ This note's frontmatter sets `footnote-prefix: 3.` and already contains one pref
 - [ ] Another press right after that marker chains `[^3.3]`
 - [ ] Named hotkey prefills the prefix: it creates `[^3.]` with the caret after the prefix; type the name, press again inside to create the detail (a second press inside the untouched `[^3.]` keeps the caret put and asks for a suffix)
 - [ ] With the toggle OFF: the same hotkey inserts plain `[^1]` (the property is ignored)
-- [ ] Linting renumbers prefixed footnotes WITHIN their namespace (e.g. `[^3.5]` can become `[^3.2]`) but always keeps the prefix, so merged chapters never collide
+- [ ] With `Apply the note's footnote prefix` ON: linting renumbers prefixed footnotes WITHIN their namespace (e.g. `[^3.5]` can become `[^3.2]`) but always keeps the prefix, so merged chapters never collide
+- [ ] With `Apply the note's footnote prefix` OFF: prefixed footnotes are treated as NAMED footnotes and keep their ids (no namespace renumbering; QOL 2026-08-08)
 - [ ] With `Apply the note's footnote prefix` ON (Linting page): running **Lint footnotes** converts the plain footnotes in the Lint-on-save section below into `3.`-prefixed ones, and would rename a named `[^tag]` to `[^3.tag]` (undo afterwards)
 - [ ] Type an untouched placeholder `[^3.]` into a sentence and run **Lint footnotes**: the unnamed-marker alert counts it just like `[^]` (a bare prefix is an unfilled footnote, QOL 2026-08-07); remove it afterwards
 
@@ -44,7 +45,7 @@ Set the property to a digit-ending value (e.g. `10`) by hand in the frontmatter,
 Turn on `Lint on save` (Linting settings page), make a mess of the line below by hand (or just trust it), then:
 
 - [ ] Ctrl+S lints this note before the write, messy[^20] markers[^10] reorder to `[^1]`/`[^2]`
-- [ ] Saving AGAIN right away shows NO notice at all (clean saves are silent, QOL 2026-08-07; the manual **Lint footnotes** command still says "No linting needed.")
+- [ ] Saving AGAIN right away shows "No linting needed." (a manual save is an explicit command and reports its outcome, decided 2026-08-08; only lint on footnote creation is silent when clean)
 - [ ] With vim keybindings enabled (Settings → Editor), `:w` lints exactly the same way
 - [ ] Doing nothing and waiting does NOT lint, background autosave never triggers it
 

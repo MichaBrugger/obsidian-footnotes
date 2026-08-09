@@ -115,7 +115,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                         // coexist fine EXCEPT when Linter's own footnote
                         // rules also rewrite the same footnotes.
                         name: "Using the Linter plugin?",
-                        desc: "Turn off Linter's own footnote rules (move footnotes to the bottom, re-index footnote references, footnote after punctuation) so the two plugins don't fight over the same footnotes.",
+                        desc: "Turn off Linter's own footnote rules (footnote after punctuation, move footnotes to the bottom, re-index footnotes) so the two plugins don't fight over the same footnotes.",
                         visible: () =>
                             !!(this.app as AppWithPlugins).plugins?.plugins?.[
                                 "obsidian-linter"
@@ -147,7 +147,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                             },
                             {
                                 name: "Apply the note's footnote prefix",
-                                desc: "When the per-note footnote prefix feature is on and the note has a footnote-prefix property, linting renames plain numbered and named footnotes to carry the prefix.",
+                                desc: "When the per-note footnote prefix feature is on and the note has a footnote-prefix property, linting renames plain numbered and named footnotes to carry the prefix, and renumbers prefixed footnotes within their namespace. While off, footnotes carrying the prefix are treated as named footnotes and keep their ids.",
                                 control: {
                                     type: "toggle",
                                     key: "lintApplyPrefix",

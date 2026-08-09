@@ -46,7 +46,7 @@ describe("Linter-coexistence warning on the Linting page", () => {
         const first = page.items?.[0];
         expect(first?.name).toBe("Using the Linter plugin?");
         expect(first?.desc).toContain("Turn off Linter's own footnote rules");
-        expect(first?.desc).toContain("re-index footnote references");
+        expect(first?.desc).toContain("re-index footnotes");
     });
 
     it("is visible while the Linter plugin is enabled", () => {

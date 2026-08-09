@@ -31,7 +31,8 @@ Press the named hotkey to get `[^]`, type NOTHING, and with the caret still betw
 ## Inline footnotes
 
 - [ ] Inline hotkey inserts `^[]` with the caret inside
-- [ ] Second press while still inside hops the caret past the closing bracket
+- [ ] Second press while the `^[]` is still EMPTY toasts to type its text and the caret stays put (QOL 2026-08-08; every footnote hotkey does the same, like the empty `[^]` guard)
+- [ ] Type some text between the brackets, then press again: NOW the caret hops past the closing bracket
 - [ ] Copy this sentence, then use the paste-inline hotkey: The clipboard text
   spans two lines and should collapse to one.
 - [ ] With the caret inside an EXISTING inline footnote, the paste-inline hotkey hops out past the closing bracket instead of nesting the clipboard into it (fixed 2026-08-07)

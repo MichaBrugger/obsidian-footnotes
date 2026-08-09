@@ -10,7 +10,7 @@ messy[^20] markers[^10] here
 [^10]: ten, used second
 
 - [ ] Ctrl+S lints (then undo restores the mess in one step)
-- [ ] Saving again right away shows NO notice at all (clean saves are silent, QOL 2026-08-07)
+- [ ] Saving again right away shows "No linting needed." (manual saves report their outcome, decided 2026-08-08; only lint on footnote creation is silent when clean)
 - [ ] With vim keybindings on, `:w` lints identically
 - [ ] Waiting with the note open does nothing (background autosave never lints)
 - [ ] With `Lint on save` OFF again, Ctrl+S leaves the mess alone

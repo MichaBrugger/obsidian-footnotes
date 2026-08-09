@@ -719,6 +719,8 @@ export async function insertAutonumFootnote(plugin: FootnotePlugin) {
     // table — reads use the resolved position, writes go through the cell
     const cell = activeTableCellEditor(doc);
     // inside an inline footnote, hop out instead of nesting a marker in it
+    // inside an EMPTY inline footnote, ask for its text instead of hopping
+    if (warnEmptyInlineFootnoteIfInside(doc, cell)) return;
     if (exitInlineFootnoteIfInside(doc, cell)) return;
     // inside an abandoned "[^]", ask for a name instead of nesting "[^N]"
     if (warnEmptyMarkerIfInside(doc, cell)) return;
@@ -877,12 +879,15 @@ function insertInlineText(
 }
 
 /**
- * The position just past an inline footnote's closing bracket when `ch`
- * sits inside one on `lineText`, or null when it doesn't. Bracket matching
- * is escape-aware and steps over nested balanced pairs (markdown links).
+ * The inline footnote whose brackets contain `ch` on `lineText`, as its
+ * `open` ("^" index) and `close` ("]" index), or null. Bracket matching is
+ * escape-aware and steps over nested balanced pairs (markdown links).
  * "Inside" spans from just after the `^` through the closing `]` itself.
  */
-export function inlineFootnoteExitCh(lineText: string, ch: number): number | null {
+export function inlineFootnoteSpanAt(
+    lineText: string,
+    ch: number,
+): { open: number; close: number } | null {
     for (let i = 0; i < lineText.length - 1; i++) {
         const c = lineText[i];
         if (c === "\\") {
@@ -911,10 +916,16 @@ export function inlineFootnoteExitCh(lineText: string, ch: number): number | nul
         // LATER "^[" on the line may still close (its opening "[" was
         // counted as nesting above), so keep scanning instead of bailing
         if (close === -1) continue;
-        if (ch > i && ch <= close) return close + 1;
+        if (ch > i && ch <= close) return { open: i, close };
         i = close; // cursor isn't in this one — keep scanning after it
     }
     return null;
+}
+
+/** The position just past an inline footnote's closing bracket when `ch` sits inside one, or null. */
+export function inlineFootnoteExitCh(lineText: string, ch: number): number | null {
+    const span = inlineFootnoteSpanAt(lineText, ch);
+    return span === null ? null : span.close + 1;
 }
 
 /**
@@ -982,6 +993,8 @@ export async function insertInlineFootnote(plugin: FootnotePlugin) {
     const doc = mdView.editor;
 
     const cell = activeTableCellEditor(doc);
+    // inside an EMPTY inline footnote, ask for its text instead of hopping
+    if (warnEmptyInlineFootnoteIfInside(doc, cell)) return;
     if (exitInlineFootnoteIfInside(doc, cell)) return;
     // inside an abandoned "[^]", ask for a name instead of nesting "^[]"
     if (warnEmptyMarkerIfInside(doc, cell)) return;
@@ -991,6 +1004,34 @@ export async function insertInlineFootnote(plugin: FootnotePlugin) {
     if (navigateMarkerIfInside(plugin, doc, cell)) return;
 
     insertInlineText(plugin, "^[]", 2);
+}
+
+/**
+ * When the caret sits inside an EMPTY inline footnote ("^[]", or only
+ * whitespace between the brackets), leave it where it is, ask for the text
+ * via a Notice, and report true. Shared by every footnote command, exactly
+ * like the empty "[^]" marker guard (manual combo-test feedback,
+ * 2026-08-08): a second press used to silently hop the caret out,
+ * stranding an inline footnote with nothing in it. A FILLED inline
+ * footnote is not this guard's business — there the press falls through
+ * to exitInlineFootnoteIfInside, the deliberate "done typing" hop.
+ */
+export function warnEmptyInlineFootnoteIfInside(
+    doc: Editor,
+    cell: TableCellEditor | null,
+): boolean {
+    const text = cell
+        ? cell.state.doc.toString()
+        : doc.getLine(doc.getCursor().line);
+    const ch = cell ? cell.state.selection.main.head : doc.getCursor().ch;
+    const span = inlineFootnoteSpanAt(text, ch);
+    if (span === null) return false;
+    if (text.slice(span.open + 2, span.close).trim() !== "") return false;
+    new Notice(
+        "This inline footnote is empty. Type its text between the brackets.",
+        8000,
+    );
+    return true;
 }
 
 /**
@@ -1037,6 +1078,8 @@ export async function pasteInlineFootnote(plugin: FootnotePlugin) {
     // inside an inline footnote, hop out instead of nesting "^[...]" in it —
     // the same guard every other insert command runs (missed here until the
     // 2026-08-07 QOL sweep; pinned by test/paste-inline-in-inline.test.ts)
+    // inside an EMPTY inline footnote, ask for its text instead of hopping
+    if (warnEmptyInlineFootnoteIfInside(mdView.editor, pasteCell)) return;
     if (exitInlineFootnoteIfInside(mdView.editor, pasteCell)) return;
     // inside an abandoned "[^]", ask for a name instead of nesting the paste
     if (warnEmptyMarkerIfInside(mdView.editor, pasteCell)) return;
@@ -1082,6 +1125,8 @@ export async function insertNamedFootnote(plugin: FootnotePlugin) {
     // table — reads use the resolved position, writes go through the cell
     const cell = activeTableCellEditor(doc);
     // inside an inline footnote, hop out instead of nesting a marker in it
+    // inside an EMPTY inline footnote, ask for its text instead of hopping
+    if (warnEmptyInlineFootnoteIfInside(doc, cell)) return;
     if (exitInlineFootnoteIfInside(doc, cell)) return;
     // inside an abandoned "[^]", ask for a name — a second press used to
     // silently hop the caret out, leaving the fragment unexplained
