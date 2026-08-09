@@ -798,15 +798,15 @@ async function main() {
 
     await test("footnote-prefix property namespaces autonumbered footnotes (issue #31)", async () => {
         resetSettings({ enableFootnotePrefix: true });
-        await setupNote("---\nfootnote-prefix: 2.\n---\nAlpha bravo");
+        await setupNote("---\nfootnote-prefix: 2-\n---\nAlpha bravo");
         setCursorAndRun(3, 8, CMD_AUTONUM); // mid "bravo"
         await expectEditorText(
-            "---\nfootnote-prefix: 2.\n---\nAlpha bravo[^2.1]\n\n[^2.1]: ",
+            "---\nfootnote-prefix: 2-\n---\nAlpha bravo[^2-1]\n\n[^2-1]: ",
         );
-        // the next press right after the marker chains [^2.2]
+        // the next press right after the marker chains [^2-2]
         setCursorAndRun(3, 17, CMD_AUTONUM);
         await expectEditorText(
-            "---\nfootnote-prefix: 2.\n---\nAlpha bravo[^2.1][^2.2]\n\n[^2.1]: \n[^2.2]: ",
+            "---\nfootnote-prefix: 2-\n---\nAlpha bravo[^2-1][^2-2]\n\n[^2-1]: \n[^2-2]: ",
         );
     });
 
@@ -1033,10 +1033,10 @@ async function main() {
 
     await test("named command prefills the note's prefix into the marker (QOL)", async () => {
         resetSettings({ enableFootnotePrefix: true });
-        await setupNote("---\nfootnote-prefix: 2.\n---\nAlpha bravo");
+        await setupNote("---\nfootnote-prefix: 2~\n---\nAlpha bravo");
         setCursorAndRun(3, 8, CMD_NAMED); // mid "bravo" → end of word
         await expectEditorText(
-            "---\nfootnote-prefix: 2.\n---\nAlpha bravo[^2.]",
+            "---\nfootnote-prefix: 2~\n---\nAlpha bravo[^2~]",
         );
         await pollUntil(
             "caret between the prefix and the bracket",
@@ -1049,13 +1049,13 @@ async function main() {
         );
         setCursorAndRun(3, "Alpha bravo[^2.ta".length, CMD_NAMED);
         await expectEditorText(
-            "---\nfootnote-prefix: 2.\n---\nAlpha bravo[^2.tag]\n\n[^2.tag]: ",
+            "---\nfootnote-prefix: 2~\n---\nAlpha bravo[^2~tag]\n\n[^2~tag]: ",
         );
     });
 
-    await test("press inside the untouched [^2.] placeholder asks for a suffix (QOL)", async () => {
+    await test("press inside the untouched [^2~] placeholder asks for a suffix (QOL)", async () => {
         resetSettings({ enableFootnotePrefix: true });
-        const note = "---\nfootnote-prefix: 2.\n---\nAlpha [^2.] bravo";
+        const note = "---\nfootnote-prefix: 2~\n---\nAlpha [^2~] bravo";
         await setupNote(note);
         setCursorAndRun(3, 8, CMD_NAMED); // inside the placeholder
         await pollUntil(
@@ -1161,16 +1161,16 @@ async function main() {
 
     await test("lint applies the note's footnote prefix to plain footnotes (QOL)", async () => {
         // plain strays adopt the prefix AND the whole namespace renumbers
-        // by reading order — the pre-existing [^2.5] is a numbered
+        // by reading order — the pre-existing [^3=5] is a numbered
         // footnote of the namespace, not a named one; named footnotes
         // keep their name behind the prefix (A6 bug)
         resetSettings({ enableFootnotePrefix: true });
         await setupNote(
-            "---\nfootnote-prefix: 2.\n---\nb[^2] a[^1] pre[^2.5] n[^note] end\n\n[^1]: one\n[^2]: two\n[^2.5]: already prefixed\n[^note]: named",
+            "---\nfootnote-prefix: 3=\n---\nb[^2] a[^1] pre[^3=5] n[^note] end\n\n[^1]: one\n[^2]: two\n[^3=5]: already prefixed\n[^note]: named",
         );
         setCursorAndRun(3, 0, CMD_LINT);
         await expectEditorText(
-            "---\nfootnote-prefix: 2.\n---\nb[^2.1] a[^2.2] pre[^2.3] n[^2.note] end\n\n[^2.1]: two\n[^2.2]: one\n[^2.3]: already prefixed\n[^2.note]: named",
+            "---\nfootnote-prefix: 3=\n---\nb[^3=1] a[^3=2] pre[^3=3] n[^3=note] end\n\n[^3=1]: two\n[^3=2]: one\n[^3=3]: already prefixed\n[^3=note]: named",
         );
     });
 
