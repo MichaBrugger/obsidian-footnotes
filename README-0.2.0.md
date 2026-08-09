@@ -67,6 +67,8 @@ So one hotkey bounces you back and forth: marker to note, note to marker.
 
 Creating or visiting a footnote opens its text in a small editor right at your cursor, so you never lose your place in the note. Close it with the same hotkey, <kbd>Escape</kbd>, or by clicking anywhere outside. Prefer the classic jump-to-the-bottom behavior? Turn off **Edit footnotes in a popup** in the settings.
 
+While the popup is open, your edits flow into the note after a short pause, and undo works the same way as in Obsidian's own footnote hover editor.
+
 ## Keeping footnotes tidy: the linter
 
 Writing and revising leaves footnotes messy: numbers out of order, notes scattered mid-document, markers on the wrong side of periods. The **Lint footnotes** command cleans up the whole note in one go:

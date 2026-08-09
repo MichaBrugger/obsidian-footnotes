@@ -256,26 +256,6 @@ export async function openFootnotePopup(
     // casing (e.g. "[^arXiv:…]") resolves to nothing (issue #50's popup
     // half: the popup silently degraded to the legacy jump)
     const subpath = `#[^${footnoteId.toLowerCase()}]`;
-    // The embed's MID-SESSION saves are suppressed (bug reported by Jason
-    // 2026-08-08, reproduced live): every save while the popup was open
-    // propagated into the MAIN editor's undo history, so typing a detail
-    // and then undoing it inside the popup left add+remove entries there —
-    // and the next main-editor undo RESURRECTED the deleted text. With only
-    // the close-time flush writing (domTeardown flips saveAllowed first), a
-    // popup session reaches the main editor as at most ONE net edit, and a
-    // net-zero session (typed then undone) leaves no trace at all.
-    // Tradeoff, accepted: text typed in the popup lives only in memory
-    // until the popup closes. ONLY save() is gated — the embed's own
-    // requestSave must keep running untouched, because it is not just a
-    // debounced save scheduler: it also marshals the edited subpath text
-    // into the embed's file data, and the real save crashes without that
-    // (found the hard way — an earlier requestSave override lost typed
-    // details entirely). Every save route funnels through save() in the
-    // end (the debounced requestSave, and Obsidian's global autosave which
-    // calls the registered active editor's save directly), so one gate
-    // covers them all; a barred call re-marks the embed dirty so the
-    // close-time flush knows there is something to write.
-    let saveAllowed = false;
     const buildEmbed = () => {
         const built = createEmbed(
             { app: plugin.app, linktext: subpath, sourcePath: file.path, containerEl: embedEl, depth: 0 },
@@ -284,30 +264,6 @@ export async function openFootnotePopup(
         );
         built.editable = true;
         built.load();
-        const realSave = built.save?.bind(built);
-        // A barred save keeps its ARGUMENTS: save(text) carries the edited
-        // subpath text, and the payload of the newest barred call is what
-        // the close-time flush replays when no fresher debounce is pending
-        // (dropping it loses the typed detail — found the hard way). The
-        // wrapper is async so the barred branch still hands callers a
-        // resolved promise; Obsidian's save chain then-chains the return
-        // value, and a bare undefined corrupts it (wedged the queue once).
-        let barredArgs: unknown[] | null = null;
-        built.save = async (...args: unknown[]) => {
-            if (!saveAllowed) {
-                barredArgs = args;
-                built.dirty = true;
-                return;
-            }
-            barredArgs = null;
-            return realSave?.(...args);
-        };
-        built.flushBarredSave = async () => {
-            if (!barredArgs) return;
-            const args = barredArgs;
-            barredArgs = null;
-            await realSave?.(...args);
-        };
         return built;
     };
     let embed = buildEmbed();
@@ -338,9 +294,6 @@ export async function openFootnotePopup(
 
     // from here on, closing must also tear the DOM and the embed down
     domTeardown = (focusEditor: boolean) => {
-        // unbar the save doors: from here on the flush below (and any
-        // save the embed's own unload path runs) writes for real
-        saveAllowed = true;
         resizeObserver.disconnect();
         doc.removeEventListener("mousedown", onDocMouseDown, true);
         containerEl.addClass("footnote-shortcut-popup-closed");
@@ -359,17 +312,8 @@ export async function openFootnotePopup(
             // the embed saves edits on its own DEBOUNCE (1-2s); flush the
             // save NOW and await its exact completion — this wait gates the
             // next footnote command, so every millisecond here is felt when
-            // creating consecutive footnotes rapidly. run() first: a fast
-            // close can beat the debounce, and the pending requestSave is
-            // what marshals the typed text into the embed's file data —
-            // saving without it writes nothing (its save call lands in the
-            // now-open gate, so this may complete the whole flush itself)
+            // creating consecutive footnotes rapidly
             try {
-                // oldest first: a mid-session barred payload, then any
-                // still-pending debounce (the newest edit — its save call
-                // lands in the now-open gate with its own arguments)
-                await embed.flushBarredSave?.();
-                embed.requestSave?.run?.();
                 if (embed.dirty && !embed.saving) await embed.save?.();
             } catch {
                 // fall through — the polling below is the safety net
@@ -385,7 +329,10 @@ export async function openFootnotePopup(
                 }
                 embed.unload();
                 containerEl.remove();
-                const finish = () => {
+                // one beat for Obsidian to reconcile the written file into
+                // the main view before anyone edits it (a timeout on
+                // purpose: rAF stalls entirely while the window is hidden)
+                win.setTimeout(() => {
                     pendingTeardown = null;
                     settle();
                     // after-settle work (lint-on-footnote-creation) runs
@@ -393,33 +340,7 @@ export async function openFootnotePopup(
                     const callback = afterSettleOnce;
                     afterSettleOnce = null;
                     callback?.();
-                };
-                // wait for the main view to INGEST the flushed write before
-                // anyone edits. Since mid-session saves are suppressed, the
-                // close-time flush is the FIRST time the file learns the
-                // typed detail — a flat beat let a rapid next command save
-                // the view's stale buffer over it, losing the text (caught
-                // by the "typed detail survives" smoke test). Poll the
-                // view's data against the file, bounded; timeouts on
-                // purpose, rAF stalls while the window is hidden.
-                void (async () => {
-                    try {
-                        const written = await plugin.app.vault.cachedRead(file);
-                        let polls = 0;
-                        while (
-                            mdView.file?.path === file.path &&
-                            mdView.data !== written &&
-                            polls++ < 60
-                        ) {
-                            await new Promise((resolve) =>
-                                win.setTimeout(resolve, 30),
-                            );
-                        }
-                    } catch {
-                        // file gone — nothing to reconcile
-                    }
-                    win.setTimeout(finish, 50);
-                })();
+                }, 50);
             };
             teardown();
         })();

@@ -42,12 +42,8 @@ export interface MarkdownEmbed {
     unload(): void;
     loadFile(): Promise<void>;
     showEditor(): void;
-    /** Immediate save. NOT argless: the first argument is the edited subpath text the embed marshals into the file — the popup's save gate must forward arguments faithfully (dropping them writes nothing). */
-    save?(...args: unknown[]): Promise<void> | void;
-    /** Debounced save pipeline; forwards its arguments to save(). Obsidian's debouncer shape — run() executes a pending call immediately (the popup's close-time flush uses it). */
-    requestSave?: ((...args: unknown[]) => void) & { run?: () => void };
-    /** Plugin-added by the popup's save gate: replays the payload of a save that was barred mid-session (see footnote-popup.ts). */
-    flushBarredSave?: () => Promise<void>;
+    /** Immediate save — `requestSave` is its debounced wrapper. */
+    save?(): Promise<void> | void;
 }
 
 export type EmbedCreator = (

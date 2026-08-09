@@ -548,15 +548,16 @@ async function main() {
         );
     });
 
-    await test("popup undo history never replays into the main editor", async () => {
-        // bug (reported by Jason 2026-08-08, reproduced live): every
-        // debounced mid-session save of the popup landed in the MAIN
-        // editor's undo history, so typing a detail, undoing it in the
-        // popup, and closing left a "remove" entry behind — the next
-        // main-editor undo RESURRECTED the deleted text. The embed's
-        // debounced saves are now suppressed (footnote-popup.ts buildEmbed):
-        // only the close-time flush writes, so a net-zero popup session
-        // leaves no trace in the main editor's history.
+    await test("popup edits propagate live into the main editor (stock parity)", async () => {
+        // DELIBERATE behavior (Jason, 2026-08-08): while the popup is open
+        // it saves on the embed's own debounce, exactly like Obsidian's
+        // stock footnote hover editor, so the note text updates while you
+        // type. A save-gate variant (one net edit per session, cleaner
+        // main-editor undo) was tried and REVERTED: edits visibly NOT
+        // appearing in the note was more disconcerting than the undo quirk
+        // it fixed. Known accepted quirk: undoing a popup session from the
+        // main editor can need an extra undo step, same as the stock hover
+        // editor.
         resetSettings({ enablePopupEditor: true });
         await setupNote("Alpha bravo charlie");
         setCursorAndRun(0, 8, CMD_AUTONUM); // [^1] + popup
@@ -566,36 +567,27 @@ async function main() {
                 return !!(p && p.contains(document.activeElement)); })()`,
             (v) => v === true,
         );
-        action(`document.execCommand('insertText', false, 'my note');`);
-        // outlast the embed's save debounce: the typed text must NOT reach
-        // the main editor mid-session (this asserts the suppression itself)
-        await sleep(2500);
-        const midSession = readJson(`(${EDITOR}).editor.getValue()`);
-        if (typeof midSession === "string" && midSession.includes("my note")) {
-            throw new Error(`mid-session debounced save still fired: ${midSession}`);
-        }
-        // undo INSIDE the popup — a real keypress, CM handles it natively
-        action(
-            `document.activeElement.dispatchEvent(new KeyboardEvent('keydown', ` +
-            `{key:'z', code:'KeyZ', ctrlKey:true, bubbles:true, cancelable:true}));`,
+        action(`document.execCommand('insertText', false, 'live text');`);
+        // the debounced save must reach the main editor WHILE the popup is
+        // still open — that is the whole point of the stock-parity model
+        await pollUntil(
+            "typed detail visible in the main editor mid-session",
+            `(${EDITOR}).editor.getValue()`,
+            (v) => typeof v === "string" && v.includes("[^1]: live text"),
+            8000,
         );
-        await sleep(300);
-        action(`app.commands.executeCommandById('${CMD_AUTONUM}');`); // close popup
+        const stillOpen = readJson(
+            `!!document.querySelector('.footnote-shortcut-popup:not(.footnote-shortcut-popup-closed)')`,
+        );
+        if (!stillOpen) {
+            throw new Error("popup closed before the mid-session save landed");
+        }
+        action(`app.commands.executeCommandById('${CMD_AUTONUM}');`); // close
         await pollUntil(
             "popup closed",
             `!document.querySelector('.footnote-shortcut-popup:not(.footnote-shortcut-popup-closed)')`,
             (v) => v === true,
         );
-        await sleep(800); // close-time flush + the reconcile beat
-        await expectEditorText("Alpha bravo[^1] charlie\n\n[^1]: ");
-        // undo in the MAIN editor: the popup session was net-zero, so this
-        // must revert the footnote INSERTION — never resurrect "my note"
-        action(
-            `const v=${EDITOR}; v.editor.focus(); ` +
-            `v.editor.cm.contentDOM.dispatchEvent(new KeyboardEvent('keydown', ` +
-            `{key:'z', code:'KeyZ', ctrlKey:true, bubbles:true, cancelable:true}));`,
-        );
-        await expectEditorText("Alpha bravo charlie");
     });
 
     await test("rapid presses deep in a long note keep every footnote and the cursor", async () => {
