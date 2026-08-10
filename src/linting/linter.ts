@@ -14,7 +14,7 @@ import {
     runOutsideTableCell,
 } from "../insert-or-navigate-footnotes";
 import { maskProtectedLines, normalizeEol, restoreEol } from "../markdown-scan";
-import { AppWithCommands, WindowWithVim } from "../obsidian-internals";
+import { AppWithCommands, AppWithPlugins, WindowWithVim } from "../obsidian-internals";
 import { activeTableCellEditor, nestedSubEditorOwnsFocus } from "../table-cursor";
 import { applyFootnotePrefix } from "./rules/apply-footnote-prefix";
 import { footnoteAfterPunctuation } from "./rules/footnote-after-punctuation";
@@ -389,7 +389,15 @@ export function installLintOnSave(plugin: FootnotePlugin) {
     if (!command || typeof command.checkCallback !== "function") return;
     const original = command.checkCallback;
     const wrapped = (checking: boolean) => {
-        if (!checking && plugin.settings.lintOnSave) {
+        // only lint while THIS plugin instance is still the registered one:
+        // when reload timing stacks a stale wrapper inside a newer one's
+        // chain, the identity-checked restore below rightly leaves it in
+        // place — and without this gate the stale closure kept linting
+        // with FROZEN settings forever (observed live 2026-08-10)
+        const active = (plugin.app as AppWithPlugins).plugins?.plugins?.[
+            "obsidian-footnotes"
+        ];
+        if (!checking && active === plugin && plugin.settings.lintOnSave) {
             lintActiveNoteIfSafe(plugin);
         }
         return original(checking);
