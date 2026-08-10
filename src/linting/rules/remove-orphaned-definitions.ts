@@ -116,12 +116,19 @@ export function orphanedFootnoteDefinitionNames(markdown: string): string[] {
     return names;
 }
 
+/** The definition blocks the reference graph can't keep alive (transitive — see module note). Shared with reindex's keepOrphanedDefinitions:false path, so both deletion routes agree at any chain depth. */
+export function orphanedDefinitionBlocks(
+    lines: string[],
+    isProtected: boolean[],
+): DefinitionBlock[] {
+    return deadBlocks(scanReferences(lines, isProtected));
+}
+
 /** Every unreferenced definition block removed (transitively — see module note). Protected regions and everything referenced stay put. */
 export function removeOrphanedFootnoteDefinitions(markdown: string): string {
     const { text, eol } = normalizeEol(markdown);
     const lines = text.split("\n");
-    const isProtected = protectedLines(lines);
-    const dead = deadBlocks(scanReferences(lines, isProtected));
+    const dead = orphanedDefinitionBlocks(lines, protectedLines(lines));
     if (dead.length === 0) return markdown;
     return restoreEol(removeLineRanges(lines, dead).join("\n"), eol);
 }

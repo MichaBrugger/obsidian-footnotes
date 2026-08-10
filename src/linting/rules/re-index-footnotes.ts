@@ -13,6 +13,7 @@ import {
 } from "../../markdown-scan";
 import { IgnoreType } from "../ignore-types";
 import { FootnoteRule } from "../rule";
+import { orphanedDefinitionBlocks } from "./remove-orphaned-definitions";
 
 // The reindex algorithm: a pure markdown → markdown transform, no Editor.
 // Policy (pinned in test/reindex-footnotes.test.ts): numbered footnotes are
@@ -102,19 +103,33 @@ export function reindexFootnotes(
     markdown: string,
     options: ReindexOptions = {},
 ): string {
-    // A single pass can leave the result not-yet-stable, so re-run to a
-    // fixpoint — this makes one call idempotent (f(f(x)) === f(x)):
-    //  - permuting definition blocks changes the appearance order of references
-    //    NESTED in their bodies, which a second pass would renumber (churn);
-    //  - with orphan deletion on, cutting an orphan can strand a definition
-    //    that only the orphan's body referenced (a transitive orphan), which
-    //    a second pass would delete — destroying user text on the later run.
-    // Both converge in a couple of iterations; the cap only guards a
-    // theoretical non-convergent document (best-effort, never loops forever).
+    // A single pass can leave the result not-yet-stable — permuting
+    // definition blocks changes the appearance order of references NESTED in
+    // their bodies, which the next pass renumbers — so re-run to a fixpoint.
+    // Some documents have NO fixpoint: permutation and nested renumbering
+    // can chase each other in a genuine cycle (bug-reindex-cycle, period 3),
+    // and with lint-on-save that rewrote the note on every save forever.
+    // Detecting a repeat and returning one canonical member of the cycle
+    // (the lexicographically smallest — any fixed choice works) restores
+    // idempotence: re-running from the canon walks the same cycle and picks
+    // the same canon. Orphan deletion is transitive within ONE pass (see
+    // orphanedDefinitionBlocks), so it never drives the iteration. The cap
+    // is a pure safety net for a cycle longer than it (never observed).
     let current = markdown;
-    for (let i = 0; i < 20; i++) {
+    const seen: string[] = [];
+    for (let i = 0; i < 30; i++) {
         const next = reindexOnce(current, options);
         if (next === current) return current;
+        const cycleStart = seen.indexOf(next);
+        if (cycleStart !== -1) {
+            let canonical = next;
+            for (const state of seen.slice(cycleStart + 1)) {
+                if (state < canonical) canonical = state;
+            }
+            if (current < canonical) canonical = current;
+            return canonical;
+        }
+        seen.push(current);
         current = next;
     }
     return current;
@@ -145,12 +160,12 @@ function reindexOnce(
     let referenceOrder = referenceAppearanceOrder(lines, isProtected);
 
     if (!keepOrphans) {
-        // referenceOrder is lowercased (ids are case-insensitive), so a
-        // definition referenced only with different casing is NOT an orphan
-        const referenced = new Set(referenceOrder);
-        const orphans = blocks.filter(
-            (block) => !referenced.has(block.name.toLowerCase()),
-        );
+        // the shared reference-graph deletion: transitive chains of any
+        // depth die in THIS pass (the outer fixpoint used to expose one
+        // link per iteration and its cap returned mid-chain on 21+-deep
+        // chains — bug-reindex-orphan-cap), while definitions referencing
+        // each other in a cycle count as referenced and survive
+        const orphans = orphanedDefinitionBlocks(lines, isProtected);
         if (orphans.length > 0) {
             // cut the orphan blocks out, then re-derive everything — line
             // numbers shifted, and a cut can even change fence pairing

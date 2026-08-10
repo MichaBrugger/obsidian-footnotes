@@ -140,7 +140,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                         heading: "Rules",
                         items: [
                             {
-                                name: "Move references after punctuation",
+                                name: "Move footnote references after punctuation",
                                 desc: "The lint command moves footnote references that sit before punctuation to sit after it.",
                                 control: { type: "toggle", key: "lintFixPunctuation" },
                             },
@@ -178,7 +178,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                             },
                             {
                                 name: "Delete orphaned definitions",
-                                desc: "Linting deletes footnote definitions that nothing references. While off, they are kept (reindexing numbers them after everything else) and linting alerts you about them instead.",
+                                desc: "Linting deletes footnote definitions that have no references  (a \"[^6]:\" line with no [^6], which Obsidian doesn't render). While off, linting alerts you about them instead and reindexing numbers them after everything else.",
                                 control: {
                                     type: "toggle",
                                     key: "lintDeleteOrphanedDefinitions",
