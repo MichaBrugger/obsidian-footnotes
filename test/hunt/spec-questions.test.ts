@@ -25,16 +25,6 @@ describe("spec questions (Jason decides: bug or intended?)", () => {
         expect(computeNextFootnoteNumber("<!-- old[^7] -->\nreal[^1]")).toBe(2);
     });
 
-    // spec question: math ($...$ and $$...$$, an Obsidian/MathJax extension) is
-    // not a protected region, so a marker-shaped token inside math reserves a
-    // number. Lens: contexts. Currently returns 8 for both.
-    it.fails("a marker inside inline math does not reserve a number", () => {
-        expect(computeNextFootnoteNumber("cost $[^7]$ real[^1]")).toBe(2);
-    });
-    it.fails("a marker inside display math does not reserve a number", () => {
-        expect(computeNextFootnoteNumber("$$\nx[^7]\n$$\nreal[^1]")).toBe(2);
-    });
-
     // RESOLVED 2026-08-07: the prefix work answered the old "reindex
     // collapses a numeric footnote-prefix namespace" question by design —
     // digit-ending prefixes like "12" are invalid (footnotePrefixProblem

@@ -1,0 +1,31 @@
+import { describe, expect, it } from "vitest";
+
+import { footnoteMarkerMatches } from "../../src/insert-or-navigate-footnotes";
+import { applyFootnotePrefix } from "../../src/linting/rules/apply-footnote-prefix";
+import { reindexFootnotes } from "../../src/linting/rules/re-index-footnotes";
+
+// Scenario: "inline ^[^literal]" is ONE inline footnote with content
+// "^literal" per the repo's own inlineFootnoteSpanAt, but
+// footnoteMarkerMatches matches the inner [^literal] as a regular marker —
+// reindex and applyFootnotePrefix rewrite inline-footnote content.
+// Hunt: 2026-08-09. Lens: grammar.
+// Root cause: the regular-marker regex double-parses the interior of an
+// inline footnote; nothing excludes spans already claimed by inlineFootnoteSpanAt.
+
+describe("bug: inline footnotes are double-parsed as regular markers", () => {
+    it.fails("an inline footnote is not also parsed as a regular marker", () => {
+        expect(footnoteMarkerMatches("inline ^[^literal]")).toEqual([]);
+    });
+
+    it.fails("reindex leaves inline-footnote content that resembles an id untouched", () => {
+        const input = "inline ^[^9] real[^7]\n\n[^7]: body";
+        expect(reindexFootnotes(input)).toBe("inline ^[^9] real[^1]\n\n[^1]: body");
+    });
+
+    it.fails("applying a prefix does not turn an inline footnote into a regular reference", () => {
+        const input = "inline ^[^note] real[^1]\n\n[^1]: body";
+        expect(applyFootnotePrefix(input, "p.")).toBe(
+            "inline ^[^note] real[^p.1]\n\n[^p.1]: body",
+        );
+    });
+});

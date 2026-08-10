@@ -1,0 +1,23 @@
+import { describe, expect, it } from "vitest";
+
+import { computeNextFootnoteNumber } from "../../src/insert-or-navigate-footnotes";
+
+// BUG: "<!-->" and "<!--->" mid-line are COMPLETE comments per CommonMark
+// 0.31.2 §6.6, but protectedLines enters multi-line comment state and hides
+// the rest of the note.
+// Hunt: 2026-08-09. Lens: contexts.
+// Root cause: indexOf("-->", open+4) misses the overlapping closer.
+
+describe("bug: complete short comments <!--> and <!---> mid-line", () => {
+    it.fails("<!--> mid-line is a complete comment, not an opener", () => {
+        expect(computeNextFootnoteNumber("x <!-->\nreal[^1]")).toBe(2);
+    });
+
+    it.fails("<!---> mid-line is a complete comment, not an opener", () => {
+        expect(computeNextFootnoteNumber("x <!--->\nreal[^1]")).toBe(2);
+    });
+
+    it.fails("text after a complete <!--> on the same line is live", () => {
+        expect(computeNextFootnoteNumber("x <!--> [^9]\nreal[^1]")).toBe(10);
+    });
+});
