@@ -502,7 +502,7 @@ export function buildDefinitionAppend(
     isFirstFootnote: boolean,
     plugin: FootnotePlugin,
     ctx: DocContext = docContext(doc),
-): { change: EditorChange; cursor: EditorPosition } {
+): { change: EditorChange; cursor: EditorPosition; prepend?: EditorChange } {
     const lines = ctx.lines;
     const isProtected = ctx.scan.isProtected;
     const blocks = findDefinitionBlocks(lines, isProtected);
@@ -592,7 +592,24 @@ export function buildDefinitionAppend(
         line: fromLine + linesAdded,
         ch: text.length - text.lastIndexOf("\n") - 1,
     };
-    return { change: { from, to, text }, cursor };
+
+    // The first footnote's section heading can carry a column-0 "---"
+    // divider; if the note's first line is a bare unclosed "---" (a
+    // thematic break), inserting that divider makes Obsidian re-read the
+    // whole head as YAML frontmatter, swallowing the prose in it (same
+    // hazard as preserveLeadingThematicBreak in
+    // move-footnotes-to-the-bottom — verified against metadataCache,
+    // 2026-08-10). A blank line prepended in the same transaction pins
+    // line 0 as content; it renders identically.
+    let prepend: EditorChange | undefined;
+    if (isFirstFootnote && lines[0] === "---" && !isProtected[0]) {
+        const candidate = lines.slice(0, fromLine + 1).join("\n") + text;
+        if (scanDocument(candidate.split("\n")).isProtected[0]) {
+            prepend = { from: { line: 0, ch: 0 }, text: "\n" };
+            cursor.line += 1;
+        }
+    }
+    return { change: { from, to, text }, cursor, prepend };
 }
 
 /** Whether `c` is trailing punctuation (TrailingPunctuationChars in markdown-scan — ASCII + CJK, shared with the lint rule). Guards the empty string explicitly — `"…".includes("")` is true, and `text[i]` past EOL yields undefined at some call sites. */
@@ -978,13 +995,19 @@ export function shouldCreateAutonumFootnote(
         // the definition append is outside the table, so the main editor is safe
         insertInTableCell(cell, plugin, footnoteReference, footnoteReference.length);
         const definition = buildDefinitionAppend(doc, footnoteId, isFirstFootnote, plugin, ctx);
+        // the phantom-frontmatter prepend (see buildDefinitionAppend) rides
+        // the same transaction; it edits above the table, which is outside
+        // the cell sub-editor's region and therefore safe (issue #28 policy)
+        const definitionChanges = definition.prepend
+            ? [definition.prepend, definition.change]
+            : [definition.change];
         if (popupEditingAvailable(plugin)) {
-            doc.transaction({ changes: [definition.change] });
+            doc.transaction({ changes: definitionChanges });
             void openFootnotePopup(plugin, footnoteId, () => {
                 moveCursorAndSetJumpPoint(doc, cursorPosition, definition.cursor, plugin, undefined, true);
             });
         } else {
-            moveCursorAndSetJumpPoint(doc, cursorPosition, definition.cursor, plugin, [definition.change], true);
+            moveCursorAndSetJumpPoint(doc, cursorPosition, definition.cursor, plugin, definitionChanges, true);
         }
         return;
     }
@@ -995,11 +1018,15 @@ export function shouldCreateAutonumFootnote(
         { from: cursorPosition, text: footnoteReference },
         definition.change,
     ];
+    // the phantom-frontmatter prepend (see buildDefinitionAppend) rides the
+    // same transaction; it shifts every post-transaction line down by one
+    if (definition.prepend) changes.push(definition.prepend);
+    const lineShift = definition.prepend ? 1 : 0;
 
     if (popupEditingAvailable(plugin)) {
         // type the definition in a popup instead of jumping to the bottom;
         // the cursor only moves past the new reference
-        const afterReference = { line: cursorPosition.line, ch: cursorPosition.ch + footnoteReference.length };
+        const afterReference = { line: cursorPosition.line + lineShift, ch: cursorPosition.ch + footnoteReference.length };
         doc.transaction({ changes, selection: { from: afterReference } });
         const cancelCreationLint = scheduleCreationLintAfterPopup(plugin);
         void openFootnotePopup(plugin, footnoteId, () => {
@@ -1427,11 +1454,16 @@ export function shouldCreateMatchingFootnoteDefinition(
             // if so, add definition for the current footnote
             if (!idListIncludes(list, footnoteId)) {
                 const definition = buildDefinitionAppend(doc, footnoteId, list.length === 0, plugin, ctx);
+                // the phantom-frontmatter prepend rides the same
+                // transaction (see buildDefinitionAppend)
+                const definitionChanges = definition.prepend
+                    ? [definition.prepend, definition.change]
+                    : [definition.change];
 
                 if (popupEditingAvailable(plugin)) {
                     // type the definition in a popup instead of jumping to the
                     // bottom; the cursor stays on the reference
-                    doc.transaction({ changes: [definition.change] });
+                    doc.transaction({ changes: definitionChanges });
                     const cancelCreationLint = scheduleCreationLintAfterPopup(plugin);
                     void openFootnotePopup(plugin, footnoteId, () => {
                         moveCursorAndSetJumpPoint(doc, cursorPosition, definition.cursor, plugin, undefined, true);
@@ -1442,7 +1474,7 @@ export function shouldCreateMatchingFootnoteDefinition(
                         lintAfterFootnoteCreation(plugin, true);
                     });
                 } else {
-                    moveCursorAndSetJumpPoint(doc, cursorPosition, definition.cursor, plugin, [definition.change], true);
+                    moveCursorAndSetJumpPoint(doc, cursorPosition, definition.cursor, plugin, definitionChanges, true);
                     lintAfterFootnoteCreation(plugin, true);
                 }
 

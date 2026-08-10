@@ -1,4 +1,9 @@
 import fc from "fast-check";
+import { fromMarkdown } from "mdast-util-from-markdown";
+import { gfmFootnoteFromMarkdown } from "mdast-util-gfm-footnote";
+import { mathFromMarkdown } from "mdast-util-math";
+import { gfmFootnote } from "micromark-extension-gfm-footnote";
+import { math } from "micromark-extension-math";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -161,6 +166,79 @@ function referenceCount(text: string): number {
         0,
     );
 }
+
+// ---------- differential oracle (remark/micromark) ----------
+// An INDEPENDENT markdown implementation as referee: micromark with the
+// GFM-footnote and math extensions parses the document before and after
+// lint, and the footnote structure it sees must match. Comparing
+// before-vs-after under the SAME parser cancels out parser-vs-plugin
+// opinion differences — any change in what remark sees was introduced by
+// lint itself.
+
+interface OracleNode {
+    type: string;
+    identifier?: string;
+    children?: OracleNode[];
+}
+
+interface FootnoteShape {
+    definitions: number;
+    references: number;
+    /** references whose identifier has a matching definition */
+    resolved: number;
+}
+
+function footnoteShape(markdown: string): FootnoteShape {
+    const tree = fromMarkdown(markdown, {
+        extensions: [gfmFootnote(), math()],
+        mdastExtensions: [gfmFootnoteFromMarkdown(), mathFromMarkdown()],
+    }) as OracleNode;
+    const defined = new Set<string>();
+    const referenced: string[] = [];
+    let definitions = 0;
+    const stack: OracleNode[] = [tree];
+    while (stack.length > 0) {
+        const node = stack.pop();
+        if (!node) break;
+        // mdast stores `identifier` already case-normalized
+        if (node.type === "footnoteDefinition" && node.identifier !== undefined) {
+            definitions++;
+            defined.add(node.identifier);
+        }
+        if (node.type === "footnoteReference" && node.identifier !== undefined) {
+            referenced.push(node.identifier);
+        }
+        if (node.children) stack.push(...node.children);
+    }
+    return {
+        definitions,
+        references: referenced.length,
+        resolved: referenced.filter((id) => defined.has(id)).length,
+    };
+}
+
+// The one KNOWN parser disagreement, found by this very property on its
+// first run (2026-08-10): micromark's math extension lets a "$" inside a
+// reference name open a math span — in "[^a$1] x[^ch-2]. $m$" the two
+// dollars pair up and swallow the [^ch-2] reference — while Obsidian keeps
+// such names as footnotes (verified live; dollarInsideReference implements
+// that). Renaming [^a$1] during reindex then changes what remark sees for
+// reasons that are micromark's opinion, not a lint bug. The oracle recuses
+// itself from documents with a "$" inside a footnote name; every other
+// property still covers them.
+const oracleDocArb = docArb.filter((doc) => !/\[\^[^\]\n]*\$/.test(doc));
+
+describe("differential oracle over random documents", () => {
+    it("remark sees the same footnote structure before and after lint (deletions off)", () => {
+        fc.assert(
+            fc.property(oracleDocArb, keepingOptionsArb, (doc, options) => {
+                const before = footnoteShape(doc);
+                const after = footnoteShape(lintFootnotes(doc, options));
+                expect(after).toEqual(before);
+            }),
+        );
+    });
+});
 
 // ---------- transform invariants ----------
 

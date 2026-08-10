@@ -103,6 +103,7 @@ export function removeOrphanedFootnoteReferences(
     const definitions = definitionNamesFolded(lines, masked);
     const safeFolded = safePrefix.toLowerCase();
 
+    let changedAny = false;
     const out = lines.map((line, i) => {
         if (scan.isProtected[i]) return line;
         let result = "";
@@ -126,11 +127,26 @@ export function removeOrphanedFootnoteReferences(
             changed = true;
         }
         if (!changed) return line;
+        changedAny = true;
         const tail = line.slice(copied);
         // a reference that closed the line leaves its leading space dangling;
         // a non-empty tail means any trailing spaces were already there
         return tail === "" ? result.replace(/[ \t]+$/, "") : result + tail;
     });
+    if (!changedAny) return markdown;
+
+    // Deleting reference text can re-classify a DISTANT line: blanking the
+    // paragraph between a definition and an indented chunk turns that chunk
+    // from indented CODE into a definition CONTINUATION (Obsidian continues
+    // a definition across any run of blank lines — verified against
+    // metadataCache, 2026-08-10; found by the idempotence property), so the
+    // next lint pass would edit text this pass promised to protect. A
+    // deletion that changes ANY other line's protection classification is
+    // refused outright; the orphans stay for the user to resolve.
+    const scanAfter = scanDocument(out);
+    for (let i = 0; i < lines.length; i++) {
+        if (scan.isProtected[i] !== scanAfter.isProtected[i]) return markdown;
+    }
     return restoreEol(out.join("\n"), eol);
 }
 

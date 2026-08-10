@@ -16,6 +16,28 @@ import { FootnoteRule } from "../rule";
 // fixed point of this transform.
 
 /**
+ * A document whose FIRST line is a bare unclosed "---" reads as a thematic
+ * break — until an edit introduces a column-0 "---"/"..." further down, at
+ * which point Obsidian re-reads the whole head as a YAML frontmatter block
+ * and every line in it (prose, references) silently leaves the note body
+ * (verified against metadataCache section types, 2026-08-10; found by the
+ * remark differential oracle — gathering definitions under a "---\n##
+ * Footnotes" heading closed the phantom block and reindex then renumbered
+ * an orphaned definition onto the swallowed reference's name). When a
+ * rebuild would flip that interpretation, one blank line is prepended: it
+ * renders identically, and frontmatter can only open on the very first
+ * line, so line 0 stays content forever.
+ */
+function preserveLeadingThematicBreak(
+    firstLineWasProtected: boolean,
+    rebuilt: string,
+): string {
+    if (firstLineWasProtected || !rebuilt.startsWith("---")) return rebuilt;
+    if (!scanDocument(rebuilt.split("\n")).isProtected[0]) return rebuilt;
+    return "\n" + rebuilt;
+}
+
+/**
  * Gather every footnote definition block at the note's footnote section,
  * keeping the blocks' relative order (reordering is reindexFootnotes' job).
  * When `sectionHeading` is given (the raw setting value) and an exact
@@ -106,7 +128,10 @@ export function moveFootnoteDefinitionsToBottom(
         const rest = body.slice(anchorEnd + 1);
         while (rest.length > 0 && rest[0] === "") rest.shift();
         if (rest.length > 0) out.push("", ...rest);
-        const anchored = out.join("\n") + "\n".repeat(trailingNewlines);
+        const anchored = preserveLeadingThematicBreak(
+            isProtected[0],
+            out.join("\n") + "\n".repeat(trailingNewlines),
+        );
         // byte-identical no-op on mixed-EOL notes (spec-mixed-eol-noop-rewrite)
         return anchored === text ? markdown : restoreEol(anchored, eol);
     }
@@ -126,7 +151,10 @@ export function moveFootnoteDefinitionsToBottom(
             ? (sectionHeading !== "" ? sectionHeading + "\n\n" : "") +
               definitions
             : base + headingPart + "\n\n" + definitions;
-    const rebuilt = result + "\n".repeat(trailingNewlines);
+    const rebuilt = preserveLeadingThematicBreak(
+        isProtected[0],
+        result + "\n".repeat(trailingNewlines),
+    );
     // byte-identical no-op on mixed-EOL notes (spec-mixed-eol-noop-rewrite)
     return rebuilt === text ? markdown : restoreEol(rebuilt, eol);
 }
