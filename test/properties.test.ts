@@ -32,6 +32,12 @@ import {
 //   $env:FC_NUM_RUNS = "5000"; npx vitest run test/properties.test.ts
 fc.configureGlobal({ numRuns: Number(process.env.FC_NUM_RUNS ?? 200) });
 
+// soaks legitimately run for minutes — vitest's 5s default timeout is for
+// hangs, not for 5000 double-parses (the oracle "failed" a soak purely by
+// exceeding it); scale the ceiling with the run count
+const SOAK_TIMEOUT = Math.max(30_000, Number(process.env.FC_NUM_RUNS ?? 200) * 60);
+const soakIt = (name: string, fn: () => void) => it(name, fn, SOAK_TIMEOUT);
+
 // ---------- document generator ----------
 // Structured, not byte-random: the pieces are the plugin's whole attack
 // surface — references (plain/named/cased/$/escaped/inline), definitions
@@ -229,7 +235,7 @@ function footnoteShape(markdown: string): FootnoteShape {
 const oracleDocArb = docArb.filter((doc) => !/\[\^[^\]\n]*\$/.test(doc));
 
 describe("differential oracle over random documents", () => {
-    it("remark sees the same footnote structure before and after lint (deletions off)", () => {
+    soakIt("remark sees the same footnote structure before and after lint (deletions off)", () => {
         fc.assert(
             fc.property(oracleDocArb, keepingOptionsArb, (doc, options) => {
                 const before = footnoteShape(doc);
@@ -243,7 +249,7 @@ describe("differential oracle over random documents", () => {
 // ---------- transform invariants ----------
 
 describe("lint invariants over random documents", () => {
-    it("lint is idempotent for every document and option combo", () => {
+    soakIt("lint is idempotent for every document and option combo", () => {
         fc.assert(
             fc.property(docArb, optionsArb, (doc, options) => {
                 const once = lintFootnotes(doc, options);
@@ -252,7 +258,7 @@ describe("lint invariants over random documents", () => {
         );
     });
 
-    it("lint never writes NUL bytes (mask leakage)", () => {
+    soakIt("lint never writes NUL bytes (mask leakage)", () => {
         fc.assert(
             fc.property(docArb, optionsArb, (doc, options) => {
                 expect(lintFootnotes(doc, options)).not.toContain("\0");
@@ -260,7 +266,7 @@ describe("lint invariants over random documents", () => {
         );
     });
 
-    it("protected line contents survive lint as a multiset", () => {
+    soakIt("protected line contents survive lint as a multiset", () => {
         fc.assert(
             fc.property(docArb, optionsArb, (doc, options) => {
                 const out = lintFootnotes(doc, options);
@@ -280,7 +286,7 @@ describe("lint invariants over random documents", () => {
         );
     });
 
-    it("definitions and references are conserved while every deletion is off", () => {
+    soakIt("definitions and references are conserved while every deletion is off", () => {
         fc.assert(
             fc.property(docArb, keepingOptionsArb, (doc, options) => {
                 const out = lintFootnotes(doc, options);
@@ -294,7 +300,7 @@ describe("lint invariants over random documents", () => {
 // ---------- scanner invariants ----------
 
 describe("scanner invariants over random documents", () => {
-    it("masking preserves every line's length", () => {
+    soakIt("masking preserves every line's length", () => {
         fc.assert(
             fc.property(docArb, (doc) => {
                 const lines = normalizeEol(doc).text.split("\n");
@@ -306,7 +312,7 @@ describe("scanner invariants over random documents", () => {
         );
     });
 
-    it("maskedLineAt agrees with the full masked twin on every line", () => {
+    soakIt("maskedLineAt agrees with the full masked twin on every line", () => {
         fc.assert(
             fc.property(docArb, fc.nat(60), (doc, pick) => {
                 const lines = normalizeEol(doc).text.split("\n");
@@ -323,7 +329,7 @@ describe("scanner invariants over random documents", () => {
 // ---------- editor-side invariants ----------
 
 describe("editor helper invariants", () => {
-    it("sanitized clipboard text always forms a closed inline footnote", () => {
+    soakIt("sanitized clipboard text always forms a closed inline footnote", () => {
         fc.assert(
             fc.property(fc.string({ maxLength: 60 }), (raw) => {
                 const content = sanitizeInlineFootnoteContent(raw);
@@ -338,7 +344,7 @@ describe("editor helper invariants", () => {
         );
     });
 
-    it("endOfWordOffset stays in range and never splits a surrogate pair", () => {
+    soakIt("endOfWordOffset stays in range and never splits a surrogate pair", () => {
         fc.assert(
             fc.property(
                 fc.string({ maxLength: 30, unit: "grapheme" }),

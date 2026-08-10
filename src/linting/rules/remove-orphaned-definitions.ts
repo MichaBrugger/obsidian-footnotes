@@ -35,7 +35,7 @@ function scanReferences(
     lines: string[],
     scan: DocumentScan,
 ): ReferenceScan {
-    const blocks = findDefinitionBlocks(lines, scan.isProtected);
+    const blocks = findDefinitionBlocks(lines, scan.isProtected, scan);
 
     // document-aware masked twin: protected lines are all-NUL (no matches),
     // and comment portions of boundary lines are invisible

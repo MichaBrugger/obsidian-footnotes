@@ -274,7 +274,7 @@ export function shouldJumpFromDefinitionToReference(
     ctx ??= docContext(doc);
     const lines = ctx.lines;
     // the press's one protection scan feeds the block lookup and masking
-    const block = findDefinitionBlocks(lines, ctx.scan.isProtected).find(
+    const block = findDefinitionBlocks(lines, ctx.scan.isProtected, ctx.scan).find(
         (candidate) =>
             cursorPosition.line >= candidate.start &&
             cursorPosition.line <= candidate.end,
@@ -505,7 +505,7 @@ export function buildDefinitionAppend(
 ): { change: EditorChange; cursor: EditorPosition; prepend?: EditorChange } {
     const lines = ctx.lines;
     const isProtected = ctx.scan.isProtected;
-    const blocks = findDefinitionBlocks(lines, isProtected);
+    const blocks = findDefinitionBlocks(lines, isProtected, ctx.scan);
     // a non-blank line directly below the new definition would be pulled INTO
     // it — Obsidian lazily continues a definition into the next line — so
     // insertions with content below them add a trailing blank separator

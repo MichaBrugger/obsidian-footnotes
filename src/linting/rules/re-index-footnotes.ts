@@ -160,7 +160,7 @@ function reindexOnce(
     let lines = text.split("\n");
     let scan = scanDocument(lines);
     let maskedLines = maskProtectedLines(lines, scan);
-    let blocks = findDefinitionBlocks(lines, scan.isProtected);
+    let blocks = findDefinitionBlocks(lines, scan.isProtected, scan);
     let referenceOrder = referenceAppearanceOrder(lines, maskedLines);
 
     if (!keepOrphans) {
@@ -176,7 +176,7 @@ function reindexOnce(
             lines = removeLineRanges(lines, orphans);
             scan = scanDocument(lines);
             maskedLines = maskProtectedLines(lines, scan);
-            blocks = findDefinitionBlocks(lines, scan.isProtected);
+            blocks = findDefinitionBlocks(lines, scan.isProtected, scan);
             referenceOrder = referenceAppearanceOrder(lines, maskedLines);
         }
     }

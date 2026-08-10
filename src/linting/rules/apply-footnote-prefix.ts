@@ -40,7 +40,7 @@ export function applyFootnotePrefix(markdown: string, prefix: string): string {
     const scan = scanDocument(lines);
     const isProtected = scan.isProtected;
     const maskedLines = maskProtectedLines(lines, scan);
-    const blocks = findDefinitionBlocks(lines, isProtected);
+    const blocks = findDefinitionBlocks(lines, isProtected, scan);
 
     // one scan collects both: distinct plain-numbered names by first reference
     // appearance then orphaned definitions (numbers have no casing, so no

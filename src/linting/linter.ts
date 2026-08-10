@@ -112,20 +112,21 @@ export function lintFootnotes(
     // original endings are restored a single time on the way out
     const { text, eol } = normalizeEol(markdown);
     let result = text;
-    // FIRST: references slated for deletion shouldn't be punctuation-swapped,
-    // prefixed, or handed numbers by the reindex below — and removing them
-    // can't orphan any definition (an orphaned reference has none)
-    if (options.removeOrphanedReferences) {
-        result = removeOrphanedFootnoteReferences(
-            result,
-            options.orphanSafePrefix ?? "",
-        );
-    }
-    // deleting orphaned references can't orphan a definition (they had none),
-    // and deleting orphaned definitions can't orphan a live reference (a
-    // reference's reference is exactly what keeps a definition alive) — the
-    // two steps are order-independent and both precede everything else
-    if (options.removeOrphanedDefinitions) {
+    // FIRST: definitions slated for deletion shouldn't be moved, prefixed,
+    // or handed numbers by the rules below — and deleting orphaned
+    // definitions can't orphan a live reference (a reference's presence is
+    // exactly what keeps a definition alive). Reindex's own
+    // keepOrphanedDefinitions:false deletion is hoisted here too (the two
+    // routes share orphanedDefinitionBlocks, so they agree; reindex's
+    // internal pass then finds nothing left): EVERY definition deletion
+    // must precede the reference deletion below, whose refusal guard
+    // judges definition geometry — a definition deleted after that
+    // judgment flipped the verdict between passes (idempotence property,
+    // 2026-08-10).
+    const reindexDeletesOrphans =
+        (options.reindex ?? true) &&
+        options.reindexOptions?.keepOrphanedDefinitions === false;
+    if (options.removeOrphanedDefinitions || reindexDeletesOrphans) {
         result = removeOrphanedFootnoteDefinitions(result);
     }
     if (options.fixPunctuation ?? true) {
@@ -136,6 +137,35 @@ export function lintFootnotes(
             result,
             options.sectionHeading ?? "",
         );
+    }
+    // orphaned-REFERENCE deletion runs on the SETTLED layout — after the
+    // deletions and moves above, before prefix/reindex hand out numbers.
+    // Its classification-refusal guard (bug-orphan-delete-reclassifies)
+    // judges the geometry of definitions around the reference, and both
+    // definition deletion and move-to-bottom change that geometry: judged
+    // any earlier, pass one can refuse a deletion pass two then performs
+    // (caught twice by the idempotence property, 2026-08-10). Punctuation
+    // may swap a doomed reference first — harmless, the deletion seam
+    // heals to the same text. Everything downstream only renames or
+    // permutes definitions among existing slots, which never changes
+    // whether a definition sits above a reference, so the guard's verdict
+    // is stable across passes.
+    if (options.removeOrphanedReferences) {
+        const beforeDeletion = result;
+        result = removeOrphanedFootnoteReferences(
+            result,
+            options.orphanSafePrefix ?? "",
+        );
+        // a deleted reference can leave its line blank; where that blank
+        // touches the moved definitions' seams, the NEXT pass's move would
+        // collapse it — re-settle now so this pass's output is already the
+        // fixed point (idempotence property, 2026-08-10)
+        if (result !== beforeDeletion && (options.moveDefinitionsToBottom ?? true)) {
+            result = moveFootnoteDefinitionsToBottom(
+                result,
+                options.sectionHeading ?? "",
+            );
+        }
     }
     // the note's own valid footnote-prefix, when any prefix behavior is on
     // (an invalid property changes nothing here — the lint guard cancels

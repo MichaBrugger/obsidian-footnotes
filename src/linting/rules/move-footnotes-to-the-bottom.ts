@@ -67,7 +67,7 @@ export function moveFootnoteDefinitionsToBottom(
 
     const scan = scanDocument(lines);
     const isProtected = scan.isProtected;
-    const blocks = findDefinitionBlocks(lines, isProtected);
+    const blocks = findDefinitionBlocks(lines, isProtected, scan);
     if (blocks.length === 0) return markdown;
 
     // a line appended at EOF would itself be protected (an unclosed fence

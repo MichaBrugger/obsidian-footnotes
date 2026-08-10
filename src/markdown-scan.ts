@@ -332,6 +332,17 @@ export interface DocumentScan {
  * (or lazily continuing a paragraph) is live markdown; only a 4-space/tab
  * chunk opening at a block boundary outside any definition is code.
  */
+/** Width of the line's leading whitespace, tabs expanding to 4-column tab stops (CommonMark). */
+function leadingIndentWidth(line: string): number {
+    let width = 0;
+    for (const ch of line) {
+        if (ch === " ") width++;
+        else if (ch === "\t") width += 4 - (width % 4);
+        else break;
+    }
+    return width;
+}
+
 export function scanDocument(lines: string[]): DocumentScan {
     const src = stripCr(lines);
     const isProtected = new Array<boolean>(lines.length).fill(false);
@@ -359,11 +370,20 @@ export function scanDocument(lines: string[]): DocumentScan {
     let inIndentedCode = false;
     let inDefinition = false;
     let prevBlank = true;
+    // open list items' CONTENT indents, innermost last (Sol bug #2,
+    // 2026-08-10, verified against metadataCache): a loose list's indented
+    // continuation ("- a", blank, "    details") is LIVE list content —
+    // indented code inside an item starts 4 columns past the item's
+    // content indent, not at column 4 of the document. Doc-level only;
+    // quoted lists ride their quote's existing rules.
+    const listStack: number[] = [];
     for (; i < src.length; i++) {
         if (inComment) {
             startsInComment[i] = true;
             inIndentedCode = false;
-            inDefinition = false;
+            // inDefinition survives: a region OPENED by an indented
+            // continuation ("    <!--") is definition content, and the
+            // definition resumes after its closer (Sol bug #3)
             prevBlank = false;
             if (!src[i].includes("-->")) {
                 isProtected[i] = true; // interior: nothing live on it
@@ -380,7 +400,7 @@ export function scanDocument(lines: string[]): DocumentScan {
         if (inMath) {
             startsInMath[i] = true;
             inIndentedCode = false;
-            inDefinition = false;
+            // inDefinition survives — same rationale as the comment branch
             prevBlank = false;
             if (!src[i].includes("$$")) {
                 isProtected[i] = true; // interior: nothing live on it
@@ -431,27 +451,65 @@ export function scanDocument(lines: string[]): DocumentScan {
             prevBlank = true;
             continue; // nothing on a blank line can open a fence or comment
         }
-        const indented = /^(?: {4}|\t)/.test(src[i]);
+        const indentWidth = leadingIndentWidth(src[i]);
+        // a non-blank line at a block boundary closes every list item it
+        // is not indented into (lazy continuations, which have no blank
+        // above them, keep their item open)
+        if (prevBlank) {
+            while (
+                listStack.length > 0 &&
+                indentWidth < listStack[listStack.length - 1]
+            ) {
+                listStack.pop();
+            }
+        }
+        const codeIndent =
+            (listStack.length > 0 ? listStack[listStack.length - 1] : 0) + 4;
+        const indented = indentWidth >= codeIndent;
         if (indented && inIndentedCode) {
             isProtected[i] = true;
             prevBlank = false;
             continue;
         }
         if (indented && !inDefinition && prevBlank) {
-            // a 4-space/tab chunk opening at a block boundary outside any
-            // definition is CommonMark indented code — inert to Obsidian,
-            // so the transforms must not count or rewrite it
+            // a chunk indented past the code threshold, opening at a block
+            // boundary outside any definition, is CommonMark indented code
+            // — inert to Obsidian, so the transforms must not count or
+            // rewrite it
             inIndentedCode = true;
             isProtected[i] = true;
             prevBlank = false;
             continue;
         }
-        // an indented line here is a definition continuation or a lazy
+        // a code-indented line here is a definition continuation or a lazy
         // paragraph continuation — live markdown, and it keeps an open
-        // definition open; a non-indented line re-decides the definition
+        // definition open; a shallower line re-decides both states
         if (!indented) {
             inIndentedCode = false;
-            inDefinition = DefinitionStart.test(src[i]);
+            // lines indented ≥ 4 continue an open definition even inside a
+            // list's live range; only a shallower line re-decides it
+            if (indentWidth < 4) {
+                inDefinition = DefinitionStart.test(src[i]);
+            }
+            // a list-item marker OPENS a container: its content indent is
+            // the marker column + marker width + the following gap (a gap
+            // of 5+, or none, counts as 1 per CommonMark)
+            if (depth === 0) {
+                const item = src[i].match(/^( *)([-+*]|\d{1,9}[.)])( +|$)/);
+                if (item) {
+                    while (
+                        listStack.length > 0 &&
+                        indentWidth < listStack[listStack.length - 1]
+                    ) {
+                        listStack.pop();
+                    }
+                    const gap =
+                        item[3].length === 0 || item[3].length > 4
+                            ? 1
+                            : item[3].length;
+                    listStack.push(item[1].length + item[2].length + gap);
+                }
+            }
         }
         prevBlank = false;
 
@@ -601,10 +659,11 @@ export function removeLineRanges(
     return out;
 }
 
-/** Every definition with its continuation lines (indented lines, plus blank runs that lead to more indented lines). */
+/** Every definition with its continuation lines (indented lines, plus blank runs that lead to more indented lines). Pass the full `scan` when available: a continuation can OPEN a multi-line comment/math region ("    $$"), and only the scan's startsIn* facts let the walk absorb that region's protected interior instead of splitting the block in half (Sol bug #3, 2026-08-10). */
 export function findDefinitionBlocks(
     lines: string[],
     isProtected: boolean[],
+    scan?: Pick<DocumentScan, "startsInComment" | "startsInMath">,
 ): DefinitionBlock[] {
     const blocks: DefinitionBlock[] = [];
     for (let i = 0; i < lines.length; i++) {
@@ -614,7 +673,19 @@ export function findDefinitionBlocks(
 
         let end = i;
         let j = i + 1;
-        while (j < lines.length && !isProtected[j]) {
+        while (j < lines.length) {
+            if (isProtected[j]) {
+                // a protected line that STARTS inside a comment/math
+                // region is that region's interior — and reaching it here
+                // means the opener was a continuation already absorbed
+                // into this block (a region open before the definition
+                // would have protected the label line itself)
+                if (scan && (scan.startsInComment[j] || scan.startsInMath[j])) {
+                    end = j++;
+                    continue;
+                }
+                break;
+            }
             if (IndentedContent.test(lines[j])) {
                 end = j++;
                 continue;
