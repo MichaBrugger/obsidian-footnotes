@@ -20,3 +20,4 @@ icons/*.svg.*.svg
 # claude skill-eval scaffolding and agent worktrees
 .claude/skills/hunt-bugs-workspace/
 .claude/worktrees/
+scripts/.smoke-settings.bak.json

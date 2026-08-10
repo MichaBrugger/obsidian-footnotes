@@ -12,8 +12,15 @@
 //   npm run test:smoke -- --no-deploy   tests whatever is already loaded
 
 import { execFileSync } from "node:child_process";
-import { copyFileSync, existsSync } from "node:fs";
-import { join, resolve } from "node:path";
+import {
+    copyFileSync,
+    existsSync,
+    readFileSync,
+    unlinkSync,
+    writeFileSync,
+} from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import process from "node:process";
 
 const NOTE = "Smoke Test - footnotes";
@@ -100,6 +107,15 @@ async function setupNote(content) {
     if (!noteReady) {
         ob("create", `name=${NOTE}`, "content=placeholder", "overwrite", "silent");
         ob("open", `file=${NOTE}`);
+        // the suite REQUIRES live preview: raw source mode renders no
+        // table widgets (the cell tests just time out), and the leaf
+        // inherits whatever mode its previous note used — force the mode
+        // instead of depending on it (repeatability, 2026-08-10)
+        action(
+            `(async () => { const v=${EDITOR}; ` +
+            `await v.setState({...v.getState(), mode:'source', source:false}, {history:false}); })();`,
+        );
+        await sleep(300);
         noteReady = true;
     }
     // close any popup a previous test left open (Escape routes through the
@@ -174,13 +190,26 @@ let skips = 0;
 
 class SkipTest extends Error {}
 
-// The table widget only opens its cell sub-editor from the render loop,
-// which stalls entirely while the window is hidden — tests that need it
-// call this and SKIP (loudly) instead of failing meaninglessly.
-function requireVisibleWindow() {
-    if (readJson("document.hidden") === true) {
-        throw new SkipTest("Obsidian window is hidden/minimized — table cell editing can't render");
-    }
+// The table widget only opens its cell sub-editor from a FOCUSED window's
+// render loop — hidden stalls it entirely, and merely-visible-but-unfocused
+// leaves the editor focus() a no-op (observed 2026-08-10: showInactive made
+// the tests FAIL instead of skip). Tests that need the cell editor call
+// this; it grabs focus once when necessary (the suite is run deliberately,
+// so a brief front is acceptable) and SKIPs loudly when even that fails.
+async function requireVisibleWindow() {
+    const usable = () =>
+        readJson("document.hidden") === false &&
+        readJson("document.hasFocus()") === true;
+    if (usable()) return;
+    action(
+        `(() => { try { const w = require('electron').remote?.getCurrentWindow?.(); ` +
+        `if (w?.isMinimized()) w.restore(); w?.show(); w?.focus(); } catch (e) {} })();`,
+    );
+    await sleep(500);
+    if (usable()) return;
+    throw new SkipTest(
+        "Obsidian window is hidden or cannot take focus — table cell editing can't render",
+    );
 }
 
 async function test(name, fn) {
@@ -205,6 +234,53 @@ async function expectEditorText(expected) {
         (v) => v === expected,
     );
 }
+
+// ---------- settings safety net ----------
+// The suite patches the live plugin settings per test. Restoration must
+// survive EVERY exit path — a failed assertion, a thrown poll timeout,
+// Ctrl+C — or Jason has to re-edit his settings by hand after each run
+// (observed 2026-08-10, when aborted runs left lint-on-save + a section
+// heading behind). The pre-run snapshot also lands in a sidecar file, so
+// even a hard-killed run heals on the NEXT invocation.
+
+const SETTINGS_BACKUP = join(
+    dirname(fileURLToPath(import.meta.url)),
+    ".smoke-settings.bak.json",
+);
+let savedSettings = null;
+let cleanupDone = false;
+
+function restoreState(reason) {
+    if (cleanupDone) return;
+    cleanupDone = true;
+    try {
+        ob("delete", `path=${NOTE}.md`);
+    } catch {
+        // the note may never have been created — nothing to delete
+    }
+    if (!savedSettings) return;
+    try {
+        setSettings(savedSettings);
+        const now = readJson(`app.plugins.plugins['${PLUGIN_ID}'].settings`);
+        if (JSON.stringify(now) === JSON.stringify(savedSettings)) {
+            if (existsSync(SETTINGS_BACKUP)) unlinkSync(SETTINGS_BACKUP);
+            console.log(`settings restored (${reason})`);
+        } else {
+            console.error(
+                `settings restore could not be verified (${reason}) — backup kept at ${SETTINGS_BACKUP}`,
+            );
+        }
+    } catch (e) {
+        console.error(
+            `settings restore failed (${reason}): ${e.message} — backup kept at ${SETTINGS_BACKUP}`,
+        );
+    }
+}
+
+process.on("SIGINT", () => {
+    restoreState("interrupted");
+    process.exit(130);
+});
 
 // ---------- suite ----------
 
@@ -252,7 +328,34 @@ async function main() {
         await sleep(300);
     }
 
-    const savedSettings = readJson(`app.plugins.plugins['${PLUGIN_ID}'].settings`);
+    // snapshot the settings — or, when a sidecar backup survived a killed
+    // run, treat THAT as the true pre-smoke state and heal it first
+    if (existsSync(SETTINGS_BACKUP)) {
+        savedSettings = JSON.parse(readFileSync(SETTINGS_BACKUP, "utf8"));
+        console.log(
+            "found settings backup from an interrupted run — restoring it before starting",
+        );
+        setSettings(savedSettings);
+    } else {
+        savedSettings = readJson(
+            `app.plugins.plugins['${PLUGIN_ID}'].settings`,
+        );
+        writeFileSync(SETTINGS_BACKUP, JSON.stringify(savedSettings, null, 2));
+    }
+
+    // an occluded/minimized window stalls the render loop (table cells,
+    // toasts, data-buffer sync) and wedges the suite — nudge it visible
+    // without stealing focus, and say so when that wasn't enough
+    action(
+        `(() => { try { const w = require('electron').remote?.getCurrentWindow?.(); ` +
+        `if (w?.isMinimized()) w.restore(); w?.showInactive?.(); } catch (e) {} })();`,
+    );
+    await sleep(300);
+    if (readJson("document.hidden") === true) {
+        console.log(
+            "NOTE: the Obsidian window is still hidden/occluded — table-cell tests will skip, and toast-dependent tests may be unreliable",
+        );
+    }
 
     // a previous failed run (or a plugin reload mid-popup) can leave stray
     // popup elements in the DOM; they'd poison every popup assertion below
@@ -638,7 +741,7 @@ async function main() {
     });
 
     await test("footnote lands at the caret inside an actively edited table cell", async () => {
-        requireVisibleWindow();
+        await requireVisibleWindow();
         // regression (reported 2026-07-14): running the command while a
         // table cell sub-editor owned focus raced the cell's sync-back —
         // the insert was swallowed or the row's pipes were displaced and
@@ -859,7 +962,7 @@ async function main() {
     });
 
     await test("the lint command does not fire while a table cell is being edited until focus returns", async () => {
-        requireVisibleWindow();
+        await requireVisibleWindow();
         // the runOutsideTableCell guard: running the whole-document lint
         // while a cell sub-editor owns focus must not corrupt the table.
         // Only the reindex step runs, matching the assertions below.
@@ -1259,7 +1362,7 @@ async function main() {
     });
 
     await test("caret after an escaped pipe still counts as inside a reference (2026-08-10 A9)", async () => {
-        requireVisibleWindow();
+        await requireVisibleWindow();
         // the cell editor shows "\|" as "|", so the caret used to resolve
         // one source column short — read as OUTSIDE the reference, the named
         // command nested a fresh "[^]" into it instead of continuing it
@@ -1446,9 +1549,8 @@ async function main() {
         }
     });
 
-    // restore state and clean up
-    setSettings(savedSettings);
-    ob("delete", `path=${NOTE}.md`);
+    // restore state and clean up (restoreState also covers every abort path)
+    restoreState("suite finished");
 
     const skipNote = skips > 0 ? ` (${skips} skipped — rerun with the Obsidian window visible)` : "";
     console.log(failures === 0 ? `\nall smoke tests passed${skipNote}` : `\n${failures} smoke test(s) FAILED${skipNote}`);
@@ -1457,5 +1559,6 @@ async function main() {
 
 main().catch((e) => {
     console.error(`smoke tests aborted: ${e.message}`);
+    restoreState("aborted");
     process.exit(1);
 });
