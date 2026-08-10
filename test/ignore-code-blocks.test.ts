@@ -151,3 +151,34 @@ describe("shouldJumpFromDefinitionToReference ignores code", () => {
         expect(cursorMoves).toEqual([{ line: 3, ch: 8 }]);
     });
 });
+
+// A fence lives in the CONTAINER that opened it (fixed 2026-08-10): a
+// blockquoted delimiter is content to a document-level fence, a blockquoted
+// fence dies when its quote ends, and a bare delimiter after that opens a
+// NEW fence. List-item fences ("- ```") are still a known gap, deferred to
+// the container-model spec decision (test/hunt/bug-list-item-fence).
+describe("fence delimiters respect their container", () => {
+    it("a blockquoted delimiter is content to a document-level fence", () => {
+        expect(computeNextFootnoteNumber("```\ncode\n> ```\nstill code[^9]")).toBe(1);
+    });
+
+    it("a blockquoted fence ends when its quote ends", () => {
+        expect(computeNextFootnoteNumber("> ```\n> code[^9]\nlive[^7]")).toBe(8);
+    });
+
+    it("a blank line ends the quote — and its fence", () => {
+        expect(computeNextFootnoteNumber("> ```\n> code[^9]\n\nlive[^7]")).toBe(8);
+    });
+
+    it("a bare delimiter after an ended blockquoted fence opens a new fence", () => {
+        expect(
+            computeNextFootnoteNumber("> ```\n> code[^9]\n```\nnow code[^7]"),
+        ).toBe(1);
+    });
+
+    it("a nested-deeper delimiter does not close a blockquoted fence", () => {
+        expect(
+            computeNextFootnoteNumber("> ```\n> > code[^9]\n> ```\n> live[^7]"),
+        ).toBe(8);
+    });
+});

@@ -10,12 +10,12 @@ import { computeNextFootnoteNumber } from "../../src/insert-or-navigate-footnote
 // Root cause: protectedLines strips blockquote prefixes from closer
 // candidates without tracking the opener's container.
 
-describe("bug: blockquote-prefixed delimiter closes a bare fence", () => {
-    it.fails("a blockquote-prefixed delimiter does not close a bare fence (backtick)", () => {
+describe("fixed 2026-08-10: blockquote-prefixed delimiter and bare fences", () => {
+    it("a blockquote-prefixed delimiter does not close a bare fence (backtick)", () => {
         expect(computeNextFootnoteNumber("```\ncode\n> ```\nreal[^1]")).toBe(1);
     });
 
-    it.fails("a blockquote-prefixed delimiter does not close a bare fence (tilde)", () => {
+    it("a blockquote-prefixed delimiter does not close a bare fence (tilde)", () => {
         expect(computeNextFootnoteNumber("~~~\ncode\n> ~~~\nreal[^1]")).toBe(1);
     });
 });

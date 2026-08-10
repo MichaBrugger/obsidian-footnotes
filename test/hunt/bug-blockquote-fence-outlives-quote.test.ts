@@ -10,8 +10,8 @@ import { moveFootnoteDefinitionsToBottom } from "../../src/linting/rules/move-fo
 // Root cause: protectedLines keeps the fence open past the end of its
 // blockquote container.
 
-describe("bug: blockquoted fence outlives its blockquote", () => {
-    it.fails("stops a blockquoted fence when the blockquote itself ends", () => {
+describe("fixed 2026-08-10: a blockquoted fence dies with its blockquote", () => {
+    it("stops a blockquoted fence when the blockquote itself ends", () => {
         const markdown = [
             "> ```",
             "> sample[^99]",
@@ -21,7 +21,7 @@ describe("bug: blockquoted fence outlives its blockquote", () => {
         expect(computeNextFootnoteNumber(markdown)).toBe(8);
     });
 
-    it.fails("keeps definitions outside an ended blockquote fence movable", () => {
+    it("keeps definitions outside an ended blockquote fence movable", () => {
         const input = [
             "> ```",
             "> sample[^99]",

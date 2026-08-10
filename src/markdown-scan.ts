@@ -51,6 +51,31 @@ export function restoreEol(text: string, eol: "\n" | "\r\n"): string {
 const BlockquotePrefix = /^(?: {0,3}>)+ ?/;
 
 /**
+ * The line's blockquote nesting depth (number of leading ">" markers, each
+ * allowed 0–3 spaces before it and one space after, per CommonMark) and the
+ * text after the markers. A fence lives in the container that opened it —
+ * depth is how the fence scan knows which container that is.
+ */
+function blockquoteDepth(line: string): { depth: number; rest: string } {
+    let depth = 0;
+    let i = 0;
+    for (;;) {
+        let j = i;
+        let spaces = 0;
+        while (line[j] === " " && spaces < 3) {
+            j++;
+            spaces++;
+        }
+        if (line[j] !== ">") break;
+        j++;
+        if (line[j] === " ") j++; // one optional space belongs to the marker
+        depth++;
+        i = j;
+    }
+    return { depth, rest: line.slice(i) };
+}
+
+/**
  * Whether a line already known to start with a fence delimiter actually opens
  * a fence. Per CommonMark a backtick fence's info string may not contain a
  * backtick — "```[^1]``` x" is an inline code span in a paragraph, not a
@@ -193,7 +218,7 @@ export function scanDocument(lines: string[]): DocumentScan {
         }
     }
 
-    let fence: { char: string; length: number } | null = null;
+    let fence: { char: string; length: number; depth: number } | null = null;
     let inComment = false;
     for (; i < src.length; i++) {
         if (inComment) {
@@ -207,23 +232,37 @@ export function scanDocument(lines: string[]): DocumentScan {
             inComment = maskLineRegions(src[i], true).endsInComment;
             continue;
         }
-        // blockquote/callout markers don't change the fence delimiters
-        const bareLine = src[i].replace(BlockquotePrefix, "");
+        // a fence lives in the CONTAINER that opened it (CommonMark):
+        // depth is the blockquote nesting where the delimiters count
+        const { depth, rest } = blockquoteDepth(src[i]);
+        if (fence && depth < fence.depth) {
+            // the fence's blockquote ended, taking the fence with it
+            // (bug-blockquote-fence-outlives-quote) — this line is normal
+            // text and gets the full treatment below, so a bare "```" here
+            // OPENS a new fence (bug-bare-fence-after-blockquote-fence)
+            fence = null;
+        }
         if (fence) {
             isProtected[i] = true;
-            const close = bareLine.match(/^ {0,3}(`{3,}|~{3,})\s*$/);
-            if (
-                close &&
-                close[1][0] === fence.char &&
-                close[1].length >= fence.length
-            ) {
-                fence = null;
+            // a closer counts only at the fence's own depth: "> ```" can't
+            // close a document-level fence (it is code content there —
+            // bug-blockquote-closes-bare-fence), and a doc-level "```"
+            // can't close a blockquoted one (handled above by ending it)
+            if (depth === fence.depth) {
+                const close = rest.match(/^ {0,3}(`{3,}|~{3,})\s*$/);
+                if (
+                    close &&
+                    close[1][0] === fence.char &&
+                    close[1].length >= fence.length
+                ) {
+                    fence = null;
+                }
             }
             continue;
         }
-        const open = bareLine.match(/^ {0,3}(`{3,}|~{3,})/);
-        if (open && isFenceOpener(bareLine, open[1])) {
-            fence = { char: open[1][0], length: open[1].length };
+        const open = rest.match(/^ {0,3}(`{3,}|~{3,})/);
+        if (open && isFenceOpener(rest, open[1])) {
+            fence = { char: open[1][0], length: open[1].length, depth };
             isProtected[i] = true;
             continue;
         }

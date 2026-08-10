@@ -9,8 +9,8 @@ import { computeNextFootnoteNumber } from "../../src/insert-or-navigate-footnote
 // Root cause: protectedLines strips blockquote prefixes from closer
 // candidates without tracking the opener's container.
 
-describe("bug: bare delimiter after a blockquoted fence", () => {
-    it.fails("a bare delimiter after a blockquoted fence starts a new fence", () => {
+describe("fixed 2026-08-10: bare delimiter after a blockquoted fence", () => {
+    it("a bare delimiter after a blockquoted fence starts a new fence", () => {
         expect(
             computeNextFootnoteNumber("> ```\n> fake[^7]\n```\nreal[^1]"),
         ).toBe(1);

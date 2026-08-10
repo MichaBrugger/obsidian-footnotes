@@ -1367,6 +1367,15 @@ async function main() {
         );
     });
 
+    await test("a blockquoted fence dies with its quote (2026-08-10 A5/A6)", async () => {
+        // the fence used to run to EOF, hiding the rest of the note: the
+        // press below saw no live text and autonumbering counted [^9]
+        resetSettings();
+        await setupNote("> ```\n> fake[^9]\nAlpha done");
+        setCursorAndRun(2, 8, CMD_AUTONUM); // mid "done" — LIVE text
+        await expectEditorText("> ```\n> fake[^9]\nAlpha done[^1]\n\n[^1]: ");
+    });
+
     // LAST before cleanup: this test flips the view mode, and a failure
     // between flip and flip-back must not poison the tests after it
     await test("deferred creation-lint stays inert after a flip to Reading view (2026-08-10 A7)", async () => {
