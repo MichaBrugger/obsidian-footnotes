@@ -381,6 +381,10 @@ export function lintAfterFootnoteCreation(
     if (!plugin.settings.lintOnFootnoteCreation) return;
     const mdView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
     if (!mdView || !mdView.editor) return;
+    // Reading view: never edit the hidden buffer (2026-08-08) — the popup
+    // path defers this call, so the user may have flipped modes since the
+    // footnote was created (no leaf change fires on a mode flip)
+    if (readingViewActive(mdView)) return;
     // a deferred (popup-path) lint must not fire on some OTHER note the
     // user has since switched to
     if (expectedFilePath && mdView.file?.path !== expectedFilePath) return;

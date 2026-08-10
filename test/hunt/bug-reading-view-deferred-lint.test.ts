@@ -81,8 +81,8 @@ function pluginFor(
     } as unknown as FootnotePlugin;
 }
 
-describe("bug: popup-deferred lint-on-creation edits the buffer in Reading view", () => {
-    it.fails("deferred lint-on-creation is inert if the note is now in Reading view", () => {
+describe("popup-deferred lint-on-creation vs Reading view (fixed 2026-08-10)", () => {
+    it("deferred lint-on-creation is inert if the note is now in Reading view", () => {
         const lines = ["Alpha[^2], bravo", "", "[^2]: "];
         const doc = fakeEditor(lines, { line: 2, ch: lines[2].length });
         const plugin = pluginFor(
@@ -93,5 +93,19 @@ describe("bug: popup-deferred lint-on-creation edits the buffer in Reading view"
         lintAfterFootnoteCreation(plugin, true, "note.md");
         expect(doc.appliedChanges).toEqual([]);
         expect(doc.cursor).toEqual({ line: 2, ch: lines[2].length });
+    });
+
+    it("the same lint still runs when the note stayed in editing view", () => {
+        // guards the fix against over-gating: identical setup, source mode —
+        // the punctuation rule has real work ("Alpha[^2]," → "Alpha,[^2]")
+        const lines = ["Alpha[^2], bravo", "", "[^2]: "];
+        const doc = fakeEditor(lines, { line: 2, ch: lines[2].length });
+        const plugin = pluginFor(
+            doc,
+            { lintOnFootnoteCreation: true },
+            "source",
+        );
+        lintAfterFootnoteCreation(plugin, true, "note.md");
+        expect(doc.appliedChanges.length).toBeGreaterThan(0);
     });
 });

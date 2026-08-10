@@ -679,8 +679,11 @@ function activeFootnotePrefix(
 export function computeNextFootnoteNumber(markdownText: string, prefix = ""): number {
     const masked = maskProtectedLines(markdownText.split("\n")).join("\n");
     const escaped = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    // /i: footnote ids are case-insensitive in Obsidian, so "[^P.1]" lives
+    // in prefix "p."'s namespace and must reserve its number — a
+    // case-sensitive scan let the next insert mint a colliding id
     const numberedMarkers = prefix
-        ? new RegExp(`\\[\\^${escaped}(\\d+)\\]`, "g")
+        ? new RegExp(`\\[\\^${escaped}(\\d+)\\]`, "gi")
         : AllNumberedMarkers;
     let currentMax = 1;
     for (const match of masked.matchAll(numberedMarkers)) {

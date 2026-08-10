@@ -55,3 +55,31 @@ describe("computeNextFootnoteNumber", () => {
         expect(computeNextFootnoteNumber(text)).toBe(6);
     });
 });
+
+// the prefixed namespace: ids are case-insensitive in Obsidian, so casing
+// must not split a namespace — and prefixes come in all separator shapes,
+// including regex-special ones
+describe("computeNextFootnoteNumber with a prefix", () => {
+    it("counts only markers carrying the prefix", () => {
+        expect(computeNextFootnoteNumber("a[^7] b[^2-3]", "2-")).toBe(4);
+    });
+
+    it("plain numbered markers belong to the empty prefix only", () => {
+        expect(computeNextFootnoteNumber("a[^7] b[^2-3]", "")).toBe(8);
+    });
+
+    it("folds case both ways across separator styles", () => {
+        expect(computeNextFootnoteNumber("x[^CH~2]", "ch~")).toBe(3);
+        expect(computeNextFootnoteNumber("x[^ch~2]", "CH~")).toBe(3);
+        expect(computeNextFootnoteNumber("x[^Note=4]", "note=")).toBe(5);
+    });
+
+    it("folds case on a regex-special prefix", () => {
+        // "+" must stay escaped even with the case-insensitive flag on
+        expect(computeNextFootnoteNumber("x[^V+9]", "v+")).toBe(10);
+    });
+
+    it("a case-variant prefixed DETAIL reserves its number too", () => {
+        expect(computeNextFootnoteNumber("[^AB-6]: orphan", "ab-")).toBe(7);
+    });
+});
