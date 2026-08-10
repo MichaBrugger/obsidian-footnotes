@@ -16,7 +16,7 @@ import { reindexFootnotes } from "../src/linting/rules/re-index-footnotes";
 // "2." never touches. Every core prefix behavior runs across the whole
 // set.
 
-const PREFIXES = ["2.", "2-", "2~", "3=", "4_", "ch2*", "n5+", "a~e"];
+const PREFIXES = ["2.", "2-", "2~", "3=", "4_", "ch2*", "n5+", "a$"];
 
 describe.each(PREFIXES)('prefix "%s"', (prefix) => {
     it("is a valid footnote prefix", () => {

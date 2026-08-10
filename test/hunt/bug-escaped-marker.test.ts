@@ -21,20 +21,20 @@ function fakeEditor(lines: string[]): Editor {
     } as unknown as Editor;
 }
 
-describe("bug: backslash-escaped references are treated as real footnotes", () => {
-    it.fails("does not treat a backslash-escaped reference as a footnote during reindex", () => {
+describe("fixed 2026-08-10: backslash-escaped references are treated as real footnotes", () => {
+    it("does not treat a backslash-escaped reference as a footnote during reindex", () => {
         const input = "literal \\[^9] real[^7]\n\n[^7]: real";
         expect(reindexFootnotes(input)).toBe("literal \\[^9] real[^1]\n\n[^1]: real");
     });
 
-    it.fails("does not list a backslash-escaped reference as a footnote", () => {
+    it("does not list a backslash-escaped reference as a footnote", () => {
         const doc = fakeEditor(["literal \\[^fake] real[^ok]"]);
         expect(listExistingFootnoteReferencesAndLocations(doc)).toEqual([
             { footnote: "[^ok]", lineNum: 0, startIndex: 21 },
         ]);
     });
 
-    it.fails("escaped numeric reference does not reserve the next autonumber", () => {
+    it("escaped numeric reference does not reserve the next autonumber", () => {
         expect(computeNextFootnoteNumber("literal \\[^99]")).toBe(1);
     });
 });

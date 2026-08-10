@@ -136,6 +136,22 @@ function isFenceOpener(bareLine: string, delim: string): boolean {
  * masked through the end of the line). Math protection is Jason's 2026-08-10
  * ruling: linting never touches math.
  */
+/**
+ * Whether the "$" at `i` sits inside a footnote-reference shape ("[^…]").
+ * Jason verified live (2026-08-10): Obsidian tokenizes the bracket construct
+ * first, so a dollar inside a reference renders as part of the footnote id —
+ * it never opens or closes a math span. Nearest bracket wins: a "[" with a
+ * "^" behind it and no "]" in between means we're inside a reference.
+ */
+function dollarInsideReference(line: string, i: number): boolean {
+    for (let j = i - 1; j >= 0; j--) {
+        const c = line[j];
+        if (c === "]") return false;
+        if (c === "[") return line[j + 1] === "^";
+    }
+    return false;
+}
+
 export function maskLineRegions(
     line: string,
     startInComment = false,
@@ -241,6 +257,11 @@ export function maskLineRegions(
             continue;
         }
         if (c === "$") {
+            // a dollar inside "[^…]" is footnote-id text, not math
+            if (dollarInsideReference(line, i)) {
+                i++;
+                continue;
+            }
             if (line.startsWith("$$", i)) {
                 const close = line.indexOf("$$", i + 2);
                 if (close === -1) {
@@ -257,14 +278,15 @@ export function maskLineRegions(
                 continue;
             }
             // inline math: closing "$" with non-empty content that neither
-            // starts nor ends with a space — otherwise the dollar is prose
+            // starts nor ends with a space — otherwise the dollar is prose.
+            // Dollars inside "[^…]" can't close either (see the opener guard)
             let close = -1;
             for (let j = i + 1; j < line.length; j++) {
                 if (line[j] === "\\") {
                     j++;
                     continue;
                 }
-                if (line[j] === "$") {
+                if (line[j] === "$" && !dollarInsideReference(line, j)) {
                     close = j;
                     break;
                 }
@@ -433,8 +455,23 @@ export function scanDocument(lines: string[]): DocumentScan {
         }
         prevBlank = false;
 
-        const open = rest.match(/^ {0,3}(`{3,}|~{3,})/);
-        if (open && isFenceOpener(rest, open[1])) {
+        // a fence can also open on a LIST ITEM line ("- ```", "1. ~~~") —
+        // the list marker is a container prefix like the blockquote one;
+        // its closer arrives indented into the item, which the {0,3}
+        // closer pattern already accepts (bug-list-item-fence)
+        let fenceLine = rest;
+        let open = fenceLine.match(/^ {0,3}(`{3,}|~{3,})/);
+        if (!open) {
+            const afterListMarker = rest.replace(
+                /^ {0,3}(?:[-+*]|\d{1,9}[.)]) +/,
+                "",
+            );
+            if (afterListMarker !== rest) {
+                fenceLine = afterListMarker;
+                open = fenceLine.match(/^ {0,3}(`{3,}|~{3,})/);
+            }
+        }
+        if (open && isFenceOpener(fenceLine, open[1])) {
             fence = { char: open[1][0], length: open[1].length, depth };
             isProtected[i] = true;
             continue;

@@ -46,10 +46,26 @@ export const ExtractNameFromFootnote = /(\[\^)([^[\]]+)(?=\])/;
 export function footnoteReferenceMatches(line: string): RegExpMatchArray[] {
     const matches: RegExpMatchArray[] = [];
     for (const match of line.matchAll(AllReferences)) {
-        if ((match.index ?? 0) === 0 && line[match[0].length] === ":") continue;
+        const start = match.index ?? 0;
+        if (start === 0 && line[match[0].length] === ":") continue;
+        // a backslash-escaped "[" is literal text per CommonMark — the
+        // "reference" is prose the user typed on purpose (bug-escaped-marker)
+        if (escapedAt(line, start)) continue;
+        // "^[" opens an INLINE footnote, so the bracket belongs to it:
+        // "^[^literal]" is inline-footnote content, not a reference
+        // (bug-inline-footnote-double-parse) — unless the caret itself is
+        // escaped ("\^[^x]" is a literal caret followed by a real reference)
+        if (line[start - 1] === "^" && !escapedAt(line, start - 1)) continue;
         matches.push(match);
     }
     return matches;
+}
+
+/** Whether the character at `index` is backslash-escaped: an ODD run of backslashes directly before it. */
+function escapedAt(line: string, index: number): boolean {
+    let backslashes = 0;
+    for (let j = index - 1; j >= 0 && line[j] === "\\"; j--) backslashes++;
+    return backslashes % 2 === 1;
 }
 
 /** Case-insensitive membership: footnote ids differing only in letter case are the same footnote (Obsidian folds them, and the metadata cache lowercases). */
@@ -58,15 +74,15 @@ function idListIncludes(ids: string[], id: string): boolean {
     return ids.some((name) => name.toLowerCase() === lower);
 }
 
-// Obsidian won't render a footnote whose name contains whitespace,
-// backticks, or dollar signs (Jason's calls, 2026-08-10: such names are
-// disallowed outright rather than supported — a "$" pair in nearby ids
-// forms an inline-math span in Obsidian's own renderer, exactly as it does
-// in the plugin's math-protected scans), and an empty name isn't a footnote
-// at all; the reference regexes stay permissive so such names can be
-// caught and warned about instead of silently misbehaving
+// Obsidian won't render a footnote whose name contains whitespace or
+// backticks (Jason's call, 2026-08-10: such names are disallowed outright
+// rather than supported), and an empty name isn't a footnote at all; the
+// reference regexes stay permissive so such names can be caught and warned
+// about instead of silently misbehaving. Dollar signs are FINE — Jason
+// verified live that "[^a$1]" renders as a footnote (the scanner keeps
+// in-reference dollars out of math pairing for the same reason).
 export function isValidFootnoteName(name: string): boolean {
-    return name.length > 0 && !/[\s`$]/.test(name);
+    return name.length > 0 && !/[\s`]/.test(name);
 }
 
 
@@ -348,9 +364,15 @@ export function jumpToFootnoteDefinition(
                 footnoteName.toLowerCase()
         ) {
             // land at the END of the definition (indented lines belong to
-            // it) so the user can backspace/type without arrow keys
+            // it) so the user can backspace/type without arrow keys — but a
+            // PROTECTED indented line (e.g. inside a fence that follows the
+            // definition) is not a continuation, matching findDefinitionBlocks
             let endLine = i;
-            while (endLine < doc.lastLine() && /^\s+\S/.test(doc.getLine(endLine + 1))) {
+            while (
+                endLine < doc.lastLine() &&
+                !ctx.scan.isProtected[endLine + 1] &&
+                /^\s+\S/.test(lines[endLine + 1])
+            ) {
                 endLine++;
             }
             const newCursorPos = { line: endLine, ch: doc.getLine(endLine).length };
@@ -590,10 +612,30 @@ function isTrailingPunctuation(c: string | undefined): boolean {
  * to the word they follow, matching the grapheme-aware `wordAt`.
  */
 export function endOfWordOffset(text: string, offset: number): number {
-    const isWord = (c: string | undefined) => !!c && /[\p{L}\p{N}\p{M}_]/u.test(c);
-    if (!isWord(text[offset]) && !isWord(text[offset - 1])) return offset;
+    // walk by CODE POINTS: astral letters (Deseret, CJK Ext-B like 𠮷) are
+    // two UTF-16 units, and testing lone surrogates against \p{L} split
+    // words in table cells (bug-astral-word-walk)
+    const isWordCp = (cp: number | undefined) =>
+        cp !== undefined && /[\p{L}\p{N}\p{M}_]/u.test(String.fromCodePoint(cp));
+    // the code point ENDING at `i` (stepping over a low surrogate to the
+    // pair's start), or undefined at the text's start
+    const cpBefore = (i: number): number | undefined => {
+        if (i <= 0) return undefined;
+        const prev = text.charCodeAt(i - 1);
+        if (prev >= 0xdc00 && prev <= 0xdfff && i >= 2) {
+            return text.codePointAt(i - 2);
+        }
+        return prev;
+    };
+    if (!isWordCp(text.codePointAt(offset)) && !isWordCp(cpBefore(offset))) {
+        return offset;
+    }
     let end = offset;
-    while (isWord(text[end])) end++;
+    for (;;) {
+        const cp = text.codePointAt(end);
+        if (!isWordCp(cp)) break;
+        end += (cp as number) > 0xffff ? 2 : 1;
+    }
     if (isTrailingPunctuation(text[end])) end++;
     return end;
 }
@@ -704,11 +746,22 @@ export function footnotePrefix(markdownText: string): string {
     if (lines[0] !== "---") return "";
     for (let i = 1; i < lines.length; i++) {
         if (/^(---|\.\.\.)\s*$/.test(lines[i])) break;
-        const match = lines[i].match(/^footnote-prefix:\s*(.*)$/);
+        // YAML needs whitespace after the colon — "footnote-prefix:2." is a
+        // plain scalar Obsidian doesn't show as a property, not a mapping
+        // (bug-prefix-yaml-comment)
+        const match = lines[i].match(/^footnote-prefix:(?:\s+(.*))?$/);
         if (match) {
-            let value = match[1].trim();
-            const quoted = value.match(/^(["'])(.*)\1$/);
-            if (quoted) value = quoted[2];
+            let value = (match[1] ?? "").trim();
+            // a value that IS a comment is an empty value
+            if (value.startsWith("#")) return "";
+            // quotes end the value — anything after the closing quote
+            // (typically a comment) is not part of it
+            const quoted = value.match(/^(["'])(.*?)\1/);
+            if (quoted) return quoted[2];
+            // an unquoted value ends at a whitespace-preceded "#" (YAML
+            // comments); a "#" glued to text is value content
+            const commentAt = value.search(/(?:^|\s)#/);
+            if (commentAt !== -1) value = value.slice(0, commentAt).trim();
             return value;
         }
     }
@@ -747,7 +800,7 @@ export function footnotePrefixFromEditor(doc: Editor): string {
 export function footnotePrefixProblem(prefix: string): string | null {
     if (!prefix) return null;
     if (!isValidFootnoteName(prefix) || /[[\]]/.test(prefix)) {
-        return "The footnote prefix can't contain spaces, backticks, dollar signs, or brackets.";
+        return "The footnote prefix can't contain spaces, backticks, or brackets.";
     }
     if (/\d$/.test(prefix)) {
         return "The footnote prefix can't end in a number. Its footnotes would be indistinguishable from plain numbered ones.";
@@ -798,11 +851,23 @@ export function computeNextFootnoteNumber(
         : AllNumberedReferences;
     let currentMax = 1;
     for (const match of masked.matchAll(numberedReferences)) {
+        const start = match.index ?? 0;
+        // the same exclusions footnoteReferenceMatches applies: an escaped
+        // "\[^9]" is literal prose (bug-escaped-marker), and "^[^9]" is
+        // inline-footnote content (bug-inline-footnote-double-parse)
+        if (escapedAt(masked, start)) continue;
+        if (masked[start - 1] === "^" && !escapedAt(masked, start - 1)) {
+            continue;
+        }
         const value = Number(match[1]);
-        // a digit run too large to round-trip through Number would push the
-        // next id into scientific notation ("[^1e+23]"); such a reference is
-        // treated as named, not numbered
-        if (!Number.isSafeInteger(value)) continue;
+        // a digit run that can't round-trip through Number — or whose
+        // SUCCESSOR can't (MAX_SAFE_INTEGER: minting value+1 would create
+        // an id this very scan then skips, so the id after it would repeat
+        // — bug-autonumber-unsafe-integer) — is treated as named, not
+        // numbered
+        if (!Number.isSafeInteger(value) || !Number.isSafeInteger(value + 1)) {
+            continue;
+        }
         currentMax = Math.max(currentMax, value + 1);
     }
     return currentMax;
@@ -1336,9 +1401,7 @@ export function shouldCreateMatchingFootnoteDefinition(
             if (!isValidFootnoteName(footnoteId)) {
                 const offender = footnoteId.includes("`")
                     ? "backticks"
-                    : footnoteId.includes("$")
-                      ? "dollar signs"
-                      : "spaces";
+                    : "spaces";
                 new Notice(
                     `Footnote name "${footnoteId}" contains ${offender}, so Obsidian won't render it as a footnote. Remove the ${offender}.`,
                     8000,
@@ -1499,8 +1562,16 @@ export function shouldCreateFootnoteReference(
 
     if (cell) {
         const cellText = cell.state.doc.toString();
+        // masked confirm like caretInsidePlaceholder: a "[^]"-shaped
+        // fragment inside inline code is plain text (#41 semantics)
         const inEmpty = emptyReferenceStart(cellText, cell.state.selection.main.head);
-        if (inEmpty !== null) {
+        if (
+            inEmpty !== null &&
+            emptyReferenceStart(
+                maskInlineRegions(cellText),
+                cell.state.selection.main.head,
+            ) !== null
+        ) {
             cell.dispatch({ selection: { anchor: inEmpty + "[^]".length } });
             return;
         }
@@ -1514,7 +1585,13 @@ export function shouldCreateFootnoteReference(
     }
 
     const inEmpty = emptyReferenceStart(lineText, cursorPosition.ch);
-    if (inEmpty !== null) {
+    if (
+        inEmpty !== null &&
+        emptyReferenceStart(
+            maskInlineRegions(lineText),
+            cursorPosition.ch,
+        ) !== null
+    ) {
         doc.setCursor({ line: cursorPosition.line, ch: inEmpty + "[^]".length });
         return;
     }

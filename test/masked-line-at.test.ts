@@ -75,3 +75,17 @@ describe("maskLineRegions", () => {
         expect(maskLineRegions("a <!---> b").endsInComment).toBe(false);
     });
 });
+
+// REVERSED 2026-08-10: Jason verified live that "$" inside a footnote
+// reference is id text, not math — nearby dollar-signed ids never pair
+describe("dollars inside references vs math", () => {
+    it("two dollar-signed ids on one line never pair into math", () => {
+        const line = "b[^a$9] a[^a$4] end";
+        expect(maskLineRegions(line).masked).toBe(line);
+    });
+
+    it("a reference BETWEEN two dollars is still math content", () => {
+        const { masked } = maskLineRegions("cost $[^7]$ real[^1]");
+        expect(masked).toBe("cost " + "\0".repeat("$[^7]$".length) + " real[^1]");
+    });
+});

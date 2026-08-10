@@ -12,17 +12,17 @@ import { reindexFootnotes } from "../../src/linting/rules/re-index-footnotes";
 // Root cause: the regular-reference regex double-parses the interior of an
 // inline footnote; nothing excludes spans already claimed by inlineFootnoteSpanAt.
 
-describe("bug: inline footnotes are double-parsed as regular references", () => {
-    it.fails("an inline footnote is not also parsed as a regular reference", () => {
+describe("fixed 2026-08-10: inline footnotes are double-parsed as regular references", () => {
+    it("an inline footnote is not also parsed as a regular reference", () => {
         expect(footnoteReferenceMatches("inline ^[^literal]")).toEqual([]);
     });
 
-    it.fails("reindex leaves inline-footnote content that resembles an id untouched", () => {
+    it("reindex leaves inline-footnote content that resembles an id untouched", () => {
         const input = "inline ^[^9] real[^7]\n\n[^7]: body";
         expect(reindexFootnotes(input)).toBe("inline ^[^9] real[^1]\n\n[^1]: body");
     });
 
-    it.fails("applying a prefix does not turn an inline footnote into a regular reference", () => {
+    it("applying a prefix does not turn an inline footnote into a regular reference", () => {
         const input = "inline ^[^note] real[^1]\n\n[^1]: body";
         expect(applyFootnotePrefix(input, "p.")).toBe(
             "inline ^[^note] real[^p.1]\n\n[^p.1]: body",

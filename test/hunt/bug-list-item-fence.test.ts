@@ -9,14 +9,14 @@ import { computeNextFootnoteNumber } from "../../src/insert-or-navigate-footnote
 // Root cause: protectedLines has no awareness of list markers when testing
 // fence delimiters.
 
-describe("bug: a fence opening on a list-item line is not protected", () => {
-    it.fails("unordered list item", () => {
+describe("fixed 2026-08-10: a fence opening on a list-item line is not protected", () => {
+    it("unordered list item", () => {
         expect(
             computeNextFootnoteNumber("- ```\n  code[^9]\n  ```\nreal[^1]"),
         ).toBe(2);
     });
 
-    it.fails("ordered list item", () => {
+    it("ordered list item", () => {
         expect(
             computeNextFootnoteNumber("1. ~~~\n   code[^9]\n   ~~~\nreal[^1]"),
         ).toBe(2);
