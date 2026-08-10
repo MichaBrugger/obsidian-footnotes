@@ -221,7 +221,15 @@ export function shouldJumpFromDetailToMarker(
         // one included — is never its own jump target
         for (let i = 0; i < masked.length; i++) {
             for (const use of footnoteMarkerMatches(masked[i])) {
-                if (use[1].toLowerCase() !== name) continue;
+                // re-slice the ORIGINAL line for the name: a code span
+                // inside it masks to NULs, which can never equal the raw
+                // block name (bug pinned in bug-masked-name-identity)
+                const useStart = use.index ?? 0;
+                const useName = lines[i].slice(
+                    useStart + 2,
+                    useStart + use[0].length - 1,
+                );
+                if (useName.toLowerCase() !== name) continue;
                 const newCursorPos = { line: i, ch: (use.index ?? 0) + use[0].length };
                 moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos, plugin, undefined, true);
                 return true;
@@ -250,12 +258,19 @@ export function jumpToFootnoteDetail(
 ) {
     // find the first line with this detail marker name in it — matching
     // the masked twin so detail-shaped lines inside code don't count (#41)
-    const masked = maskProtectedLines(docLines(doc));
+    const lines = docLines(doc);
+    const masked = maskProtectedLines(lines);
     for (let i = 0; i < masked.length; i++) {
         const lineMatch = masked[i].match(DetailInLine);
         // ids are case-insensitive: the detail label may differ in casing
-        // from the marker name that sent us here
-        if (lineMatch && lineMatch[1].toLowerCase() === footnoteName.toLowerCase()) {
+        // from the marker name that sent us here. Re-slice the ORIGINAL
+        // line for the name — a code span inside it masks to NULs
+        // (bug-masked-name-identity); the name always starts at index 2
+        if (
+            lineMatch &&
+            lines[i].slice(2, 2 + lineMatch[1].length).toLowerCase() ===
+                footnoteName.toLowerCase()
+        ) {
             // land at the END of the detail (indented lines belong to
             // it) so the user can backspace/type without arrow keys
             let endLine = i;
@@ -309,20 +324,26 @@ export function shouldJumpFromMarkerToDetail(
     if (markerAtCursor(rawMarkers, cursorPosition.ch) === null) return false;
 
     // #41: re-check against the masked twin — a marker inside a fence or
-    // inline code is plain text, so the press falls through to insertion
+    // inline code is plain text, so the press falls through to insertion.
+    // The marker TEXT is re-sliced from the raw line: a code span inside
+    // the name masks to NULs, and the masked name would break the detail
+    // lookup and jump below (bug-masked-name-identity)
     const maskedLine =
         maskedLineAt(docLines(doc), cursorPosition.line);
-    const markersOnLine = footnoteMarkerMatches(maskedLine).map((match) => ({
-        footnote: match[0],
-        startIndex: match.index ?? 0,
-    }));
+    const markersOnLine = footnoteMarkerMatches(maskedLine).map((match) => {
+        const start = match.index ?? 0;
+        return {
+            footnote: lineText.slice(start, start + match[0].length),
+            startIndex: start,
+        };
+    });
     const markerTarget = markerAtCursor(markersOnLine, cursorPosition.ch);
 
     if (markerTarget !== null) {
-        // extract name
-        const match = markerTarget.match(ExtractNameFromFootnote);
-        if (match) {
-            const footnoteName = match[2];
+        // the marker is exactly "[^name]", so the name is a positional
+        // slice — regex re-extraction would stop at brackets the mask hid
+        {
+            const footnoteName = markerTarget.slice(2, -1);
 
             // markers without a detail line fall through to the
             // detail-creation paths (ids compared case-insensitively)
@@ -1184,18 +1205,23 @@ export function shouldCreateMatchingFootnoteDetail(
 
     const maskedLine =
         maskedLineAt(docLines(doc), cursorPosition.line);
-    const markersOnLine = footnoteMarkerMatches(maskedLine).map((match) => ({
-        footnote: match[0],
-        startIndex: match.index ?? 0,
-    }));
+    // re-slice the raw line for the marker text — a code span inside the
+    // name masks to NULs, and creating a detail from the masked name wrote
+    // literal NUL bytes into the note (bug-masked-name-identity)
+    const markersOnLine = footnoteMarkerMatches(maskedLine).map((match) => {
+        const start = match.index ?? 0;
+        return {
+            footnote: lineText.slice(start, start + match[0].length),
+            startIndex: start,
+        };
+    });
     const markerTarget = markerAtCursor(markersOnLine, cursorPosition.ch);
 
     if (markerTarget !== null) {
-        //extract footnote
-        const match = markerTarget.match(ExtractNameFromFootnote);
         //find if this footnote exists by listing existing footnote details
-        if (match) {
-            const footnoteId = match[2];
+        {
+            // positional slice of "[^name]" — see shouldJumpFromMarkerToDetail
+            const footnoteId = markerTarget.slice(2, -1);
 
             // a spaced name is a common authoring mistake Obsidian won't
             // render; warn instead of creating a detail that can't work

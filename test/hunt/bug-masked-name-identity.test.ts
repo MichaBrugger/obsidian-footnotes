@@ -61,17 +61,17 @@ function fakePlugin(): FootnotePlugin {
     } as unknown as FootnotePlugin;
 }
 
-describe("bug: press-jump (marker → detail) with a code-span-named footnote", () => {
+describe("press-jump (marker → detail) with a code-span-named footnote (fixed 2026-08-10)", () => {
     const MARKER_LINE = "ref [^x`c`y] end"; // marker at ch 4..11, caret ch 8 is inside
     const DETAIL_LINE = "[^x`c`y]: body";
 
-    it.fails("jumps from such a marker to its existing detail", () => {
+    it("jumps from such a marker to its existing detail", () => {
         const doc = fakeEditor([MARKER_LINE, "", DETAIL_LINE], { line: 0, ch: 8 });
         expect(shouldJumpFromMarkerToDetail(MARKER_LINE, doc.cursor, doc, fakePlugin())).toBe(true);
         expect(doc.cursor).toEqual({ line: 2, ch: DETAIL_LINE.length });
     });
 
-    it.fails("jumps from [^`1`] to its detail", () => {
+    it("jumps from [^`1`] to its detail", () => {
         const lines = ["ref [^`1`] here", "", "[^`1`]: the detail"];
         const caret = { line: 0, ch: 7 }; // on the "1" inside "[^`1`]"
         const doc = fakeEditor(lines, caret);
@@ -80,8 +80,8 @@ describe("bug: press-jump (marker → detail) with a code-span-named footnote", 
     });
 });
 
-describe("bug: press-create writes NUL bytes for a code-span-named footnote", () => {
-    it.fails("creates the detail with the ORIGINAL name (no NUL bytes) when missing", () => {
+describe("press-create with a code-span-named footnote (fixed 2026-08-10)", () => {
+    it("creates the detail with the ORIGINAL name (no NUL bytes) when missing", () => {
         const MARKER_LINE = "ref [^x`c`y] end";
         const doc = fakeEditor([MARKER_LINE, ""], { line: 0, ch: 8 });
         shouldCreateMatchingFootnoteDetail(MARKER_LINE, doc.cursor, fakePlugin(), doc);
@@ -90,7 +90,7 @@ describe("bug: press-create writes NUL bytes for a code-span-named footnote", ()
         expect(inserted).toContain("[^x`c`y]: ");
     });
 
-    it.fails("does NOT append a duplicate detail full of NUL bytes when the detail exists", () => {
+    it("does NOT append a duplicate detail full of NUL bytes when the detail exists", () => {
         const lines = ["ref [^`1`] here", "", "[^`1`]: the detail"];
         const doc = fakeEditor(lines, { line: 0, ch: 7 });
         shouldCreateMatchingFootnoteDetail(lines[0], { line: 0, ch: 7 }, fakePlugin(), doc);
@@ -98,8 +98,8 @@ describe("bug: press-create writes NUL bytes for a code-span-named footnote", ()
     });
 });
 
-describe("bug: press-jump (detail → marker) with a code-span-named footnote", () => {
-    it.fails("finds the marker of a backticked footnote name", () => {
+describe("press-jump (detail → marker) with a code-span-named footnote (fixed 2026-08-10)", () => {
+    it("finds the marker of a backticked footnote name", () => {
         const lines = ["ref [^`1`] here", "", "[^`1`]: the detail"];
         const doc = fakeEditor(lines, { line: 2, ch: 5 });
         shouldJumpFromDetailToMarker(lines[2], { line: 2, ch: 5 }, doc, fakePlugin());
@@ -108,20 +108,20 @@ describe("bug: press-jump (detail → marker) with a code-span-named footnote", 
     });
 });
 
-describe("bug: reindex with a code-span-named footnote", () => {
+describe("reindex with a code-span-named footnote (fixed 2026-08-10)", () => {
     const doc = "see[^a`b`c] twice[^a`b`c].\n\n[^a`b`c]: hi";
 
-    it.fails("renumberNamedFootnotes keeps marker and definition paired", () => {
+    it("renumberNamedFootnotes keeps marker and definition paired", () => {
         expect(reindexFootnotes(doc, { renumberNamedFootnotes: true })).toBe(
             "see[^1] twice[^1].\n\n[^1]: hi",
         );
     });
 
-    it.fails("drop-orphans does not delete a referenced code-span-named definition", () => {
+    it("drop-orphans does not delete a referenced code-span-named definition", () => {
         expect(reindexFootnotes(doc, { keepOrphanedDefinitions: false })).toBe(doc);
     });
 
-    it.fails("the same split through a name containing an HTML comment span", () => {
+    it("the same split through a name containing an HTML comment span", () => {
         const commentNamed = "see[^a<!-- -->b].\n\n[^a<!-- -->b]: hi";
         expect(reindexFootnotes(commentNamed, { renumberNamedFootnotes: true })).toBe(
             "see[^1].\n\n[^1]: hi",

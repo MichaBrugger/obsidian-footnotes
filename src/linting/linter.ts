@@ -349,11 +349,14 @@ function uniqueEmptyDetailName(doc: Editor): string | null {
     const lines: string[] = [];
     for (let i = 0; i < doc.lineCount(); i++) lines.push(doc.getLine(i));
     let found: string | null = null;
-    for (const line of maskProtectedLines(lines)) {
-        const match = line.match(EmptyDetailLine);
+    const masked = maskProtectedLines(lines);
+    for (let i = 0; i < masked.length; i++) {
+        const match = masked[i].match(EmptyDetailLine);
         if (!match) continue;
         if (found !== null) return null; // ambiguous
-        found = match[1];
+        // re-slice the original line: the name feeds jumpToFootnoteDetail,
+        // which compares RAW names (a code span in the name masks to NULs)
+        found = lines[i].slice(2, 2 + match[1].length);
     }
     return found;
 }

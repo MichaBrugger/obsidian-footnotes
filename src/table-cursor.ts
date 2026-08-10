@@ -117,14 +117,28 @@ export function resolveTableCellCursor(editor: Editor): EditorPosition | null {
     if (!span) return null;
 
     // the sub-editor's doc is the cell's source sans padding; anchor it
-    // inside the raw cell, then add the sub-editor's caret offset
+    // inside the raw cell, then walk the sub-editor's caret offset through
+    // the raw text. The walk is escape-aware: the cell editor shows "\|"
+    // as a bare "|", so each escape byte before the caret consumes a
+    // source column but no cell-editor column — plain addition resolved
+    // one column short per escape and read a caret just inside a marker
+    // as OUTSIDE it, nesting a new marker (bug-table-escape-offset).
     const rawCell = lineText.slice(span.from, span.to);
     const cellText = cellView.state.doc.toString();
-    let base = span.from + (rawCell.length - rawCell.trimStart().length);
+    let start = rawCell.length - rawCell.trimStart().length;
     if (cellText.length > 0) {
         const idx = rawCell.indexOf(cellText);
-        if (idx >= 0) base = span.from + idx;
+        if (idx >= 0) start = idx;
     }
-    const ch = Math.min(base + cellView.state.selection.main.head, span.to);
+    const head = cellView.state.selection.main.head;
+    let raw = start;
+    for (let c = 0; c < head && raw < rawCell.length; c++) {
+        if (rawCell[raw] === "\\" && rawCell[raw + 1] === cellText[c]) {
+            raw += 2; // escape byte + the character the cell editor shows
+        } else {
+            raw += 1;
+        }
+    }
+    const ch = Math.min(span.from + raw, span.to);
     return { line, ch };
 }

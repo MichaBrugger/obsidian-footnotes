@@ -56,8 +56,17 @@ function fakeResolution(
     return resolveTableCellCursor(editor);
 }
 
-describe("bug: table source-to-cell offset ignores the escape byte before \\|", () => {
-    it.fails("accounts for the escape byte before a pipe when the caret is after it", () => {
+describe("table source-to-cell offset accounts for escape bytes (fixed 2026-08-10)", () => {
+    it("leaves a caret BEFORE the escape unshifted", () => {
+        // head 3 sits after "lef", before any escape — the mapping must not
+        // shift carets that no escape byte precedes
+        expect(fakeResolution("| left \\| [^note] | tail |", "left | [^note]", 3)).toEqual({
+            line: 7,
+            ch: 5,
+        });
+    });
+
+    it("accounts for the escape byte before a pipe when the caret is after it", () => {
         // Cell editor text omits table-source escaping. Its head 8 is just
         // inside the marker, after "["; in the raw row the same caret is one
         // column later because the pipe is represented as "\\|". Returning
@@ -69,7 +78,7 @@ describe("bug: table source-to-cell offset ignores the escape byte before \\|", 
         });
     });
 
-    it.fails("does not treat a cell caret just inside a post-escape marker as outside", async () => {
+    it("does not treat a cell caret just inside a post-escape marker as outside", async () => {
         const lines = ["| Header |", "| --- |", "| left \\| [^note] |"];
         const table = { rows: [] as unknown[] };
         const headerRow = {};

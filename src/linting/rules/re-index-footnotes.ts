@@ -53,7 +53,13 @@ function markerAppearanceOrder(
     for (let i = 0; i < lines.length; i++) {
         if (isProtected[i]) continue;
         for (const match of footnoteMarkerMatches(maskInlineRegions(lines[i]))) {
-            const id = match[1].toLowerCase();
+            // re-slice the original: a code span inside the name masks to
+            // NULs, which would split the marker's identity from its raw
+            // definition label (bug-masked-name-identity)
+            const start = match.index ?? 0;
+            const id = lines[i]
+                .slice(start + 2, start + match[0].length - 1)
+                .toLowerCase();
             if (!seen.has(id)) {
                 seen.add(id);
                 order.push(id);
@@ -69,9 +75,14 @@ function rewriteMarkers(line: string, renames: Map<string, string>): string {
     let out = "";
     let copied = 0;
     for (const match of footnoteMarkerMatches(masked)) {
-        const newName = renames.get(match[1].toLowerCase());
-        if (newName === undefined) continue;
+        // re-slice the original for the id — same masked-name rationale as
+        // markerAppearanceOrder above
         const start = match.index ?? 0;
+        const id = line
+            .slice(start + 2, start + match[0].length - 1)
+            .toLowerCase();
+        const newName = renames.get(id);
+        if (newName === undefined) continue;
         out += line.slice(copied, start) + `[^${newName}]`;
         copied = start + match[0].length;
     }
