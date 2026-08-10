@@ -59,3 +59,11 @@
 .footnote-shortcut-popup .cm-gutters {
     display: none;
 }
+
+/* inline validation message in the Set-footnote-prefix modal */
+.footnote-shortcut-prefix-error {
+    color: var(--text-error);
+    font-size: var(--font-ui-small);
+    min-height: 1.4em;
+    margin-bottom: var(--size-4-2);
+}

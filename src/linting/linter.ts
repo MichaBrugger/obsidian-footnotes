@@ -14,8 +14,8 @@ import {
     runOutsideTableCell,
 } from "../insert-or-navigate-footnotes";
 import { maskProtectedLines, normalizeEol, restoreEol } from "../markdown-scan";
-import { AppWithCommands, EditorWithCm, WindowWithVim } from "../obsidian-internals";
-import { activeTableCellEditor } from "../table-cursor";
+import { AppWithCommands, WindowWithVim } from "../obsidian-internals";
+import { activeTableCellEditor, nestedSubEditorOwnsFocus } from "../table-cursor";
 import { applyFootnotePrefix } from "./rules/apply-footnote-prefix";
 import { footnoteAfterPunctuation } from "./rules/footnote-after-punctuation";
 import { moveFootnoteDefinitionsToBottom } from "./rules/move-footnotes-to-the-bottom";
@@ -316,17 +316,8 @@ function noticeLintAlerts(plugin: FootnotePlugin, markdown: string) {
 // A sub-editor (an actively edited table cell) owning focus means document
 // edits race its sync-back (issue #28 family). The manual command defers
 // around this state; the automatic triggers just skip — a save must never
-// be delayed or destabilized by its lint.
-function subEditorOwnsFocus(doc: Editor): boolean {
-    const cm = (doc as EditorWithCm).cm;
-    const active = cm?.contentDOM.ownerDocument.activeElement;
-    return !!(
-        cm &&
-        active &&
-        active !== cm.contentDOM &&
-        cm.contentDOM.contains(active)
-    );
-}
+// be delayed or destabilized by its lint. (Shared predicate:
+// nestedSubEditorOwnsFocus in table-cursor.ts.)
 
 /**
  * The alert blocking a lint of `markdown`, or null when linting may
@@ -349,7 +340,16 @@ function lintActiveNoteIfSafe(plugin: FootnotePlugin) {
     if (readingViewActive(mdView)) return;
     if (footnotePopupBusy()) return; // a pending popup save owns the file
     const doc = mdView.editor;
-    if (activeTableCellEditor(doc) || subEditorOwnsFocus(doc)) return;
+    if (activeTableCellEditor(doc) || nestedSubEditorOwnsFocus(doc)) return;
+    // same message as the Lint footnotes command: with every rule off the
+    // pipeline is a no-op by construction, and "No linting needed." would
+    // wrongly imply the note was checked and found clean (E34)
+    if (lintRulesAllDisabled(plugin)) {
+        new Notice(
+            "All lint rules are turned off in the plugin settings, so there is nothing to lint.",
+        );
+        return;
+    }
     const before = doc.getValue();
     const blocked = lintBlockedByPrefix(before);
     if (blocked) {
@@ -385,21 +385,29 @@ export function installLintOnSave(plugin: FootnotePlugin) {
     ];
     if (!command || typeof command.checkCallback !== "function") return;
     const original = command.checkCallback;
-    command.checkCallback = (checking: boolean) => {
+    const wrapped = (checking: boolean) => {
         if (!checking && plugin.settings.lintOnSave) {
             lintActiveNoteIfSafe(plugin);
         }
         return original(checking);
     };
+    command.checkCallback = wrapped;
     plugin.register(() => {
-        command.checkCallback = original;
+        // restore only OUR wrapper: another plugin may have wrapped the
+        // command after us, and blindly writing `original` back would
+        // silently strip its wrapper too (E30)
+        if (command.checkCallback === wrapped) {
+            command.checkCallback = original;
+        }
     });
 }
 
 // vim's ":w" saves through the CM5 vim adapter, NOT the core save command,
 // so the wrapper above never sees it (verified live: handleEx("w") leaves
 // editor:save-file uninvoked). Linter parity means ":w" must lint too.
-let vimWriteHooked = false;
+// Tracked by adapter IDENTITY, not a boolean: toggling vim off and on can
+// build a fresh adapter that our defineEx never touched (E31).
+let hookedVim: unknown = null;
 
 /**
  * Redefine vim's "write"/":w" ex command to route through the core save
@@ -411,14 +419,13 @@ let vimWriteHooked = false;
  * app's own save command, which is exactly what ":w" does anyway.
  */
 export function installVimWriteHook(plugin: FootnotePlugin) {
-    if (vimWriteHooked) return;
     const vim = (activeWindow as WindowWithVim).CodeMirrorAdapter?.Vim;
-    if (!vim?.defineEx) return;
+    if (!vim?.defineEx || hookedVim === vim) return;
     const app = plugin.app as AppWithCommands;
     vim.defineEx("write", "w", () => {
         app.commands?.executeCommandById?.("editor:save-file");
     });
-    vimWriteHooked = true;
+    hookedVim = vim;
 }
 
 // masked-line shape of a footnote definition with NOTHING typed yet
@@ -478,7 +485,7 @@ export function lintAfterFootnoteCreation(
     if (expectedFilePath && mdView.file?.path !== expectedFilePath) return;
     if (footnotePopupBusy()) return;
     const doc = mdView.editor;
-    if (activeTableCellEditor(doc) || subEditorOwnsFocus(doc)) return;
+    if (activeTableCellEditor(doc) || nestedSubEditorOwnsFocus(doc)) return;
     const before = doc.getValue();
     // silent on a blocked prefix: the insert path already explained it
     if (lintBlockedByPrefix(before)) return;

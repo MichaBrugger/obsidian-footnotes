@@ -28,6 +28,24 @@ export interface TableCellEditor {
 }
 
 /**
+ * Whether a sub-editor NESTED inside the main editor's contentDOM owns
+ * focus (an actively edited table cell, or any similar widget editor).
+ * Document edits in that state race the sub-editor's sync-back — the
+ * issue-#28 corruption family — so callers either defer, re-route, or
+ * skip. One shared predicate; it used to be pasted in three places (E9).
+ */
+export function nestedSubEditorOwnsFocus(editor: Editor): boolean {
+    const cm = (editor as EditorWithCm).cm;
+    const active = cm?.contentDOM.ownerDocument.activeElement;
+    return !!(
+        cm &&
+        active &&
+        active !== cm.contentDOM &&
+        cm.contentDOM.contains(active)
+    );
+}
+
+/**
  * The EditorView of the actively edited table cell, or null when focus
  * isn't inside a table cell sub-editor.
  *

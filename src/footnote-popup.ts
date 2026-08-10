@@ -284,9 +284,11 @@ export async function openFootnotePopup(
     doc.addEventListener("mousedown", onDocMouseDown, true);
 
     // bubble phase, so the embedded editor (e.g. vim mode leaving insert
-    // mode) gets first claim on Escape
+    // mode) gets first claim on Escape — and when it TOOK the key
+    // (defaultPrevented: vim left insert mode), the popup must stay open
+    // instead of also closing on the same press (E28)
     containerEl.addEventListener("keydown", (evt: KeyboardEvent) => {
-        if (evt.key === "Escape") {
+        if (evt.key === "Escape" && !evt.defaultPrevented) {
             evt.preventDefault();
             close(true);
         }
@@ -327,7 +329,13 @@ export async function openFootnotePopup(
                     win.setTimeout(teardown, 30);
                     return;
                 }
-                embed.unload();
+                try {
+                    embed.unload();
+                } catch {
+                    // private API — a throw here must not skip the settle
+                    // below, or every later footnote command would wait on
+                    // pendingTeardown forever (E29)
+                }
                 containerEl.remove();
                 // one beat for Obsidian to reconcile the written file into
                 // the main view before anyone edits it (a timeout on

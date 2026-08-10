@@ -7,11 +7,11 @@ import {
 } from "obsidian";
 
 import FootnotePlugin from "./main";
-import { openFootnotePopup, popupEditingAvailable, runAfterNextPopupSettle, settleFootnotePopupWithFeedback, toggleCloseFootnotePopup } from "./footnote-popup";
+import { footnotePopupBusy, openFootnotePopup, popupEditingAvailable, runAfterNextPopupSettle, settleFootnotePopupWithFeedback, toggleCloseFootnotePopup } from "./footnote-popup";
 import { lintAfterFootnoteCreation } from "./linting/linter";
 import { DocumentScan, findDefinitionBlocks, maskInlineRegions, maskLineRegions, maskProtectedLines, maskedLineAt, scanDocument } from "./markdown-scan";
 import { EditorWithCm, VaultWithConfig, WindowWithVim } from "./obsidian-internals";
-import { activeTableCellEditor, resolveTableCellCursor, TableCellEditor } from "./table-cursor";
+import { activeTableCellEditor, nestedSubEditorOwnsFocus, resolveTableCellCursor, TableCellEditor } from "./table-cursor";
 
 // Core logic for both hotkey commands. Each press walks the same decision
 // cascade against the caret position:
@@ -192,11 +192,8 @@ function moveCursorAndSetJumpPoint(
     // otherwise leave keystrokes going to the abandoned cell editor, while
     // a jump into a table re-activates cell editing on its own
     const cmView = (doc as EditorWithCm).cm;
-    if (cmView) {
-        const active = cmView.contentDOM.ownerDocument.activeElement;
-        if (active !== cmView.contentDOM && cmView.contentDOM.contains(active)) {
-            cmView.focus();
-        }
+    if (cmView && nestedSubEditorOwnsFocus(doc)) {
+        cmView.focus();
     }
 
     if (changes && changes.length > 0) {
@@ -606,23 +603,25 @@ export function runOutsideTableCell(
 ) {
     const cursorPosition = resolveTableCellCursor(doc) ?? doc.getCursor();
     const cm = (doc as EditorWithCm).cm;
-    const active = cm?.contentDOM.ownerDocument.activeElement;
-    if (!cm || !active || active === cm.contentDOM || !cm.contentDOM.contains(active)) {
+    if (!cm || !nestedSubEditorOwnsFocus(doc)) {
         run(cursorPosition);
         return;
     }
     cm.focus();
     // rAF stalls entirely while the window is hidden (same reason the popup
     // teardown uses a timeout), which would swallow the command outright —
-    // whichever of the two fires first runs the edit
+    // whichever of the two fires first runs the edit. Timers come from the
+    // editor's OWN window, so a note popped out into a separate window
+    // isn't scheduled on the main one (E37)
+    const win = cm.contentDOM.ownerDocument.defaultView ?? window;
     let ran = false;
     const invoke = () => {
         if (ran) return;
         ran = true;
         run(cursorPosition);
     };
-    window.requestAnimationFrame(invoke);
-    window.setTimeout(invoke, 100);
+    win.requestAnimationFrame(invoke);
+    win.setTimeout(invoke, 100);
 }
 
 // Insert `text` at the caret of an actively edited table cell, through the
@@ -794,7 +793,7 @@ export async function insertAutonumFootnote(plugin: FootnotePlugin) {
 
     const mdView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
 
-    if (!mdView || !mdView.editor) return false;
+    if (!mdView || !mdView.editor) return;
     // Reading view: the editor API happily edits the HIDDEN buffer — one
     // press invisibly inserted "[^]" and the next press toasted about a
     // reference the user could not see (reported 2026-08-08, probed live).
@@ -901,8 +900,13 @@ export function shouldCreateAutonumFootnote(
         doc.transaction({ changes, selection: { from: afterReference } });
         const cancelCreationLint = scheduleCreationLintAfterPopup(plugin);
         void openFootnotePopup(plugin, footnoteId, () => {
-            cancelCreationLint();
             moveCursorAndSetJumpPoint(doc, cursorPosition, definition.cursor, plugin, undefined, true);
+            // a popup that failed AFTER its DOM existed is still settling
+            // its teardown save here — an immediate lint would no-op behind
+            // the busy gate, so leave the settle-deferred one registered
+            // above to fire instead (E32)
+            if (footnotePopupBusy()) return;
+            cancelCreationLint();
             lintAfterFootnoteCreation(plugin, true);
         });
     } else {
@@ -1220,7 +1224,7 @@ export async function insertNamedFootnote(plugin: FootnotePlugin) {
 
     const mdView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
 
-    if (!mdView || !mdView.editor) return false;
+    if (!mdView || !mdView.editor) return;
     // inert in Reading view — see insertAutonumFootnote
     if (readingViewActive(mdView)) return;
 
@@ -1327,8 +1331,11 @@ export function shouldCreateMatchingFootnoteDefinition(
                     doc.transaction({ changes: [definition.change] });
                     const cancelCreationLint = scheduleCreationLintAfterPopup(plugin);
                     void openFootnotePopup(plugin, footnoteId, () => {
-                        cancelCreationLint();
                         moveCursorAndSetJumpPoint(doc, cursorPosition, definition.cursor, plugin, undefined, true);
+                        // see the autonum twin: a late popup failure is
+                        // still settling — the deferred lint fires (E32)
+                        if (footnotePopupBusy()) return;
+                        cancelCreationLint();
                         lintAfterFootnoteCreation(plugin, true);
                     });
                 } else {
