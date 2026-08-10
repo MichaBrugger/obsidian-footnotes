@@ -33,7 +33,7 @@ import {
 } from "./linting/linter";
 
 // bump when adding a new one-time settings migration in loadSettings
-const CURRENT_SETTINGS_VERSION = 1;
+const CURRENT_SETTINGS_VERSION = 2;
 
 export default class FootnotePlugin extends Plugin {
   // `declare`: refine the base Plugin.settings type (Obsidian 1.13+)
@@ -198,51 +198,77 @@ export default class FootnotePlugin extends Plugin {
     // existed, or a fresh install (where everything below no-ops). All
     // migrations share ONE save at the end.
     if (this.settings.settingsVersion < CURRENT_SETTINGS_VERSION) {
-      // saved data from 0.1.x used a PascalCase key for the section heading
-      const legacySettings = this.settings as FootnotePluginSettings & {
-        FootnoteSectionHeading?: string;
-        enableAutoSuggest?: boolean;
-      };
-      if (typeof legacySettings.FootnoteSectionHeading === "string") {
-        this.settings.footnoteSectionHeading = legacySettings.FootnoteSectionHeading;
-        delete legacySettings.FootnoteSectionHeading;
+      // each block is gated on the version it upgrades FROM, so a later
+      // bump can never re-run an earlier shape-based rewrite on values the
+      // user saved deliberately in the meantime (the heading-mangle bug)
+      if (this.settings.settingsVersion < 1) {
+        // saved data from 0.1.x used a PascalCase key for the section heading
+        const legacySettings = this.settings as FootnotePluginSettings & {
+          FootnoteSectionHeading?: string;
+          enableAutoSuggest?: boolean;
+        };
+        if (typeof legacySettings.FootnoteSectionHeading === "string") {
+          this.settings.footnoteSectionHeading = legacySettings.FootnoteSectionHeading;
+          delete legacySettings.FootnoteSectionHeading;
+        }
+
+        // migrate pre-0.2.0 section heading values: the old text input
+        // implied an H1, the textarea takes literal markdown
+        const heading = this.settings.footnoteSectionHeading;
+        if (heading && !/^(#{1,6} |---|\*\*\*|___)/.test(heading)) {
+          this.settings.footnoteSectionHeading = `# ${heading}`;
+        }
+
+        // drop the setting for the removed autosuggest feature (Obsidian now
+        // suggests footnotes natively)
+        delete legacySettings.enableAutoSuggest;
+
+        // the linting settings shipped under tidy* keys in beta.5/6: copy
+        // each saved tidy* value onto its lint* name and drop the old key,
+        // so beta testers keep their toggle choices
+        const tidyKeyRenames: Record<string, string> = {
+          tidyFixPunctuation: "lintFixPunctuation",
+          tidyMoveToBottom: "lintMoveToBottom",
+          tidyReindex: "lintReindex",
+          tidyOnSave: "lintOnSave",
+        };
+        const withTidyKeys = this.settings as FootnotePluginSettings &
+          Record<string, unknown>;
+        for (const [oldKey, newKey] of Object.entries(tidyKeyRenames)) {
+          if (oldKey in withTidyKeys) {
+            // withTidyKeys is the same object as this.settings, so writing
+            // here sets the real lint* setting
+            withTidyKeys[newKey] = withTidyKeys[oldKey];
+            delete withTidyKeys[oldKey];
+          }
+        }
+        // the lint-on-focused-file-change trigger was replaced by lint on
+        // footnote creation (2026-08-05) — its saved keys are dropped rather
+        // than carried over, since the semantics are different
+        delete withTidyKeys["lintOnFileChange"];
+        delete withTidyKeys["tidyOnFileChange"];
       }
 
-      // migrate pre-0.2.0 section heading values: the old text input
-      // implied an H1, the textarea takes literal markdown
-      const heading = this.settings.footnoteSectionHeading;
-      if (heading && !/^(#{1,6} |---|\*\*\*|___)/.test(heading)) {
-        this.settings.footnoteSectionHeading = `# ${heading}`;
-      }
-
-      // drop the setting for the removed autosuggest feature (Obsidian now
-      // suggests footnotes natively)
-      delete legacySettings.enableAutoSuggest;
-
-      // the linting settings shipped under tidy* keys in beta.5/6: copy
-      // each saved tidy* value onto its lint* name and drop the old key,
-      // so beta testers keep their toggle choices
-      const tidyKeyRenames: Record<string, string> = {
-        tidyFixPunctuation: "lintFixPunctuation",
-        tidyMoveToBottom: "lintMoveToBottom",
-        tidyReindex: "lintReindex",
-        tidyOnSave: "lintOnSave",
-      };
-      const withTidyKeys = this.settings as FootnotePluginSettings &
-        Record<string, unknown>;
-      for (const [oldKey, newKey] of Object.entries(tidyKeyRenames)) {
-        if (oldKey in withTidyKeys) {
-          // withTidyKeys is the same object as this.settings, so writing
-          // here sets the real lint* setting
-          withTidyKeys[newKey] = withTidyKeys[oldKey];
-          delete withTidyKeys[oldKey];
+      if (this.settings.settingsVersion < 2) {
+        // v2 (2026-08-10): the two orphan settings became symmetric delete
+        // toggles. keepOrphanedDefinitions (shipped in the betas) carries
+        // over with its polarity flipped; the short-lived lintOrphanedMarkers
+        // dropdown only existed in dev builds but maps just as cheaply.
+        const legacyOrphans = this.settings as FootnotePluginSettings & {
+          keepOrphanedDefinitions?: boolean;
+          lintOrphanedMarkers?: string;
+        };
+        if (typeof legacyOrphans.keepOrphanedDefinitions === "boolean") {
+          this.settings.lintDeleteOrphanedDefinitions =
+            !legacyOrphans.keepOrphanedDefinitions;
+          delete legacyOrphans.keepOrphanedDefinitions;
+        }
+        if (legacyOrphans.lintOrphanedMarkers !== undefined) {
+          this.settings.lintDeleteOrphanedMarkers =
+            legacyOrphans.lintOrphanedMarkers === "delete";
+          delete legacyOrphans.lintOrphanedMarkers;
         }
       }
-      // the lint-on-focused-file-change trigger was replaced by lint on
-      // footnote creation (2026-08-05) — its saved keys are dropped rather
-      // than carried over, since the semantics are different
-      delete withTidyKeys["lintOnFileChange"];
-      delete withTidyKeys["tidyOnFileChange"];
 
       this.settings.settingsVersion = CURRENT_SETTINGS_VERSION;
       await this.saveSettings();

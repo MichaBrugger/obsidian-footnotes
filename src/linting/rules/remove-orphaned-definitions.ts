@@ -1,0 +1,155 @@
+import { footnoteMarkerMatches } from "../../insert-or-navigate-footnotes";
+import {
+    DefinitionBlock,
+    findDefinitionBlocks,
+    maskInlineRegions,
+    normalizeEol,
+    protectedLines,
+    removeLineRanges,
+    restoreEol,
+} from "../../markdown-scan";
+import { IgnoreType } from "../ignore-types";
+import { FootnoteRule } from "../rule";
+
+// Orphaned DEFINITION deletion as its own rule (2026-08-10): it used to live
+// inside reindex (the keepOrphanedDefinitions option, which reindexFootnotes
+// still honors for direct callers), but the lint pipeline runs this instead —
+// the "Delete orphaned definitions" toggle works with reindexing off, and the
+// two orphan settings mirror each other. Deletion is transitive over a
+// reference graph, so a chain of definitions each kept alive only by the
+// previous one's body dies in ONE call at any depth (the 20-iteration
+// fixpoint cap never applies here); definitions that reference each other in
+// a cycle count as referenced and survive, exactly like the reindex policy.
+
+interface ReferenceScan {
+    blocks: DefinitionBlock[];
+    /** folded name → reference count from lines OUTSIDE every definition block */
+    liveRefs: Map<string, number>;
+    /** per block: the folded names its own lines reference */
+    blockRefs: string[][];
+}
+
+function scanReferences(
+    lines: string[],
+    isProtected: boolean[],
+): ReferenceScan {
+    const blocks = findDefinitionBlocks(lines, isProtected);
+    const blockAtLine = new Array<number>(lines.length).fill(-1);
+    blocks.forEach((block, i) => {
+        for (let line = block.start; line <= block.end; line++) {
+            blockAtLine[line] = i;
+        }
+    });
+
+    const liveRefs = new Map<string, number>();
+    const blockRefs: string[][] = blocks.map(() => []);
+    for (let i = 0; i < lines.length; i++) {
+        if (isProtected[i]) continue;
+        for (const match of footnoteMarkerMatches(maskInlineRegions(lines[i]))) {
+            // re-slice the original for the name (a code span masks to NULs)
+            const start = match.index ?? 0;
+            const name = lines[i]
+                .slice(start + 2, start + match[0].length - 1)
+                .toLowerCase();
+            if (blockAtLine[i] === -1) {
+                liveRefs.set(name, (liveRefs.get(name) ?? 0) + 1);
+            } else {
+                blockRefs[blockAtLine[i]].push(name);
+            }
+        }
+    }
+    return { blocks, liveRefs, blockRefs };
+}
+
+/**
+ * The blocks the reference graph can't keep alive: repeatedly kill every
+ * definition whose (folded) name has zero remaining references, retiring the
+ * dead block's own body references as it goes. Duplicate definitions of one
+ * name share a fate. Terminates because every round kills at least one block.
+ */
+function deadBlocks(scan: ReferenceScan): DefinitionBlock[] {
+    const { blocks, liveRefs, blockRefs } = scan;
+    const refCount = new Map(liveRefs);
+    for (const refs of blockRefs) {
+        for (const name of refs) {
+            refCount.set(name, (refCount.get(name) ?? 0) + 1);
+        }
+    }
+    const alive = new Set(blocks.map((_, i) => i));
+    let changed = true;
+    while (changed) {
+        changed = false;
+        for (const i of [...alive]) {
+            if ((refCount.get(blocks[i].name.toLowerCase()) ?? 0) > 0) continue;
+            alive.delete(i);
+            for (const name of blockRefs[i]) {
+                refCount.set(name, (refCount.get(name) ?? 0) - 1);
+            }
+            changed = true;
+        }
+    }
+    return blocks.filter((_, i) => !alive.has(i));
+}
+
+/**
+ * Distinct names of definitions no marker references (each in its own
+ * casing, definition order) — the alert's list. Single-level on purpose: a
+ * definition referenced only from an orphan's body is still "referenced",
+ * matching the message's wording; fixing the listed orphan surfaces it on
+ * the next lint.
+ */
+export function orphanedFootnoteDefinitionNames(markdown: string): string[] {
+    const lines = normalizeEol(markdown).text.split("\n");
+    const scan = scanReferences(lines, protectedLines(lines));
+    const referenced = new Set(scan.liveRefs.keys());
+    for (const refs of scan.blockRefs) {
+        for (const name of refs) referenced.add(name);
+    }
+    const names: string[] = [];
+    const seen = new Set<string>();
+    for (const block of scan.blocks) {
+        const folded = block.name.toLowerCase();
+        if (referenced.has(folded) || seen.has(folded)) continue;
+        seen.add(folded);
+        names.push(block.name);
+    }
+    return names;
+}
+
+/** Every unreferenced definition block removed (transitively — see module note). Protected regions and everything referenced stay put. */
+export function removeOrphanedFootnoteDefinitions(markdown: string): string {
+    const { text, eol } = normalizeEol(markdown);
+    const lines = text.split("\n");
+    const isProtected = protectedLines(lines);
+    const dead = deadBlocks(scanReferences(lines, isProtected));
+    if (dead.length === 0) return markdown;
+    return restoreEol(removeLineRanges(lines, dead).join("\n"), eol);
+}
+
+/** Linter-shaped registry entry. */
+export const removeOrphanedDefinitionsRule: FootnoteRule = {
+    id: "remove-orphaned-definitions",
+    name: "Remove orphaned definitions",
+    description:
+        "Delete footnote definitions that no marker references, including chains only kept alive by each other's bodies.",
+    ignoreTypes: [
+        IgnoreType.Code,
+        IgnoreType.InlineCode,
+        IgnoreType.Math,
+        IgnoreType.Yaml,
+        IgnoreType.HtmlComment,
+    ],
+    examples: [
+        {
+            description: "An unreferenced definition is removed",
+            before: "text[^1]\n\n[^1]: used\n[^9]: stray",
+            after: "text[^1]\n\n[^1]: used",
+        },
+        {
+            description: "A definition only an orphan's body references dies with it",
+            before: "text\n\n[^a]: uses[^b]\n[^b]: chained",
+            after: "text\n",
+        },
+    ],
+    apply: (text) => removeOrphanedFootnoteDefinitions(text),
+};

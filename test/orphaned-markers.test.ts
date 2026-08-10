@@ -1,16 +1,19 @@
 import { describe, expect, it } from "vitest";
 
 import { lintFootnotes } from "../src/linting/linter";
-import { orphanedFootnoteDefinitionNames } from "../src/linting/rules/re-index-footnotes";
+import {
+    orphanedFootnoteDefinitionNames,
+    removeOrphanedFootnoteDefinitions,
+} from "../src/linting/rules/remove-orphaned-definitions";
 import {
     orphanedFootnoteMarkerNames,
     removeOrphanedFootnoteMarkers,
 } from "../src/linting/rules/remove-orphaned-markers";
 
-// The "Orphaned markers" setting (requested 2026-08-10): a marker with no
-// definition renders as plain text in Obsidian, so linting either alerts
-// (default) or deletes them — plus the definition-side alert list for
-// orphans that keepOrphanedDefinitions preserves.
+// The symmetric orphan handling (requested 2026-08-10): markers with no
+// definition and definitions with no marker each get a delete toggle, and
+// while a toggle is off linting alerts about that orphan kind instead —
+// orphans are never silent.
 
 describe("orphanedFootnoteMarkerNames (the alert's list)", () => {
     it("lists markers with no definition, in first-appearance order", () => {
@@ -120,6 +123,51 @@ describe("lintFootnotes with removeOrphanedMarkers", () => {
             orphanSafePrefix: "2.",
         });
         expect(out).toContain("[^2.]");
+    });
+});
+
+describe("removeOrphanedFootnoteDefinitions", () => {
+    it("removes an unreferenced definition block, continuation lines included", () => {
+        const doc = "text[^1]\n\n[^1]: used\n[^9]: stray\n    continues";
+        expect(removeOrphanedFootnoteDefinitions(doc)).toBe(
+            "text[^1]\n\n[^1]: used",
+        );
+    });
+
+    it("deletes a 25-deep chain in ONE call (no iteration cap)", () => {
+        const chain = Array.from({ length: 25 }, (_, i) =>
+            i === 24 ? "[^25]: end" : `[^${i + 1}]: uses[^${i + 2}]`,
+        ).join("\n");
+        const out = removeOrphanedFootnoteDefinitions(`para.\n\n${chain}`);
+        expect(out).toBe("para.\n");
+        expect(removeOrphanedFootnoteDefinitions(out)).toBe(out);
+    });
+
+    it("keeps a cycle of definitions referencing each other (reindex parity)", () => {
+        const doc = "para.\n\n[^a]: uses[^b]\n[^b]: uses[^a]";
+        expect(removeOrphanedFootnoteDefinitions(doc)).toBe(doc);
+    });
+
+    it("a case-variant marker keeps its definition", () => {
+        const doc = "see[^Note]\n\n[^note]: n";
+        expect(removeOrphanedFootnoteDefinitions(doc)).toBe(doc);
+    });
+
+    it("definition-shaped lines inside code are not definitions (or references)", () => {
+        const doc = "```\n[^9]: fenced\nuses[^9]\n```\nprose";
+        expect(removeOrphanedFootnoteDefinitions(doc)).toBe(doc);
+    });
+
+    it("works without reindex: lintFootnotes deletes with reindex off", () => {
+        const doc = "Text[^2].\n\n[^2]: used\n[^9]: orphan";
+        expect(
+            lintFootnotes(doc, {
+                removeOrphanedDefinitions: true,
+                reindex: false,
+                fixPunctuation: false,
+                moveDefinitionsToBottom: false,
+            }),
+        ).toBe("Text[^2].\n\n[^2]: used");
     });
 });
 

@@ -69,29 +69,6 @@ function markerAppearanceOrder(
     return order;
 }
 
-/**
- * Names of definitions no marker references (ids folded for identity, each
- * reported in its own casing), in definition order — the lint alert's list
- * when orphaned definitions are being kept (requested 2026-08-10, the
- * definition-side twin of the orphaned-marker alert). Same reference
- * semantics as the keepOrphanedDefinitions policy: a marker nested in
- * another definition's body counts.
- */
-export function orphanedFootnoteDefinitionNames(markdown: string): string[] {
-    const lines = normalizeEol(markdown).text.split("\n");
-    const isProtected = protectedLines(lines);
-    const referenced = new Set(markerAppearanceOrder(lines, isProtected));
-    const names: string[] = [];
-    const seen = new Set<string>();
-    for (const block of findDefinitionBlocks(lines, isProtected)) {
-        const folded = block.name.toLowerCase();
-        if (referenced.has(folded) || seen.has(folded)) continue;
-        seen.add(folded);
-        names.push(block.name);
-    }
-    return names;
-}
-
 /** All markers on the line rewritten through `renames` (code spans and the definition label skipped; ids matched case-insensitively); the map is complete, so swaps can't collide. */
 function rewriteMarkers(line: string, renames: Map<string, string>): string {
     const masked = maskInlineRegions(line);

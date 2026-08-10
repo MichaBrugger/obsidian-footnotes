@@ -132,8 +132,9 @@ const BASELINE_SETTINGS = {
     enableFootnotePrefix: false,
     enableFootnoteSectionHeading: false,
     enableRemoveBlankLastLines: true,
-    keepOrphanedDefinitions: true,
     renumberNamedFootnotes: false,
+    lintDeleteOrphanedMarkers: false,
+    lintDeleteOrphanedDefinitions: false,
     lintFixPunctuation: true,
     lintMoveToBottom: true,
     lintReindex: true,
@@ -819,15 +820,29 @@ async function main() {
         );
     });
 
-    await test("lint reindex deletes orphaned definitions when the setting says so", async () => {
+    await test("lint deletes orphaned definitions when the setting says so", async () => {
         resetSettings({
-            keepOrphanedDefinitions: false,
+            lintDeleteOrphanedDefinitions: true,
             lintFixPunctuation: false,
             lintMoveToBottom: false,
         });
         await setupNote("Text[^2].\n\n[^2]: used\n[^9]: orphan");
         setCursorAndRun(0, 0, CMD_LINT);
         await expectEditorText("Text[^1].\n\n[^1]: used");
+    });
+
+    await test("orphaned-definition deletion works with reindex OFF (2026-08-10)", async () => {
+        // the deletion used to live inside reindex; it is its own rule now
+        resetSettings({
+            lintDeleteOrphanedDefinitions: true,
+            lintReindex: false,
+            lintFixPunctuation: false,
+            lintMoveToBottom: false,
+        });
+        await setupNote("Text[^2].\n\n[^2]: used\n[^9]: orphan");
+        setCursorAndRun(0, 0, CMD_LINT);
+        // no renumbering (reindex off) — just the orphan gone
+        await expectEditorText("Text[^2].\n\n[^2]: used");
     });
 
     await test("lint skips the reindex step when its toggle is off", async () => {
@@ -1311,14 +1326,14 @@ async function main() {
     });
 
     await test("lint deletes orphaned markers when the setting says so (2026-08-10)", async () => {
-        resetSettings({ lintOrphanedMarkers: "delete" });
+        resetSettings({ lintDeleteOrphanedMarkers: true });
         await setupNote("Keep[^1] drop[^stray] end\n\n[^1]: one");
         setCursorAndRun(0, 0, CMD_LINT);
         await expectEditorText("Keep[^1] drop end\n\n[^1]: one");
     });
 
     await test("lint alerts about kept orphaned definitions (2026-08-10)", async () => {
-        resetSettings(); // keepOrphanedDefinitions defaults to on
+        resetSettings(); // orphaned-definition deletion defaults to off
         await setupNote("plain text[^1]\n\n[^1]: used\n[^stray]: unused");
         setCursorAndRun(0, 0, CMD_LINT);
         await pollUntil(

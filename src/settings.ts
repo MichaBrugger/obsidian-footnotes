@@ -16,10 +16,11 @@ export interface FootnotePluginSettings {
 
     enableRemoveBlankLastLines: boolean;
 
-    keepOrphanedDefinitions: boolean;
     renumberNamedFootnotes: boolean;
-    /** What linting does about markers with no definition: report them ("alert") or remove them from the text ("delete"). Always one or the other — orphans are never silent (Jason, 2026-08-10). */
-    lintOrphanedMarkers: "alert" | "delete";
+    /** Linting deletes markers that have no definition; while off, it alerts about them instead. Orphans are never silent either way (Jason, 2026-08-10). */
+    lintDeleteOrphanedMarkers: boolean;
+    /** Linting deletes definitions no marker references (independent of reindexing); while off, they are kept and alerted about. Mirrors lintDeleteOrphanedMarkers. */
+    lintDeleteOrphanedDefinitions: boolean;
     lintFixPunctuation: boolean;
     lintMoveToBottom: boolean;
     lintReindex: boolean;
@@ -42,9 +43,9 @@ export const DEFAULT_SETTINGS: FootnotePluginSettings = {
 
     enableRemoveBlankLastLines: true,
 
-    keepOrphanedDefinitions: true,
     renumberNamedFootnotes: false,
-    lintOrphanedMarkers: "alert",
+    lintDeleteOrphanedMarkers: false,
+    lintDeleteOrphanedDefinitions: false,
     lintFixPunctuation: true,
     lintMoveToBottom: true,
     lintReindex: true,
@@ -149,16 +150,19 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                                 control: { type: "toggle", key: "lintMoveToBottom" },
                             },
                             {
-                                name: "Orphaned markers",
-                                desc: "What linting does about footnote markers that have no definition (a [^5] with no \"[^5]:\" line, which Obsidian renders as plain text): alert you, or delete the markers from the text.",
+                                name: "Delete orphaned markers",
+                                desc: "Linting deletes footnote markers that have no definition (a [^5] with no \"[^5]:\" line, which Obsidian renders as plain text). While off, linting alerts you about them instead.",
                                 control: {
-                                    type: "dropdown",
-                                    key: "lintOrphanedMarkers",
-                                    defaultValue: "alert",
-                                    options: {
-                                        alert: "Alert",
-                                        delete: "Delete",
-                                    },
+                                    type: "toggle",
+                                    key: "lintDeleteOrphanedMarkers",
+                                },
+                            },
+                            {
+                                name: "Delete orphaned definitions",
+                                desc: "Linting deletes footnote definitions that no marker references. While off, they are kept (reindexing numbers them after everything else) and linting alerts you about them instead.",
+                                control: {
+                                    type: "toggle",
+                                    key: "lintDeleteOrphanedDefinitions",
                                 },
                             },
                             {
@@ -180,15 +184,6 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                                 name: "Reindex",
                                 desc: "The lint command also renumbers footnotes and reorders their definitions, following the options in this reindexing section below.",
                                 control: { type: "toggle", key: "lintReindex" },
-                            },
-                            {
-                                name: "Keep orphaned definitions",
-                                desc: "Reindexing keeps definitions that no marker references, numbering them after everything else; linting alerts you about the ones it keeps. Turn off to delete them instead.",
-                                control: {
-                                    type: "toggle",
-                                    key: "keepOrphanedDefinitions",
-                                    disabled: () => !this.plugin.settings.lintReindex,
-                                },
                             },
                             {
                                 name: "Renumber named footnotes",

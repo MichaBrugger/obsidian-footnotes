@@ -9,10 +9,12 @@ import { applyFootnotePrefixRule } from "./apply-footnote-prefix";
 import { footnoteAfterPunctuationRule } from "./footnote-after-punctuation";
 import { moveFootnotesToTheBottomRule } from "./move-footnotes-to-the-bottom";
 import { reIndexFootnotesRule } from "./re-index-footnotes";
+import { removeOrphanedDefinitionsRule } from "./remove-orphaned-definitions";
 import { removeOrphanedMarkersRule } from "./remove-orphaned-markers";
 
 export const footnoteRules: FootnoteRule<never>[] = [
     removeOrphanedMarkersRule,
+    removeOrphanedDefinitionsRule,
     footnoteAfterPunctuationRule,
     moveFootnotesToTheBottomRule,
     reIndexFootnotesRule,

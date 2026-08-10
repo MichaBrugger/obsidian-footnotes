@@ -38,12 +38,25 @@ describe("one-shot settings migration (heading-mangle bug fix)", () => {
         // value saved from the settings tab looks like on disk
         const { plugin, saves } = pluginWithSavedData({
             footnoteSectionHeading: "**Footnotes**",
-            settingsVersion: 1,
+            settingsVersion: 2,
         });
         await plugin.loadSettings();
         expect(plugin.settings.footnoteSectionHeading).toBe("**Footnotes**");
         // nothing migrated, so nothing was written either
         expect(saves()).toBe(0);
+    });
+
+    it("a version bump never re-runs an earlier shape-based rewrite", async () => {
+        // v1 data upgrading to v2: only the v2 block may run — the heading
+        // rewrite belongs to the <1 block and must not touch this value
+        const { plugin, saves } = pluginWithSavedData({
+            footnoteSectionHeading: "**Footnotes**",
+            settingsVersion: 1,
+        });
+        await plugin.loadSettings();
+        expect(plugin.settings.footnoteSectionHeading).toBe("**Footnotes**");
+        expect(plugin.settings.settingsVersion).toBe(2);
+        expect(saves()).toBe(1);
     });
 
     it("pre-flag data still migrates once: plain text becomes an H1", async () => {
@@ -52,7 +65,7 @@ describe("one-shot settings migration (heading-mangle bug fix)", () => {
         });
         await plugin.loadSettings();
         expect(plugin.settings.footnoteSectionHeading).toBe("# Footnotes");
-        expect(plugin.settings.settingsVersion).toBe(1);
+        expect(plugin.settings.settingsVersion).toBe(2);
     });
 
     it("a fully legacy payload migrates in ONE save", async () => {
@@ -69,7 +82,7 @@ describe("one-shot settings migration (heading-mangle bug fix)", () => {
         expect(plugin.settings.lintOnSave).toBe(true);
         expect("enableAutoSuggest" in plugin.settings).toBe(false);
         expect("lintOnFileChange" in plugin.settings).toBe(false);
-        expect(plugin.settings.settingsVersion).toBe(1);
+        expect(plugin.settings.settingsVersion).toBe(2);
         expect(saves()).toBe(1);
     });
 
@@ -88,7 +101,7 @@ describe("one-shot settings migration (heading-mangle bug fix)", () => {
         plugin.loadData = async () => null;
         plugin.saveData = async () => {};
         await plugin.loadSettings();
-        expect(plugin.settings.settingsVersion).toBe(1);
+        expect(plugin.settings.settingsVersion).toBe(2);
         expect(plugin.settings.footnoteSectionHeading).toBe("# Footnotes");
     });
 });

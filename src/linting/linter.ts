@@ -19,11 +19,11 @@ import { activeTableCellEditor } from "../table-cursor";
 import { applyFootnotePrefix } from "./rules/apply-footnote-prefix";
 import { footnoteAfterPunctuation } from "./rules/footnote-after-punctuation";
 import { moveFootnoteDefinitionsToBottom } from "./rules/move-footnotes-to-the-bottom";
+import { reindexFootnotes, ReindexOptions } from "./rules/re-index-footnotes";
 import {
     orphanedFootnoteDefinitionNames,
-    reindexFootnotes,
-    ReindexOptions,
-} from "./rules/re-index-footnotes";
+    removeOrphanedFootnoteDefinitions,
+} from "./rules/remove-orphaned-definitions";
 import {
     orphanedFootnoteMarkerNames,
     removeOrphanedFootnoteMarkers,
@@ -41,12 +41,11 @@ function configuredSectionHeading(plugin: FootnotePlugin): string {
         : "";
 }
 
-/** The reindex policy the user picked in the settings tab. */
+/** The reindex policy the user picked in the settings tab. Orphaned-definition deletion is NOT reindex's job on the lint path anymore — the standalone rule handles it (2026-08-10), so reindex always keeps (and numbers) whatever orphans remain. */
 export function reindexOptionsFromSettings(
     plugin: FootnotePlugin,
 ): ReindexOptions {
     return {
-        keepOrphanedDefinitions: plugin.settings.keepOrphanedDefinitions,
         renumberNamedFootnotes: plugin.settings.renumberNamedFootnotes,
     };
 }
@@ -63,8 +62,9 @@ export function lintOptionsFromSettings(
         moveDefinitionsToBottom: plugin.settings.lintMoveToBottom,
         reindex: plugin.settings.lintReindex,
         reindexOptions: reindexOptionsFromSettings(plugin),
-        removeOrphanedMarkers:
-            plugin.settings.lintOrphanedMarkers === "delete",
+        removeOrphanedMarkers: plugin.settings.lintDeleteOrphanedMarkers,
+        removeOrphanedDefinitions:
+            plugin.settings.lintDeleteOrphanedDefinitions,
         orphanSafePrefix: alertPrefix(plugin, markdown),
         // BOTH prefix behaviors ride the apply-prefix rule (and the whole
         // feature toggle): with the rule off, footnotes carrying the
@@ -91,8 +91,10 @@ export interface LintOptions {
     reindex?: boolean;
     /** Passed through to reindexFootnotes. */
     reindexOptions?: ReindexOptions;
-    /** Delete markers that have no definition anywhere in the note (default off; the caller gates on the "Orphaned markers" setting). */
+    /** Delete markers that have no definition anywhere in the note (default off; the caller gates on the "Delete orphaned markers" setting). */
     removeOrphanedMarkers?: boolean;
+    /** Delete definitions no marker references, transitively (default off; the caller gates on the "Delete orphaned definitions" setting). Independent of `reindex`. */
+    removeOrphanedDefinitions?: boolean;
     /** The note's own valid footnote-prefix while the prefix feature is on: its untouched "[^2.]" placeholder is an in-progress footnote, never an orphan to delete. */
     orphanSafePrefix?: string;
     /** Rename plain numbered AND named footnotes to carry the note's own footnote-prefix property (default off; the caller gates on settings). */
@@ -118,6 +120,13 @@ export function lintFootnotes(
             result,
             options.orphanSafePrefix ?? "",
         );
+    }
+    // deleting orphaned markers can't orphan a definition (they had none),
+    // and deleting orphaned definitions can't orphan a live marker (a
+    // marker's reference is exactly what keeps a definition alive) — the
+    // two steps are order-independent and both precede everything else
+    if (options.removeOrphanedDefinitions) {
+        result = removeOrphanedFootnoteDefinitions(result);
     }
     if (options.fixPunctuation ?? true) {
         result = footnoteAfterPunctuation(result);
@@ -196,9 +205,10 @@ export function lintRulesAllDisabled(plugin: FootnotePlugin): boolean {
         !s.lintMoveToBottom &&
         !s.lintReindex &&
         !(s.enableFootnotePrefix && s.lintApplyPrefix) &&
-        // orphan-marker DELETION is a transform; the Alert mode is not
-        // (and the alerts deliberately stay silent when every rule is off)
-        s.lintOrphanedMarkers !== "delete"
+        // orphan DELETION is a transform; the alerts that replace it while
+        // the toggles are off deliberately stay silent when every rule is off
+        !s.lintDeleteOrphanedMarkers &&
+        !s.lintDeleteOrphanedDefinitions
     );
 }
 
@@ -258,10 +268,10 @@ function markerList(names: string[]): string {
     return names.length > 3 ? `${shown}, …` : shown;
 }
 
-// the "Orphaned markers" setting's Alert mode; in Delete mode the lint
-// already removed them, so the post-lint scan below finds nothing anyway
+// the alert half of "Delete orphaned markers": while the toggle is off,
+// linting reports them instead — orphans are never silent
 function noticeOrphanedMarkers(plugin: FootnotePlugin, markdown: string) {
-    if (plugin.settings.lintOrphanedMarkers !== "alert") return;
+    if (plugin.settings.lintDeleteOrphanedMarkers) return;
     const names = orphanedFootnoteMarkerNames(
         markdown,
         alertPrefix(plugin, markdown),
@@ -276,9 +286,9 @@ function noticeOrphanedMarkers(plugin: FootnotePlugin, markdown: string) {
 }
 
 // kept orphaned definitions alert too (Jason, 2026-08-10) — every orphan
-// kind is either deleted or surfaced, never silently preserved. No settings
-// gate: when deletion is on and reindex ran, none survive to report.
+// kind is either deleted or surfaced, never silently preserved
 function noticeOrphanedDefinitions(plugin: FootnotePlugin, markdown: string) {
+    if (plugin.settings.lintDeleteOrphanedDefinitions) return;
     const names = orphanedFootnoteDefinitionNames(markdown);
     if (names.length === 0) return;
     new Notice(

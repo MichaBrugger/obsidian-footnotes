@@ -19,9 +19,9 @@ function pluginWith(overrides: Record<string, boolean>): FootnotePlugin {
             lintFixPunctuation: true,
             lintMoveToBottom: true,
             lintReindex: true,
-            keepOrphanedDefinitions: true,
             renumberNamedFootnotes: false,
-            lintOrphanedMarkers: "alert",
+            lintDeleteOrphanedMarkers: false,
+            lintDeleteOrphanedDefinitions: false,
             ...overrides,
         },
     } as unknown as FootnotePlugin;
