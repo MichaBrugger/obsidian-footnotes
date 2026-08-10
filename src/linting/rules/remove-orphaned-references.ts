@@ -103,7 +103,6 @@ export function removeOrphanedFootnoteReferences(
     const definitions = definitionNamesFolded(lines, masked);
     const safeFolded = safePrefix.toLowerCase();
 
-    let changedAny = false;
     const out = lines.map((line, i) => {
         if (scan.isProtected[i]) return line;
         let result = "";
@@ -127,13 +126,12 @@ export function removeOrphanedFootnoteReferences(
             changed = true;
         }
         if (!changed) return line;
-        changedAny = true;
         const tail = line.slice(copied);
         // a reference that closed the line leaves its leading space dangling;
         // a non-empty tail means any trailing spaces were already there
         return tail === "" ? result.replace(/[ \t]+$/, "") : result + tail;
     });
-    if (!changedAny) return markdown;
+    if (out.every((line, i) => line === lines[i])) return markdown;
 
     // Deleting reference text can re-classify a DISTANT line: blanking the
     // paragraph between a definition and an indented chunk turns that chunk
