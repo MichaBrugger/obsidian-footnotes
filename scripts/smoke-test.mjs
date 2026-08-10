@@ -1376,6 +1376,29 @@ async function main() {
         await expectEditorText("> ```\n> fake[^9]\nAlpha done[^1]\n\n[^1]: ");
     });
 
+    await test("footnotes navigate inside a callout (2026-08-10 C22)", async () => {
+        resetSettings();
+        const note = "> [!note]\n> body[^1] here\n> [^1]: def";
+        await setupNote(note);
+        setCursorAndRun(1, 8, CMD_AUTONUM); // inside [^1] — must navigate
+        await pollUntil(
+            "cursor on the callout definition line",
+            `(${EDITOR}).editor.getCursor()`,
+            (c) => c && c.line === 2,
+        );
+        const text = readJson(`(${EDITOR}).editor.getValue()`);
+        if (text !== note) {
+            throw new Error(`navigation duplicated the definition: ${JSON.stringify(text)}`);
+        }
+    });
+
+    await test("lint leaves math alone, swaps real punctuation (2026-08-10 C20)", async () => {
+        resetSettings({ lintMoveToBottom: false, lintReindex: false });
+        await setupNote("$x[^9].$ real[^1].\n\n[^1]: one");
+        setCursorAndRun(0, 0, CMD_LINT);
+        await expectEditorText("$x[^9].$ real.[^1]\n\n[^1]: one");
+    });
+
     // LAST before cleanup: this test flips the view mode, and a failure
     // between flip and flip-back must not poison the tests after it
     await test("deferred creation-lint stays inert after a flip to Reading view (2026-08-10 A7)", async () => {

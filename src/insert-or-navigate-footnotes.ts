@@ -9,7 +9,7 @@ import {
 import FootnotePlugin from "./main";
 import { footnotePopupBusy, openFootnotePopup, popupEditingAvailable, runAfterNextPopupSettle, settleFootnotePopupWithFeedback, toggleCloseFootnotePopup } from "./footnote-popup";
 import { lintAfterFootnoteCreation } from "./linting/linter";
-import { DocumentScan, findDefinitionBlocks, maskInlineRegions, maskLineRegions, maskProtectedLines, maskedLineAt, scanDocument, TrailingPunctuationChars } from "./markdown-scan";
+import { definitionLabelIn, DocumentScan, findDefinitionBlocks, maskInlineRegions, maskLineRegions, maskProtectedLines, maskedLineAt, scanDocument, TrailingPunctuationChars } from "./markdown-scan";
 import { EditorWithCm, VaultWithConfig, WindowWithVim } from "./obsidian-internals";
 import { activeTableCellEditor, nestedSubEditorOwnsFocus, resolveTableCellCursor, TableCellEditor } from "./table-cursor";
 
@@ -29,8 +29,6 @@ import { activeTableCellEditor, nestedSubEditorOwnsFocus, resolveTableCellCursor
 export const AllReferences = /\[\^([^[\]]+)\]/g;
 /** Numbered references AND numbered definitions — both reserve their number for autonumbering. */
 const AllNumberedReferences = /\[\^(\d+)\]/g;
-// anchored: a definition only counts at the start of a line, same as markdown
-const DefinitionInLine = /^\[\^([^[\]]+)\]:/;
 /** Pulls the name out of a single reference string; the name is match[2]. */
 export const ExtractNameFromFootnote = /(\[\^)([^[\]]+)(?=\])/;
 
@@ -143,17 +141,17 @@ export function listExistingFootnoteDefinitions(
 ) {
     const definitionNames: string[] = [];
 
-    //search each line for footnote definitions and add their names to the list
+    //search each line for footnote definitions — column-0 labels and
+    //blockquote/callout ones ("> [^x]: …", C22) — and list their names
     const lines = ctx.lines;
     const masked = ctx.maskedLines();
     for (let i = 0; i < lines.length; i++) {
-        const match = masked[i].match(DefinitionInLine);
-        if (match) {
+        const label = definitionLabelIn(masked[i]);
+        if (label) {
             // re-slice the ORIGINAL line: a code span inside the name masks
             // to NULs, and the masked name would otherwise leak them into
-            // saved output (its reference sibling re-slices for the same reason).
-            // The name always starts at index 2 (past the "[^").
-            definitionNames.push(lines[i].slice(2, 2 + match[1].length));
+            // saved output (its reference sibling re-slices for the same reason)
+            definitionNames.push(lines[i].slice(label.nameStart, label.nameEnd));
         }
     }
     return definitionNames;
@@ -248,7 +246,7 @@ export function shouldJumpFromDefinitionToReference(
     // (jump-to-definition deliberately parks the caret on the LAST continuation
     // line, and the hotkey there used to insert a new footnote instead of
     // jumping back — bug reported 2026-07-17)
-    if (!DefinitionInLine.test(lineText) && !/^\s+\S/.test(lineText)) return false;
+    if (definitionLabelIn(lineText) === null && !/^\s+\S/.test(lineText)) return false;
 
     // #41: a "[^x]:" inside a code block is not a definition, and a reference
     // inside code is not a jump target — resolve against protected-aware
@@ -263,10 +261,24 @@ export function shouldJumpFromDefinitionToReference(
             cursorPosition.line >= candidate.start &&
             cursorPosition.line <= candidate.end,
     );
+    let definitionName: string | null = null;
+    let caretLineLabel: { nameStart: number } | null = null;
     if (block) {
+        definitionName = block.name;
+    } else {
+        // a blockquoted/callout label ("> [^x]: …", C22) is a definition
+        // too, but never part of a column-0 definition BLOCK — match the
+        // caret's masked line and re-slice the raw name
+        const label = definitionLabelIn(ctx.maskedLine(cursorPosition.line));
+        if (label && label.nameStart > 2) {
+            definitionName = lineText.slice(label.nameStart, label.nameEnd);
+            caretLineLabel = label;
+        }
+    }
+    if (definitionName !== null) {
         // ids are case-insensitive, so the reference may differ in casing from
         // the definition's label ("[^Note]" ↔ "[^note]:") — fold both to compare
-        const name = block.name.toLowerCase();
+        const name = definitionName.toLowerCase();
         const masked = ctx.maskedLines();
 
         // find the FIRST reference use of this footnote. footnoteReferenceMatches
@@ -274,16 +286,25 @@ export function shouldJumpFromDefinitionToReference(
         // one included — is never its own jump target
         for (let i = 0; i < masked.length; i++) {
             for (const use of footnoteReferenceMatches(masked[i])) {
+                const useStart = use.index ?? 0;
+                // a blockquoted label reads as a mid-line reference on its
+                // own line — it must not be its own jump target either
+                if (
+                    caretLineLabel &&
+                    i === cursorPosition.line &&
+                    useStart === caretLineLabel.nameStart - 2
+                ) {
+                    continue;
+                }
                 // re-slice the ORIGINAL line for the name: a code span
                 // inside it masks to NULs, which can never equal the raw
                 // block name (bug pinned in bug-masked-name-identity)
-                const useStart = use.index ?? 0;
                 const useName = lines[i].slice(
                     useStart + 2,
                     useStart + use[0].length - 1,
                 );
                 if (useName.toLowerCase() !== name) continue;
-                const newCursorPos = { line: i, ch: (use.index ?? 0) + use[0].length };
+                const newCursorPos = { line: i, ch: useStart + use[0].length };
                 moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos, plugin, undefined, true);
                 return true;
             }
@@ -294,7 +315,7 @@ export function shouldJumpFromDefinitionToReference(
         // have since deleted; explain and stand still instead (QOL sweep,
         // 2026-08-07)
         new Notice(
-            `Nothing references this footnote. Add a [^${block.name}] reference in the text, or delete the definition.`,
+            `Nothing references this footnote. Add a [^${definitionName}] reference in the text, or delete the definition.`,
             8000,
         );
         return true;
@@ -311,18 +332,19 @@ export function jumpToFootnoteDefinition(
     ctx: DocContext = docContext(doc),
 ) {
     // find the first line with this definition reference name in it — matching
-    // the masked twin so definition-shaped lines inside code don't count (#41)
+    // the masked twin so definition-shaped lines inside code don't count
+    // (#41); blockquote/callout labels count too (C22)
     const lines = ctx.lines;
     const masked = ctx.maskedLines();
     for (let i = 0; i < masked.length; i++) {
-        const lineMatch = masked[i].match(DefinitionInLine);
+        const label = definitionLabelIn(masked[i]);
         // ids are case-insensitive: the definition label may differ in casing
         // from the reference name that sent us here. Re-slice the ORIGINAL
         // line for the name — a code span inside it masks to NULs
-        // (bug-masked-name-identity); the name always starts at index 2
+        // (bug-masked-name-identity)
         if (
-            lineMatch &&
-            lines[i].slice(2, 2 + lineMatch[1].length).toLowerCase() ===
+            label &&
+            lines[i].slice(label.nameStart, label.nameEnd).toLowerCase() ===
                 footnoteName.toLowerCase()
         ) {
             // land at the END of the definition (indented lines belong to

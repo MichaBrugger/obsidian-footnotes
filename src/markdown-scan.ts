@@ -86,6 +86,28 @@ function blockquoteDepth(line: string): { depth: number; rest: string } {
 }
 
 /**
+ * The footnote definition label on `line` — at column 0, or behind a
+ * blockquote/callout prefix ("> [^x]: …" — Jason's ruling 2026-08-10:
+ * footnote creation, navigation, and linting work inside
+ * blockquotes/callouts). Positions index into the SAME line passed in, so
+ * callers can re-slice the raw line when they matched the masked twin (a
+ * code span inside the name masks to NULs). Null when the line carries no
+ * label.
+ */
+export function definitionLabelIn(
+    line: string,
+): { nameStart: number; nameEnd: number; labelEnd: number } | null {
+    const prefix = line.match(BlockquotePrefix)?.[0].length ?? 0;
+    const match = line.slice(prefix).match(DefinitionStart);
+    if (!match) return null;
+    return {
+        nameStart: prefix + 2,
+        nameEnd: prefix + 2 + match[1].length,
+        labelEnd: prefix + match[0].length,
+    };
+}
+
+/**
  * Whether a line already known to start with a fence delimiter actually opens
  * a fence. Per CommonMark a backtick fence's info string may not contain a
  * backtick — "```[^1]``` x" is an inline code span in a paragraph, not a

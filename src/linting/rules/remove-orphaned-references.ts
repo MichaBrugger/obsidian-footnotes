@@ -3,7 +3,7 @@ import {
     isValidFootnoteName,
 } from "../../insert-or-navigate-footnotes";
 import {
-    DefinitionStart,
+    definitionLabelIn,
     maskProtectedLines,
     normalizeEol,
     scanDocument,
@@ -25,13 +25,15 @@ import { FootnoteRule } from "../rule";
 //    an IN-PROGRESS footnote mid-naming, owned by the unnamed-reference alert —
 //    deleting it out from under the user's caret would be data loss.
 
-/** The definition names present in the note, case-folded. Masked scan, raw re-slice (a code span in a name masks to NULs). */
+/** The definition names present in the note, case-folded — column-0 labels and blockquoted/callout ones (C22). Masked scan, raw re-slice (a code span in a name masks to NULs). */
 function definitionNamesFolded(lines: string[], masked: string[]): Set<string> {
     const names = new Set<string>();
     for (let i = 0; i < masked.length; i++) {
-        const match = masked[i].match(DefinitionStart);
-        if (!match) continue;
-        names.add(lines[i].slice(2, 2 + match[1].length).toLowerCase());
+        const label = definitionLabelIn(masked[i]);
+        if (!label) continue;
+        names.add(
+            lines[i].slice(label.nameStart, label.nameEnd).toLowerCase(),
+        );
     }
     return names;
 }

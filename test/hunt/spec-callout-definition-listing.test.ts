@@ -21,8 +21,8 @@ function fakeEditor(lines: string[]) {
     } as unknown as Editor;
 }
 
-describe("spec question: definition listing vs. callouts", () => {
-    it.fails("a definition inside a callout is listed", () => {
+describe("fixed 2026-08-10: definitions inside callouts are listed", () => {
+    it("a definition inside a callout is listed", () => {
         expect(
             listExistingFootnoteDefinitions(
                 fakeEditor(["> [!note]", "> body[^1]", "> [^1]: def"]),

@@ -1,5 +1,5 @@
 import {
-    DefinitionStart,
+    definitionLabelIn,
     maskProtectedLines,
     normalizeEol,
     scanDocument,
@@ -70,8 +70,10 @@ export function footnoteAfterPunctuation(markdown: string): string {
         if (scan.isProtected[i]) return line;
         const masked = maskedLines[i];
         // a definition's own "[^x]:" prefix must not be treated as a
-        // reference-before-colon — skip past it
-        const prefixLength = line.match(DefinitionStart)?.[0].length ?? 0;
+        // reference-before-colon — skip past it. Blockquoted/callout labels
+        // ("> [^1]: def.") are definitions too (C22): the swap used to
+        // mangle them into "> :[^1] def."
+        const prefixLength = definitionLabelIn(line)?.labelEnd ?? 0;
         return (
             line.slice(0, prefixLength) +
             swapInSegment(line.slice(prefixLength), masked.slice(prefixLength))

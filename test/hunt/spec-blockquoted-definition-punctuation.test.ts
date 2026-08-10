@@ -11,8 +11,8 @@ import { footnoteAfterPunctuation } from "../../src/linting/rules/footnote-after
 // renders blockquoted definitions live (markdown-it-footnote does), this
 // corrupts a definition label; if not, the swap is harmless.
 
-describe("spec question: punctuation swap vs. blockquoted definition label", () => {
-    it.fails("punctuation swap does not mangle a blockquoted definition label", () => {
+describe("fixed 2026-08-10: blockquoted definition labels survive the punctuation swap", () => {
+    it("punctuation swap does not mangle a blockquoted definition label", () => {
         expect(footnoteAfterPunctuation("> [^1]: def.")).toBe("> [^1]: def.");
     });
 });
