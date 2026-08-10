@@ -17,6 +17,7 @@ Place the cursor in the middle of the word markers below and press the auto-numb
 
 - [ ] Named hotkey inserts `[^]` with the caret inside the brackets
 - [ ] Type a name, press the hotkey again with the caret still inside → the detail is created
+- [ ] Type a name, then press the NUMBERED hotkey by accident: it creates the detail exactly like the named key, nothing is nested into the brackets (bug from beta.9 phone testing, fixed 2026-08-09; the inline keys already behaved this way)
 - [ ] Try a name with a space in it → the plugin warns instead of creating a broken detail
 
 ## Empty marker guard (QOL 2026-08-07)

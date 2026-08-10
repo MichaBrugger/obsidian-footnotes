@@ -17,7 +17,9 @@ import { activeTableCellEditor, resolveTableCellCursor, TableCellEditor } from "
 // cascade against the caret position:
 //   1. on a detail line ("[^x]: …")      → jump back to the first marker
 //   2. on a marker with an existing detail → jump to (or popup-edit) it
-//   3. named command, on a marker with NO detail → create the detail
+//   3. on a marker with NO detail → create the detail (every key: an
+//      accidental press mid-naming must continue the footnote, never
+//      nest a new marker into the brackets)
 //   4. otherwise → insert a new marker ("[^N]" + detail, or empty "[^]")
 // Table caveat (see table-cursor.ts): when the caret is in an actively
 // edited table cell, reads use the position resolved from the cell's
@@ -733,6 +735,13 @@ export async function insertAutonumFootnote(plugin: FootnotePlugin) {
             return;
         if (shouldJumpFromMarkerToDetail(lineText, cursorPosition, doc, plugin))
             return;
+        // caret inside a marker with NO detail: continue the half-built
+        // footnote (create its detail) instead of nesting "[^N]" into the
+        // brackets — parity with the named and inline keys, so an
+        // accidental numbered press mid-naming is just the next step
+        // (reported from beta.9 phone testing, 2026-08-09)
+        if (shouldCreateMatchingFootnoteDetail(lineText, cursorPosition, plugin, doc))
+            return;
 
         shouldCreateAutonumFootnote(lineText, cursorPosition, plugin, doc, cell);
     };
@@ -1150,7 +1159,7 @@ export async function insertNamedFootnote(plugin: FootnotePlugin) {
     else runOutsideTableCell(doc, run);
 }
 
-/** Cascade step 3 (named only): caret on a marker with no detail → append the matching detail (or warn on an invalid name). Returns true when it handled the press. The note's footnote-prefix is NOT applied here — it goes in at bracket creation (shouldCreateFootnoteMarker), where the user can see it. */
+/** Cascade step 3 (numbered, named, and the inline keys via navigateMarkerIfInside): caret on a marker with no detail → append the matching detail (or warn on an invalid name). Returns true when it handled the press. The note's footnote-prefix is NOT applied here — it goes in at bracket creation (shouldCreateFootnoteMarker), where the user can see it. */
 export function shouldCreateMatchingFootnoteDetail(
     lineText: string,
     cursorPosition: EditorPosition,
