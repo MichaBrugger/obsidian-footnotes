@@ -8,6 +8,7 @@
     "build": "tsc -noEmit && node esbuild.config.mjs production",
     "lint": "eslint src",
     "knip": "knip",
+    "mutation": "cross-env FC_NUM_RUNS=25 stryker run",
     "test": "vitest",
     "test:smoke": "node scripts/smoke-test.mjs",
     "version": "node scripts/version-bump.mjs && git add manifest.json versions.json"

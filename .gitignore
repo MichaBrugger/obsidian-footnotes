@@ -21,3 +21,8 @@ icons/*.svg.*.svg
 .claude/skills/hunt-bugs-workspace/
 .claude/worktrees/
 scripts/.smoke-settings.bak.json
+
+# Stryker mutation testing (local pre-release audit — npm run mutation)
+.stryker-tmp/
+reports/
+stryker.log

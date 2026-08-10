@@ -1,0 +1,17 @@
+{
+    "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+    "_comment": "Mutation testing — LOCAL pre-release audit, not CI (GitHub Actions are too slow for this; run `npm run mutation`). perTest coverage analysis means each mutant only runs the tests that cover it; incremental mode caches results so re-runs after small changes take seconds-to-minutes. The mutate list is the pure logic the unit suite exercises — plugin bootstrap, settings UI, and the DOM-bound popup are smoke-test territory where mutants would just be no-coverage noise.",
+    "testRunner": "vitest",
+    "coverageAnalysis": "perTest",
+    "mutate": [
+        "src/markdown-scan.ts",
+        "src/linting/**/*.ts",
+        "src/insert-or-navigate-footnotes.ts",
+        "src/table-cursor.ts"
+    ],
+    "incremental": true,
+    "incrementalFile": "reports/stryker-incremental.json",
+    "reporters": ["html", "clear-text", "progress"],
+    "htmlReporter": { "fileName": "reports/mutation.html" },
+    "tempDirName": ".stryker-tmp"
+}
