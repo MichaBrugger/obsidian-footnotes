@@ -19,7 +19,7 @@ export interface FootnotePluginSettings {
     renumberNamedFootnotes: boolean;
     /** Linting deletes references that have no definition; while off, it alerts about them instead. Orphans are never silent either way (Jason, 2026-08-10). */
     lintDeleteOrphanedReferences: boolean;
-    /** Linting deletes definitions nothing references (independent of reindexing); while off, they are kept and alerted about. Mirrors lintDeleteOrphanedReferences. */
+    /** Linting deletes definitions that have no references (independent of reindexing); while off, they are kept and alerted about. Mirrors lintDeleteOrphanedReferences. */
     lintDeleteOrphanedDefinitions: boolean;
     lintFixPunctuation: boolean;
     lintMoveToBottom: boolean;

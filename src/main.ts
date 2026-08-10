@@ -184,11 +184,10 @@ export default class FootnotePlugin extends Plugin {
   }
 
   async loadSettings() {
-    this.settings = Object.assign(
-      {},
-      DEFAULT_SETTINGS,
-      (await this.loadData()) as Partial<FootnotePluginSettings> | null,
-    );
+    const saved = (await this.loadData()) as
+      | Partial<FootnotePluginSettings>
+      | null;
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, saved);
 
     // One-shot legacy migrations, gated by settingsVersion: some of them
     // rewrite saved values by SHAPE, so re-running them on every load can
@@ -207,10 +206,16 @@ export default class FootnotePlugin extends Plugin {
           FootnoteSectionHeading?: string;
           enableAutoSuggest?: boolean;
         };
-        if (typeof legacySettings.FootnoteSectionHeading === "string") {
+        // when the saved data SOMEHOW carries both keys (a downgrade or a
+        // data.json sync merge — no real upgrade path produces it), the
+        // newer camelCase value wins (decided 2026-08-10)
+        if (
+          typeof legacySettings.FootnoteSectionHeading === "string" &&
+          typeof saved?.footnoteSectionHeading !== "string"
+        ) {
           this.settings.footnoteSectionHeading = legacySettings.FootnoteSectionHeading;
-          delete legacySettings.FootnoteSectionHeading;
         }
+        delete legacySettings.FootnoteSectionHeading;
 
         // migrate pre-0.2.0 section heading values: the old text input
         // implied an H1, the textarea takes literal markdown

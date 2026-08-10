@@ -106,10 +106,9 @@ export function moveFootnoteDefinitionsToBottom(
         const rest = body.slice(anchorEnd + 1);
         while (rest.length > 0 && rest[0] === "") rest.shift();
         if (rest.length > 0) out.push("", ...rest);
-        return restoreEol(
-            out.join("\n") + "\n".repeat(trailingNewlines),
-            eol,
-        );
+        const anchored = out.join("\n") + "\n".repeat(trailingNewlines);
+        // byte-identical no-op on mixed-EOL notes (spec-mixed-eol-noop-rewrite)
+        return anchored === text ? markdown : restoreEol(anchored, eol);
     }
 
     const base = body.join("\n");
@@ -127,7 +126,9 @@ export function moveFootnoteDefinitionsToBottom(
             ? (sectionHeading !== "" ? sectionHeading + "\n\n" : "") +
               definitions
             : base + headingPart + "\n\n" + definitions;
-    return restoreEol(result + "\n".repeat(trailingNewlines), eol);
+    const rebuilt = result + "\n".repeat(trailingNewlines);
+    // byte-identical no-op on mixed-EOL notes (spec-mixed-eol-noop-rewrite)
+    return rebuilt === text ? markdown : restoreEol(rebuilt, eol);
 }
 
 /**

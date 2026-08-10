@@ -163,7 +163,10 @@ export function lintFootnotes(
             prefix: options.prefixAware ? validPrefix : "",
         });
     }
-    return restoreEol(result, eol);
+    // byte-identical no-op: restoring EOL onto an unchanged result would
+    // normalize a mixed-EOL note and report a phantom lint (decided
+    // 2026-08-10, spec-mixed-eol-noop-rewrite)
+    return result === text ? markdown : restoreEol(result, eol);
 }
 
 // Replace only the changed middle of the document, so the cursor and the

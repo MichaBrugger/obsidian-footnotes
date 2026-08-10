@@ -54,8 +54,12 @@ function fakePlugin(): FootnotePlugin {
     } as unknown as FootnotePlugin;
 }
 
-describe("spec question: navigation priority inside a continuation line", () => {
-    it.fails("caret on ANOTHER footnote's reference inside a continuation line jumps to THAT definition", () => {
+// DECIDED (Jason, 2026-08-10): footnote references nested in another
+// footnote's definition body are unsupported — the definition-block jump
+// (back to the OUTER footnote's first reference) deliberately wins the
+// press, exactly as the 2026-07-17 jump-back fix established.
+describe("decided: the definition-block jump owns presses inside a continuation line", () => {
+    it("caret anywhere in a continuation line jumps back to the OUTER footnote's reference", () => {
         const lines = [
             "text[^a] more[^b]",
             "",
@@ -66,7 +70,8 @@ describe("spec question: navigation priority inside a continuation line", () => 
         ];
         const doc = fakeEditor(lines, { line: 3, ch: 17 }); // inside [^b]
         const handled = shouldJumpFromDefinitionToReference(lines[3], doc.cursor, doc, fakePlugin());
-        // user intent: navigate to [^b]'s definition on line 5
-        expect(handled).toBe(false);
+        expect(handled).toBe(true);
+        // [^a]'s first reference ends at ch 8 on line 0
+        expect(doc.cursor).toEqual({ line: 0, ch: 8 });
     });
 });

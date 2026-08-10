@@ -4,6 +4,7 @@ import {
     normalizeEol,
     scanDocument,
     restoreEol,
+    TrailingPunctuationChars,
 } from "../../markdown-scan";
 import { IgnoreType } from "../ignore-types";
 import { FootnoteRule } from "../rule";
@@ -11,9 +12,21 @@ import { FootnoteRule } from "../rule";
 // Linter's "footnote after punctuation" as a pure transform. Policy pinned
 // in test/footnote-after-punctuation.test.ts.
 
+// the ONE punctuation class shared with the insert commands' end-of-word
+// hop (TrailingPunctuationChars: ASCII + CJK fullwidth), escaped for use
+// inside a regex character class
+const PunctuationClass = TrailingPunctuationChars.replace(
+    /[.*+?^${}()|[\]\\-]/g,
+    "\\$&",
+);
+
 // a run of references directly followed by a run of punctuation; matching both
 // as runs makes a single pass idempotent ("[^1][^2]?!" swaps as one unit)
-const ReferencesBeforePunctuation = /((?:\[\^[^[\]]+\])+)([.,;:!?]+)/g;
+const ReferencesBeforePunctuation = new RegExp(
+    `((?:\\[\\^[^[\\]]+\\])+)([${PunctuationClass}]+)`,
+    "g",
+);
+const SinglePunctuation = new RegExp(`[${PunctuationClass}]`);
 
 // Swap every reference-run/punctuation-run pair in one segment of a line. The
 // scan runs on the code-masked text but the output is assembled from the
@@ -26,7 +39,7 @@ function swapInSegment(original: string, masked: string): string {
         // a reference run already sitting AFTER punctuation is settled — the
         // punctuation following it belongs to the next clause, and swapping
         // again would drift it away from its text (idempotence)
-        if (start > 0 && /[.,;:!?]/.test(masked[start - 1])) continue;
+        if (start > 0 && SinglePunctuation.test(masked[start - 1])) continue;
         const punctuationStart = start + match[1].length;
         const end = start + match[0].length;
         out +=
@@ -64,7 +77,9 @@ export function footnoteAfterPunctuation(markdown: string): string {
             swapInSegment(line.slice(prefixLength), masked.slice(prefixLength))
         );
     });
-    return restoreEol(result.join("\n"), eol);
+    const joined = result.join("\n");
+    // byte-identical no-op on mixed-EOL notes (spec-mixed-eol-noop-rewrite)
+    return joined === text ? markdown : restoreEol(joined, eol);
 }
 
 /** Linter-shaped wrapper: id matches Linter's rule filename. */

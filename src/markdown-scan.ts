@@ -4,6 +4,16 @@
 
 /** A footnote definition at the start of a line ("[^x]: …"). */
 export const DefinitionStart = /^\[\^([^[\]]+)\]:/;
+
+/**
+ * The trailing punctuation the insert commands hop over — the same class
+ * the footnote-after-punctuation lint reorders, so the two features can't
+ * disagree about where a reference belongs. ASCII plus the CJK fullwidth
+ * forms 。，、；：！？ (Jason, 2026-08-10). Lives here, in the dependency
+ * root, because both consumers read it at MODULE scope — anywhere else it
+ * rides an import cycle and evaluates as undefined.
+ */
+export const TrailingPunctuationChars = ".,;:!?。，、；：！？";
 // a continuation line belongs to the definition above it
 const IndentedContent = /^\s+\S/;
 

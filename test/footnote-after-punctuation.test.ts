@@ -100,3 +100,19 @@ describe("footnoteAfterPunctuation and single-line HTML comments", () => {
         expect(footnoteAfterPunctuation(input)).toBe(expected);
     });
 });
+
+// CJK punctuation joins the shared class (Jason, 2026-08-10)
+describe("CJK punctuation", () => {
+    it("swaps a reference across a CJK full stop", () => {
+        expect(footnoteAfterPunctuation("中文[^1]。")).toBe("中文。[^1]");
+    });
+
+    it("a reference already after CJK punctuation is settled", () => {
+        const doc = "中文。[^1] more";
+        expect(footnoteAfterPunctuation(doc)).toBe(doc);
+    });
+
+    it("mixed ASCII and CJK punctuation swap as one run", () => {
+        expect(footnoteAfterPunctuation("wait[^1]？!")).toBe("wait？![^1]");
+    });
+});

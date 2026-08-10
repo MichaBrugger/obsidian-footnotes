@@ -16,8 +16,8 @@ function bareFootnotePlugin(): FootnotePlugin {
     return new (FootnotePlugin as unknown as new () => FootnotePlugin)();
 }
 
-describe("spec question: migration with both heading keys present", () => {
-    it.fails("both PascalCase and camelCase heading keys: the newer key should win", async () => {
+describe("decided 2026-08-10: the newer heading key wins a data.json collision", () => {
+    it("both PascalCase and camelCase heading keys: the newer key should win", async () => {
         const plugin = bareFootnotePlugin();
         plugin.loadData = async () => ({
             FootnoteSectionHeading: "Plain Old",

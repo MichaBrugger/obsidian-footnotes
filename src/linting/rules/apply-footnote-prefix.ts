@@ -119,7 +119,9 @@ export function applyFootnotePrefix(markdown: string, prefix: string): string {
         }
         return result;
     });
-    return restoreEol(rewritten.join("\n"), eol);
+    const joined = rewritten.join("\n");
+    // byte-identical no-op on mixed-EOL notes (spec-mixed-eol-noop-rewrite)
+    return joined === text ? markdown : restoreEol(joined, eol);
 }
 
 /** Linter-shaped registry entry; the prefix comes in as the rule's option. */

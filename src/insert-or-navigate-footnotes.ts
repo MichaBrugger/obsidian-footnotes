@@ -9,7 +9,7 @@ import {
 import FootnotePlugin from "./main";
 import { footnotePopupBusy, openFootnotePopup, popupEditingAvailable, runAfterNextPopupSettle, settleFootnotePopupWithFeedback, toggleCloseFootnotePopup } from "./footnote-popup";
 import { lintAfterFootnoteCreation } from "./linting/linter";
-import { DocumentScan, findDefinitionBlocks, maskInlineRegions, maskLineRegions, maskProtectedLines, maskedLineAt, scanDocument } from "./markdown-scan";
+import { DocumentScan, findDefinitionBlocks, maskInlineRegions, maskLineRegions, maskProtectedLines, maskedLineAt, scanDocument, TrailingPunctuationChars } from "./markdown-scan";
 import { EditorWithCm, VaultWithConfig, WindowWithVim } from "./obsidian-internals";
 import { activeTableCellEditor, nestedSubEditorOwnsFocus, resolveTableCellCursor, TableCellEditor } from "./table-cursor";
 
@@ -547,10 +547,10 @@ export function buildDefinitionAppend(
     return { change: { from, to, text }, cursor };
 }
 
-// the trailing punctuation the reference hops over — the same class the
-// footnote-after-punctuation lint reorders, so the two features can't
-// disagree about where a reference belongs
-const TrailingPunctuation = [".", ",", ":", ";", "!", "?"];
+/** Whether `c` is trailing punctuation (TrailingPunctuationChars in markdown-scan — ASCII + CJK, shared with the lint rule). Guards the empty string explicitly — `"…".includes("")` is true, and `text[i]` past EOL yields undefined at some call sites. */
+function isTrailingPunctuation(c: string | undefined): boolean {
+    return !!c && TrailingPunctuationChars.includes(c);
+}
 
 /**
  * The end-of-word insertion point within plain text: from `offset`, the end
@@ -566,7 +566,7 @@ export function endOfWordOffset(text: string, offset: number): number {
     if (!isWord(text[offset]) && !isWord(text[offset - 1])) return offset;
     let end = offset;
     while (isWord(text[end])) end++;
-    if (TrailingPunctuation.includes(text[end] ?? "")) end++;
+    if (isTrailingPunctuation(text[end])) end++;
     return end;
 }
 
@@ -583,7 +583,7 @@ function adjustFootnotePosition(
 
     // adjust cursor position to insert a footnote only at the end of word
     const nextChar = lineText.charAt(endOfWordUnderCursor.ch);
-    if (TrailingPunctuation.includes(nextChar)) endOfWordUnderCursor.ch++;
+    if (isTrailingPunctuation(nextChar)) endOfWordUnderCursor.ch++;
     cursorPosition = endOfWordUnderCursor;
     return cursorPosition;
 }

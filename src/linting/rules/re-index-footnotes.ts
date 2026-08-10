@@ -256,7 +256,9 @@ function reindexOnce(
         for (let j = block.start; j <= block.end; j++) out.push(rewritten[j]);
         i = blocks[slot].end;
     }
-    return restoreEol(out.join("\n"), eol);
+    const joined = out.join("\n");
+    // byte-identical no-op on mixed-EOL notes (spec-mixed-eol-noop-rewrite)
+    return joined === text ? markdown : restoreEol(joined, eol);
 }
 
 /** Linter-shaped wrapper: id matches Linter's rule filename. */
