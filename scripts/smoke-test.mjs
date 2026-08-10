@@ -1212,6 +1212,132 @@ async function main() {
         );
     });
 
+    await test("case-variant prefixed marker reserves its number (2026-08-10 A3)", async () => {
+        // ids are case-insensitive in Obsidian: [^p-1] lives in prefix
+        // "P-"'s namespace, so the next insert must mint 2, not a
+        // colliding 1 that silently merges two footnotes
+        resetSettings({ enableFootnotePrefix: true });
+        await setupNote("---\nfootnote-prefix: P-\n---\nAlpha [^p-1] bravo\n\n[^p-1]: one");
+        setCursorAndRun(3, 15, CMD_AUTONUM); // mid "bravo"
+        await expectEditorText(
+            "---\nfootnote-prefix: P-\n---\nAlpha [^p-1] bravo[^P-2]\n\n[^p-1]: one\n[^P-2]: ",
+        );
+    });
+
+    await test("press inside a code-span-named marker navigates, never duplicates (2026-08-10 A2)", async () => {
+        // the masked scan used to read the name as NUL bytes: the press
+        // appended a duplicate detail containing literal NULs instead of
+        // jumping to the existing one
+        resetSettings();
+        const note = "See[^`1`] end\n\n[^`1`]: detail";
+        await setupNote(note);
+        setCursorAndRun(0, 6, CMD_AUTONUM); // inside the [^`1`] marker
+        await pollUntil(
+            "cursor on the detail line",
+            `(${EDITOR}).editor.getCursor()`,
+            (c) => c && c.line === 2,
+        );
+        const text = readJson(`(${EDITOR}).editor.getValue()`);
+        if (text !== note) {
+            throw new Error(`navigation changed the text: ${JSON.stringify(text)}`);
+        }
+    });
+
+    await test("caret after an escaped pipe still counts as inside a marker (2026-08-10 A9)", async () => {
+        requireVisibleWindow();
+        // the cell editor shows "\|" as "|", so the caret used to resolve
+        // one source column short — read as OUTSIDE the marker, the named
+        // command nested a fresh "[^]" into it instead of continuing it
+        resetSettings();
+        const table = [
+            "| Head |",
+            "| ---- |",
+            "| left \\| right[^note] |",
+        ].join("\n");
+        await setupNote("table pending");
+        action(`(${EDITOR}).editor.setValue(${JSON.stringify(table)});`);
+        await pollUntil(
+            "table content in editor",
+            `(${EDITOR}).editor.getValue()`,
+            (v) => typeof v === "string" && v.includes("[^note]"),
+        );
+        await pollUntil(
+            "table content in data buffer",
+            `(${EDITOR}).data`,
+            (v) => typeof v === "string" && v.includes("[^note]"),
+        );
+        // caret between "[" and "^" — strictly inside, and past the escape
+        action(
+            `(() => { const v=${EDITOR}; v.editor.focus(); ` +
+            `const ch=v.editor.getLine(2).indexOf('[^note]')+1; ` +
+            `v.editor.setCursor({line:2, ch}); })();`,
+        );
+        await pollUntil(
+            "table cell sub-editor to open",
+            `(() => { const t=document.querySelector('.markdown-source-view table'); ` +
+            `return !!(t && t.querySelector('.cm-content')); })()`,
+            (v) => v === true,
+        );
+        action(`app.commands.executeCommandById('${CMD_NAMED}');`);
+        // inside a detail-less marker the press continues the footnote:
+        // its detail appears and the row itself stays untouched
+        await pollUntil(
+            "the created detail line",
+            `(${EDITOR}).editor.getValue()`,
+            (v) => typeof v === "string" && v.includes("[^note]: "),
+        );
+        const line = readJson(`(${EDITOR}).editor.getLine(2)`);
+        if (line.includes("[^]")) throw new Error(`nested a marker into the marker: ${line}`);
+        if (!line.includes("\\|")) throw new Error(`the escaped pipe was lost: ${line}`);
+    });
+
+    // LAST before cleanup: this test flips the view mode, and a failure
+    // between flip and flip-back must not poison the tests after it
+    await test("deferred creation-lint stays inert after a flip to Reading view (2026-08-10 A7)", async () => {
+        resetSettings({
+            enablePopupEditor: true,
+            lintOnFootnoteCreation: true,
+            insertAtEndOfWord: false,
+        });
+        await setupNote("Alpha, bravo");
+        setCursorAndRun(0, 5, CMD_AUTONUM); // just before the comma
+        await pollUntil(
+            "popup open",
+            `!!document.querySelector('.footnote-shortcut-popup')`,
+            (v) => v === true,
+        );
+        const created = "Alpha[^1], bravo\n\n[^1]: ";
+        await expectEditorText(created);
+        // flip to Reading view WITHOUT a leaf change — the popup stays up
+        // and none of the deferred lint's other gates trip
+        action(
+            `(async () => { const v=${EDITOR}; ` +
+            `await v.setState({...v.getState(), mode:'preview'}, {history:false}); })();`,
+        );
+        await pollUntil("reading view", `(${EDITOR}).getMode()`, (v) => v === "preview");
+        // the hotkey's toggle path closes the popup; its settle callback
+        // then fires the deferred lint, which must now be inert — the
+        // pending punctuation fix ("Alpha[^1]," → "Alpha,[^1]") must NOT
+        // be applied to the hidden buffer
+        action(`app.commands.executeCommandById('${CMD_AUTONUM}');`);
+        await pollUntil(
+            "popup closed",
+            `!document.querySelector('.footnote-shortcut-popup')`,
+            (v) => v === true,
+        );
+        await sleep(1200); // teardown save + settle beat + would-be lint
+        const text = readJson(`(${EDITOR}).editor.getValue()`);
+        // flip back BEFORE asserting so a failure can't strand Reading view
+        action(
+            `(async () => { const v=${EDITOR}; ` +
+            `await v.setState({...v.getState(), mode:'source'}, {history:false}); })();`,
+        );
+        await pollUntil("editing view", `(${EDITOR}).getMode()`, (v) => v === "source");
+        if (text !== created) {
+            throw new Error(`deferred lint edited the hidden buffer: ${JSON.stringify(text)}`);
+        }
+    });
+
     // restore state and clean up
     setSettings(savedSettings);
     ob("delete", `path=${NOTE}.md`);
