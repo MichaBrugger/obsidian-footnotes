@@ -209,10 +209,13 @@ export interface DocumentScan {
 /**
  * The whole-document protection walk: YAML frontmatter, fenced code blocks
  * (both delimiter lines included, including fences nested in
- * blockquotes/callouts), and multi-line HTML comments — whose state is
- * tracked by the same escape- and code-span-aware scanner that does the
- * masking, so the two can't disagree. Indented code blocks are NOT
- * detected — indentation is how definition continuations work.
+ * blockquotes/callouts), multi-line HTML comments — whose state is tracked
+ * by the same escape- and code-span-aware scanner that does the masking, so
+ * the two can't disagree — and STANDALONE indented code blocks (Jason's
+ * ruling 2026-08-10: linting never touches code). "Standalone" is the
+ * definition-aware part: an indented line continuing a footnote definition
+ * (or lazily continuing a paragraph) is live markdown; only a 4-space/tab
+ * chunk opening at a block boundary outside any definition is code.
  */
 export function scanDocument(lines: string[]): DocumentScan {
     const src = stripCr(lines);
@@ -232,9 +235,19 @@ export function scanDocument(lines: string[]): DocumentScan {
 
     let fence: { char: string; length: number; depth: number } | null = null;
     let inComment = false;
+    // indented-code state (C21): `prevBlank` marks a block boundary (doc
+    // start included), `inDefinition` mirrors findDefinitionBlocks' reach —
+    // a "[^x]:" line plus its indented continuations and the blank runs
+    // between them — and `inIndentedCode` is an open indented chunk.
+    let inIndentedCode = false;
+    let inDefinition = false;
+    let prevBlank = true;
     for (; i < src.length; i++) {
         if (inComment) {
             startsInComment[i] = true;
+            inIndentedCode = false;
+            inDefinition = false;
+            prevBlank = false;
             if (!src[i].includes("-->")) {
                 isProtected[i] = true; // interior: nothing live on it
                 continue;
@@ -255,6 +268,9 @@ export function scanDocument(lines: string[]): DocumentScan {
             fence = null;
         }
         if (fence) {
+            inIndentedCode = false;
+            inDefinition = false;
+            prevBlank = false;
             isProtected[i] = true;
             // a closer counts only at the fence's own depth: "> ```" can't
             // close a document-level fence (it is code content there —
@@ -272,6 +288,39 @@ export function scanDocument(lines: string[]): DocumentScan {
             }
             continue;
         }
+        // ---- indented code (C21), definition-aware ----
+        if (src[i].trim() === "") {
+            // a blank is a block boundary, but it ENDS neither an open
+            // definition (blank runs can lead to more continuation —
+            // findDefinitionBlocks) nor an indented chunk (code blocks
+            // continue across blanks when more indented lines follow)
+            prevBlank = true;
+            continue; // nothing on a blank line can open a fence or comment
+        }
+        const indented = /^(?: {4}|\t)/.test(src[i]);
+        if (indented && inIndentedCode) {
+            isProtected[i] = true;
+            prevBlank = false;
+            continue;
+        }
+        if (indented && !inDefinition && prevBlank) {
+            // a 4-space/tab chunk opening at a block boundary outside any
+            // definition is CommonMark indented code — inert to Obsidian,
+            // so the transforms must not count or rewrite it
+            inIndentedCode = true;
+            isProtected[i] = true;
+            prevBlank = false;
+            continue;
+        }
+        // an indented line here is a definition continuation or a lazy
+        // paragraph continuation — live markdown, and it keeps an open
+        // definition open; a non-indented line re-decides the definition
+        if (!indented) {
+            inIndentedCode = false;
+            inDefinition = DefinitionStart.test(src[i]);
+        }
+        prevBlank = false;
+
         const open = rest.match(/^ {0,3}(`{3,}|~{3,})/);
         if (open && isFenceOpener(rest, open[1])) {
             fence = { char: open[1][0], length: open[1].length, depth };

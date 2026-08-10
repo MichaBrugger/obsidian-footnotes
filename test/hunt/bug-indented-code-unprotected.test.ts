@@ -15,24 +15,24 @@ import { reindexFootnotes } from "../../src/linting/rules/re-index-footnotes";
 // Protecting these blocks must remain context-aware because indentation is
 // also valid for footnote-definition continuation lines.
 
-describe("bug: indented code blocks are treated as live footnotes", () => {
-    it.fails("autonumbering ignores standalone indented code", () => {
+describe("fixed 2026-08-10: standalone indented code is protected", () => {
+    it("autonumbering ignores standalone indented code", () => {
         expect(computeNextFootnoteNumber("    code[^90]\nreal[^2]")).toBe(3);
     });
 
-    it.fails("reindex leaves indented code untouched", () => {
+    it("reindex leaves indented code untouched", () => {
         const input = "    sample[^9]\nreal[^2]\n\n[^2]: real";
         const expected = "    sample[^9]\nreal[^1]\n\n[^1]: real";
         expect(reindexFootnotes(input)).toBe(expected);
     });
 
-    it.fails("punctuation leaves indented code untouched", () => {
+    it("punctuation leaves indented code untouched", () => {
         const input = "    code[^9].\nreal[^1].";
         const expected = "    code[^9].\nreal.[^1]";
         expect(footnoteAfterPunctuation(input)).toBe(expected);
     });
 
-    it.fails("apply-prefix leaves indented code untouched", () => {
+    it("apply-prefix leaves indented code untouched", () => {
         const input = "    code[^9]\nreal[^1]\n\n[^1]: real";
         const expected = "    code[^9]\nreal[^2.1]\n\n[^2.1]: real";
         expect(applyFootnotePrefix(input, "2.")).toBe(expected);
