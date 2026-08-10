@@ -29,6 +29,16 @@ describe("isValidFootnoteName", () => {
     it("rejects other whitespace too", () => {
         expect(isValidFootnoteName("a\tb")).toBe(false);
     });
+
+    it("rejects names containing backticks (disallowed, Jason 2026-08-10)", () => {
+        // backticked names don't render properly in Obsidian
+        expect(isValidFootnoteName("x`c`y")).toBe(false);
+        expect(isValidFootnoteName("`1`")).toBe(false);
+    });
+
+    it("rejects an empty name", () => {
+        expect(isValidFootnoteName("")).toBe(false);
+    });
 });
 
 describe("shouldCreateMatchingFootnoteDetail with an invalid name", () => {
@@ -44,6 +54,22 @@ describe("shouldCreateMatchingFootnoteDetail with an invalid name", () => {
         const handled = shouldCreateMatchingFootnoteDetail(
             line,
             { line: 0, ch: 7 }, // cursor inside [^my note]
+            {} as FootnotePlugin,
+            doc,
+        );
+        expect(handled).toBe(true);
+    });
+
+    it("warns and stops on a backticked name too", () => {
+        const line = "alpha[^`c`] bravo";
+        const doc = {
+            getLine: () => line,
+            lineCount: () => 1,
+        } as unknown as Editor;
+
+        const handled = shouldCreateMatchingFootnoteDetail(
+            line,
+            { line: 0, ch: 8 }, // cursor inside [^`c`]
             {} as FootnotePlugin,
             doc,
         );

@@ -90,8 +90,9 @@ describe("footnotePrefixProblem (QOL: prefix validation)", () => {
     });
 
     it("rejects spaces and brackets", () => {
-        expect(footnotePrefixProblem("a b")).toMatch(/spaces or brackets/);
-        expect(footnotePrefixProblem("a[b]")).toMatch(/spaces or brackets/);
+        expect(footnotePrefixProblem("a b")).toMatch(/spaces, backticks, or brackets/);
+        expect(footnotePrefixProblem("a[b]")).toMatch(/spaces, backticks, or brackets/);
+        expect(footnotePrefixProblem("a`b`")).toMatch(/spaces, backticks, or brackets/);
     });
 
     it("rejects a trailing digit: [^101] would be ambiguous", () => {

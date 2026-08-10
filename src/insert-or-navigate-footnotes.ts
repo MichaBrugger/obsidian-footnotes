@@ -60,11 +60,13 @@ function idListIncludes(ids: string[], id: string): boolean {
     return ids.some((name) => name.toLowerCase() === lower);
 }
 
-// Obsidian won't render a footnote whose name contains whitespace; the
-// marker regexes stay permissive so such names can be caught and warned
-// about instead of silently misbehaving
+// Obsidian won't render a footnote whose name contains whitespace or
+// backticks (Jason's call, 2026-08-10: backticked names are disallowed
+// outright rather than supported), and an empty name isn't a footnote at
+// all; the marker regexes stay permissive so such names can be caught and
+// warned about instead of silently misbehaving
 export function isValidFootnoteName(name: string): boolean {
-    return !/\s/.test(name);
+    return name.length > 0 && !/[\s`]/.test(name);
 }
 
 
@@ -663,7 +665,7 @@ export function footnotePrefixFromEditor(doc: Editor): string {
 export function footnotePrefixProblem(prefix: string): string | null {
     if (!prefix) return null;
     if (!isValidFootnoteName(prefix) || /[[\]]/.test(prefix)) {
-        return "The footnote prefix can't contain spaces or brackets.";
+        return "The footnote prefix can't contain spaces, backticks, or brackets.";
     }
     if (/\d$/.test(prefix)) {
         return "The footnote prefix can't end in a number. Its footnotes would be indistinguishable from plain numbered ones.";
@@ -1223,11 +1225,14 @@ export function shouldCreateMatchingFootnoteDetail(
             // positional slice of "[^name]" — see shouldJumpFromMarkerToDetail
             const footnoteId = markerTarget.slice(2, -1);
 
-            // a spaced name is a common authoring mistake Obsidian won't
-            // render; warn instead of creating a detail that can't work
+            // a spaced or backticked name is an authoring mistake Obsidian
+            // won't render; warn instead of creating a detail that can't work
             if (!isValidFootnoteName(footnoteId)) {
+                const offender = footnoteId.includes("`")
+                    ? "backticks"
+                    : "spaces";
                 new Notice(
-                    `Footnote name "${footnoteId}" contains spaces, so Obsidian won't render it as a footnote. Remove the spaces.`,
+                    `Footnote name "${footnoteId}" contains ${offender}, so Obsidian won't render it as a footnote. Remove the ${offender}.`,
                     8000,
                 );
                 return true;

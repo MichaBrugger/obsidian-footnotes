@@ -81,13 +81,20 @@ describe("press-jump (marker → detail) with a code-span-named footnote (fixed 
 });
 
 describe("press-create with a code-span-named footnote (fixed 2026-08-10)", () => {
-    it("creates the detail with the ORIGINAL name (no NUL bytes) when missing", () => {
+    it("refuses to create a detail for a backticked name (disallowed, Jason 2026-08-10)", () => {
+        // backticked names don't render in Obsidian, so instead of creating
+        // a detail (with or without NUL bytes) the press warns and stops —
+        // the same treatment as spaced names
         const MARKER_LINE = "ref [^x`c`y] end";
         const doc = fakeEditor([MARKER_LINE, ""], { line: 0, ch: 8 });
-        shouldCreateMatchingFootnoteDetail(MARKER_LINE, doc.cursor, fakePlugin(), doc);
-        const inserted = doc.appliedChanges.map((change) => change.text).join("");
-        expect(inserted).not.toContain("\0");
-        expect(inserted).toContain("[^x`c`y]: ");
+        const handled = shouldCreateMatchingFootnoteDetail(
+            MARKER_LINE,
+            doc.cursor,
+            fakePlugin(),
+            doc,
+        );
+        expect(handled).toBe(true);
+        expect(doc.appliedChanges).toEqual([]);
     });
 
     it("does NOT append a duplicate detail full of NUL bytes when the detail exists", () => {
