@@ -4,9 +4,9 @@ import { reindexFootnotes } from "../../src/linting/rules/re-index-footnotes";
 
 // BUG: reindex orphan-deletion is non-transitive (single pass). Two definitions
 // that only reference EACH OTHER ("[^1]: uses[^2] inside" / "[^2]: two body",
-// no top-level marker for either) are mutually orphaned, but reindex computes
+// no top-level reference for either) are mutually orphaned, but reindex computes
 // the orphan set once, cuts, then re-derives WITHOUT looping. Pass 1 deletes
-// [^1] (not in the pre-cut marker set) and renumbers [^2]->[^1], leaving
+// [^1] (not in the pre-cut reference set) and renumbers [^2]->[^1], leaving
 // "para.\n\n[^1]: two body". Running the same command AGAIN (pass 2) now finds
 // that survivor unreferenced and deletes it too, silently destroying "two
 // body". A convergent transform must reach its orphan fixpoint in one run.

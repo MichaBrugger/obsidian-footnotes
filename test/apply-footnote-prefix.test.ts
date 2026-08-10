@@ -53,8 +53,8 @@ describe("applyFootnotePrefix", () => {
     });
 
     it("prefixes a named orphan definition", () => {
-        const input = "no markers here\n\n[^lonely]: orphan";
-        const expected = "no markers here\n\n[^2.lonely]: orphan";
+        const input = "no references here\n\n[^lonely]: orphan";
+        const expected = "no references here\n\n[^2.lonely]: orphan";
         expect(applyFootnotePrefix(input, "2.")).toBe(expected);
     });
 
@@ -72,7 +72,7 @@ describe("applyFootnotePrefix", () => {
         expect(applyFootnotePrefix(input, "2.")).toBe(expected);
     });
 
-    it("moves every use of a repeated marker together", () => {
+    it("moves every use of a repeated reference together", () => {
         const input = "a[^7] b[^7] end\n\n[^7]: seven";
         const expected = "a[^2.1] b[^2.1] end\n\n[^2.1]: seven";
         expect(applyFootnotePrefix(input, "2.")).toBe(expected);

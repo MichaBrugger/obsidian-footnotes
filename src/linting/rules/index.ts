@@ -10,10 +10,10 @@ import { footnoteAfterPunctuationRule } from "./footnote-after-punctuation";
 import { moveFootnotesToTheBottomRule } from "./move-footnotes-to-the-bottom";
 import { reIndexFootnotesRule } from "./re-index-footnotes";
 import { removeOrphanedDefinitionsRule } from "./remove-orphaned-definitions";
-import { removeOrphanedMarkersRule } from "./remove-orphaned-markers";
+import { removeOrphanedReferencesRule } from "./remove-orphaned-references";
 
 export const footnoteRules: FootnoteRule<never>[] = [
-    removeOrphanedMarkersRule,
+    removeOrphanedReferencesRule,
     removeOrphanedDefinitionsRule,
     footnoteAfterPunctuationRule,
     moveFootnotesToTheBottomRule,

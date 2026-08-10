@@ -2,10 +2,10 @@ import { Editor } from "obsidian";
 import { describe, expect, it } from "vitest";
 
 import FootnotePlugin from "../src/main";
-import { buildDetailAppend } from "../src/insert-or-navigate-footnotes";
+import { buildDefinitionAppend } from "../src/insert-or-navigate-footnotes";
 
-// Where a new footnote detail lands. Issue #55: when definitions already
-// exist, the new detail belongs right after the LAST existing definition
+// Where a new footnote definition lands. Issue #55: when definitions already
+// exist, the new definition belongs right after the LAST existing definition
 // block — not at the end of the file, where it strands the footnotes away
 // from the section (e.g. "#### Citations") the user keeps them under.
 // Only the very first footnote starts a new section at the end of the note.
@@ -29,10 +29,10 @@ function fakePlugin(overrides: Record<string, unknown> = {}): FootnotePlugin {
     } as unknown as FootnotePlugin;
 }
 
-describe("buildDetailAppend", () => {
+describe("buildDefinitionAppend", () => {
     it("starts the first footnote's section at the end of the note", () => {
         const doc = fakeEditor(["Alpha"]);
-        const { change, cursor } = buildDetailAppend(doc, "1", true, fakePlugin());
+        const { change, cursor } = buildDefinitionAppend(doc, "1", true, fakePlugin());
         expect(change).toEqual({
             from: { line: 0, ch: 5 },
             // with trimming enabled, `to` always spans to the note's end —
@@ -45,14 +45,14 @@ describe("buildDetailAppend", () => {
 
     it("trims trailing blank lines for the first footnote when enabled", () => {
         const doc = fakeEditor(["Alpha", "", ""]);
-        const { change } = buildDetailAppend(doc, "1", true, fakePlugin());
+        const { change } = buildDefinitionAppend(doc, "1", true, fakePlugin());
         expect(change.from).toEqual({ line: 0, ch: 5 });
         expect(change.to).toEqual({ line: 2, ch: 0 });
     });
 
     it("adds the section heading for the first footnote when enabled", () => {
         const doc = fakeEditor(["Alpha"]);
-        const { change } = buildDetailAppend(
+        const { change } = buildDefinitionAppend(
             doc,
             "1",
             true,
@@ -66,7 +66,7 @@ describe("buildDetailAppend", () => {
         // trimming off, note ends with an empty line: inserting there must
         // not stack a second blank above the heading
         const doc = fakeEditor(["Alpha", ""]);
-        const { change } = buildDetailAppend(
+        const { change } = buildDefinitionAppend(
             doc,
             "1",
             true,
@@ -81,9 +81,9 @@ describe("buildDetailAppend", () => {
         });
     });
 
-    it("appends after the last detail when definitions end the note", () => {
+    it("appends after the last definition when definitions end the note", () => {
         const doc = fakeEditor(["Alpha[^1] bravo", "", "[^1]: one"]);
-        const { change, cursor } = buildDetailAppend(doc, "2", false, fakePlugin());
+        const { change, cursor } = buildDefinitionAppend(doc, "2", false, fakePlugin());
         expect(change).toEqual({
             from: { line: 2, ch: "[^1]: one".length },
             text: "\n[^2]: ",
@@ -101,7 +101,7 @@ describe("buildDetailAppend", () => {
             "#### Images",
             "picture here",
         ]);
-        const { change, cursor } = buildDetailAppend(doc, "2", false, fakePlugin());
+        const { change, cursor } = buildDefinitionAppend(doc, "2", false, fakePlugin());
         expect(change).toEqual({
             from: { line: 3, ch: "[^1]: one".length },
             text: "\n[^2]: ",
@@ -118,7 +118,7 @@ describe("buildDetailAppend", () => {
             "",
             "closing prose",
         ]);
-        const { change } = buildDetailAppend(doc, "2", false, fakePlugin());
+        const { change } = buildDefinitionAppend(doc, "2", false, fakePlugin());
         expect(change.from).toEqual({ line: 3, ch: "    continued".length });
     });
 
@@ -132,24 +132,24 @@ describe("buildDetailAppend", () => {
             "[^9]: fake",
             "```",
         ]);
-        const { change } = buildDetailAppend(doc, "2", false, fakePlugin());
+        const { change } = buildDefinitionAppend(doc, "2", false, fakePlugin());
         expect(change.from).toEqual({ line: 2, ch: "[^1]: one".length });
     });
 });
 
-// Bug (A4, reported 2026-07-20): a detail inserted directly above prose gets
+// Bug (A4, reported 2026-07-20): a definition inserted directly above prose gets
 // that prose pulled INTO the footnote — Obsidian lazily continues a
 // definition into the next non-blank line. Every insertion point that can
-// have content below it must keep a blank line between the detail and it.
-describe("blank line between the new detail and following content", () => {
-    it("separates the detail from prose right below the heading slot (A4)", () => {
+// have content below it must keep a blank line between the definition and it.
+describe("blank line between the new definition and following content", () => {
+    it("separates the definition from prose right below the heading slot (A4)", () => {
         const doc = fakeEditor([
             "Intro[^1] text",
             "",
             "# Footnotes",
             "prose right after",
         ]);
-        const { change, cursor } = buildDetailAppend(
+        const { change, cursor } = buildDefinitionAppend(
             doc,
             "1",
             true,
@@ -159,13 +159,13 @@ describe("blank line between the new detail and following content", () => {
             from: { line: 2, ch: "# Footnotes".length },
             text: "\n\n[^1]: \n",
         });
-        // the cursor still lands at the end of the detail line itself
+        // the cursor still lands at the end of the definition line itself
         expect(cursor).toEqual({ line: 4, ch: 6 });
     });
 
-    it("separates the detail from prose below a reused blank line", () => {
+    it("separates the definition from prose below a reused blank line", () => {
         const doc = fakeEditor(["Intro[^1]", "", "# Footnotes", "", "prose"]);
-        const { change, cursor } = buildDetailAppend(
+        const { change, cursor } = buildDefinitionAppend(
             doc,
             "1",
             true,
@@ -175,7 +175,7 @@ describe("blank line between the new detail and following content", () => {
         expect(cursor).toEqual({ line: 4, ch: 6 });
     });
 
-    it("separates a detail appended after the last block from prose below", () => {
+    it("separates a definition appended after the last block from prose below", () => {
         const doc = fakeEditor([
             "Alpha[^1] bravo.",
             "",
@@ -183,7 +183,7 @@ describe("blank line between the new detail and following content", () => {
             "[^1]: one",
             "#### Images",
         ]);
-        const { change, cursor } = buildDetailAppend(doc, "2", false, fakePlugin());
+        const { change, cursor } = buildDefinitionAppend(doc, "2", false, fakePlugin());
         expect(change).toEqual({
             from: { line: 3, ch: "[^1]: one".length },
             text: "\n[^2]: \n",
@@ -199,7 +199,7 @@ describe("blank line between the new detail and following content", () => {
             "",
             "tail prose",
         ]);
-        const { change } = buildDetailAppend(doc, "2", false, fakePlugin());
+        const { change } = buildDefinitionAppend(doc, "2", false, fakePlugin());
         expect(change.text).toBe("\n[^2]: ");
     });
 });
@@ -208,7 +208,7 @@ describe("slotting under an existing section heading (QOL follow-up to #55)", ()
     const headingOn = () =>
         fakePlugin({ enableFootnoteSectionHeading: true });
 
-    it("the first detail goes under an existing heading, not to EOF", () => {
+    it("the first definition goes under an existing heading, not to EOF", () => {
         const doc = fakeEditor([
             "Intro[^1] text",
             "",
@@ -217,7 +217,7 @@ describe("slotting under an existing section heading (QOL follow-up to #55)", ()
             "## Other section",
             "other stuff",
         ]);
-        const { change, cursor } = buildDetailAppend(doc, "1", true, headingOn());
+        const { change, cursor } = buildDefinitionAppend(doc, "1", true, headingOn());
         // the blank line after the heading is reused, not doubled; the
         // trailing "\n" keeps "## Other section" out of the footnote
         expect(change).toEqual({
@@ -229,7 +229,7 @@ describe("slotting under an existing section heading (QOL follow-up to #55)", ()
 
     it("inserts its own blank line when none follows the heading", () => {
         const doc = fakeEditor(["Intro[^1]", "# Footnotes", "## Other"]);
-        const { change, cursor } = buildDetailAppend(doc, "1", true, headingOn());
+        const { change, cursor } = buildDefinitionAppend(doc, "1", true, headingOn());
         expect(change).toEqual({
             from: { line: 1, ch: "# Footnotes".length },
             text: "\n\n[^1]: \n",
@@ -250,7 +250,7 @@ describe("slotting under an existing section heading (QOL follow-up to #55)", ()
             enableFootnoteSectionHeading: true,
             footnoteSectionHeading: "---\n## Footnotes",
         });
-        const { change } = buildDetailAppend(doc, "1", true, plugin);
+        const { change } = buildDefinitionAppend(doc, "1", true, plugin);
         expect(change).toEqual({ from: { line: 4, ch: 0 }, text: "\n[^1]: \n" });
     });
 
@@ -263,20 +263,20 @@ describe("slotting under an existing section heading (QOL follow-up to #55)", ()
             "",
             "tail",
         ]);
-        const { change } = buildDetailAppend(doc, "2", false, headingOn());
+        const { change } = buildDefinitionAppend(doc, "2", false, headingOn());
         expect(change.from).toEqual({ line: 3, ch: "[^1]: one".length });
     });
 
     it("a heading line inside a fence does not count", () => {
         const doc = fakeEditor(["A[^1] b", "```", "# Footnotes", "```"]);
-        const { change } = buildDetailAppend(doc, "1", true, headingOn());
+        const { change } = buildDefinitionAppend(doc, "1", true, headingOn());
         // falls through to the EOF path, which adds the real heading
         expect(change.text).toBe("\n\n# Footnotes\n\n[^1]: ");
     });
 
     it("with the heading feature off, nothing slots", () => {
         const doc = fakeEditor(["A[^1] b", "", "# Footnotes", "", "tail"]);
-        const { change } = buildDetailAppend(doc, "1", true, fakePlugin());
+        const { change } = buildDefinitionAppend(doc, "1", true, fakePlugin());
         expect(change.from.line).toBe(4); // EOF path
     });
 });

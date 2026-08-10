@@ -15,39 +15,39 @@ import { activeTableCellEditor, resolveTableCellCursor, TableCellEditor } from "
 
 // Core logic for both hotkey commands. Each press walks the same decision
 // cascade against the caret position:
-//   1. on a detail line ("[^x]: …")      → jump back to the first marker
-//   2. on a marker with an existing detail → jump to (or popup-edit) it
-//   3. on a marker with NO detail → create the detail (every key: an
+//   1. on a definition line ("[^x]: …")      → jump back to the first reference
+//   2. on a reference with an existing definition → jump to (or popup-edit) it
+//   3. on a reference with NO definition → create the definition (every key: an
 //      accidental press mid-naming must continue the footnote, never
-//      nest a new marker into the brackets)
-//   4. otherwise → insert a new marker ("[^N]" + detail, or empty "[^]")
+//      nest a new reference into the brackets)
+//   4. otherwise → insert a new reference ("[^N]" + definition, or empty "[^]")
 // Table caveat (see table-cursor.ts): when the caret is in an actively
 // edited table cell, reads use the position resolved from the cell's
-// sub-editor and marker writes are dispatched INTO that sub-editor.
+// sub-editor and reference writes are dispatched INTO that sub-editor.
 
-/** Every footnote marker SHAPE (numbered or named); the definition-label exclusion is positional — see footnoteMarkerMatches. /g: read with matchAll, never test/exec (lastIndex is stateful). */
-export const AllMarkers = /\[\^([^[\]]+)\]/g;
-/** Numbered markers AND numbered details — both reserve their number for autonumbering. */
-const AllNumberedMarkers = /\[\^(\d+)\]/g;
-// anchored: a detail only counts at the start of a line, same as markdown
-const DetailInLine = /^\[\^([^[\]]+)\]:/;
-/** Pulls the name out of a single marker string; the name is match[2]. */
+/** Every footnote reference SHAPE (numbered or named); the definition-label exclusion is positional — see footnoteReferenceMatches. /g: read with matchAll, never test/exec (lastIndex is stateful). */
+export const AllReferences = /\[\^([^[\]]+)\]/g;
+/** Numbered references AND numbered definitions — both reserve their number for autonumbering. */
+const AllNumberedReferences = /\[\^(\d+)\]/g;
+// anchored: a definition only counts at the start of a line, same as markdown
+const DefinitionInLine = /^\[\^([^[\]]+)\]:/;
+/** Pulls the name out of a single reference string; the name is match[2]. */
 export const ExtractNameFromFootnote = /(\[\^)([^[\]]+)(?=\])/;
 
 /**
- * Marker occurrences on a single line — every "[^id]" EXCEPT a definition's
+ * Reference occurrences on a single line — every "[^id]" EXCEPT a definition's
  * own "[^id]:" label at column 0. A "[^id]:" appearing MID-line is a live
  * reference followed by a literal colon (exactly how Obsidian renders it),
- * so it counts as a marker; only a column-0 label is a definition. Excluding
+ * so it counts as a reference; only a column-0 label is a definition. Excluding
  * definitions positionally (rather than by the old `(?!:)` lookahead, which
  * also dropped genuine mid-line references sitting before a colon) is the
  * whole point. Pass the line already code-masked when code must be ignored.
  * Footnote ids are case-insensitive in Obsidian, but casing is preserved
  * here — callers fold case only when comparing identities.
  */
-export function footnoteMarkerMatches(line: string): RegExpMatchArray[] {
+export function footnoteReferenceMatches(line: string): RegExpMatchArray[] {
     const matches: RegExpMatchArray[] = [];
-    for (const match of line.matchAll(AllMarkers)) {
+    for (const match of line.matchAll(AllReferences)) {
         if ((match.index ?? 0) === 0 && line[match[0].length] === ":") continue;
         matches.push(match);
     }
@@ -63,7 +63,7 @@ function idListIncludes(ids: string[], id: string): boolean {
 // Obsidian won't render a footnote whose name contains whitespace or
 // backticks (Jason's call, 2026-08-10: backticked names are disallowed
 // outright rather than supported), and an empty name isn't a footnote at
-// all; the marker regexes stay permissive so such names can be caught and
+// all; the reference regexes stay permissive so such names can be caught and
 // warned about instead of silently misbehaving
 export function isValidFootnoteName(name: string): boolean {
     return name.length > 0 && !/[\s`]/.test(name);
@@ -86,42 +86,42 @@ function docLines(doc: Editor): string[] {
     return lines;
 }
 
-/** Names of all footnote details ("[^x]: …" lines) in document order, one per line at most. Code blocks don't count. */
-export function listExistingFootnoteDetails(
+/** Names of all footnote definitions ("[^x]: …" lines) in document order, one per line at most. Code blocks don't count. */
+export function listExistingFootnoteDefinitions(
     doc: Editor
 ) {
-    const detailNames: string[] = [];
+    const definitionNames: string[] = [];
 
-    //search each line for footnote details and add their names to the list
+    //search each line for footnote definitions and add their names to the list
     const lines = docLines(doc);
     const masked = maskProtectedLines(lines);
     for (let i = 0; i < lines.length; i++) {
-        const match = masked[i].match(DetailInLine);
+        const match = masked[i].match(DefinitionInLine);
         if (match) {
             // re-slice the ORIGINAL line: a code span inside the name masks
             // to NULs, and the masked name would otherwise leak them into
-            // saved output (its marker sibling re-slices for the same reason).
+            // saved output (its reference sibling re-slices for the same reason).
             // The name always starts at index 2 (past the "[^").
-            detailNames.push(lines[i].slice(2, 2 + match[1].length));
+            definitionNames.push(lines[i].slice(2, 2 + match[1].length));
         }
     }
-    return detailNames;
+    return definitionNames;
 }
 
-/** Every marker occurrence with its position — repeated markers appear once per use. Code blocks don't count. */
-export function listExistingFootnoteMarkersAndLocations(
+/** Every reference occurrence with its position — repeated references appear once per use. Code blocks don't count. */
+export function listExistingFootnoteReferencesAndLocations(
     doc: Editor
 ) {
-    const markers: { footnote: string; lineNum: number; startIndex: number }[] = [];
+    const references: { footnote: string; lineNum: number; startIndex: number }[] = [];
 
-    //search each line for footnote markers
+    //search each line for footnote references
     //for each, add their name, line number, and start index to the list
     const lines = docLines(doc);
     const masked = maskProtectedLines(lines);
     for (let i = 0; i < lines.length; i++) {
-        for (const match of footnoteMarkerMatches(masked[i])) {
+        for (const match of footnoteReferenceMatches(masked[i])) {
             const start = match.index ?? 0;
-            markers.push({
+            references.push({
                 // slice the original: the masked match text could carry
                 // mask characters when code sits inside the brackets
                 footnote: lines[i].slice(start, start + match[0].length),
@@ -130,7 +130,7 @@ export function listExistingFootnoteMarkersAndLocations(
             });
         }
     }
-    return markers;
+    return references;
 }
 
 function moveCursorAndSetJumpPoint(
@@ -183,25 +183,25 @@ function moveCursorAndSetJumpPoint(
     }
 }
 
-/** Cascade step 1: caret on a detail line → jump to the first use of its marker. Returns whether it handled the press. */
-export function shouldJumpFromDetailToMarker(
+/** Cascade step 1: caret on a definition line → jump to the first use of its reference. Returns whether it handled the press. */
+export function shouldJumpFromDefinitionToReference(
     lineText: string,
     cursorPosition: EditorPosition,
     doc: Editor,
     plugin: FootnotePlugin
 ) {
-    // check if we're in a footnote detail line ("[^1]: footnote") or one of
+    // check if we're in a footnote definition line ("[^1]: footnote") or one of
     // its continuation lines; if so, jump back to the footnote in the text
 
     // cheap pre-check on the raw line; the whole-document scanning below
-    // only runs when the caret sits on something detail-shaped — the
+    // only runs when the caret sits on something definition-shaped — the
     // "[^x]:" line itself, or an indented line that MIGHT be a continuation
-    // (jump-to-detail deliberately parks the caret on the LAST continuation
+    // (jump-to-definition deliberately parks the caret on the LAST continuation
     // line, and the hotkey there used to insert a new footnote instead of
     // jumping back — bug reported 2026-07-17)
-    if (!DetailInLine.test(lineText) && !/^\s+\S/.test(lineText)) return false;
+    if (!DefinitionInLine.test(lineText) && !/^\s+\S/.test(lineText)) return false;
 
-    // #41: a "[^x]:" inside a code block is not a detail, and a marker
+    // #41: a "[^x]:" inside a code block is not a definition, and a reference
     // inside code is not a jump target — resolve against protected-aware
     // definition blocks and scan the masked twin
     const lines = docLines(doc);
@@ -213,16 +213,16 @@ export function shouldJumpFromDetailToMarker(
             cursorPosition.line <= candidate.end,
     );
     if (block) {
-        // ids are case-insensitive, so the marker may differ in casing from
-        // the detail's label ("[^Note]" ↔ "[^note]:") — fold both to compare
+        // ids are case-insensitive, so the reference may differ in casing from
+        // the definition's label ("[^Note]" ↔ "[^note]:") — fold both to compare
         const name = block.name.toLowerCase();
         const masked = maskProtectedLines(lines, isProtected);
 
-        // find the FIRST marker use of this footnote. footnoteMarkerMatches
-        // skips a definition's own column-0 label, so a detail line — this
+        // find the FIRST reference use of this footnote. footnoteReferenceMatches
+        // skips a definition's own column-0 label, so a definition line — this
         // one included — is never its own jump target
         for (let i = 0; i < masked.length; i++) {
-            for (const use of footnoteMarkerMatches(masked[i])) {
+            for (const use of footnoteReferenceMatches(masked[i])) {
                 // re-slice the ORIGINAL line for the name: a code span
                 // inside it masks to NULs, which can never equal the raw
                 // block name (bug pinned in bug-masked-name-identity)
@@ -237,13 +237,13 @@ export function shouldJumpFromDetailToMarker(
                 return true;
             }
         }
-        // an ORPHANED definition — no marker anywhere. Falling through used
+        // an ORPHANED definition — no reference anywhere. Falling through used
         // to insert a brand-new footnote INTO the definitions area, when the
-        // user almost certainly pressed the key to jump to the marker they
+        // user almost certainly pressed the key to jump to the reference they
         // have since deleted; explain and stand still instead (QOL sweep,
         // 2026-08-07)
         new Notice(
-            `No marker references this footnote. Add a [^${block.name}] marker in the text, or delete the definition.`,
+            `Nothing references this footnote. Add a [^${block.name}] reference in the text, or delete the definition.`,
             8000,
         );
         return true;
@@ -251,21 +251,21 @@ export function shouldJumpFromDetailToMarker(
     return false;
 }
 
-/** Move the caret to the end of the named footnote's detail (including its indented continuation lines). */
-export function jumpToFootnoteDetail(
+/** Move the caret to the end of the named footnote's definition (including its indented continuation lines). */
+export function jumpToFootnoteDefinition(
     footnoteName: string,
     cursorPosition: EditorPosition,
     doc: Editor,
     plugin: FootnotePlugin
 ) {
-    // find the first line with this detail marker name in it — matching
-    // the masked twin so detail-shaped lines inside code don't count (#41)
+    // find the first line with this definition reference name in it — matching
+    // the masked twin so definition-shaped lines inside code don't count (#41)
     const lines = docLines(doc);
     const masked = maskProtectedLines(lines);
     for (let i = 0; i < masked.length; i++) {
-        const lineMatch = masked[i].match(DetailInLine);
-        // ids are case-insensitive: the detail label may differ in casing
-        // from the marker name that sent us here. Re-slice the ORIGINAL
+        const lineMatch = masked[i].match(DefinitionInLine);
+        // ids are case-insensitive: the definition label may differ in casing
+        // from the reference name that sent us here. Re-slice the ORIGINAL
         // line for the name — a code span inside it masks to NULs
         // (bug-masked-name-identity); the name always starts at index 2
         if (
@@ -273,7 +273,7 @@ export function jumpToFootnoteDetail(
             lines[i].slice(2, 2 + lineMatch[1].length).toLowerCase() ===
                 footnoteName.toLowerCase()
         ) {
-            // land at the END of the detail (indented lines belong to
+            // land at the END of the definition (indented lines belong to
             // it) so the user can backspace/type without arrow keys
             let endLine = i;
             while (endLine < doc.lastLine() && /^\s+\S/.test(doc.getLine(endLine + 1))) {
@@ -288,16 +288,16 @@ export function jumpToFootnoteDetail(
 }
 
 /**
- * The marker whose brackets contain `ch`, or null. Strictly INSIDE only —
+ * The reference whose brackets contain `ch`, or null. Strictly INSIDE only —
  * same rule as inline footnotes: a caret immediately after the closing
  * bracket (or before the opening one) is outside, so the hotkey there
  * inserts a consecutive footnote instead of navigating (issue #49).
  */
-export function markerAtCursor(
-    markers: { footnote: string; startIndex: number }[],
+export function referenceAtCursor(
+    references: { footnote: string; startIndex: number }[],
     ch: number,
 ): string | null {
-    for (const { footnote, startIndex } of markers) {
+    for (const { footnote, startIndex } of references) {
         if (ch > startIndex && ch < startIndex + footnote.length) {
             return footnote;
         }
@@ -305,61 +305,61 @@ export function markerAtCursor(
     return null;
 }
 
-/** Cascade step 2: caret on a marker that HAS a detail → popup-edit it (when enabled) or jump to it. Markers without a detail return false so creation runs. */
-export function shouldJumpFromMarkerToDetail(
+/** Cascade step 2: caret on a reference that HAS a definition → popup-edit it (when enabled) or jump to it. References without a definition return false so creation runs. */
+export function shouldJumpFromReferenceToDefinition(
     lineText: string,
     cursorPosition: EditorPosition,
     doc: Editor,
     plugin: FootnotePlugin
 ) {
-    // Jump cursor TO detail marker:
-    // find the marker whose brackets contain the cursor on this line,
-    // then place the cursor at that footnote's detail line. This runs on
+    // Jump cursor TO definition reference:
+    // find the reference whose brackets contain the cursor on this line,
+    // then place the cursor at that footnote's definition line. This runs on
     // every keypress of both commands and a whole-document scan here is
     // measurable on large notes, so the raw line gates first — masking
     // (which needs the whole document for fence state) only runs when
-    // the caret actually sits on something marker-shaped.
-    const rawMarkers = footnoteMarkerMatches(lineText).map((match) => ({
+    // the caret actually sits on something reference-shaped.
+    const rawReferences = footnoteReferenceMatches(lineText).map((match) => ({
         footnote: match[0],
         startIndex: match.index ?? 0,
     }));
-    if (markerAtCursor(rawMarkers, cursorPosition.ch) === null) return false;
+    if (referenceAtCursor(rawReferences, cursorPosition.ch) === null) return false;
 
-    // #41: re-check against the masked twin — a marker inside a fence or
+    // #41: re-check against the masked twin — a reference inside a fence or
     // inline code is plain text, so the press falls through to insertion.
-    // The marker TEXT is re-sliced from the raw line: a code span inside
-    // the name masks to NULs, and the masked name would break the detail
+    // The reference TEXT is re-sliced from the raw line: a code span inside
+    // the name masks to NULs, and the masked name would break the definition
     // lookup and jump below (bug-masked-name-identity)
     const maskedLine =
         maskedLineAt(docLines(doc), cursorPosition.line);
-    const markersOnLine = footnoteMarkerMatches(maskedLine).map((match) => {
+    const referencesOnLine = footnoteReferenceMatches(maskedLine).map((match) => {
         const start = match.index ?? 0;
         return {
             footnote: lineText.slice(start, start + match[0].length),
             startIndex: start,
         };
     });
-    const markerTarget = markerAtCursor(markersOnLine, cursorPosition.ch);
+    const referenceTarget = referenceAtCursor(referencesOnLine, cursorPosition.ch);
 
-    if (markerTarget !== null) {
-        // the marker is exactly "[^name]", so the name is a positional
+    if (referenceTarget !== null) {
+        // the reference is exactly "[^name]", so the name is a positional
         // slice — regex re-extraction would stop at brackets the mask hid
         {
-            const footnoteName = markerTarget.slice(2, -1);
+            const footnoteName = referenceTarget.slice(2, -1);
 
-            // markers without a detail line fall through to the
-            // detail-creation paths (ids compared case-insensitively)
-            if (!idListIncludes(listExistingFootnoteDetails(doc), footnoteName)) {
+            // references without a definition line fall through to the
+            // definition-creation paths (ids compared case-insensitively)
+            if (!idListIncludes(listExistingFootnoteDefinitions(doc), footnoteName)) {
                 return false;
             }
 
             if (popupEditingAvailable(plugin)) {
                 void openFootnotePopup(plugin, footnoteName, () =>
-                    jumpToFootnoteDetail(footnoteName, cursorPosition, doc, plugin)
+                    jumpToFootnoteDefinition(footnoteName, cursorPosition, doc, plugin)
                 );
                 return true;
             }
-            return jumpToFootnoteDetail(footnoteName, cursorPosition, doc, plugin);
+            return jumpToFootnoteDefinition(footnoteName, cursorPosition, doc, plugin);
         }
     }
     return false;
@@ -395,9 +395,9 @@ export function addFootnoteSectionHeader(
 // mid-document heading with more content below), otherwise after the last
 // non-blank line — trimming trailing blank lines if enabled, and adding a
 // blank separator plus the optional section heading before the first
-// footnote. Returned as data so the caller can bundle it with the marker
+// footnote. Returned as data so the caller can bundle it with the reference
 // insertion into a single transaction (see moveCursorAndSetJumpPoint).
-export function buildDetailAppend(
+export function buildDefinitionAppend(
     doc: Editor,
     footnoteId: string,
     isFirstFootnote: boolean,
@@ -406,10 +406,10 @@ export function buildDetailAppend(
     const lines = docLines(doc);
     const isProtected = protectedLines(lines);
     const blocks = findDefinitionBlocks(lines, isProtected);
-    // a non-blank line directly below the new detail would be pulled INTO
+    // a non-blank line directly below the new definition would be pulled INTO
     // it — Obsidian lazily continues a definition into the next line — so
     // insertions with content below them add a trailing blank separator
-    // (A4 bug, 2026-07-20). The cursor still lands on the detail line.
+    // (A4 bug, 2026-07-20). The cursor still lands on the definition line.
     const needsSeparator = (insertLine: number) =>
         insertLine + 1 < lines.length && lines[insertLine + 1].trim() !== "";
     if (blocks.length > 0) {
@@ -428,7 +428,7 @@ export function buildDetailAppend(
 
     // no definitions yet — but an existing section heading in the note
     // claims the first footnote (QOL follow-up to issue #55): slot the
-    // detail under it instead of appending a second heading at the end.
+    // definition under it instead of appending a second heading at the end.
     // The setting is markdown that can span multiple lines, so match runs.
     if (
         plugin.settings.enableFootnoteSectionHeading &&
@@ -486,7 +486,7 @@ export function buildDetailAppend(
         text = heading + "\n" + text;
     }
 
-    // cursor lands at the end of the inserted detail line
+    // cursor lands at the end of the inserted definition line
     const linesAdded = text.split("\n").length - 1;
     const cursor = {
         line: fromLine + linesAdded,
@@ -495,9 +495,9 @@ export function buildDetailAppend(
     return { change: { from, to, text }, cursor };
 }
 
-// the trailing punctuation the marker hops over — the same class the
+// the trailing punctuation the reference hops over — the same class the
 // footnote-after-punctuation lint reorders, so the two features can't
-// disagree about where a marker belongs
+// disagree about where a reference belongs
 const TrailingPunctuation = [".", ",", ":", ";", "!", "?"];
 
 /**
@@ -544,7 +544,7 @@ function adjustFootnotePosition(
 // (regression reported 2026-07-14; same family as issue #28). Hand focus
 // back to the main editor and only edit once the sync-back has settled.
 // The primary table-cell path dispatches through the cell's own editor
-// instead — see shouldCreateAutonumFootnote / shouldCreateFootnoteMarker.
+// instead — see shouldCreateAutonumFootnote / shouldCreateFootnoteReference.
 export function runOutsideTableCell(
     doc: Editor,
     run: (cursorPosition: EditorPosition) => void,
@@ -694,25 +694,25 @@ function activeFootnotePrefix(
     return prefix;
 }
 
-// One more than the highest numbered marker or detail in the text; gaps in
+// One more than the highest numbered reference or definition in the text; gaps in
 // the numbering are not reused, and named footnotes don't count. Numbers
 // inside code blocks or frontmatter don't reserve anything (#41). With a
-// `prefix`, only markers carrying it count ("[^2.7]" under prefix "2."),
-// and plain numbered markers belong to the "" prefix only.
+// `prefix`, only references carrying it count ("[^2.7]" under prefix "2."),
+// and plain numbered references belong to the "" prefix only.
 export function computeNextFootnoteNumber(markdownText: string, prefix = ""): number {
     const masked = maskProtectedLines(markdownText.split("\n")).join("\n");
     const escaped = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     // /i: footnote ids are case-insensitive in Obsidian, so "[^P.1]" lives
     // in prefix "p."'s namespace and must reserve its number — a
     // case-sensitive scan let the next insert mint a colliding id
-    const numberedMarkers = prefix
+    const numberedReferences = prefix
         ? new RegExp(`\\[\\^${escaped}(\\d+)\\]`, "gi")
-        : AllNumberedMarkers;
+        : AllNumberedReferences;
     let currentMax = 1;
-    for (const match of masked.matchAll(numberedMarkers)) {
+    for (const match of masked.matchAll(numberedReferences)) {
         const value = Number(match[1]);
         // a digit run too large to round-trip through Number would push the
-        // next id into scientific notation ("[^1e+23]"); such a marker is
+        // next id into scientific notation ("[^1e+23]"); such a reference is
         // treated as named, not numbered
         if (!Number.isSafeInteger(value)) continue;
         currentMax = Math.max(currentMax, value + 1);
@@ -720,13 +720,13 @@ export function computeNextFootnoteNumber(markdownText: string, prefix = ""): nu
     return currentMax;
 }
 
-/** The auto-numbered command ("Insert / navigate auto-numbered footnote"): runs the decision cascade, creating "[^N]" + detail when nothing to navigate to. */
+/** The auto-numbered command ("Insert / navigate auto-numbered footnote"): runs the decision cascade, creating "[^N]" + definition when nothing to navigate to. */
 export async function insertAutonumFootnote(plugin: FootnotePlugin) {
     // ORDER MATTERS: settle first, then toggle. The settle wait must come
     // before the popup toggle so a same-tick second press sees the popup
     // the first press opened (and closes it) instead of racing past it —
     // and document edits must wait for a just-closed popup's pending
-    // detail save, or that save clobbers them.
+    // definition save, or that save clobbers them.
     await settleFootnotePopupWithFeedback();
     // pressing the hotkey while the popup editor is open closes it
     if (toggleCloseFootnotePopup()) return;
@@ -736,7 +736,7 @@ export async function insertAutonumFootnote(plugin: FootnotePlugin) {
     if (!mdView || !mdView.editor) return false;
     // Reading view: the editor API happily edits the HIDDEN buffer — one
     // press invisibly inserted "[^]" and the next press toasted about a
-    // marker the user could not see (reported 2026-08-08, probed live).
+    // reference the user could not see (reported 2026-08-08, probed live).
     // Text-editing commands are inert there; main.ts also disables them
     // in the palette, this guards programmatic invocation.
     if (readingViewActive(mdView)) return;
@@ -746,27 +746,27 @@ export async function insertAutonumFootnote(plugin: FootnotePlugin) {
     // stale there, and editing the row via the main editor corrupts the
     // table — reads use the resolved position, writes go through the cell
     const cell = activeTableCellEditor(doc);
-    // inside an inline footnote, hop out instead of nesting a marker in it
+    // inside an inline footnote, hop out instead of nesting a reference in it
     // inside an EMPTY inline footnote, ask for its text instead of hopping
     if (warnEmptyInlineFootnoteIfInside(doc, cell)) return;
     if (exitInlineFootnoteIfInside(doc, cell)) return;
     // inside an abandoned "[^]", ask for a name instead of nesting "[^N]"
-    if (warnEmptyMarkerIfInside(doc, cell)) return;
+    if (warnEmptyReferenceIfInside(doc, cell)) return;
     // inside an untouched "[^7-]" placeholder, ask for a suffix
-    if (warnPrefilledMarkerIfInside(plugin, doc, cell)) return;
+    if (warnPrefilledReferenceIfInside(plugin, doc, cell)) return;
     const run = (cursorPosition: EditorPosition) => {
         const lineText = doc.getLine(cursorPosition.line);
 
-        if (shouldJumpFromDetailToMarker(lineText, cursorPosition, doc, plugin))
+        if (shouldJumpFromDefinitionToReference(lineText, cursorPosition, doc, plugin))
             return;
-        if (shouldJumpFromMarkerToDetail(lineText, cursorPosition, doc, plugin))
+        if (shouldJumpFromReferenceToDefinition(lineText, cursorPosition, doc, plugin))
             return;
-        // caret inside a marker with NO detail: continue the half-built
-        // footnote (create its detail) instead of nesting "[^N]" into the
+        // caret inside a reference with NO definition: continue the half-built
+        // footnote (create its definition) instead of nesting "[^N]" into the
         // brackets — parity with the named and inline keys, so an
         // accidental numbered press mid-naming is just the next step
         // (reported from beta.9 phone testing, 2026-08-09)
-        if (shouldCreateMatchingFootnoteDetail(lineText, cursorPosition, plugin, doc))
+        if (shouldCreateMatchingFootnoteDefinition(lineText, cursorPosition, plugin, doc))
             return;
 
         shouldCreateAutonumFootnote(lineText, cursorPosition, plugin, doc, cell);
@@ -776,7 +776,7 @@ export async function insertAutonumFootnote(plugin: FootnotePlugin) {
 }
 
 
-/** Cascade step 4 (autonum): insert the next-numbered marker at the caret (through `cell` when in a table) and append its detail, then popup or jump per settings. */
+/** Cascade step 4 (autonum): insert the next-numbered reference at the caret (through `cell` when in a table) and append its definition, then popup or jump per settings. */
 export function shouldCreateAutonumFootnote(
     lineText: string,
     cursorPosition: EditorPosition,
@@ -796,48 +796,48 @@ export function shouldCreateAutonumFootnote(
     const currentMax = computeNextFootnoteNumber(markdownText, prefix);
 
     const footnoteId = `${prefix}${currentMax}`;
-    const footnoteMarker = `[^${footnoteId}]`;
+    const footnoteReference = `[^${footnoteId}]`;
 
     const isFirstFootnote =
-        listExistingFootnoteDetails(doc).length === 0 && currentMax === 1;
+        listExistingFootnoteDefinitions(doc).length === 0 && currentMax === 1;
 
     if (cell) {
-        // the marker goes through the cell's own editor (never the main
+        // the reference goes through the cell's own editor (never the main
         // editor — that races the cell's sync-back and corrupts the table);
-        // the detail append is outside the table, so the main editor is safe
-        insertInTableCell(cell, plugin, footnoteMarker, footnoteMarker.length);
-        const detail = buildDetailAppend(doc, footnoteId, isFirstFootnote, plugin);
+        // the definition append is outside the table, so the main editor is safe
+        insertInTableCell(cell, plugin, footnoteReference, footnoteReference.length);
+        const definition = buildDefinitionAppend(doc, footnoteId, isFirstFootnote, plugin);
         if (popupEditingAvailable(plugin)) {
-            doc.transaction({ changes: [detail.change] });
+            doc.transaction({ changes: [definition.change] });
             void openFootnotePopup(plugin, footnoteId, () =>
-                moveCursorAndSetJumpPoint(doc, cursorPosition, detail.cursor, plugin, undefined, true)
+                moveCursorAndSetJumpPoint(doc, cursorPosition, definition.cursor, plugin, undefined, true)
             );
         } else {
-            moveCursorAndSetJumpPoint(doc, cursorPosition, detail.cursor, plugin, [detail.change], true);
+            moveCursorAndSetJumpPoint(doc, cursorPosition, definition.cursor, plugin, [definition.change], true);
         }
         return;
     }
 
     cursorPosition = adjustFootnotePosition(cursorPosition, doc, lineText, plugin);
-    const detail = buildDetailAppend(doc, footnoteId, isFirstFootnote, plugin);
+    const definition = buildDefinitionAppend(doc, footnoteId, isFirstFootnote, plugin);
     const changes: EditorChange[] = [
-        { from: cursorPosition, text: footnoteMarker },
-        detail.change,
+        { from: cursorPosition, text: footnoteReference },
+        definition.change,
     ];
 
     if (popupEditingAvailable(plugin)) {
-        // type the detail in a popup instead of jumping to the bottom;
-        // the cursor only moves past the new marker
-        const afterMarker = { line: cursorPosition.line, ch: cursorPosition.ch + footnoteMarker.length };
-        doc.transaction({ changes, selection: { from: afterMarker } });
+        // type the definition in a popup instead of jumping to the bottom;
+        // the cursor only moves past the new reference
+        const afterReference = { line: cursorPosition.line, ch: cursorPosition.ch + footnoteReference.length };
+        doc.transaction({ changes, selection: { from: afterReference } });
         const cancelCreationLint = scheduleCreationLintAfterPopup(plugin);
         void openFootnotePopup(plugin, footnoteId, () => {
             cancelCreationLint();
-            moveCursorAndSetJumpPoint(doc, cursorPosition, detail.cursor, plugin, undefined, true);
+            moveCursorAndSetJumpPoint(doc, cursorPosition, definition.cursor, plugin, undefined, true);
             lintAfterFootnoteCreation(plugin, true);
         });
     } else {
-        moveCursorAndSetJumpPoint(doc, cursorPosition, detail.cursor, plugin, changes, true);
+        moveCursorAndSetJumpPoint(doc, cursorPosition, definition.cursor, plugin, changes, true);
         lintAfterFootnoteCreation(plugin, true);
     }
 }
@@ -964,14 +964,14 @@ export function inlineFootnoteExitCh(lineText: string, ch: number): number | nul
 }
 
 /**
- * When the caret sits strictly inside a "[^x]" marker, handle the press the
+ * When the caret sits strictly inside a "[^x]" reference, handle the press the
  * way the numbered/named commands would — jump to (or popup-edit) the
- * marker's detail, creating it when missing — and report true. The reverse
+ * reference's definition, creating it when missing — and report true. The reverse
  * of exitInlineFootnoteIfInside (QOL, 2026-07-20), shared by both inline
- * commands: inserting "^[…]" into a marker would corrupt it ("[^na^[]med]"),
+ * commands: inserting "^[…]" into a reference would corrupt it ("[^na^[]med]"),
  * so the inline hotkeys navigate there instead.
  */
-export function navigateMarkerIfInside(
+export function navigateReferenceIfInside(
     plugin: FootnotePlugin,
     doc: Editor,
     cell: TableCellEditor | null,
@@ -981,29 +981,29 @@ export function navigateMarkerIfInside(
     const lineText = doc.getLine(cursorPosition.line);
     // raw-line gate first — masking needs the whole document, and this runs
     // on every inline-command press (same rationale as
-    // shouldJumpFromMarkerToDetail)
-    const rawMarkers = footnoteMarkerMatches(lineText).map((match) => ({
+    // shouldJumpFromReferenceToDefinition)
+    const rawReferences = footnoteReferenceMatches(lineText).map((match) => ({
         footnote: match[0],
         startIndex: match.index ?? 0,
     }));
-    if (markerAtCursor(rawMarkers, cursorPosition.ch) === null) return false;
+    if (referenceAtCursor(rawReferences, cursorPosition.ch) === null) return false;
 
     // the masked twin decides for real: a "[^x]" inside code is plain text,
     // and inserting an inline footnote there is fine (#41 semantics)
     const maskedLine =
         maskedLineAt(docLines(doc), cursorPosition.line);
-    const markersOnLine = footnoteMarkerMatches(maskedLine).map((match) => ({
+    const referencesOnLine = footnoteReferenceMatches(maskedLine).map((match) => ({
         footnote: match[0],
         startIndex: match.index ?? 0,
     }));
-    if (markerAtCursor(markersOnLine, cursorPosition.ch) === null) return false;
+    if (referenceAtCursor(referencesOnLine, cursorPosition.ch) === null) return false;
 
-    if (shouldJumpFromMarkerToDetail(lineText, cursorPosition, doc, plugin))
+    if (shouldJumpFromReferenceToDefinition(lineText, cursorPosition, doc, plugin))
         return true;
-    if (shouldCreateMatchingFootnoteDetail(lineText, cursorPosition, plugin, doc))
+    if (shouldCreateMatchingFootnoteDefinition(lineText, cursorPosition, plugin, doc))
         return true;
     // however the cascade resolved (e.g. an invalid name's warning), the
-    // press is handled — "^[…]" must never land inside the marker
+    // press is handled — "^[…]" must never land inside the reference
     return true;
 }
 
@@ -1012,7 +1012,7 @@ export function navigateMarkerIfInside(
  * brackets for quick writing. A second press while the cursor is still
  * inside an inline footnote instead hops it just past the closing bracket,
  * so typing continues without reaching for the arrow keys. Inside a
- * regular "[^x]" marker the press navigates like the numbered/named
+ * regular "[^x]" reference the press navigates like the numbered/named
  * commands instead of nesting.
  */
 export async function insertInlineFootnote(plugin: FootnotePlugin) {
@@ -1032,11 +1032,11 @@ export async function insertInlineFootnote(plugin: FootnotePlugin) {
     if (warnEmptyInlineFootnoteIfInside(doc, cell)) return;
     if (exitInlineFootnoteIfInside(doc, cell)) return;
     // inside an abandoned "[^]", ask for a name instead of nesting "^[]"
-    if (warnEmptyMarkerIfInside(doc, cell)) return;
+    if (warnEmptyReferenceIfInside(doc, cell)) return;
     // the untouched "[^7-]" placeholder warns for a suffix (it is not a
-    // real footnote to navigate to) — checked before navigateMarkerIfInside
-    if (warnPrefilledMarkerIfInside(plugin, doc, cell)) return;
-    if (navigateMarkerIfInside(plugin, doc, cell)) return;
+    // real footnote to navigate to) — checked before navigateReferenceIfInside
+    if (warnPrefilledReferenceIfInside(plugin, doc, cell)) return;
+    if (navigateReferenceIfInside(plugin, doc, cell)) return;
 
     insertInlineText(plugin, "^[]", 2);
 }
@@ -1045,7 +1045,7 @@ export async function insertInlineFootnote(plugin: FootnotePlugin) {
  * When the caret sits inside an EMPTY inline footnote ("^[]", or only
  * whitespace between the brackets), leave it where it is, ask for the text
  * via a Notice, and report true. Shared by every footnote command, exactly
- * like the empty "[^]" marker guard (manual combo-test feedback,
+ * like the empty "[^]" reference guard (manual combo-test feedback,
  * 2026-08-08): a second press used to silently hop the caret out,
  * stranding an inline footnote with nothing in it. A FILLED inline
  * footnote is not this guard's business — there the press falls through
@@ -1073,7 +1073,7 @@ export function warnEmptyInlineFootnoteIfInside(
  * When the caret sits inside an inline footnote ("^[...]"), hop it just
  * past the closing bracket and report true. Shared by every insert
  * command: for the numbered/named ones this prevents nesting a "[^x]"
- * marker inside the inline footnote's brackets, which would end the inline
+ * reference inside the inline footnote's brackets, which would end the inline
  * footnote early and corrupt it ("^[in [^named]line]").
  */
 export function exitInlineFootnoteIfInside(
@@ -1099,7 +1099,7 @@ export function exitInlineFootnoteIfInside(
     return true;
 }
 
-/** Inline-footnote paste command: inserts `^[<clipboard>]` with the caret after it. Inside a "[^x]" marker it navigates like the named command instead (the clipboard stays untouched). */
+/** Inline-footnote paste command: inserts `^[<clipboard>]` with the caret after it. Inside a "[^x]" reference it navigates like the named command instead (the clipboard stays untouched). */
 export async function pasteInlineFootnote(plugin: FootnotePlugin) {
     // settle before toggle — same ordering rationale as insertAutonumFootnote
     await settleFootnotePopupWithFeedback();
@@ -1117,9 +1117,9 @@ export async function pasteInlineFootnote(plugin: FootnotePlugin) {
     if (warnEmptyInlineFootnoteIfInside(mdView.editor, pasteCell)) return;
     if (exitInlineFootnoteIfInside(mdView.editor, pasteCell)) return;
     // inside an abandoned "[^]", ask for a name instead of nesting the paste
-    if (warnEmptyMarkerIfInside(mdView.editor, pasteCell)) return;
-    if (warnPrefilledMarkerIfInside(plugin, mdView.editor, pasteCell)) return;
-    if (navigateMarkerIfInside(plugin, mdView.editor, pasteCell)) return;
+    if (warnEmptyReferenceIfInside(mdView.editor, pasteCell)) return;
+    if (warnPrefilledReferenceIfInside(plugin, mdView.editor, pasteCell)) return;
+    if (navigateReferenceIfInside(plugin, mdView.editor, pasteCell)) return;
 
     // read the clipboard BEFORE resolving positions — it's the only await,
     // and everything position-dependent should happen after it
@@ -1141,7 +1141,7 @@ export async function pasteInlineFootnote(plugin: FootnotePlugin) {
 
 //FUNCTIONS FOR NAMED FOOTNOTES
 
-/** The named command ("Insert / navigate named footnote"): same cascade, but creation is two-step — first press inserts "[^]" for name entry, next press (caret on the named marker) creates its detail. */
+/** The named command ("Insert / navigate named footnote"): same cascade, but creation is two-step — first press inserts "[^]" for name entry, next press (caret on the named reference) creates its definition. */
 export async function insertNamedFootnote(plugin: FootnotePlugin) {
     // settle before toggle — same ordering rationale as insertAutonumFootnote
     await settleFootnotePopupWithFeedback();
@@ -1159,74 +1159,74 @@ export async function insertNamedFootnote(plugin: FootnotePlugin) {
     // stale there, and editing the row via the main editor corrupts the
     // table — reads use the resolved position, writes go through the cell
     const cell = activeTableCellEditor(doc);
-    // inside an inline footnote, hop out instead of nesting a marker in it
+    // inside an inline footnote, hop out instead of nesting a reference in it
     // inside an EMPTY inline footnote, ask for its text instead of hopping
     if (warnEmptyInlineFootnoteIfInside(doc, cell)) return;
     if (exitInlineFootnoteIfInside(doc, cell)) return;
     // inside an abandoned "[^]", ask for a name — a second press used to
     // silently hop the caret out, leaving the fragment unexplained
-    if (warnEmptyMarkerIfInside(doc, cell)) return;
+    if (warnEmptyReferenceIfInside(doc, cell)) return;
     // inside an untouched "[^7-]" placeholder, warn — a second press
     // must not create a footnote named after the bare prefix
-    if (warnPrefilledMarkerIfInside(plugin, doc, cell)) return;
+    if (warnPrefilledReferenceIfInside(plugin, doc, cell)) return;
     const run = (cursorPosition: EditorPosition) => {
         const lineText = doc.getLine(cursorPosition.line);
 
-        if (shouldJumpFromDetailToMarker(lineText, cursorPosition, doc, plugin))
+        if (shouldJumpFromDefinitionToReference(lineText, cursorPosition, doc, plugin))
             return;
-        if (shouldJumpFromMarkerToDetail(lineText, cursorPosition, doc, plugin))
+        if (shouldJumpFromReferenceToDefinition(lineText, cursorPosition, doc, plugin))
             return;
 
-        if (shouldCreateMatchingFootnoteDetail(lineText, cursorPosition, plugin, doc))
+        if (shouldCreateMatchingFootnoteDefinition(lineText, cursorPosition, plugin, doc))
             return;
-        shouldCreateFootnoteMarker(lineText, cursorPosition, doc, plugin, cell);
+        shouldCreateFootnoteReference(lineText, cursorPosition, doc, plugin, cell);
     };
     if (cell) run(resolveTableCellCursor(doc) ?? doc.getCursor());
     else runOutsideTableCell(doc, run);
 }
 
-/** Cascade step 3 (numbered, named, and the inline keys via navigateMarkerIfInside): caret on a marker with no detail → append the matching detail (or warn on an invalid name). Returns true when it handled the press. The note's footnote-prefix is NOT applied here — it goes in at bracket creation (shouldCreateFootnoteMarker), where the user can see it. */
-export function shouldCreateMatchingFootnoteDetail(
+/** Cascade step 3 (numbered, named, and the inline keys via navigateReferenceIfInside): caret on a reference with no definition → append the matching definition (or warn on an invalid name). Returns true when it handled the press. The note's footnote-prefix is NOT applied here — it goes in at bracket creation (shouldCreateFootnoteReference), where the user can see it. */
+export function shouldCreateMatchingFootnoteDefinition(
     lineText: string,
     cursorPosition: EditorPosition,
     plugin: FootnotePlugin,
     doc: Editor
 ) {
-    // Create matching footnote detail for footnote marker
+    // Create matching footnote definition for footnote reference
 
-    // is the cursor inside a footnote marker on this line?
-    // does that marker have a detail line?
+    // is the cursor inside a footnote reference on this line?
+    // does that reference have a definition line?
     // if not, create it and place cursor there
     // (raw-line gate first, masked re-check after — same rationale and
-    // #41 semantics as shouldJumpFromMarkerToDetail above)
-    const rawMarkers = footnoteMarkerMatches(lineText).map((match) => ({
+    // #41 semantics as shouldJumpFromReferenceToDefinition above)
+    const rawReferences = footnoteReferenceMatches(lineText).map((match) => ({
         footnote: match[0],
         startIndex: match.index ?? 0,
     }));
-    if (markerAtCursor(rawMarkers, cursorPosition.ch) === null) return;
+    if (referenceAtCursor(rawReferences, cursorPosition.ch) === null) return;
 
     const maskedLine =
         maskedLineAt(docLines(doc), cursorPosition.line);
-    // re-slice the raw line for the marker text — a code span inside the
-    // name masks to NULs, and creating a detail from the masked name wrote
+    // re-slice the raw line for the reference text — a code span inside the
+    // name masks to NULs, and creating a definition from the masked name wrote
     // literal NUL bytes into the note (bug-masked-name-identity)
-    const markersOnLine = footnoteMarkerMatches(maskedLine).map((match) => {
+    const referencesOnLine = footnoteReferenceMatches(maskedLine).map((match) => {
         const start = match.index ?? 0;
         return {
             footnote: lineText.slice(start, start + match[0].length),
             startIndex: start,
         };
     });
-    const markerTarget = markerAtCursor(markersOnLine, cursorPosition.ch);
+    const referenceTarget = referenceAtCursor(referencesOnLine, cursorPosition.ch);
 
-    if (markerTarget !== null) {
-        //find if this footnote exists by listing existing footnote details
+    if (referenceTarget !== null) {
+        //find if this footnote exists by listing existing footnote definitions
         {
-            // positional slice of "[^name]" — see shouldJumpFromMarkerToDetail
-            const footnoteId = markerTarget.slice(2, -1);
+            // positional slice of "[^name]" — see shouldJumpFromReferenceToDefinition
+            const footnoteId = referenceTarget.slice(2, -1);
 
             // a spaced or backticked name is an authoring mistake Obsidian
-            // won't render; warn instead of creating a detail that can't work
+            // won't render; warn instead of creating a definition that can't work
             if (!isValidFootnoteName(footnoteId)) {
                 const offender = footnoteId.includes("`")
                     ? "backticks"
@@ -1238,27 +1238,27 @@ export function shouldCreateMatchingFootnoteDetail(
                 return true;
             }
 
-            const list = listExistingFootnoteDetails(doc);
+            const list = listExistingFootnoteDefinitions(doc);
 
             // Check if the list doesn't include current footnote (ids are
-            // case-insensitive — a "[^note]:" detail already covers a
-            // "[^Note]" marker, so this must navigate, not create a duplicate)
-            // if so, add detail for the current footnote
+            // case-insensitive — a "[^note]:" definition already covers a
+            // "[^Note]" reference, so this must navigate, not create a duplicate)
+            // if so, add definition for the current footnote
             if (!idListIncludes(list, footnoteId)) {
-                const detail = buildDetailAppend(doc, footnoteId, list.length === 0, plugin);
+                const definition = buildDefinitionAppend(doc, footnoteId, list.length === 0, plugin);
 
                 if (popupEditingAvailable(plugin)) {
-                    // type the detail in a popup instead of jumping to the
-                    // bottom; the cursor stays on the marker
-                    doc.transaction({ changes: [detail.change] });
+                    // type the definition in a popup instead of jumping to the
+                    // bottom; the cursor stays on the reference
+                    doc.transaction({ changes: [definition.change] });
                     const cancelCreationLint = scheduleCreationLintAfterPopup(plugin);
                     void openFootnotePopup(plugin, footnoteId, () => {
                         cancelCreationLint();
-                        moveCursorAndSetJumpPoint(doc, cursorPosition, detail.cursor, plugin, undefined, true);
+                        moveCursorAndSetJumpPoint(doc, cursorPosition, definition.cursor, plugin, undefined, true);
                         lintAfterFootnoteCreation(plugin, true);
                     });
                 } else {
-                    moveCursorAndSetJumpPoint(doc, cursorPosition, detail.cursor, plugin, [detail.change], true);
+                    moveCursorAndSetJumpPoint(doc, cursorPosition, definition.cursor, plugin, [definition.change], true);
                     lintAfterFootnoteCreation(plugin, true);
                 }
 
@@ -1269,33 +1269,33 @@ export function shouldCreateMatchingFootnoteDetail(
     }
 }
 
-// The start index of a placeholder `marker` occurrence whose brackets
-// strictly contain `ch`, or null. For the empty "[^]": the marker regexes
+// The start index of a placeholder `reference` occurrence whose brackets
+// strictly contain `ch`, or null. For the empty "[^]": the reference regexes
 // require a non-empty name, so the placeholder a first press just inserted
 // is invisible to every earlier cascade step — this is the only guard
 // between a second press and a nested "[^[^]]". The prefilled "[^7-]"
-// placeholder reuses the same containment scan via warnPrefilledMarkerIfInside.
-function emptyMarkerStart(
+// placeholder reuses the same containment scan via warnPrefilledReferenceIfInside.
+function emptyReferenceStart(
     text: string,
     ch: number,
-    marker = "[^]",
+    reference = "[^]",
 ): number | null {
-    for (let i = 0; (i = text.indexOf(marker, i)) !== -1; i += marker.length) {
-        if (ch > i && ch < i + marker.length) return i;
+    for (let i = 0; (i = text.indexOf(reference, i)) !== -1; i += reference.length) {
+        if (ch > i && ch < i + reference.length) return i;
     }
     return null;
 }
 
 /**
- * When the caret sits inside an untouched prefilled marker — "[^7-]",
+ * When the caret sits inside an untouched prefilled reference — "[^7-]",
  * exactly the note's footnote-prefix with no name typed yet — leave the
  * caret where it is, ask for a suffix via a Notice, and report true. The
- * prefilled marker is the prefix-era twin of the empty "[^]" placeholder;
+ * prefilled reference is the prefix-era twin of the empty "[^]" placeholder;
  * a press inside it must never create a footnote named after the bare
  * prefix. It used to hop the caret out instead (like "[^]"), but staying
  * put with an explanation is easier to understand (2026-08-05).
  */
-export function warnPrefilledMarkerIfInside(
+export function warnPrefilledReferenceIfInside(
     plugin: FootnotePlugin,
     doc: Editor,
     cell: TableCellEditor | null,
@@ -1333,53 +1333,53 @@ function caretInsidePlaceholder(
     if (cell) {
         const head = cell.state.selection.main.head;
         const cellText = cell.state.doc.toString();
-        if (emptyMarkerStart(cellText, head, placeholder) === null) return false;
+        if (emptyReferenceStart(cellText, head, placeholder) === null) return false;
         // cell text is a single line, so line-local masking suffices
-        return emptyMarkerStart(maskInlineRegions(cellText), head, placeholder) !== null;
+        return emptyReferenceStart(maskInlineRegions(cellText), head, placeholder) !== null;
     }
     const cursorPosition = doc.getCursor();
     const lineText = doc.getLine(cursorPosition.line);
-    if (emptyMarkerStart(lineText, cursorPosition.ch, placeholder) === null) {
+    if (emptyReferenceStart(lineText, cursorPosition.ch, placeholder) === null) {
         return false;
     }
     const maskedLine =
         maskedLineAt(docLines(doc), cursorPosition.line);
-    return emptyMarkerStart(maskedLine, cursorPosition.ch, placeholder) !== null;
+    return emptyReferenceStart(maskedLine, cursorPosition.ch, placeholder) !== null;
 }
 
 /**
- * When the caret sits inside an abandoned empty marker "[^]", leave it
+ * When the caret sits inside an abandoned empty reference "[^]", leave it
  * where it is, ask for a name via a Notice, and report true. Shared by
  * every footnote command (QOL sweep, 2026-08-07): "[^]" is invisible to
- * the marker regexes (they require a non-empty name), so without this
+ * the reference regexes (they require a non-empty name), so without this
  * guard the numbered/inline commands nested their insertion INTO the
  * brackets ("[^[^1]]") and the named command silently hopped the caret
  * out — a warning is the one response that tells the user what the
  * fragment is and how to fix it.
  */
-export function warnEmptyMarkerIfInside(
+export function warnEmptyReferenceIfInside(
     doc: Editor,
     cell: TableCellEditor | null,
 ): boolean {
     if (!caretInsidePlaceholder(doc, cell, "[^]")) return false;
     new Notice(
-        "This footnote marker is empty. Type a name between the brackets.",
+        "This footnote reference is empty. Type a name between the brackets.",
         8000,
     );
     return true;
 }
 
-/** Cascade step 4 (named): insert an empty marker (through `cell` when in a table) ready for name entry — "[^]" with the caret between the brackets, or "[^7-]" with the caret after the prefix when the note's footnote-prefix is active, so the namespace is visible while the name is typed (requested 2026-07-20). A press with the caret still inside an empty "[^]" never reaches this step — warnEmptyMarkerIfInside claims it at the command entry — but the hop-out branches below stay as a last line of defense against nesting "[^[^]]". */
-export function shouldCreateFootnoteMarker(
+/** Cascade step 4 (named): insert an empty reference (through `cell` when in a table) ready for name entry — "[^]" with the caret between the brackets, or "[^7-]" with the caret after the prefix when the note's footnote-prefix is active, so the namespace is visible while the name is typed (requested 2026-07-20). A press with the caret still inside an empty "[^]" never reaches this step — warnEmptyReferenceIfInside claims it at the command entry — but the hop-out branches below stay as a last line of defense against nesting "[^[^]]". */
+export function shouldCreateFootnoteReference(
     lineText: string,
     cursorPosition: EditorPosition,
     doc: Editor,
     plugin: FootnotePlugin,
     cell: TableCellEditor | null = null
 ) {
-    //create empty footnote marker for name input, cursor after [^ and any
+    //create empty footnote reference for name input, cursor after [^ and any
     //prefix. The prefix gate runs AFTER the second-press hop checks: an
-    //invalid prefix blocks marker CREATION (toast only, nothing to clean
+    //invalid prefix blocks reference CREATION (toast only, nothing to clean
     //up — reported 2026-08-07), but never plain caret navigation.
     const resolvePrefix = () =>
         plugin.settings.enableFootnotePrefix
@@ -1388,7 +1388,7 @@ export function shouldCreateFootnoteMarker(
 
     if (cell) {
         const cellText = cell.state.doc.toString();
-        const inEmpty = emptyMarkerStart(cellText, cell.state.selection.main.head);
+        const inEmpty = emptyReferenceStart(cellText, cell.state.selection.main.head);
         if (inEmpty !== null) {
             cell.dispatch({ selection: { anchor: inEmpty + "[^]".length } });
             return;
@@ -1402,7 +1402,7 @@ export function shouldCreateFootnoteMarker(
         return;
     }
 
-    const inEmpty = emptyMarkerStart(lineText, cursorPosition.ch);
+    const inEmpty = emptyReferenceStart(lineText, cursorPosition.ch);
     if (inEmpty !== null) {
         doc.setCursor({ line: cursorPosition.line, ch: inEmpty + "[^]".length });
         return;
@@ -1410,13 +1410,13 @@ export function shouldCreateFootnoteMarker(
 
     const prefix = resolvePrefix();
     if (prefix === null) return;
-    const emptyMarker = `[^${prefix}]`;
+    const emptyReference = `[^${prefix}]`;
     cursorPosition = adjustFootnotePosition(cursorPosition, doc, lineText, plugin);
     const newCursorPos = {
         line: cursorPosition.line,
         ch: cursorPosition.ch + 2 + prefix.length,
     };
     moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos, plugin, [
-        { from: cursorPosition, text: emptyMarker },
+        { from: cursorPosition, text: emptyReference },
     ]);
 }

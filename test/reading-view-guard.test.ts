@@ -13,7 +13,7 @@ import {
 // view the commands passed their checks and ran the whole cascade against
 // the HIDDEN editor buffer — one named press invisibly inserted "[^]" at
 // the end-of-word position (render and file untouched), and the next press
-// found the caret inside it and toasted about an empty marker the user
+// found the caret inside it and toasted about an empty reference the user
 // could not see. Text-editing commands must be inert in Reading view; the
 // editor state there is not something the user can watch or fix.
 

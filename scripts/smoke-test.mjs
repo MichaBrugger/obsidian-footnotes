@@ -133,7 +133,7 @@ const BASELINE_SETTINGS = {
     enableFootnoteSectionHeading: false,
     enableRemoveBlankLastLines: true,
     renumberNamedFootnotes: false,
-    lintDeleteOrphanedMarkers: false,
+    lintDeleteOrphanedReferences: false,
     lintDeleteOrphanedDefinitions: false,
     lintFixPunctuation: true,
     lintMoveToBottom: true,
@@ -274,21 +274,21 @@ async function main() {
         await expectEditorText("Alpha bravo[^1] charlie[^2]\n\n[^1]: existing\n[^2]: ");
     });
 
-    await test("hotkey right after an existing marker inserts a consecutive footnote", async () => {
-        // issue #49: this used to jump to [^1]'s detail because the caret
-        // touching the marker's outer edge counted as "on" it
+    await test("hotkey right after an existing reference inserts a consecutive footnote", async () => {
+        // issue #49: this used to jump to [^1]'s definition because the caret
+        // touching the reference's outer edge counted as "on" it
         resetSettings();
         await setupNote("Alpha bravo[^1] charlie\n\n[^1]: existing");
         setCursorAndRun(0, 15, CMD_AUTONUM); // caret immediately after "[^1]"
         await expectEditorText("Alpha bravo[^1][^2] charlie\n\n[^1]: existing\n[^2]: ");
     });
 
-    await test("hotkey inside an existing marker still navigates to its detail", async () => {
+    await test("hotkey inside an existing reference still navigates to its definition", async () => {
         resetSettings();
         await setupNote("Alpha bravo[^1] charlie\n\n[^1]: existing");
         setCursorAndRun(0, 13, CMD_AUTONUM); // caret inside "[^1]"
         await pollUntil(
-            "cursor on the detail line",
+            "cursor on the definition line",
             `(${EDITOR}).editor.getCursor()`,
             (c) => c && c.line === 2,
         );
@@ -298,19 +298,19 @@ async function main() {
         }
     });
 
-    await test("jumping between marker and detail centers the cursor in view", async () => {
+    await test("jumping between reference and definition centers the cursor in view", async () => {
         // regression (reported 2026-07-16): Obsidian's minimal scrolling
         // parked the cursor at the very edge of the viewport after a jump —
         // on mobile, nearly off screen. Jumps should land centered.
         resetSettings();
         const lines = Array.from({ length: 120 }, (_, i) => `Paragraph ${i + 1} lorem ipsum.`);
         lines[60] += "[^1]";
-        lines.push("", "[^1]: the detail");
+        lines.push("", "[^1]: the definition");
         await setupNote(lines.join("\n"));
-        // start on the detail line (last line) and jump UP to the marker
+        // start on the definition line (last line) and jump UP to the reference
         setCursorAndRun(122, 5, CMD_AUTONUM);
         await pollUntil(
-            "cursor on the marker line",
+            "cursor on the reference line",
             `(${EDITOR}).editor.getCursor()`,
             (c) => c && c.line === 60,
         );
@@ -325,13 +325,13 @@ async function main() {
         void ratio;
     });
 
-    await test("named footnote inserts empty marker with cursor inside", async () => {
+    await test("named footnote inserts empty reference with cursor inside", async () => {
         resetSettings();
         await setupNote("Alpha bravo charlie");
         setCursorAndRun(0, 8, CMD_NAMED);
         await expectEditorText("Alpha bravo[^] charlie");
         const cursor = await pollUntil(
-            "cursor inside marker",
+            "cursor inside reference",
             `(${EDITOR}).editor.getCursor()`,
             (c) => c && c.line === 0,
         );
@@ -403,7 +403,7 @@ async function main() {
     await test("second inline press warns while empty, hops once filled", async () => {
         // empty half (Jason, 2026-08-08): the second press used to hop the
         // caret out of the untouched ^[], stranding an empty inline
-        // footnote — it now warns like the empty [^] marker and stays put
+        // footnote — it now warns like the empty [^] reference and stays put
         resetSettings();
         await setupNote("Alpha bravo charlie");
         setCursorAndRun(0, 8, CMD_INLINE); // creates ^[] with cursor inside
@@ -525,9 +525,9 @@ async function main() {
         }
     });
 
-    await test("typed popup detail survives an immediately-following footnote", async () => {
+    await test("typed popup definition survives an immediately-following footnote", async () => {
         // regression (reported 2026-07-16, third round): the user's real flow
-        // — type a detail in the popup, close, immediately insert the next
+        // — type a definition in the popup, close, immediately insert the next
         // footnote. The popup's (legitimate) debounced save wrote the file
         // WITHOUT the just-inserted next footnote, clobbering it; the
         // conflict reload then dumped the cursor at the top.
@@ -547,7 +547,7 @@ async function main() {
         await sleep(150); // press again while the popup's save is still pending
         action(`app.commands.executeCommandById('${CMD_AUTONUM}');`); // [^2]
         await pollUntil(
-            "both footnotes and the typed detail present",
+            "both footnotes and the typed definition present",
             `(${EDITOR}).editor.getValue()`,
             (v) => v === "Alpha bravo[^1][^2] charlie\n\n[^1]: my note\n[^2]: ",
             12000,
@@ -588,7 +588,7 @@ async function main() {
         // the debounced save must reach the main editor WHILE the popup is
         // still open — that is the whole point of the stock-parity model
         await pollUntil(
-            "typed detail visible in the main editor mid-session",
+            "typed definition visible in the main editor mid-session",
             `(${EDITOR}).editor.getValue()`,
             (v) => typeof v === "string" && v.includes("[^1]: live text"),
             8000,
@@ -624,12 +624,12 @@ async function main() {
             "three footnotes present with the cursor still on line 30",
             `(() => { const ed=(${EDITOR}).editor; return { ` +
             `line30: ed.getLine(30), cursor: ed.getCursor(), ` +
-            `details: ['1','2','3'].filter(n => ed.getValue().includes('[^'+n+']: ')).length, ` +
+            `definitions: ['1','2','3'].filter(n => ed.getValue().includes('[^'+n+']: ')).length, ` +
             `popup: !!document.querySelector('.footnote-shortcut-popup:not(.footnote-shortcut-popup-closed)') }; })()`,
             (s) =>
                 s &&
                 s.line30 === "Paragraph 31[^1][^2][^3] lorem ipsum." &&
-                s.details === 3 &&
+                s.definitions === 3 &&
                 !s.popup &&
                 s.cursor.line === 30,
             10000,
@@ -679,7 +679,7 @@ async function main() {
         );
         action(`app.commands.executeCommandById('${CMD_NAMED}');`);
         await pollUntil(
-            "marker inserted between the parens",
+            "reference inserted between the parens",
             `(${EDITOR}).editor.getLine(2)`,
             (v) => typeof v === "string" && v.includes("([^])"),
         );
@@ -703,7 +703,7 @@ async function main() {
         await expectEditorText("Para one[^1].\n\nPara two.\n\n[^1]: def");
     });
 
-    await test("lint with only punctuation on swaps markers across punctuation", async () => {
+    await test("lint with only punctuation on swaps references across punctuation", async () => {
         resetSettings({ lintMoveToBottom: false, lintReindex: false });
         await setupNote("Word[^1].\n\n[^1]: def");
         setCursorAndRun(0, 0, CMD_LINT);
@@ -729,9 +729,9 @@ async function main() {
         resetSettings();
         const note = "Ref [^arXiv:1234.5678] end.\n\n[^arXiv:1234.5678]: Content 2";
         await setupNote(note);
-        setCursorAndRun(0, 8, CMD_NAMED); // caret inside the marker
+        setCursorAndRun(0, 8, CMD_NAMED); // caret inside the reference
         await pollUntil(
-            "cursor on the detail line",
+            "cursor on the definition line",
             `(${EDITOR}).editor.getCursor()`,
             (c) => c && c.line === 2,
         );
@@ -748,7 +748,7 @@ async function main() {
         );
         setCursorAndRun(0, 8, CMD_NAMED);
         await pollUntil(
-            "popup visible with the right detail loaded",
+            "popup visible with the right definition loaded",
             `(() => { const p = document.querySelector('.footnote-shortcut-popup');
                 return { open: !!p, text: p ? p.textContent : '' }; })()`,
             (s) => s && s.open && s.text.includes("Content 2"),
@@ -762,7 +762,7 @@ async function main() {
     });
 
     await test("autonumbering ignores [^x] inside code blocks (issue #41)", async () => {
-        // fenced fake marker+detail used to reserve numbers and suppress
+        // fenced fake reference+definition used to reserve numbers and suppress
         // the first-footnote handling
         resetSettings();
         await setupNote("```\nfake[^7]\n[^9]: fake\n```\nAlpha bravo");
@@ -772,7 +772,7 @@ async function main() {
         );
     });
 
-    await test("new details land under the existing footnote group, not at EOF (issue #55)", async () => {
+    await test("new definitions land under the existing footnote group, not at EOF (issue #55)", async () => {
         resetSettings();
         const note = [
             "Alpha[^1] bravo",
@@ -804,7 +804,7 @@ async function main() {
         await expectEditorText(
             "---\nfootnote-prefix: 2-\n---\nAlpha bravo[^2-1]\n\n[^2-1]: ",
         );
-        // the next press right after the marker chains [^2-2]
+        // the next press right after the reference chains [^2-2]
         setCursorAndRun(3, 17, CMD_AUTONUM);
         await expectEditorText(
             "---\nfootnote-prefix: 2-\n---\nAlpha bravo[^2-1][^2-2]\n\n[^2-1]: \n[^2-2]: ",
@@ -847,7 +847,7 @@ async function main() {
 
     await test("lint skips the reindex step when its toggle is off", async () => {
         resetSettings({ lintReindex: false });
-        // no marker touches punctuation and definitions sit at the bottom,
+        // no reference touches punctuation and definitions sit at the bottom,
         // so with reindex off the whole lint must be a no-op
         await setupNote("Beta[^2] alpha[^1] end.\n\n[^1]: one\n[^2]: two");
         setCursorAndRun(0, 0, CMD_LINT);
@@ -980,16 +980,16 @@ async function main() {
 
     await test("creating a footnote lints the note when enabled", async () => {
         resetSettings({ lintOnFootnoteCreation: true });
-        // inserting mid "alpha" puts the new marker BEFORE [^1] in reading
+        // inserting mid "alpha" puts the new reference BEFORE [^1] in reading
         // order — the creation-time lint renumbers everything and the
-        // caret still lands on the (renamed) new empty detail
+        // caret still lands on the (renamed) new empty definition
         await setupNote("alpha bravo[^1] end.\n\n[^1]: one");
         setCursorAndRun(0, 3, CMD_AUTONUM); // mid "alpha"
         await expectEditorText(
             "alpha[^1] bravo[^2] end.\n\n[^1]: \n[^2]: one",
         );
         await pollUntil(
-            "caret at the end of the new empty detail",
+            "caret at the end of the new empty definition",
             `(${EDITOR}).editor.getCursor()`,
             (c) => c && c.line === 2 && c.ch === "[^1]: ".length,
         );
@@ -1026,14 +1026,14 @@ async function main() {
         });
         await setupNote("Alpha bravo\n\n# Footnotes\n\ntail here");
         setCursorAndRun(0, 8, CMD_AUTONUM); // mid "bravo"
-        // a blank line separates the detail from "tail here" — otherwise
+        // a blank line separates the definition from "tail here" — otherwise
         // Obsidian lazily pulls the prose into the footnote (A4 bug)
         await expectEditorText(
             "Alpha bravo[^1]\n\n# Footnotes\n\n[^1]: \n\ntail here",
         );
     });
 
-    await test("detail slotted above prose keeps a blank line between them (A4 bug)", async () => {
+    await test("definition slotted above prose keeps a blank line between them (A4 bug)", async () => {
         resetSettings({
             enableFootnoteSectionHeading: true,
             footnoteSectionHeading: "# Footnotes",
@@ -1046,7 +1046,7 @@ async function main() {
         );
     });
 
-    await test("named command prefills the note's prefix into the marker (QOL)", async () => {
+    await test("named command prefills the note's prefix into the reference (QOL)", async () => {
         resetSettings({ enableFootnotePrefix: true });
         await setupNote("---\nfootnote-prefix: 2~\n---\nAlpha bravo");
         setCursorAndRun(3, 8, CMD_NAMED); // mid "bravo" → end of word
@@ -1058,7 +1058,7 @@ async function main() {
             `(${EDITOR}).editor.getCursor()`,
             (c) => c && c.line === 3 && c.ch === "Alpha bravo[^2.".length,
         );
-        // type the name, press again inside → detail for the full name
+        // type the name, press again inside → definition for the full name
         action(
             `const v=${EDITOR}; v.editor.replaceRange('tag', v.editor.getCursor());`,
         );
@@ -1105,13 +1105,13 @@ async function main() {
         }
     });
 
-    await test("inline hotkey inside a marker navigates like the named key (QOL)", async () => {
+    await test("inline hotkey inside a reference navigates like the named key (QOL)", async () => {
         resetSettings();
         const note = "Alpha [^1] end.\n\n[^1]: one";
         await setupNote(note);
-        setCursorAndRun(0, 8, CMD_INLINE); // inside the [^1] marker
+        setCursorAndRun(0, 8, CMD_INLINE); // inside the [^1] reference
         await pollUntil(
-            "caret at the end of the detail",
+            "caret at the end of the definition",
             `(${EDITOR}).editor.getCursor()`,
             (c) => c && c.line === 2 && c.ch === "[^1]: one".length,
         );
@@ -1121,10 +1121,10 @@ async function main() {
         }
     });
 
-    await test("inline hotkey on a detail-less marker creates its detail (QOL)", async () => {
+    await test("inline hotkey on a definition-less reference creates its definition (QOL)", async () => {
         resetSettings();
         await setupNote("Alpha [^tag] end.");
-        setCursorAndRun(0, 8, CMD_INLINE); // inside the [^tag] marker
+        setCursorAndRun(0, 8, CMD_INLINE); // inside the [^tag] reference
         await expectEditorText("Alpha [^tag] end.\n\n[^tag]: ");
     });
 
@@ -1227,7 +1227,7 @@ async function main() {
         );
     });
 
-    await test("case-variant prefixed marker reserves its number (2026-08-10 A3)", async () => {
+    await test("case-variant prefixed reference reserves its number (2026-08-10 A3)", async () => {
         // ids are case-insensitive in Obsidian: [^p-1] lives in prefix
         // "P-"'s namespace, so the next insert must mint 2, not a
         // colliding 1 that silently merges two footnotes
@@ -1239,16 +1239,16 @@ async function main() {
         );
     });
 
-    await test("press inside a code-span-named marker navigates, never duplicates (2026-08-10 A2)", async () => {
+    await test("press inside a code-span-named reference navigates, never duplicates (2026-08-10 A2)", async () => {
         // the masked scan used to read the name as NUL bytes: the press
-        // appended a duplicate detail containing literal NULs instead of
+        // appended a duplicate definition containing literal NULs instead of
         // jumping to the existing one
         resetSettings();
-        const note = "See[^`1`] end\n\n[^`1`]: detail";
+        const note = "See[^`1`] end\n\n[^`1`]: definition";
         await setupNote(note);
-        setCursorAndRun(0, 6, CMD_AUTONUM); // inside the [^`1`] marker
+        setCursorAndRun(0, 6, CMD_AUTONUM); // inside the [^`1`] reference
         await pollUntil(
-            "cursor on the detail line",
+            "cursor on the definition line",
             `(${EDITOR}).editor.getCursor()`,
             (c) => c && c.line === 2,
         );
@@ -1258,10 +1258,10 @@ async function main() {
         }
     });
 
-    await test("caret after an escaped pipe still counts as inside a marker (2026-08-10 A9)", async () => {
+    await test("caret after an escaped pipe still counts as inside a reference (2026-08-10 A9)", async () => {
         requireVisibleWindow();
         // the cell editor shows "\|" as "|", so the caret used to resolve
-        // one source column short — read as OUTSIDE the marker, the named
+        // one source column short — read as OUTSIDE the reference, the named
         // command nested a fresh "[^]" into it instead of continuing it
         resetSettings();
         const table = [
@@ -1294,39 +1294,39 @@ async function main() {
             (v) => v === true,
         );
         action(`app.commands.executeCommandById('${CMD_NAMED}');`);
-        // inside a detail-less marker the press continues the footnote:
-        // its detail appears and the row itself stays untouched
+        // inside a definition-less reference the press continues the footnote:
+        // its definition appears and the row itself stays untouched
         await pollUntil(
-            "the created detail line",
+            "the created definition line",
             `(${EDITOR}).editor.getValue()`,
             (v) => typeof v === "string" && v.includes("[^note]: "),
         );
         const line = readJson(`(${EDITOR}).editor.getLine(2)`);
-        if (line.includes("[^]")) throw new Error(`nested a marker into the marker: ${line}`);
+        if (line.includes("[^]")) throw new Error(`nested a reference into the reference: ${line}`);
         if (!line.includes("\\|")) throw new Error(`the escaped pipe was lost: ${line}`);
     });
 
-    await test("lint alerts about markers with no definition (2026-08-10)", async () => {
-        resetSettings(); // "Orphaned markers" defaults to Alert
+    await test("lint alerts about references with no definition (2026-08-10)", async () => {
+        resetSettings(); // "Orphaned references" defaults to Alert
         await setupNote("Ref[^1] and stray[^stray] end\n\n[^1]: one");
         setCursorAndRun(0, 0, CMD_LINT);
         await pollUntil(
-            "the orphaned-marker alert",
+            "the orphaned-reference alert",
             `[...document.querySelectorAll('.notice')].map(n => n.textContent).join('|')`,
             (v) =>
                 typeof v === "string" &&
                 v.includes("no definition") &&
                 v.includes("[^stray]"),
         );
-        // alert only — the marker itself stays in the text
+        // alert only — the reference itself stays in the text
         const text = readJson(`(${EDITOR}).editor.getValue()`);
         if (!text.includes("[^stray]")) {
-            throw new Error(`alert mode removed the marker: ${JSON.stringify(text)}`);
+            throw new Error(`alert mode removed the reference: ${JSON.stringify(text)}`);
         }
     });
 
-    await test("lint deletes orphaned markers when the setting says so (2026-08-10)", async () => {
-        resetSettings({ lintDeleteOrphanedMarkers: true });
+    await test("lint deletes orphaned references when the setting says so (2026-08-10)", async () => {
+        resetSettings({ lintDeleteOrphanedReferences: true });
         await setupNote("Keep[^1] drop[^stray] end\n\n[^1]: one");
         setCursorAndRun(0, 0, CMD_LINT);
         await expectEditorText("Keep[^1] drop end\n\n[^1]: one");
@@ -1341,7 +1341,7 @@ async function main() {
             `[...document.querySelectorAll('.notice')].map(n => n.textContent).join('|')`,
             (v) =>
                 typeof v === "string" &&
-                v.includes("no marker references") &&
+                v.includes("nothing references") &&
                 v.includes("[^stray]"),
         );
         const text = readJson(`(${EDITOR}).editor.getValue()`);

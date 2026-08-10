@@ -2,13 +2,13 @@ import { Editor, EditorChange, EditorPosition } from "obsidian";
 import { describe, expect, it } from "vitest";
 
 import FootnotePlugin from "../src/main";
-import { navigateMarkerIfInside } from "../src/insert-or-navigate-footnotes";
+import { navigateReferenceIfInside } from "../src/insert-or-navigate-footnotes";
 
 // QOL (2026-07-20), the reverse of the inline-footnote hop: pressing the
 // INLINE footnote hotkey while the caret sits inside a numbered or named
-// marker must not nest "^[]" into it ("[^na^[]med]" is invalid). The press
-// behaves like the numbered/named hotkey instead: jump to the marker's
-// detail, or create the detail when it is missing.
+// reference must not nest "^[]" into it ("[^na^[]med]" is invalid). The press
+// behaves like the numbered/named hotkey instead: jump to the reference's
+// definition, or create the definition when it is missing.
 
 interface FakeDoc extends Editor {
     appliedChanges: EditorChange[];
@@ -52,21 +52,21 @@ function fakePlugin(): FootnotePlugin {
     } as unknown as FootnotePlugin;
 }
 
-describe("navigateMarkerIfInside (inline hotkey on a regular marker)", () => {
-    it("jumps to the detail when the caret is inside a marker that has one", () => {
+describe("navigateReferenceIfInside (inline hotkey on a regular reference)", () => {
+    it("jumps to the definition when the caret is inside a reference that has one", () => {
         const doc = fakeEditor(["Alpha[^1] b", "", "[^1]: one"], {
             line: 0,
             ch: 7,
         });
-        expect(navigateMarkerIfInside(fakePlugin(), doc, null)).toBe(true);
-        // caret lands at the end of the detail, nothing was inserted
+        expect(navigateReferenceIfInside(fakePlugin(), doc, null)).toBe(true);
+        // caret lands at the end of the definition, nothing was inserted
         expect(doc.cursor).toEqual({ line: 2, ch: "[^1]: one".length });
         expect(doc.appliedChanges).toEqual([]);
     });
 
-    it("creates the missing detail like the named hotkey would", () => {
+    it("creates the missing definition like the named hotkey would", () => {
         const doc = fakeEditor(["Alpha[^note] b"], { line: 0, ch: 8 });
-        expect(navigateMarkerIfInside(fakePlugin(), doc, null)).toBe(true);
+        expect(navigateReferenceIfInside(fakePlugin(), doc, null)).toBe(true);
         expect(doc.appliedChanges).toEqual([
             {
                 from: { line: 0, ch: "Alpha[^note] b".length },
@@ -76,12 +76,12 @@ describe("navigateMarkerIfInside (inline hotkey on a regular marker)", () => {
         ]);
     });
 
-    it("reports false when the caret is not inside any marker", () => {
+    it("reports false when the caret is not inside any reference", () => {
         const doc = fakeEditor(["Alpha[^1] b", "", "[^1]: one"], {
             line: 0,
             ch: 2,
         });
-        expect(navigateMarkerIfInside(fakePlugin(), doc, null)).toBe(false);
+        expect(navigateReferenceIfInside(fakePlugin(), doc, null)).toBe(false);
         expect(doc.appliedChanges).toEqual([]);
     });
 
@@ -90,15 +90,15 @@ describe("navigateMarkerIfInside (inline hotkey on a regular marker)", () => {
             line: 0,
             ch: 9,
         });
-        expect(navigateMarkerIfInside(fakePlugin(), doc, null)).toBe(false);
+        expect(navigateReferenceIfInside(fakePlugin(), doc, null)).toBe(false);
     });
 
-    it("a marker inside inline code is plain text (issue #41 parity)", () => {
+    it("a reference inside inline code is plain text (issue #41 parity)", () => {
         const doc = fakeEditor(["code `x [^1] y` end", "", "[^1]: one"], {
             line: 0,
             ch: 10,
         });
-        expect(navigateMarkerIfInside(fakePlugin(), doc, null)).toBe(false);
+        expect(navigateReferenceIfInside(fakePlugin(), doc, null)).toBe(false);
         expect(doc.appliedChanges).toEqual([]);
     });
 });

@@ -3,12 +3,12 @@ import { describe, expect, it } from "vitest";
 import { computeNextFootnoteNumber } from "../../src/insert-or-navigate-footnotes";
 
 // BUG: backtick handling in the protected-region scanner ignores CommonMark
-// fine print, and the mistakes swallow real markers.
+// fine print, and the mistakes swallow real references.
 // (a) A line like "```[^7]``` inline" is NOT a fence opener — a backtick fence
 //     info string may not contain backticks, so this is a paragraph with an
 //     inline code span. protectedLines opens a fence anyway; with no bare
 //     closing fence it runs unclosed to EOF and nulls out the rest of the
-//     document, hiding the real real[^2] marker.
+//     document, hiding the real real[^2] reference.
 // (b) Escaped backticks "\`" are literal per CommonMark and cannot open a code
 //     span, but maskInlineCode pairs them as a phantom span and masks the
 //     [^3] between them (unlike inlineFootnoteExitCh / sanitizeInlineFootnoteContent
@@ -18,7 +18,7 @@ import { computeNextFootnoteNumber } from "../../src/insert-or-navigate-footnote
 // string contains a backtick; (b) maskInlineCode skips escaped backticks when
 // opening a span.
 
-describe("bug: backtick fine print swallows real markers", () => {
+describe("bug: backtick fine print swallows real references", () => {
     it(
         "a backtick line whose info string contains backticks is inline code, not a fence",
         () => {

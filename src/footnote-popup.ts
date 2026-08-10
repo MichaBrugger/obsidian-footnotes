@@ -4,9 +4,9 @@ import FootnotePlugin from "./main";
 import { AppWithEmbedRegistry, EditorWithCm } from "./obsidian-internals";
 
 // A small popup anchored at the cursor containing Obsidian's own editable
-// markdown embed, bound to just the footnote's detail via the `#[^id]`
+// markdown embed, bound to just the footnote's definition via the `#[^id]`
 // subpath (the same machinery the core Footnotes view uses). Editing in the
-// popup saves straight back to the detail line at the bottom of the note,
+// popup saves straight back to the definition line at the bottom of the note,
 // so the user's cursor never has to leave the text.
 
 type ActivePopup = {
@@ -16,7 +16,7 @@ type ActivePopup = {
 let activePopup: ActivePopup | null = null;
 
 // Resolves once no closed popup still has file work in flight. A closed
-// popup legitimately saves the user's typed detail on a debounce — but that
+// popup legitimately saves the user's typed definition on a debounce — but that
 // save writes the file as the EMBED knew it, so any document edit made
 // before it lands gets clobbered, and the conflict reload dumps the cursor
 // at the top of the note (regression, reported 2026-07-16). Commands that
@@ -24,7 +24,7 @@ let activePopup: ActivePopup | null = null;
 let pendingTeardown: Promise<void> | null = null;
 
 // One-shot callback fired after the NEXT popup teardown fully settles (its
-// detail save landed). "Lint on footnote creation" uses this: a footnote
+// definition save landed). "Lint on footnote creation" uses this: a footnote
 // created with the popup open must not be linted until the popup closes —
 // linting earlier could renumber the very id the popup is bound to.
 let afterSettleOnce: (() => void) | null = null;
@@ -116,7 +116,7 @@ export async function openFootnotePopup(
     // the buildEmbed closure
     const file = mdView.file;
 
-    // a just-inserted detail is only indexed once the file saves — but
+    // a just-inserted definition is only indexed once the file saves — but
     // mdView.data lags a tick behind editor API changes, so saving too early
     // would write pre-insertion content to disk; wait for the buffer to
     // catch up first. Finishing the save (and its fold-state event) before
@@ -128,7 +128,7 @@ export async function openFootnotePopup(
     // Register the popup handle BEFORE the first await: a hotkey press
     // during this async setup must toggle-close THIS pending popup, not
     // start a second one whose file saves race this one's — rapid
-    // consecutive footnotes used to lose the later markers exactly that
+    // consecutive footnotes used to lose the later references exactly that
     // way (regression, reported 2026-07-16). Until the DOM exists, closing
     // just abandons the setup (the awaits below re-check `closed`).
     let closed = false;
@@ -142,16 +142,16 @@ export async function openFootnotePopup(
         if (cmView) cmView.focus();
         else editor.focus();
     };
-    // land the cursor right after the marker so typing continues seamlessly
+    // land the cursor right after the reference so typing continues seamlessly
     // (a named footnote would otherwise leave it inside the brackets);
     // string search, since the id isn't regex-safe
-    const placeCursorAfterMarker = () => {
+    const placeCursorAfterReference = () => {
         const cursor = editor.getCursor();
         const line = editor.getLine(cursor.line);
-        const marker = `[^${footnoteId}]`;
-        for (let idx = line.indexOf(marker); idx !== -1; idx = line.indexOf(marker, idx + 1)) {
-            if (cursor.ch >= idx && cursor.ch <= idx + marker.length) {
-                editor.setCursor({ line: cursor.line, ch: idx + marker.length });
+        const reference = `[^${footnoteId}]`;
+        for (let idx = line.indexOf(reference); idx !== -1; idx = line.indexOf(reference, idx + 1)) {
+            if (cursor.ch >= idx && cursor.ch <= idx + reference.length) {
+                editor.setCursor({ line: cursor.line, ch: idx + reference.length });
                 break;
             }
         }
@@ -164,18 +164,18 @@ export async function openFootnotePopup(
             domTeardown(focusEditor);
         } else if (focusEditor) {
             focusMainEditor();
-            placeCursorAfterMarker();
+            placeCursorAfterReference();
         }
     };
     activePopup = { close };
 
-    const detailToken = `[^${footnoteId}]:`;
+    const definitionToken = `[^${footnoteId}]:`;
     const dataDeadline = Date.now() + 2000;
     // the data buffer usually catches up within a tick — check again almost
     // immediately before falling back to coarse 50ms polls, so the popup
     // doesn't spend a blind 50ms on what is typically a ~1ms wait
     let pollDelay = 0;
-    while (!closed && !mdView.data.includes(detailToken) && Date.now() < dataDeadline) {
+    while (!closed && !mdView.data.includes(definitionToken) && Date.now() < dataDeadline) {
         await new Promise((resolve) => win.setTimeout(resolve, pollDelay));
         pollDelay = pollDelay === 0 ? 10 : 50;
     }
@@ -241,10 +241,10 @@ export async function openFootnotePopup(
     };
     const resizeObserver = new win.ResizeObserver(positionPopup);
     resizeObserver.observe(containerEl);
-    // stay invisible until the footnote detail is actually loaded
+    // stay invisible until the footnote definition is actually loaded
     containerEl.addClass("footnote-shortcut-popup-loading");
 
-    // name the footnote being edited so the user can tell markers apart
+    // name the footnote being edited so the user can tell references apart
     containerEl.createDiv({
         cls: "footnote-shortcut-popup-label",
         text: `[^${footnoteId}]:`,
@@ -252,7 +252,7 @@ export async function openFootnotePopup(
     const embedEl = containerEl.createDiv("footnote-shortcut-popup-embed");
 
     // footnote labels are case-insensitive markdown, and the metadata cache
-    // stores their ids lowercased — a subpath in the marker's original
+    // stores their ids lowercased — a subpath in the reference's original
     // casing (e.g. "[^arXiv:…]") resolves to nothing (issue #50's popup
     // half: the popup silently degraded to the legacy jump)
     const subpath = `#[^${footnoteId.toLowerCase()}]`;
@@ -299,10 +299,10 @@ export async function openFootnotePopup(
         containerEl.addClass("footnote-shortcut-popup-closed");
         if (focusEditor) {
             focusMainEditor();
-            placeCursorAfterMarker();
+            placeCursorAfterReference();
         }
 
-        // block document edits until the typed detail has fully landed
+        // block document edits until the typed definition has fully landed
         // (whenFootnotePopupSettled) so the save can't clobber them
         let settle: () => void;
         pendingTeardown = new Promise<void>((resolve) => {
@@ -336,7 +336,7 @@ export async function openFootnotePopup(
                     pendingTeardown = null;
                     settle();
                     // after-settle work (lint-on-footnote-creation) runs
-                    // only now, when the saved detail is fully reconciled
+                    // only now, when the saved definition is fully reconciled
                     const callback = afterSettleOnce;
                     afterSettleOnce = null;
                     callback?.();
@@ -355,7 +355,7 @@ export async function openFootnotePopup(
         const inner = embed.editMode?.editor;
         if (inner) {
             inner.focus();
-            // cursor at the END of the detail so the user can backspace
+            // cursor at the END of the definition so the user can backspace
             // or keep writing without reaching for the arrow keys
             if (inner.lastLine && inner.getLine && inner.setCursor) {
                 const last = inner.lastLine();

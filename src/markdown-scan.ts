@@ -129,7 +129,7 @@ export function protectedLines(lines: string[]): boolean[] {
 
 /**
  * The line with every inline code span (backtick run + content + matching
- * closing run, CommonMark equal-length rule) overwritten by NULs, so marker
+ * closing run, CommonMark equal-length rule) overwritten by NULs, so reference
  * scans skip code while every index still lines up with the original.
  */
 export function maskInlineCode(line: string): string {

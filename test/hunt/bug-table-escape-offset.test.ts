@@ -5,7 +5,7 @@ import { insertAutonumFootnote } from "../../src/insert-or-navigate-footnotes";
 import type FootnotePlugin from "../../src/main";
 import { resolveTableCellCursor, type TableCellEditor } from "../../src/table-cursor";
 
-// A caret just inside a marker after an escaped pipe (\|) resolves one source column short, reads as OUTSIDE the marker, and insertAutonumFootnote nests a new marker inside the existing one.
+// A caret just inside a reference after an escaped pipe (\|) resolves one source column short, reads as OUTSIDE the reference, and insertAutonumFootnote nests a new reference inside the existing one.
 // Hunt: 2026-08-09. Lens: offsets.
 // Root cause: resolveTableCellCursor doesn't account for the escape byte before an escaped pipe when mapping a cell caret that sits after it back to source.
 
@@ -68,17 +68,17 @@ describe("table source-to-cell offset accounts for escape bytes (fixed 2026-08-1
 
     it("accounts for the escape byte before a pipe when the caret is after it", () => {
         // Cell editor text omits table-source escaping. Its head 8 is just
-        // inside the marker, after "["; in the raw row the same caret is one
+        // inside the reference, after "["; in the raw row the same caret is one
         // column later because the pipe is represented as "\\|". Returning
-        // ch 10 puts it on the marker's opening bracket, which the command
-        // deliberately treats as outside and can therefore nest a new marker.
+        // ch 10 puts it on the reference's opening bracket, which the command
+        // deliberately treats as outside and can therefore nest a new reference.
         expect(fakeResolution("| left \\| [^note] | tail |", "left | [^note]", 8)).toEqual({
             line: 7,
             ch: 11,
         });
     });
 
-    it("does not treat a cell caret just inside a post-escape marker as outside", async () => {
+    it("does not treat a cell caret just inside a post-escape reference as outside", async () => {
         const lines = ["| Header |", "| --- |", "| left \\| [^note] |"];
         const table = { rows: [] as unknown[] };
         const headerRow = {};

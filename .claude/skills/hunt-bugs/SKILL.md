@@ -68,7 +68,7 @@ Sonnet, never Fable).
 
 Lenses, from `references/attack-surface.md`:
 
-1. **grammar** — marker/definition parsing vs. what Obsidian actually accepts
+1. **grammar** — reference/definition parsing vs. what Obsidian actually accepts
 2. **contexts** — protected regions: code, math, frontmatter, callouts, tables
 3. **offsets** — cursor/index arithmetic: boundaries, unicode, empty inputs
 4. **properties** — idempotence and invariants of the pure transforms

@@ -2,22 +2,22 @@ import { describe, expect, it } from "vitest";
 
 import { footnoteAfterPunctuation } from "../src/linting/rules/footnote-after-punctuation";
 
-// Linter's "footnote after punctuation": a marker sitting BEFORE
+// Linter's "footnote after punctuation": a reference sitting BEFORE
 // punctuation swaps to sit after it ("word[^1]." → "word.[^1]"). Policy
 // pinned here:
 //   - the punctuation set is . , ; : ! ?
-//   - a run of consecutive markers moves as one unit across a run of
+//   - a run of consecutive references moves as one unit across a run of
 //     punctuation, in a single application (idempotent)
 //   - definition prefixes ("[^x]:" at line start) are never touched, but
 //     the definition's content is corrected like any other text
 //   - code blocks, inline code, and frontmatter are invisible
 
 describe("footnoteAfterPunctuation", () => {
-    it("moves a marker after a period", () => {
+    it("moves a reference after a period", () => {
         expect(footnoteAfterPunctuation("word[^1].")).toBe("word.[^1]");
     });
 
-    it("moves named markers too", () => {
+    it("moves named references too", () => {
         expect(footnoteAfterPunctuation("word[^note],")).toBe("word,[^note]");
     });
 
@@ -31,7 +31,7 @@ describe("footnoteAfterPunctuation", () => {
             .toBe("a.[^1] b,[^2] c;[^3] d:[^4] e![^5] f?[^6]");
     });
 
-    it("moves a run of markers as one unit", () => {
+    it("moves a run of references as one unit", () => {
         expect(footnoteAfterPunctuation("word[^1][^2].")).toBe(
             "word.[^1][^2]",
         );
@@ -47,13 +47,13 @@ describe("footnoteAfterPunctuation", () => {
         expect(footnoteAfterPunctuation(text)).toBe(text);
     });
 
-    it("corrects markers inside definition content", () => {
+    it("corrects references inside definition content", () => {
         expect(footnoteAfterPunctuation("[^1]: see also[^2].")).toBe(
             "[^1]: see also.[^2]",
         );
     });
 
-    it("ignores markers inside inline code", () => {
+    it("ignores references inside inline code", () => {
         const text = "use `x[^1].` as-is";
         expect(footnoteAfterPunctuation(text)).toBe(text);
     });
@@ -65,7 +65,7 @@ describe("footnoteAfterPunctuation", () => {
         );
     });
 
-    it("leaves markers not followed by punctuation alone", () => {
+    it("leaves references not followed by punctuation alone", () => {
         const text = "word[^1] and[^2] more";
         expect(footnoteAfterPunctuation(text)).toBe(text);
     });
@@ -76,7 +76,7 @@ describe("footnoteAfterPunctuation", () => {
         expect(footnoteAfterPunctuation(once)).toBe(once);
     });
 
-    it("is idempotent on an interleaved marker/punctuation chain", () => {
+    it("is idempotent on an interleaved reference/punctuation chain", () => {
         // hunt 2026-07-17: the first pass turns "word[^1].[^2]," into
         // "word.[^1],[^2]"; a second pass must not swap [^1] with the comma
         // that belongs to [^2] and drift the punctuation away from its text
@@ -89,12 +89,12 @@ describe("footnoteAfterPunctuation", () => {
 describe("footnoteAfterPunctuation and single-line HTML comments", () => {
     // found live 2026-07-17: "<!-- [^66]: x -->" had its colon swapped to
     // ":[^66]" — the rule masked inline code but not one-line comments
-    it("never touches a marker-colon pair inside a comment", () => {
+    it("never touches a reference-colon pair inside a comment", () => {
         const text = "<!-- [^66]: a commented-out definition -->";
         expect(footnoteAfterPunctuation(text)).toBe(text);
     });
 
-    it("still fixes real markers on a line that also has a comment", () => {
+    it("still fixes real references on a line that also has a comment", () => {
         const input = "word[^1]. <!-- [^9]: leave me -->";
         const expected = "word.[^1] <!-- [^9]: leave me -->";
         expect(footnoteAfterPunctuation(input)).toBe(expected);

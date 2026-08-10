@@ -1,23 +1,23 @@
 # Linking and navigation
 
 > [!info] How to use
-> Place the caret INSIDE a marker and press the footnote hotkey to jump to its detail; press again on the detail line to jump back to the first use of the marker. Test once with `Edit footnotes in a popup` off (classic jump) and once with it on (popup opens instead).
+> Place the caret INSIDE a reference and press the footnote hotkey to jump to its definition; press again on the definition line to jump back to the first use of the reference. Test once with `Edit footnotes in a popup` off (classic jump) and once with it on (popup opens instead).
 
-Jump from this numbered marker[^1] and from this repeated one[^1], jumping back from the detail always lands on the FIRST use. A multi-digit one[^12] works the same.
+Jump from this numbered reference[^1] and from this repeated one[^1], jumping back from the definition always lands on the FIRST use. A multi-digit one[^12] works the same.
 
 Named footnotes navigate too: a plain name[^plain], an uppercase name[^Chapter], and the hard cases, a colon in the name[^arXiv:2026.0717] and a dotted name[^named-footnote.1].
 
-- [ ] Marker → detail jump lands CENTERED in the viewport, at the END of the detail text
-- [ ] Detail → marker jump returns to the first use, centered
-- [ ] The multi-line detail below lands the caret at the end of its LAST continuation line
-- [ ] Colon and uppercase names open the popup bound to the right detail (popup on)
-- [ ] With the caret just AFTER a marker's closing bracket, the hotkey inserts a new footnote instead of navigating
+- [ ] Reference → definition jump lands CENTERED in the viewport, at the END of the definition text
+- [ ] Definition → reference jump returns to the first use, centered
+- [ ] The multi-line definition below lands the caret at the end of its LAST continuation line
+- [ ] Colon and uppercase names open the popup bound to the right definition (popup on)
+- [ ] With the caret just AFTER a reference's closing bracket, the hotkey inserts a new footnote instead of navigating
 
 ## Orphaned definition (QOL 2026-08-07)
 
-The definition at the very bottom of this note has NO marker anywhere. Put the caret on it and press a footnote hotkey:
+The definition at the very bottom of this note has NO reference anywhere. Put the caret on it and press a footnote hotkey:
 
-- [ ] A "No marker references this footnote" toast appears, the caret stays put, and NOTHING is inserted (it used to insert a brand-new footnote right into the definitions)
+- [ ] A "Nothing references this footnote" toast appears, the caret stays put, and NOTHING is inserted (it used to insert a brand-new footnote right into the definitions)
 - [ ] The same happens with the caret on its indented continuation line
 
 Filler so the jumps actually travel, scroll matters here.
@@ -34,17 +34,17 @@ Ut enim ad minima veniam, quis nostrum exercitationem ullam corporis suscipit la
 
 At vero eos et accusamus et iusto odio dignissimos ducimus qui blanditiis praesentium voluptatum deleniti atque corrupti quos dolores et quas molestias excepturi sint occaecati cupiditate non provident.
 
-[^1]: the first numbered detail
-[^12]: multi-digit detail
-[^plain]: a plainly named detail
+[^1]: the first numbered definition
+[^12]: multi-digit definition
+[^plain]: a plainly named definition
 [^Chapter]: uppercase names are stored lowercased internally, jumping and the popup must both still work
 [^arXiv:2026.0717]: colons in names used to break jumping (issue #50)
 [^named-footnote.1]: dots are fine in names
-[^multiline]: this detail has continuation lines
+[^multiline]: this definition has continuation lines
     the caret should land at the end
     of this very last line, right here
 
-A trailing marker so the multi-line detail has a use: jump from me[^multiline].
+A trailing reference so the multi-line definition has a use: jump from me[^multiline].
 
-[^orphan]: no marker anywhere uses this definition, on purpose
+[^orphan]: no reference anywhere uses this definition, on purpose
     its continuation line behaves the same way

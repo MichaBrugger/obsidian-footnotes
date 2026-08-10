@@ -18,7 +18,7 @@ describe("bug: a cut stranding '---' at document start manufactures frontmatter"
         expect(protectedLines(lines)[proseLine]).toBe(false);
     });
 
-    it.fails("reindex drop-orphans keeps the definition whose marker sits after a stranded '---'", () => {
+    it.fails("reindex drop-orphans keeps the definition whose reference sits after a stranded '---'", () => {
         const doc = "[^9]: orphan\n---\ntext[^1]\n---\n\n[^1]: def";
         const out = reindexFootnotes(doc, {
             keepOrphanedDefinitions: false,

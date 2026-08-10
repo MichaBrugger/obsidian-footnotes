@@ -20,7 +20,7 @@ function pluginWith(overrides: Record<string, boolean>): FootnotePlugin {
             lintMoveToBottom: true,
             lintReindex: true,
             renumberNamedFootnotes: false,
-            lintDeleteOrphanedMarkers: false,
+            lintDeleteOrphanedReferences: false,
             lintDeleteOrphanedDefinitions: false,
             ...overrides,
         },

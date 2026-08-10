@@ -10,7 +10,7 @@ import {
 // feature. `protectedLines` and `footnotePrefix` both gate on the exact string
 // `lines[0] === "---"`, but a CRLF document split on "\n" leaves "---\r" on
 // line 0, so the check silently fails. On any Windows/synced (CRLF) note the
-// frontmatter is treated as live text — markers inside it are counted and get
+// frontmatter is treated as live text — references inside it are counted and get
 // rewritten by reindex/lint/move — and the documented footnote-prefix property
 // (issue #31) is ignored entirely.
 // Hunt: 2026-07-17. Lenses: contexts / interactions / regressions. Severity: data-loss.
@@ -23,7 +23,7 @@ describe("bug: CRLF defeats frontmatter protection and footnote-prefix", () => {
         expect(flags).toEqual([true, true, true, false]);
     });
 
-    it("a marker inside CRLF frontmatter does not reserve a number", () => {
+    it("a reference inside CRLF frontmatter does not reserve a number", () => {
         expect(
             computeNextFootnoteNumber("---\r\nnum: [^9]\r\n---\r\nreal[^1]"),
         ).toBe(2);

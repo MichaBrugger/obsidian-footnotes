@@ -6,7 +6,7 @@ import { moveFootnoteDefinitionsToBottom } from "../../src/linting/rules/move-fo
 import { reindexFootnotes } from "../../src/linting/rules/re-index-footnotes";
 
 // Scenario: $...$ / $$...$$ regions are MathJax, but footnote scans treat
-// marker-shaped math as Markdown footnotes and the transforms rewrite it.
+// reference-shaped math as Markdown footnotes and the transforms rewrite it.
 // Hunt: 2026-08-10. Lenses: contexts and properties.
 // The transforms don't just miscount math, they rewrite it:
 // reindex renumbers $x[^9]$ to $x[^1]$, move-to-bottom rips a
@@ -16,15 +16,15 @@ import { reindexFootnotes } from "../../src/linting/rules/re-index-footnotes";
 // declaration-only).
 
 describe("bug: math regions are treated as Markdown footnotes", () => {
-    it.fails("a marker inside inline math does not reserve a number", () => {
+    it.fails("a reference inside inline math does not reserve a number", () => {
         expect(computeNextFootnoteNumber("cost $[^7]$ real[^1]")).toBe(2);
     });
 
-    it.fails("a marker inside display math does not reserve a number", () => {
+    it.fails("a reference inside display math does not reserve a number", () => {
         expect(computeNextFootnoteNumber("$$\nx[^7]\n$$\nreal[^1]")).toBe(2);
     });
 
-    it.fails("reindex leaves marker-shaped inline and display math unchanged", () => {
+    it.fails("reindex leaves reference-shaped inline and display math unchanged", () => {
         const input = "$x[^9]$ real[^2]\n$$\ny[^8]\n$$\n\n[^2]: real";
         const out = reindexFootnotes(input);
         expect(out).toContain("$x[^9]$");

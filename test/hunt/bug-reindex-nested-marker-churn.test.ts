@@ -3,20 +3,20 @@ import { describe, expect, it } from "vitest";
 import { reindexFootnotes } from "../../src/linting/rules/re-index-footnotes";
 
 // BUG: reindexFootnotes is not idempotent when definition BODIES contain nested
-// numbered markers whose first appearance is inside a definition. The marker
+// numbered references whose first appearance is inside a definition. The reference
 // appearance order is computed once from pre-reorder line positions, but the
-// definition blocks are then permuted, which changes the nested markers' actual
+// definition blocks are then permuted, which changes the nested references' actual
 // appearance order in the output. A second pass therefore renumbers them
 // differently: the nested [^1]/[^2] (and their [^1]:/[^2]: bodies) get swapped
 // on the re-run, so reindex(reindex(doc)) !== reindex(doc). The code already
 // re-derives order after orphan removal for the same class of reason, but not
 // after block permutation.
-// Scenario: reindex churns nested-in-definition marker numbers on a second run.
+// Scenario: reindex churns nested-in-definition reference numbers on a second run.
 // fixed 2026-07-17: reindexFootnotes re-runs reindexOnce to a fixpoint, so the
-// post-permutation nested-marker order settles within a single call.
+// post-permutation nested-reference order settles within a single call.
 // Provenance: iteration-1/eval-0/with_skill/run-1 (transforms hunt), lens: properties.
 
-describe("bug: reindex not idempotent with markers nested in reordered definitions", () => {
+describe("bug: reindex not idempotent with references nested in reordered definitions", () => {
     const doc = [
         "body[^b] text[^a].",
         "",

@@ -2,13 +2,13 @@ import { Editor, EditorChange, EditorPosition } from "obsidian";
 import { describe, expect, it } from "vitest";
 
 import FootnotePlugin from "../src/main";
-import { shouldJumpFromDetailToMarker } from "../src/insert-or-navigate-footnotes";
+import { shouldJumpFromDefinitionToReference } from "../src/insert-or-navigate-footnotes";
 
 // QOL sweep (2026-08-07): pressing a footnote hotkey with the caret on an
-// ORPHANED definition ("[^x]: …" with no marker anywhere) used to fall
+// ORPHANED definition ("[^x]: …" with no reference anywhere) used to fall
 // through the whole cascade and insert a brand-new footnote right into the
 // definitions area — the user almost certainly pressed the key to jump to
-// the (deleted) marker. The press is now handled with an explanatory
+// the (deleted) reference. The press is now handled with an explanatory
 // notice: cascade step 1 claims it and changes nothing.
 
 interface FakeDoc extends Editor {
@@ -52,11 +52,11 @@ function fakePlugin(): FootnotePlugin {
 
 describe("footnote hotkey on an orphaned definition", () => {
     it("handles the press without editing or moving the caret", () => {
-        const lines = ["some text", "", "[^orphan]: stranded detail"];
+        const lines = ["some text", "", "[^orphan]: stranded definition"];
         const cursor = { line: 2, ch: lines[2].length };
         const doc = fakeEditor(lines, cursor);
         expect(
-            shouldJumpFromDetailToMarker(lines[2], cursor, doc, fakePlugin()),
+            shouldJumpFromDefinitionToReference(lines[2], cursor, doc, fakePlugin()),
         ).toBe(true);
         expect(doc.appliedChanges).toEqual([]);
         expect(doc.cursor).toEqual(cursor);
@@ -67,28 +67,28 @@ describe("footnote hotkey on an orphaned definition", () => {
         const cursor = { line: 3, ch: 4 };
         const doc = fakeEditor(lines, cursor);
         expect(
-            shouldJumpFromDetailToMarker(lines[3], cursor, doc, fakePlugin()),
+            shouldJumpFromDefinitionToReference(lines[3], cursor, doc, fakePlugin()),
         ).toBe(true);
         expect(doc.appliedChanges).toEqual([]);
         expect(doc.cursor).toEqual(cursor);
     });
 
-    it("still jumps to the marker when one exists", () => {
-        const lines = ["ref[^1] text", "", "[^1]: detail"];
+    it("still jumps to the reference when one exists", () => {
+        const lines = ["ref[^1] text", "", "[^1]: definition"];
         const cursor = { line: 2, ch: lines[2].length };
         const doc = fakeEditor(lines, cursor);
         expect(
-            shouldJumpFromDetailToMarker(lines[2], cursor, doc, fakePlugin()),
+            shouldJumpFromDefinitionToReference(lines[2], cursor, doc, fakePlugin()),
         ).toBe(true);
         expect(doc.cursor).toEqual({ line: 0, ch: "ref[^1]".length });
     });
 
-    it("a detail-shaped line inside a code fence still falls through (#41)", () => {
+    it("a definition-shaped line inside a code fence still falls through (#41)", () => {
         const lines = ["```", "[^orphan]: in code", "```"];
         const cursor = { line: 1, ch: 5 };
         const doc = fakeEditor(lines, cursor);
         expect(
-            shouldJumpFromDetailToMarker(lines[1], cursor, doc, fakePlugin()),
+            shouldJumpFromDefinitionToReference(lines[1], cursor, doc, fakePlugin()),
         ).toBe(false);
     });
 });

@@ -40,7 +40,7 @@ describe("settings migration to v2 (symmetric orphan toggles)", () => {
             lintOrphanedMarkers: "alert",
         });
         await alert.loadSettings();
-        expect(alert.settings.lintDeleteOrphanedMarkers).toBe(false);
+        expect(alert.settings.lintDeleteOrphanedReferences).toBe(false);
         expect("lintOrphanedMarkers" in alert.settings).toBe(false);
 
         const del = pluginWithSavedData({
@@ -48,7 +48,7 @@ describe("settings migration to v2 (symmetric orphan toggles)", () => {
             lintOrphanedMarkers: "delete",
         });
         await del.loadSettings();
-        expect(del.settings.lintDeleteOrphanedMarkers).toBe(true);
+        expect(del.settings.lintDeleteOrphanedReferences).toBe(true);
     });
 
     it("pre-versioned (0.1.x) data runs both migration stages", async () => {
@@ -65,7 +65,7 @@ describe("settings migration to v2 (symmetric orphan toggles)", () => {
     it("a fresh install gets both toggles off", async () => {
         const plugin = pluginWithSavedData({});
         await plugin.loadSettings();
-        expect(plugin.settings.lintDeleteOrphanedMarkers).toBe(false);
+        expect(plugin.settings.lintDeleteOrphanedReferences).toBe(false);
         expect(plugin.settings.lintDeleteOrphanedDefinitions).toBe(false);
     });
 });

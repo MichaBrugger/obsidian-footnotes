@@ -5,7 +5,7 @@ import {
     footnotePrefix,
     footnotePrefixProblem,
 } from "../src/insert-or-navigate-footnotes";
-import { countEmptyFootnoteMarkers, lintFootnotes } from "../src/linting/linter";
+import { countEmptyFootnoteReferences, lintFootnotes } from "../src/linting/linter";
 import { applyFootnotePrefix } from "../src/linting/rules/apply-footnote-prefix";
 import { reindexFootnotes } from "../src/linting/rules/re-index-footnotes";
 
@@ -78,7 +78,7 @@ describe.each(PREFIXES)('prefix "%s"', (prefix) => {
         ).toBe(once);
     });
 
-    it("the bare-prefix placeholder counts as an unnamed marker", () => {
-        expect(countEmptyFootnoteMarkers(`a [^${prefix}] b [^]`, prefix)).toBe(2);
+    it("the bare-prefix placeholder counts as an unnamed reference", () => {
+        expect(countEmptyFootnoteReferences(`a [^${prefix}] b [^]`, prefix)).toBe(2);
     });
 });

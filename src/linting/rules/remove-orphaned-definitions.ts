@@ -1,4 +1,4 @@
-import { footnoteMarkerMatches } from "../../insert-or-navigate-footnotes";
+import { footnoteReferenceMatches } from "../../insert-or-navigate-footnotes";
 import {
     DefinitionBlock,
     findDefinitionBlocks,
@@ -45,7 +45,7 @@ function scanReferences(
     const blockRefs: string[][] = blocks.map(() => []);
     for (let i = 0; i < lines.length; i++) {
         if (isProtected[i]) continue;
-        for (const match of footnoteMarkerMatches(maskInlineRegions(lines[i]))) {
+        for (const match of footnoteReferenceMatches(maskInlineRegions(lines[i]))) {
             // re-slice the original for the name (a code span masks to NULs)
             const start = match.index ?? 0;
             const name = lines[i]
@@ -92,7 +92,7 @@ function deadBlocks(scan: ReferenceScan): DefinitionBlock[] {
 }
 
 /**
- * Distinct names of definitions no marker references (each in its own
+ * Distinct names of definitions nothing references (each in its own
  * casing, definition order) — the alert's list. Single-level on purpose: a
  * definition referenced only from an orphan's body is still "referenced",
  * matching the message's wording; fixing the listed orphan surfaces it on
@@ -131,7 +131,7 @@ export const removeOrphanedDefinitionsRule: FootnoteRule = {
     id: "remove-orphaned-definitions",
     name: "Remove orphaned definitions",
     description:
-        "Delete footnote definitions that no marker references, including chains only kept alive by each other's bodies.",
+        "Delete footnote definitions that nothing references, including chains only kept alive by each other's bodies.",
     ignoreTypes: [
         IgnoreType.Code,
         IgnoreType.InlineCode,

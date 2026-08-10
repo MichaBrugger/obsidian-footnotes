@@ -1,5 +1,5 @@
 import {
-    footnoteMarkerMatches,
+    footnoteReferenceMatches,
     isValidFootnoteName,
 } from "../../insert-or-navigate-footnotes";
 import {
@@ -12,17 +12,17 @@ import {
 import { IgnoreType } from "../ignore-types";
 import { FootnoteRule } from "../rule";
 
-// Orphaned MARKERS — the mirror image of reindex's orphaned definitions
+// Orphaned REFERENCES — the mirror image of reindex's orphaned definitions
 // (requested 2026-08-10): a "[^5]" with no "[^5]:" line anywhere renders as
 // literal text in Obsidian, so linting either alerts about them (the
-// default) or, with the "Orphaned markers" setting on Delete, removes them
+// default) or, with the "Orphaned references" setting on Delete, removes them
 // from the text. Shared exclusions, in both modes:
 //  - ids are case-insensitive, so a definition in any casing counts;
 //  - invalid names (spaces/backticks) are not footnotes to Obsidian either —
 //    deleting "[^my note]" would destroy literal prose, so they are left
 //    alone (the creation path already warns about them);
 //  - the note's own bare-prefix placeholder ("[^2.]" under prefix "2.") is
-//    an IN-PROGRESS footnote mid-naming, owned by the unnamed-marker alert —
+//    an IN-PROGRESS footnote mid-naming, owned by the unnamed-reference alert —
 //    deleting it out from under the user's caret would be data loss.
 
 /** The definition names present in the note, case-folded. Masked scan, raw re-slice (a code span in a name masks to NULs). */
@@ -36,7 +36,7 @@ function definitionNamesFolded(lines: string[], masked: string[]): Set<string> {
     return names;
 }
 
-/** Whether this marker occurrence is an orphan the setting should act on. */
+/** Whether this reference occurrence is an orphan the setting should act on. */
 function isOrphan(
     name: string,
     definitions: Set<string>,
@@ -50,11 +50,11 @@ function isOrphan(
 }
 
 /**
- * Distinct names of orphaned markers in first-appearance order, each in its
+ * Distinct names of orphaned references in first-appearance order, each in its
  * first-seen casing — the alert's list. `safePrefix` is the note's own valid
  * footnote-prefix while the prefix feature is on ("" otherwise).
  */
-export function orphanedFootnoteMarkerNames(
+export function orphanedFootnoteReferenceNames(
     markdown: string,
     safePrefix = "",
 ): string[] {
@@ -66,7 +66,7 @@ export function orphanedFootnoteMarkerNames(
     const names: string[] = [];
     const seen = new Set<string>();
     for (let i = 0; i < masked.length; i++) {
-        for (const match of footnoteMarkerMatches(masked[i])) {
+        for (const match of footnoteReferenceMatches(masked[i])) {
             const start = match.index ?? 0;
             const name = lines[i].slice(start + 2, start + match[0].length - 1);
             if (!isOrphan(name, definitions, safeFolded)) continue;
@@ -81,13 +81,13 @@ export function orphanedFootnoteMarkerNames(
 }
 
 /**
- * Every orphaned marker occurrence removed from the text (definitions,
+ * Every orphaned reference occurrence removed from the text (definitions,
  * protected regions, and the exclusions above untouched). Spacing seams
- * heal: "a [^1] b" → "a b", and a marker that was the last thing on its
+ * heal: "a [^1] b" → "a b", and a reference that was the last thing on its
  * line takes the space before it along — but spaces the line already ended
  * with (a markdown hard break) survive.
  */
-export function removeOrphanedFootnoteMarkers(
+export function removeOrphanedFootnoteReferences(
     markdown: string,
     safePrefix = "",
 ): string {
@@ -103,7 +103,7 @@ export function removeOrphanedFootnoteMarkers(
         let result = "";
         let copied = 0;
         let changed = false;
-        for (const match of footnoteMarkerMatches(masked[i])) {
+        for (const match of footnoteReferenceMatches(masked[i])) {
             const start = match.index ?? 0;
             const end = start + match[0].length;
             const name = line.slice(start + 2, end - 1);
@@ -122,7 +122,7 @@ export function removeOrphanedFootnoteMarkers(
         }
         if (!changed) return line;
         const tail = line.slice(copied);
-        // a marker that closed the line leaves its leading space dangling;
+        // a reference that closed the line leaves its leading space dangling;
         // a non-empty tail means any trailing spaces were already there
         return tail === "" ? result.replace(/[ \t]+$/, "") : result + tail;
     });
@@ -130,12 +130,12 @@ export function removeOrphanedFootnoteMarkers(
 }
 
 /** Linter-shaped registry entry; the option is the note's safe bare prefix. */
-export const removeOrphanedMarkersRule: FootnoteRule<{ safePrefix?: string }> =
+export const removeOrphanedReferencesRule: FootnoteRule<{ safePrefix?: string }> =
     {
-        id: "remove-orphaned-markers",
-        name: "Remove orphaned markers",
+        id: "remove-orphaned-references",
+        name: "Remove orphaned references",
         description:
-            "Delete footnote markers that have no definition anywhere in the note.",
+            "Delete footnote references that have no definition anywhere in the note.",
         ignoreTypes: [
             IgnoreType.Code,
             IgnoreType.InlineCode,
@@ -145,16 +145,16 @@ export const removeOrphanedMarkersRule: FootnoteRule<{ safePrefix?: string }> =
         ],
         examples: [
             {
-                description: "A marker with no definition is removed",
+                description: "A reference with no definition is removed",
                 before: "keep[^1] drop[^9] end\n\n[^1]: one",
                 after: "keep[^1] drop end\n\n[^1]: one",
             },
             {
-                description: "A definition in any casing keeps its markers",
+                description: "A definition in any casing keeps its references",
                 before: "see[^Note]\n\n[^note]: n",
                 after: "see[^Note]\n\n[^note]: n",
             },
         ],
         apply: (text, options = {}) =>
-            removeOrphanedFootnoteMarkers(text, options.safePrefix ?? ""),
+            removeOrphanedFootnoteReferences(text, options.safePrefix ?? ""),
     };

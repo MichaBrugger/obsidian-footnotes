@@ -1,5 +1,5 @@
 import {
-    footnoteMarkerMatches,
+    footnoteReferenceMatches,
     footnotePrefixProblem,
 } from "../../insert-or-navigate-footnotes";
 import {
@@ -16,14 +16,14 @@ import { FootnoteRule } from "../rule";
 
 // The reindex algorithm: a pure markdown → markdown transform, no Editor.
 // Policy (pinned in test/reindex-footnotes.test.ts): numbered footnotes are
-// renumbered 1..n by first marker appearance and their definitions reordered
+// renumbered 1..n by first reference appearance and their definitions reordered
 // to match; named footnotes keep their names (unless renumberNamedFootnotes)
 // but slot into the definition ordering; orphaned definitions are kept and
 // numbered after everything referenced (unless keepOrphanedDefinitions is
 // off); code and frontmatter are invisible to all of it.
 
 export interface ReindexOptions {
-    /** Keep definitions no marker references, numbering them after everything referenced (default). Off deletes them. */
+    /** Keep definitions nothing references, numbering them after everything referenced (default). Off deletes them. */
     keepOrphanedDefinitions?: boolean;
     /** Give named footnotes numbers by appearance order instead of preserving their names (default off). With an active `prefix` they renumber into its namespace. */
     renumberNamedFootnotes?: boolean;
@@ -38,13 +38,13 @@ export interface ReindexOptions {
 }
 
 /**
- * Distinct marker names by first appearance in the (unprotected) text,
+ * Distinct reference names by first appearance in the (unprotected) text,
  * folded to lowercase — footnote ids are case-insensitive in Obsidian, so
  * "[^Note]" and "[^note]" are one footnote for ordering and identity. A
- * definition's own "[^id]:" label is not a reference (footnoteMarkerMatches
- * excludes it positionally), but a marker nested in a definition body is.
+ * definition's own "[^id]:" label is not a reference (footnoteReferenceMatches
+ * excludes it positionally), but a reference nested in a definition body is.
  */
-function markerAppearanceOrder(
+function referenceAppearanceOrder(
     lines: string[],
     isProtected: boolean[],
 ): string[] {
@@ -52,9 +52,9 @@ function markerAppearanceOrder(
     const seen = new Set<string>();
     for (let i = 0; i < lines.length; i++) {
         if (isProtected[i]) continue;
-        for (const match of footnoteMarkerMatches(maskInlineRegions(lines[i]))) {
+        for (const match of footnoteReferenceMatches(maskInlineRegions(lines[i]))) {
             // re-slice the original: a code span inside the name masks to
-            // NULs, which would split the marker's identity from its raw
+            // NULs, which would split the reference's identity from its raw
             // definition label (bug-masked-name-identity)
             const start = match.index ?? 0;
             const id = lines[i]
@@ -69,14 +69,14 @@ function markerAppearanceOrder(
     return order;
 }
 
-/** All markers on the line rewritten through `renames` (code spans and the definition label skipped; ids matched case-insensitively); the map is complete, so swaps can't collide. */
-function rewriteMarkers(line: string, renames: Map<string, string>): string {
+/** All references on the line rewritten through `renames` (code spans and the definition label skipped; ids matched case-insensitively); the map is complete, so swaps can't collide. */
+function rewriteReferences(line: string, renames: Map<string, string>): string {
     const masked = maskInlineRegions(line);
     let out = "";
     let copied = 0;
-    for (const match of footnoteMarkerMatches(masked)) {
+    for (const match of footnoteReferenceMatches(masked)) {
         // re-slice the original for the id — same masked-name rationale as
-        // markerAppearanceOrder above
+        // referenceAppearanceOrder above
         const start = match.index ?? 0;
         const id = line
             .slice(start + 2, start + match[0].length - 1)
@@ -91,7 +91,7 @@ function rewriteMarkers(line: string, renames: Map<string, string>): string {
 
 /**
  * Reindex every footnote in `markdown`: numbered footnotes become 1..n by
- * order of first marker appearance (all repeats follow), named footnotes
+ * order of first reference appearance (all repeats follow), named footnotes
  * keep their names, and definition blocks are reordered into the same
  * appearance order by permuting them among their existing positions —
  * everything between them stays where it was. `options` selects the two
@@ -104,7 +104,7 @@ export function reindexFootnotes(
 ): string {
     // A single pass can leave the result not-yet-stable, so re-run to a
     // fixpoint — this makes one call idempotent (f(f(x)) === f(x)):
-    //  - permuting definition blocks changes the appearance order of markers
+    //  - permuting definition blocks changes the appearance order of references
     //    NESTED in their bodies, which a second pass would renumber (churn);
     //  - with orphan deletion on, cutting an orphan can strand a definition
     //    that only the orphan's body referenced (a transitive orphan), which
@@ -142,12 +142,12 @@ function reindexOnce(
     let lines = text.split("\n");
     let isProtected = protectedLines(lines);
     let blocks = findDefinitionBlocks(lines, isProtected);
-    let markerOrder = markerAppearanceOrder(lines, isProtected);
+    let referenceOrder = referenceAppearanceOrder(lines, isProtected);
 
     if (!keepOrphans) {
-        // markerOrder is lowercased (ids are case-insensitive), so a
+        // referenceOrder is lowercased (ids are case-insensitive), so a
         // definition referenced only with different casing is NOT an orphan
-        const referenced = new Set(markerOrder);
+        const referenced = new Set(referenceOrder);
         const orphans = blocks.filter(
             (block) => !referenced.has(block.name.toLowerCase()),
         );
@@ -157,15 +157,15 @@ function reindexOnce(
             lines = removeLineRanges(lines, orphans);
             isProtected = protectedLines(lines);
             blocks = findDefinitionBlocks(lines, isProtected);
-            markerOrder = markerAppearanceOrder(lines, isProtected);
+            referenceOrder = referenceAppearanceOrder(lines, isProtected);
         }
     }
 
-    // referenced names first (by first marker appearance), then whatever
+    // referenced names first (by first reference appearance), then whatever
     // orphaned definitions remain, in definition order
-    // all names are canonical (lowercased) here so case-variant markers and
+    // all names are canonical (lowercased) here so case-variant references and
     // definitions share one identity throughout ordering and numbering
-    const order = [...markerOrder];
+    const order = [...referenceOrder];
     const seen = new Set(order);
     for (const block of blocks) {
         const name = block.name.toLowerCase();
@@ -201,7 +201,7 @@ function reindexOnce(
 
     const rewritten = lines.map((line, i) => {
         if (isProtected[i]) return line;
-        let result = rewriteMarkers(line, renames);
+        let result = rewriteReferences(line, renames);
         const definition = line.match(DefinitionStart);
         if (definition) {
             const newName = renames.get(definition[1].toLowerCase());
@@ -244,7 +244,7 @@ export const reIndexFootnotesRule: FootnoteRule<ReindexOptions> = {
     id: "re-index-footnotes",
     name: "Re-index footnotes",
     description:
-        "Renumber numbered footnotes 1..n by first marker appearance and reorder their definitions to match.",
+        "Renumber numbered footnotes 1..n by first reference appearance and reorder their definitions to match.",
     ignoreTypes: [
         IgnoreType.Code,
         IgnoreType.InlineCode,
@@ -253,7 +253,7 @@ export const reIndexFootnotesRule: FootnoteRule<ReindexOptions> = {
     ],
     examples: [
         {
-            description: "Renumbers by first marker appearance",
+            description: "Renumbers by first reference appearance",
             before: "bravo[^2] alpha[^1].\n\n[^1]: one\n[^2]: two",
             after: "bravo[^1] alpha[^2].\n\n[^1]: two\n[^2]: one",
         },

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { computeNextFootnoteNumber } from "../../src/insert-or-navigate-footnotes";
 
-// BUG: autonumbering goes through a JavaScript Number, so a marker with a huge
+// BUG: autonumbering goes through a JavaScript Number, so a reference with a huge
 // number (beyond 2^53) makes the next footnote id render in scientific notation.
 // computeNextFootnoteNumber does `Number(match[1]) + 1` and returns a number the
 // caller stringifies; after "[^99999999999999999999999]" the next value is

@@ -11,7 +11,7 @@ import { FootnoteRule } from "../rule";
 // Linter's "move footnotes to the bottom" as a pure transform, integrated
 // with the plugin's section-heading setting. Policy pinned in
 // test/move-footnotes-to-bottom.test.ts. The output layout deliberately
-// matches buildDetailAppend's insert flow, so a note the plugin built is a
+// matches buildDefinitionAppend's insert flow, so a note the plugin built is a
 // fixed point of this transform.
 
 /**
@@ -48,7 +48,7 @@ export function moveFootnoteDefinitionsToBottom(
 
     // probe whether a line appended at EOF would itself be protected (an
     // unclosed fence or comment runs to EOF) — relocating definitions into
-    // such a region would sever them from their markers
+    // such a region would sever them from their references
     const probe = protectedLines([...lines, "", "probe"]);
     if (probe[probe.length - 1]) return markdown;
 
@@ -101,7 +101,7 @@ export function moveFootnoteDefinitionsToBottom(
         out.push("", ...definitions.split("\n"));
         // the rest of the note follows below the gathered definitions,
         // separated by a blank line so it can't lazily continue the last
-        // definition (same rule as buildDetailAppend)
+        // definition (same rule as buildDefinitionAppend)
         const rest = body.slice(anchorEnd + 1);
         while (rest.length > 0 && rest[0] === "") rest.shift();
         if (rest.length > 0) out.push("", ...rest);

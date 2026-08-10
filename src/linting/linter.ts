@@ -9,7 +9,7 @@ import {
 import {
     footnotePrefix,
     footnotePrefixProblem,
-    jumpToFootnoteDetail,
+    jumpToFootnoteDefinition,
     readingViewActive,
     runOutsideTableCell,
 } from "../insert-or-navigate-footnotes";
@@ -25,9 +25,9 @@ import {
     removeOrphanedFootnoteDefinitions,
 } from "./rules/remove-orphaned-definitions";
 import {
-    orphanedFootnoteMarkerNames,
-    removeOrphanedFootnoteMarkers,
-} from "./rules/remove-orphaned-markers";
+    orphanedFootnoteReferenceNames,
+    removeOrphanedFootnoteReferences,
+} from "./rules/remove-orphaned-references";
 
 // The whole-document footnote linter: each pure rule (see src/linting/rules/)
 // gets a command, plus one "lint" command composing all three. This module
@@ -62,7 +62,7 @@ export function lintOptionsFromSettings(
         moveDefinitionsToBottom: plugin.settings.lintMoveToBottom,
         reindex: plugin.settings.lintReindex,
         reindexOptions: reindexOptionsFromSettings(plugin),
-        removeOrphanedMarkers: plugin.settings.lintDeleteOrphanedMarkers,
+        removeOrphanedReferences: plugin.settings.lintDeleteOrphanedReferences,
         removeOrphanedDefinitions:
             plugin.settings.lintDeleteOrphanedDefinitions,
         orphanSafePrefix: alertPrefix(plugin, markdown),
@@ -91,9 +91,9 @@ export interface LintOptions {
     reindex?: boolean;
     /** Passed through to reindexFootnotes. */
     reindexOptions?: ReindexOptions;
-    /** Delete markers that have no definition anywhere in the note (default off; the caller gates on the "Delete orphaned markers" setting). */
-    removeOrphanedMarkers?: boolean;
-    /** Delete definitions no marker references, transitively (default off; the caller gates on the "Delete orphaned definitions" setting). Independent of `reindex`. */
+    /** Delete references that have no definition anywhere in the note (default off; the caller gates on the "Delete orphaned references" setting). */
+    removeOrphanedReferences?: boolean;
+    /** Delete definitions nothing references, transitively (default off; the caller gates on the "Delete orphaned definitions" setting). Independent of `reindex`. */
     removeOrphanedDefinitions?: boolean;
     /** The note's own valid footnote-prefix while the prefix feature is on: its untouched "[^2.]" placeholder is an in-progress footnote, never an orphan to delete. */
     orphanSafePrefix?: string;
@@ -112,18 +112,18 @@ export function lintFootnotes(
     // original endings are restored a single time on the way out
     const { text, eol } = normalizeEol(markdown);
     let result = text;
-    // FIRST: markers slated for deletion shouldn't be punctuation-swapped,
+    // FIRST: references slated for deletion shouldn't be punctuation-swapped,
     // prefixed, or handed numbers by the reindex below — and removing them
-    // can't orphan any definition (an orphaned marker has none)
-    if (options.removeOrphanedMarkers) {
-        result = removeOrphanedFootnoteMarkers(
+    // can't orphan any definition (an orphaned reference has none)
+    if (options.removeOrphanedReferences) {
+        result = removeOrphanedFootnoteReferences(
             result,
             options.orphanSafePrefix ?? "",
         );
     }
-    // deleting orphaned markers can't orphan a definition (they had none),
-    // and deleting orphaned definitions can't orphan a live marker (a
-    // marker's reference is exactly what keeps a definition alive) — the
+    // deleting orphaned references can't orphan a definition (they had none),
+    // and deleting orphaned definitions can't orphan a live reference (a
+    // reference's reference is exactly what keeps a definition alive) — the
     // two steps are order-independent and both precede everything else
     if (options.removeOrphanedDefinitions) {
         result = removeOrphanedFootnoteDefinitions(result);
@@ -207,21 +207,21 @@ export function lintRulesAllDisabled(plugin: FootnotePlugin): boolean {
         !(s.enableFootnotePrefix && s.lintApplyPrefix) &&
         // orphan DELETION is a transform; the alerts that replace it while
         // the toggles are off deliberately stay silent when every rule is off
-        !s.lintDeleteOrphanedMarkers &&
+        !s.lintDeleteOrphanedReferences &&
         !s.lintDeleteOrphanedDefinitions
     );
 }
 
 /**
- * Occurrences of unnamed footnote markers outside code and frontmatter: the
+ * Occurrences of unnamed footnote references outside code and frontmatter: the
  * abandoned empty "[^]", plus — when `prefix` is given — its prefix-era twin,
  * the untouched bare-prefix placeholder ("[^3.]" under prefix "3."). Both
  * are footnotes the user started and never named; the rules can't fix them
- * ("[^]" is invisible to the marker regexes, and a bare prefix is
+ * ("[^]" is invisible to the reference regexes, and a bare prefix is
  * indistinguishable from a deliberate name), so the lint paths alert
  * instead — the user should name or delete the fragment ASAP.
  */
-export function countEmptyFootnoteMarkers(
+export function countEmptyFootnoteReferences(
     markdown: string,
     prefix = "",
 ): number {
@@ -249,38 +249,38 @@ function alertPrefix(plugin: FootnotePlugin, markdown: string): string {
     return prefix && footnotePrefixProblem(prefix) === null ? prefix : "";
 }
 
-function noticeEmptyMarkers(plugin: FootnotePlugin, markdown: string) {
+function noticeEmptyReferences(plugin: FootnotePlugin, markdown: string) {
     const prefix = alertPrefix(plugin, markdown);
-    const count = countEmptyFootnoteMarkers(markdown, prefix);
+    const count = countEmptyFootnoteReferences(markdown, prefix);
     if (count === 0) return;
     const hint = prefix ? `"[^]" or the bare prefix "[^${prefix}]"` : '"[^]"';
     new Notice(
         count === 1
-            ? `This note has an unnamed footnote marker (${hint}). Give it a name or delete it.`
-            : `This note has ${count} unnamed footnote markers (${hint}). Give them names or delete them.`,
+            ? `This note has an unnamed footnote reference (${hint}). Give it a name or delete it.`
+            : `This note has ${count} unnamed footnote references (${hint}). Give them names or delete them.`,
         8000,
     );
 }
 
 /** "[^a], [^b], …" — at most three names spelled out, an ellipsis for the rest. */
-function markerList(names: string[]): string {
+function referenceList(names: string[]): string {
     const shown = names.slice(0, 3).map((name) => `[^${name}]`).join(", ");
     return names.length > 3 ? `${shown}, …` : shown;
 }
 
-// the alert half of "Delete orphaned markers": while the toggle is off,
+// the alert half of "Delete orphaned references": while the toggle is off,
 // linting reports them instead — orphans are never silent
-function noticeOrphanedMarkers(plugin: FootnotePlugin, markdown: string) {
-    if (plugin.settings.lintDeleteOrphanedMarkers) return;
-    const names = orphanedFootnoteMarkerNames(
+function noticeOrphanedReferences(plugin: FootnotePlugin, markdown: string) {
+    if (plugin.settings.lintDeleteOrphanedReferences) return;
+    const names = orphanedFootnoteReferenceNames(
         markdown,
         alertPrefix(plugin, markdown),
     );
     if (names.length === 0) return;
     new Notice(
         names.length === 1
-            ? `This note has a footnote marker with no definition (${markerList(names)}). Write its definition or delete the marker.`
-            : `This note has ${names.length} footnote markers with no definition (${markerList(names)}). Write their definitions or delete the markers.`,
+            ? `This note has a footnote reference with no definition (${referenceList(names)}). Write its definition or delete the reference.`
+            : `This note has ${names.length} footnote references with no definition (${referenceList(names)}). Write their definitions or delete the references.`,
         8000,
     );
 }
@@ -293,8 +293,8 @@ function noticeOrphanedDefinitions(plugin: FootnotePlugin, markdown: string) {
     if (names.length === 0) return;
     new Notice(
         names.length === 1
-            ? `This note has a footnote definition no marker references (${markerList(names)}). Add its marker in the text or delete the definition.`
-            : `This note has ${names.length} footnote definitions no marker references (${markerList(names)}). Add their markers in the text or delete the definitions.`,
+            ? `This note has a footnote definition nothing references (${referenceList(names)}). Add its reference in the text or delete the definition.`
+            : `This note has ${names.length} footnote definitions nothing references (${referenceList(names)}). Add their references in the text or delete the definitions.`,
         8000,
     );
 }
@@ -302,8 +302,8 @@ function noticeOrphanedDefinitions(plugin: FootnotePlugin, markdown: string) {
 // every lint entry point calls this with the POST-lint text, so the alerts
 // fire whether or not the rules changed anything
 function noticeLintAlerts(plugin: FootnotePlugin, markdown: string) {
-    noticeEmptyMarkers(plugin, markdown);
-    noticeOrphanedMarkers(plugin, markdown);
+    noticeEmptyReferences(plugin, markdown);
+    noticeOrphanedReferences(plugin, markdown);
     noticeOrphanedDefinitions(plugin, markdown);
 }
 
@@ -326,7 +326,7 @@ function subEditorOwnsFocus(doc: Editor): boolean {
 
 /**
  * The alert blocking a lint of `markdown`, or null when linting may
- * proceed. A digit-ending footnote-prefix makes prefixed markers
+ * proceed. A digit-ending footnote-prefix makes prefixed references
  * indistinguishable from plain numbers, so reindexing would collapse the
  * chapter namespace — the lint is refused until the property is fixed.
  */
@@ -418,24 +418,24 @@ export function installVimWriteHook(plugin: FootnotePlugin) {
 }
 
 // masked-line shape of a footnote definition with NOTHING typed yet
-const EmptyDetailLine = /^\[\^([^[\]]+)\]:[ \t]*$/;
+const EmptyDefinitionLine = /^\[\^([^[\]]+)\]:[ \t]*$/;
 
-// The name of the note's single empty detail ("[^x]: " with no content),
+// The name of the note's single empty definition ("[^x]: " with no content),
 // or null when there are none or several. Linting a note right after a
 // footnote was created can RENAME the new footnote (reindex swaps ids by
 // appearance order), so the id alone can't relocate it — but the fresh
-// detail is empty, and as long as it is the only empty one, it is
+// definition is empty, and as long as it is the only empty one, it is
 // unambiguously the footnote just created.
-function uniqueEmptyDetailName(doc: Editor): string | null {
+function uniqueEmptyDefinitionName(doc: Editor): string | null {
     const lines: string[] = [];
     for (let i = 0; i < doc.lineCount(); i++) lines.push(doc.getLine(i));
     let found: string | null = null;
     const masked = maskProtectedLines(lines);
     for (let i = 0; i < masked.length; i++) {
-        const match = masked[i].match(EmptyDetailLine);
+        const match = masked[i].match(EmptyDefinitionLine);
         if (!match) continue;
         if (found !== null) return null; // ambiguous
-        // re-slice the original line: the name feeds jumpToFootnoteDetail,
+        // re-slice the original line: the name feeds jumpToFootnoteDefinition,
         // which compares RAW names (a code span in the name masks to NULs)
         found = lines[i].slice(2, 2 + match[1].length);
     }
@@ -444,14 +444,14 @@ function uniqueEmptyDetailName(doc: Editor): string | null {
 
 /**
  * "Lint on footnote creation" (replacing lint-on-focused-file-change,
- * 2026-08-05): lint the active note right after a new footnote detail was
+ * 2026-08-05): lint the active note right after a new footnote definition was
  * created there. Quiet by design — a clean creation (the usual case) shows
  * no notice at all; only an actual cleanup announces itself, and it happens
  * in the note the user is LOOKING AT, unlike the old file-change trigger.
  *
- * The creation sites call this directly on the jump-to-detail path (and
+ * The creation sites call this directly on the jump-to-definition path (and
  * `relandCursor` puts the caret back on the new — possibly renumbered —
- * empty detail afterwards). On the popup path they defer it through
+ * empty definition afterwards). On the popup path they defer it through
  * runAfterNextPopupSettle instead: linting under a live popup could
  * renumber the id the popup is bound to. Table-cell creations skip the
  * trigger entirely (editing the document while a cell sub-editor owns
@@ -490,9 +490,9 @@ export function lintAfterFootnoteCreation(
     new Notice("Footnotes linted.");
     noticeLintAlerts(plugin, after);
     if (relandCursor) {
-        const target = uniqueEmptyDetailName(doc);
+        const target = uniqueEmptyDefinitionName(doc);
         if (target !== null) {
-            jumpToFootnoteDetail(target, doc.getCursor(), doc, plugin);
+            jumpToFootnoteDefinition(target, doc.getCursor(), doc, plugin);
         }
     }
 }
@@ -521,7 +521,7 @@ export async function runFootnoteTransformCommand(
     runOutsideTableCell(doc, () => {
         const before = doc.getValue();
         // an invalid footnote-prefix cancels the lint outright — reindexing
-        // would otherwise renumber the prefixed markers as plain ones
+        // would otherwise renumber the prefixed references as plain ones
         const blocked = lintBlockedByPrefix(before);
         if (blocked) {
             new Notice(blocked, 8000);

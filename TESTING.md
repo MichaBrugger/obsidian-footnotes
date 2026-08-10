@@ -17,17 +17,17 @@ new import breaks test startup.
 Suite map (one file per unit under test):
 
 - `next-footnote-number.test.ts` — autonumbering policy (gaps not reused,
-  named markers ignored)
-- `list-footnotes.test.ts` — document scans for details and markers
+  named references ignored)
+- `list-footnotes.test.ts` — document scans for definitions and references
 - `section-header.test.ts` — heading/divider blank-line rules
-- `marker-regexes.test.ts` — the exported marker regexes
+- `reference-regexes.test.ts` — the exported reference regexes
 - `invalid-footnote-name.test.ts` — spaced-name guard (warns via Notice)
 - `end-of-word-offset.test.ts` — cell-local end-of-word insertion point
 - `table-cell-insert.test.ts` — the edit dispatched into a table cell editor
 - `table-cursor.test.ts` — escape-aware table-row cell spans
 - `inline-footnote-content.test.ts` — clipboard sanitizing for ^[...] bodies
 - `inline-footnote-exit.test.ts` — second-press exit past the closing bracket
-- `marker-at-cursor.test.ts` — the strict "inside a marker" rule (issue #49)
+- `reference-at-cursor.test.ts` — the strict "inside a reference" rule (issue #49)
 
 Standing rules:
 

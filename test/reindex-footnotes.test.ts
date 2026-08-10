@@ -4,11 +4,11 @@ import { reindexFootnotes } from "../src/linting/rules/re-index-footnotes";
 
 // The full spec of the reindex algorithm, pinned as tests. Policy decisions
 // made here (and nowhere else):
-//   - numbered footnotes are renumbered 1..n by FIRST MARKER APPEARANCE
+//   - numbered footnotes are renumbered 1..n by FIRST REFERENCE APPEARANCE
 //   - named footnotes keep their names and never consume a number
 //   - definitions are reordered to match appearance order; named ones slot
 //     into the same ordering
-//   - markers with no definition still take part in the renumbering
+//   - references with no definition still take part in the renumbering
 //   - orphaned definitions are KEPT (never delete user content) and get the
 //     numbers after all referenced footnotes, in definition order
 //   - anything inside fenced code blocks, inline code, or frontmatter
@@ -31,7 +31,7 @@ describe("reindexFootnotes", () => {
         expect(reindexFootnotes(text)).toBe(text);
     });
 
-    it("renumbers by first marker appearance", () => {
+    it("renumbers by first reference appearance", () => {
         const input = "bravo[^2] alpha[^1].\n\n[^1]: one\n[^2]: two";
         const expected = "bravo[^1] alpha[^2].\n\n[^1]: two\n[^2]: one";
         expect(reindexFootnotes(input)).toBe(expected);
@@ -50,7 +50,7 @@ describe("reindexFootnotes", () => {
         expect(reindexFootnotes(input)).toBe(expected);
     });
 
-    it("moves every reference of a repeated marker together", () => {
+    it("moves every reference of a repeated reference together", () => {
         const input = "a[^5] b[^2] c[^5].\n\n[^2]: two\n[^5]: five";
         const expected = "a[^1] b[^2] c[^1].\n\n[^1]: five\n[^2]: two";
         expect(reindexFootnotes(input)).toBe(expected);
@@ -83,7 +83,7 @@ describe("reindexFootnotes", () => {
         expect(reindexFootnotes(input)).toBe(expected);
     });
 
-    it("renumbers a marker that has no definition", () => {
+    it("renumbers a reference that has no definition", () => {
         const input = "a[^5] b[^2].\n\n[^2]: two";
         const expected = "a[^1] b[^2].\n\n[^2]: two";
         expect(reindexFootnotes(input)).toBe(expected);
@@ -101,12 +101,12 @@ describe("reindexFootnotes", () => {
         expect(reindexFootnotes(input)).toBe(expected);
     });
 
-    it("ignores markers and definitions inside fenced code blocks", () => {
+    it("ignores references and definitions inside fenced code blocks", () => {
         const input = [
             "real[^2].",
             "",
             "```",
-            "fake[^1] marker",
+            "fake[^1] reference",
             "[^1]: fake definition",
             "```",
             "",
@@ -116,7 +116,7 @@ describe("reindexFootnotes", () => {
             "real[^1].",
             "",
             "```",
-            "fake[^1] marker",
+            "fake[^1] reference",
             "[^1]: fake definition",
             "```",
             "",
@@ -131,21 +131,21 @@ describe("reindexFootnotes", () => {
         expect(reindexFootnotes(input)).toBe(expected);
     });
 
-    it("ignores markers inside inline code", () => {
+    it("ignores references inside inline code", () => {
         const input = "use `[^1]` syntax[^2].\n\n[^2]: def";
         const expected = "use `[^1]` syntax[^1].\n\n[^1]: def";
         expect(reindexFootnotes(input)).toBe(expected);
     });
 
-    it("ignores markers inside double-backtick code spans", () => {
+    it("ignores references inside double-backtick code spans", () => {
         const input = "``code [^1] here`` real[^2].\n\n[^2]: def";
         const expected = "``code [^1] here`` real[^1].\n\n[^1]: def";
         expect(reindexFootnotes(input)).toBe(expected);
     });
 
     it("does not treat an unclosed backtick as a code span", () => {
-        const input = "a stray ` then a real[^2] marker.\n\n[^2]: def";
-        const expected = "a stray ` then a real[^1] marker.\n\n[^1]: def";
+        const input = "a stray ` then a real[^2] reference.\n\n[^2]: def";
+        const expected = "a stray ` then a real[^1] reference.\n\n[^1]: def";
         expect(reindexFootnotes(input)).toBe(expected);
     });
 
@@ -194,7 +194,7 @@ describe("reindexFootnotes", () => {
         expect(reindexFootnotes(input)).toBe(expected);
     });
 
-    it("rewrites markers inside definition content", () => {
+    it("rewrites references inside definition content", () => {
         const input = "a[^2].\n\n[^2]: see also[^1]\n\n[^1]: the other";
         const expected = "a[^1].\n\n[^1]: see also[^2]\n\n[^2]: the other";
         expect(reindexFootnotes(input)).toBe(expected);
@@ -301,13 +301,13 @@ describe("reindexFootnotes with keepOrphanedDefinitions: false", () => {
 describe("reindexFootnotes with renumberNamedFootnotes: true", () => {
     const renumberNamed = { renumberNamedFootnotes: true };
 
-    it("converts named markers to numbers by appearance order", () => {
+    it("converts named references to numbers by appearance order", () => {
         const input = "a[^note] b[^5].\n\n[^5]: five\n[^note]: n";
         const expected = "a[^1] b[^2].\n\n[^1]: n\n[^2]: five";
         expect(reindexFootnotes(input, renumberNamed)).toBe(expected);
     });
 
-    it("moves every reference of a repeated named marker together", () => {
+    it("moves every reference of a repeated named reference together", () => {
         const input = "a[^x] b[^2] c[^x].\n\n[^2]: two\n[^x]: ex";
         const expected = "a[^1] b[^2] c[^1].\n\n[^1]: ex\n[^2]: two";
         expect(reindexFootnotes(input, renumberNamed)).toBe(expected);
@@ -340,7 +340,7 @@ describe("reindexFootnotes with renumberNamedFootnotes: true", () => {
 describe("reindexFootnotes and single-line HTML comments", () => {
     // found live 2026-07-17: a one-line <!-- [^66]: ... --> was renumbered
     // and its colon swapped — only MULTI-line comments were protected
-    it("ignores markers inside a single-line HTML comment", () => {
+    it("ignores references inside a single-line HTML comment", () => {
         const input = "text[^5]\n<!-- [^2]: commented out -->\n\n[^5]: five";
         const expected =
             "text[^1]\n<!-- [^2]: commented out -->\n\n[^1]: five";

@@ -17,9 +17,9 @@ export interface FootnotePluginSettings {
     enableRemoveBlankLastLines: boolean;
 
     renumberNamedFootnotes: boolean;
-    /** Linting deletes markers that have no definition; while off, it alerts about them instead. Orphans are never silent either way (Jason, 2026-08-10). */
-    lintDeleteOrphanedMarkers: boolean;
-    /** Linting deletes definitions no marker references (independent of reindexing); while off, they are kept and alerted about. Mirrors lintDeleteOrphanedMarkers. */
+    /** Linting deletes references that have no definition; while off, it alerts about them instead. Orphans are never silent either way (Jason, 2026-08-10). */
+    lintDeleteOrphanedReferences: boolean;
+    /** Linting deletes definitions nothing references (independent of reindexing); while off, they are kept and alerted about. Mirrors lintDeleteOrphanedReferences. */
     lintDeleteOrphanedDefinitions: boolean;
     lintFixPunctuation: boolean;
     lintMoveToBottom: boolean;
@@ -44,7 +44,7 @@ export const DEFAULT_SETTINGS: FootnotePluginSettings = {
     enableRemoveBlankLastLines: true,
 
     renumberNamedFootnotes: false,
-    lintDeleteOrphanedMarkers: false,
+    lintDeleteOrphanedReferences: false,
     lintDeleteOrphanedDefinitions: false,
     lintFixPunctuation: true,
     lintMoveToBottom: true,
@@ -72,12 +72,12 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
             },
             {
                 name: "Edit footnotes in a popup",
-                desc: "Open the footnote detail in a small editor where you're typing, instead of jumping to the bottom of the note. Close with the footnote hotkey, the escape key, or by clicking outside.",
+                desc: "Open the footnote definition in a small editor where you're typing, instead of jumping to the bottom of the note. Close with the footnote hotkey, the escape key, or by clicking outside.",
                 control: { type: "toggle", key: "enablePopupEditor" },
             },
             {
                 name: "Per-note footnote prefix",
-                desc: "Footnotes respect a footnote-prefix property in the note's frontmatter: with \"footnote-prefix: 2.\" the numbered command inserts [^2.1], then [^2.2], and the named command starts its new marker with the prefix filled in ([^2.]). Useful when chapter notes are combined into one document. The \"Set footnote prefix\" command edits the property for you.",
+                desc: "Footnotes respect a footnote-prefix property in the note's frontmatter: with \"footnote-prefix: 2.\" the numbered command inserts [^2.1], then [^2.2], and the named command starts its new reference with the prefix filled in ([^2.]). Useful when chapter notes are combined into one document. The \"Set footnote prefix\" command edits the property for you.",
                 control: { type: "toggle", key: "enableFootnotePrefix" },
             },
             {
@@ -132,7 +132,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                     },
                     {
                         name: "Lint on footnote creation",
-                        desc: "Lint the note right after a new footnote detail is created in it.",
+                        desc: "Lint the note right after a new footnote definition is created in it.",
                         control: { type: "toggle", key: "lintOnFootnoteCreation" },
                     },
                     {
@@ -140,8 +140,8 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                         heading: "Rules",
                         items: [
                             {
-                                name: "Move markers after punctuation",
-                                desc: "The lint command moves footnote markers that sit before punctuation to sit after it.",
+                                name: "Move references after punctuation",
+                                desc: "The lint command moves footnote references that sit before punctuation to sit after it.",
                                 control: { type: "toggle", key: "lintFixPunctuation" },
                             },
                             {
@@ -150,16 +150,16 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                                 control: { type: "toggle", key: "lintMoveToBottom" },
                             },
                             {
-                                name: "Delete orphaned markers",
-                                desc: "Linting deletes footnote markers that have no definition (a [^5] with no \"[^5]:\" line, which Obsidian renders as plain text). While off, linting alerts you about them instead.",
+                                name: "Delete orphaned references",
+                                desc: "Linting deletes footnote references that have no definition (a [^5] with no \"[^5]:\" line, which Obsidian renders as plain text). While off, linting alerts you about them instead.",
                                 control: {
                                     type: "toggle",
-                                    key: "lintDeleteOrphanedMarkers",
+                                    key: "lintDeleteOrphanedReferences",
                                 },
                             },
                             {
                                 name: "Delete orphaned definitions",
-                                desc: "Linting deletes footnote definitions that no marker references. While off, they are kept (reindexing numbers them after everything else) and linting alerts you about them instead.",
+                                desc: "Linting deletes footnote definitions that nothing references. While off, they are kept (reindexing numbers them after everything else) and linting alerts you about them instead.",
                                 control: {
                                     type: "toggle",
                                     key: "lintDeleteOrphanedDefinitions",

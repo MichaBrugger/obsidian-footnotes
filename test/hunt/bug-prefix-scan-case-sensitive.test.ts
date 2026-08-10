@@ -13,7 +13,7 @@ import { applyFootnotePrefix } from "../../src/linting/rules/apply-footnote-pref
 // test/hunt/bug-case-insensitive-footnote-ids.test.ts).
 
 describe("prefix-namespace number scanning folds id case (fixed 2026-08-10)", () => {
-    it("a case-variant prefixed marker reserves its number", () => {
+    it("a case-variant prefixed reference reserves its number", () => {
         // [^P.1] IS footnote "p.1" (Obsidian folds ids) — the next number
         // under prefix "p." must be 2, not a colliding 1
         expect(computeNextFootnoteNumber("text[^P.1]", "p.")).toBe(2);
@@ -23,7 +23,7 @@ describe("prefix-namespace number scanning folds id case (fixed 2026-08-10)", ()
         expect(computeNextFootnoteNumber("text[^p.3]", "P.")).toBe(4);
     });
 
-    it("counts a prefixed DETAIL whose casing differs", () => {
+    it("counts a prefixed DEFINITION whose casing differs", () => {
         // "[^CH-7]:" IS namespace "ch-" in Obsidian's eyes
         expect(computeNextFootnoteNumber("[^CH-7]: orphan", "ch-")).toBe(8);
     });

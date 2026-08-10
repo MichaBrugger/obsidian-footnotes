@@ -6,64 +6,64 @@ import {
     removeOrphanedFootnoteDefinitions,
 } from "../src/linting/rules/remove-orphaned-definitions";
 import {
-    orphanedFootnoteMarkerNames,
-    removeOrphanedFootnoteMarkers,
-} from "../src/linting/rules/remove-orphaned-markers";
+    orphanedFootnoteReferenceNames,
+    removeOrphanedFootnoteReferences,
+} from "../src/linting/rules/remove-orphaned-references";
 
-// The symmetric orphan handling (requested 2026-08-10): markers with no
-// definition and definitions with no marker each get a delete toggle, and
+// The symmetric orphan handling (requested 2026-08-10): references with no
+// definition and definitions with no reference each get a delete toggle, and
 // while a toggle is off linting alerts about that orphan kind instead —
 // orphans are never silent.
 
-describe("orphanedFootnoteMarkerNames (the alert's list)", () => {
-    it("lists markers with no definition, in first-appearance order", () => {
+describe("orphanedFootnoteReferenceNames (the alert's list)", () => {
+    it("lists references with no definition, in first-appearance order", () => {
         const doc = "a[^9] b[^note] c[^1]\n\n[^1]: one";
-        expect(orphanedFootnoteMarkerNames(doc)).toEqual(["9", "note"]);
+        expect(orphanedFootnoteReferenceNames(doc)).toEqual(["9", "note"]);
     });
 
-    it("a definition in any casing keeps its markers off the list", () => {
-        expect(orphanedFootnoteMarkerNames("see[^Note]\n\n[^note]: n")).toEqual([]);
+    it("a definition in any casing keeps its references off the list", () => {
+        expect(orphanedFootnoteReferenceNames("see[^Note]\n\n[^note]: n")).toEqual([]);
     });
 
     it("repeats of one orphan are listed once, first-seen casing", () => {
-        expect(orphanedFootnoteMarkerNames("a[^Tag] b[^tag]")).toEqual(["Tag"]);
+        expect(orphanedFootnoteReferenceNames("a[^Tag] b[^tag]")).toEqual(["Tag"]);
     });
 
-    it("markers in code and invalid names don't count", () => {
+    it("references in code and invalid names don't count", () => {
         const doc = "`x[^9]` and [^my note] end";
-        expect(orphanedFootnoteMarkerNames(doc)).toEqual([]);
+        expect(orphanedFootnoteReferenceNames(doc)).toEqual([]);
     });
 
     it("the note's bare-prefix placeholder is not an orphan", () => {
-        expect(orphanedFootnoteMarkerNames("mid [^ch~] naming", "ch~")).toEqual([]);
+        expect(orphanedFootnoteReferenceNames("mid [^ch~] naming", "ch~")).toEqual([]);
         // case-variant placeholder too — ids fold
-        expect(orphanedFootnoteMarkerNames("mid [^CH~] naming", "ch~")).toEqual([]);
+        expect(orphanedFootnoteReferenceNames("mid [^CH~] naming", "ch~")).toEqual([]);
         // …but only the exact placeholder — a named orphan still counts
-        expect(orphanedFootnoteMarkerNames("mid [^2.] x[^stray]", "2.")).toEqual([
+        expect(orphanedFootnoteReferenceNames("mid [^2.] x[^stray]", "2.")).toEqual([
             "stray",
         ]);
     });
 });
 
-describe("removeOrphanedFootnoteMarkers", () => {
-    it("removes every occurrence of an orphaned marker, keeps referenced ones", () => {
+describe("removeOrphanedFootnoteReferences", () => {
+    it("removes every occurrence of an orphaned reference, keeps referenced ones", () => {
         const doc = "keep[^1] drop[^9] again[^9] end\n\n[^1]: one";
-        expect(removeOrphanedFootnoteMarkers(doc)).toBe(
+        expect(removeOrphanedFootnoteReferences(doc)).toBe(
             "keep[^1] drop again end\n\n[^1]: one",
         );
     });
 
     it("heals the spacing seam between words", () => {
-        expect(removeOrphanedFootnoteMarkers("a [^9] b")).toBe("a b");
-        expect(removeOrphanedFootnoteMarkers("[^9] start")).toBe("start");
+        expect(removeOrphanedFootnoteReferences("a [^9] b")).toBe("a b");
+        expect(removeOrphanedFootnoteReferences("[^9] start")).toBe("start");
     });
 
-    it("a marker closing the line takes its leading space along", () => {
-        expect(removeOrphanedFootnoteMarkers("word [^9]")).toBe("word");
+    it("a reference closing the line takes its leading space along", () => {
+        expect(removeOrphanedFootnoteReferences("word [^9]")).toBe("word");
     });
 
-    it("preserves a markdown hard break after the marker", () => {
-        expect(removeOrphanedFootnoteMarkers("word[^9]  \nnext")).toBe(
+    it("preserves a markdown hard break after the reference", () => {
+        expect(removeOrphanedFootnoteReferences("word[^9]  \nnext")).toBe(
             "word  \nnext",
         );
     });
@@ -75,43 +75,43 @@ describe("removeOrphanedFootnoteMarkers", () => {
             "```",
             "prose `x[^8]` and [^my note] here",
         ].join("\n");
-        expect(removeOrphanedFootnoteMarkers(doc)).toBe(doc);
+        expect(removeOrphanedFootnoteReferences(doc)).toBe(doc);
     });
 
     it("never deletes the note's bare-prefix placeholder", () => {
-        expect(removeOrphanedFootnoteMarkers("mid [^p-] naming", "p-")).toBe(
+        expect(removeOrphanedFootnoteReferences("mid [^p-] naming", "p-")).toBe(
             "mid [^p-] naming",
         );
     });
 
-    it("case-variant definitions keep their markers", () => {
+    it("case-variant definitions keep their references", () => {
         const doc = "see[^Note] end\n\n[^note]: n";
-        expect(removeOrphanedFootnoteMarkers(doc)).toBe(doc);
+        expect(removeOrphanedFootnoteReferences(doc)).toBe(doc);
     });
 
     it("is idempotent", () => {
-        const once = removeOrphanedFootnoteMarkers("a[^9] b[^1]\n\n[^1]: one");
-        expect(removeOrphanedFootnoteMarkers(once)).toBe(once);
+        const once = removeOrphanedFootnoteReferences("a[^9] b[^1]\n\n[^1]: one");
+        expect(removeOrphanedFootnoteReferences(once)).toBe(once);
     });
 
     it("preserves CRLF line endings", () => {
-        expect(removeOrphanedFootnoteMarkers("drop[^9] x\r\nnext")).toBe(
+        expect(removeOrphanedFootnoteReferences("drop[^9] x\r\nnext")).toBe(
             "drop x\r\nnext",
         );
     });
 });
 
-describe("lintFootnotes with removeOrphanedMarkers", () => {
+describe("lintFootnotes with removeOrphanedReferences", () => {
     it("deletes orphans first, then reindexes the survivors", () => {
         const doc = "a[^7] b[^3] end\n\n[^3]: three";
         expect(
-            lintFootnotes(doc, { removeOrphanedMarkers: true }),
+            lintFootnotes(doc, { removeOrphanedReferences: true }),
         ).toBe("a b[^1] end\n\n[^1]: three");
     });
 
     it("one lint pass converges (idempotent with deletion on)", () => {
         const doc = "a[^7] b[^3].\n\n[^3]: three\n[^9]: orphan def";
-        const options = { removeOrphanedMarkers: true };
+        const options = { removeOrphanedReferences: true };
         const once = lintFootnotes(doc, options);
         expect(lintFootnotes(once, options)).toBe(once);
     });
@@ -119,7 +119,7 @@ describe("lintFootnotes with removeOrphanedMarkers", () => {
     it("the safe prefix rides through the pipeline", () => {
         const doc = "---\nfootnote-prefix: 2.\n---\nmid [^2.] naming";
         const out = lintFootnotes(doc, {
-            removeOrphanedMarkers: true,
+            removeOrphanedReferences: true,
             orphanSafePrefix: "2.",
         });
         expect(out).toContain("[^2.]");
@@ -148,7 +148,7 @@ describe("removeOrphanedFootnoteDefinitions", () => {
         expect(removeOrphanedFootnoteDefinitions(doc)).toBe(doc);
     });
 
-    it("a case-variant marker keeps its definition", () => {
+    it("a case-variant reference keeps its definition", () => {
         const doc = "see[^Note]\n\n[^note]: n";
         expect(removeOrphanedFootnoteDefinitions(doc)).toBe(doc);
     });
@@ -172,18 +172,18 @@ describe("removeOrphanedFootnoteDefinitions", () => {
 });
 
 describe("orphanedFootnoteDefinitionNames (the definition-side alert)", () => {
-    it("lists definitions no marker references, in definition order", () => {
+    it("lists definitions nothing references, in definition order", () => {
         const doc = "text[^1]\n\n[^1]: used\n[^9]: stray\n[^note]: also stray";
         expect(orphanedFootnoteDefinitionNames(doc)).toEqual(["9", "note"]);
     });
 
-    it("a case-variant marker counts as a reference", () => {
+    it("a case-variant reference counts as a reference", () => {
         expect(
             orphanedFootnoteDefinitionNames("see[^Note]\n\n[^note]: n"),
         ).toEqual([]);
     });
 
-    it("a marker nested in another definition's body counts", () => {
+    it("a reference nested in another definition's body counts", () => {
         const doc = "text[^1]\n\n[^1]: see also[^2]\n[^2]: nested ref";
         expect(orphanedFootnoteDefinitionNames(doc)).toEqual([]);
     });

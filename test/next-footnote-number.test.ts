@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { computeNextFootnoteNumber } from "../src/insert-or-navigate-footnotes";
 
 // The pure core of the auto-numbered command: next number = highest
-// existing numbered marker/detail + 1. Deliberate policy pinned here:
+// existing numbered reference/definition + 1. Deliberate policy pinned here:
 // gaps are never reused and named footnotes never count.
 
 describe("computeNextFootnoteNumber", () => {
@@ -29,7 +29,7 @@ describe("computeNextFootnoteNumber", () => {
         expect(computeNextFootnoteNumber("alpha[^note] bravo[^why]")).toBe(1);
     });
 
-    it("counts only the numbered markers in a mixed document", () => {
+    it("counts only the numbered references in a mixed document", () => {
         expect(computeNextFootnoteNumber("alpha[^note] bravo[^4]")).toBe(5);
     });
 
@@ -37,9 +37,9 @@ describe("computeNextFootnoteNumber", () => {
         expect(computeNextFootnoteNumber("alpha[^2] bravo[^2]")).toBe(3);
     });
 
-    it("counts detail lines as well as markers", () => {
-        // an orphaned detail still reserves its number
-        expect(computeNextFootnoteNumber("[^7]: an orphaned detail")).toBe(8);
+    it("counts definition lines as well as references", () => {
+        // an orphaned definition still reserves its number
+        expect(computeNextFootnoteNumber("[^7]: an orphaned definition")).toBe(8);
     });
 
     it("handles multi-digit numbers", () => {
@@ -60,11 +60,11 @@ describe("computeNextFootnoteNumber", () => {
 // must not split a namespace — and prefixes come in all separator shapes,
 // including regex-special ones
 describe("computeNextFootnoteNumber with a prefix", () => {
-    it("counts only markers carrying the prefix", () => {
+    it("counts only references carrying the prefix", () => {
         expect(computeNextFootnoteNumber("a[^7] b[^2-3]", "2-")).toBe(4);
     });
 
-    it("plain numbered markers belong to the empty prefix only", () => {
+    it("plain numbered references belong to the empty prefix only", () => {
         expect(computeNextFootnoteNumber("a[^7] b[^2-3]", "")).toBe(8);
     });
 
@@ -79,7 +79,7 @@ describe("computeNextFootnoteNumber with a prefix", () => {
         expect(computeNextFootnoteNumber("x[^V+9]", "v+")).toBe(10);
     });
 
-    it("a case-variant prefixed DETAIL reserves its number too", () => {
+    it("a case-variant prefixed DEFINITION reserves its number too", () => {
         expect(computeNextFootnoteNumber("[^AB-6]: orphan", "ab-")).toBe(7);
     });
 });

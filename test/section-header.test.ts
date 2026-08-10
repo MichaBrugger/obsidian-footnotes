@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { addFootnoteSectionHeader } from "../src/insert-or-navigate-footnotes";
 import type FootnotePlugin from "../src/main";
 
-// The optional heading inserted above the first footnote detail. A blank
+// The optional heading inserted above the first footnote definition. A blank
 // line ALWAYS separates the heading from the content above it (markdown
 // block convention, requested 2026-07-20) — which also keeps a heading
 // starting with a divider (---/***/___) from turning the last text line

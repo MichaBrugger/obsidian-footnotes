@@ -9,7 +9,7 @@ import { reindexFootnotes } from "../../src/linting/rules/re-index-footnotes";
 // start are treated as live footnote syntax and rewritten by lint transforms.
 // Hunt: 2026-08-10. Lens: contexts.
 // protectedLines deliberately does NOT detect indented code (documented:
-// "indentation is how definition continuations work"), so the inert marker
+// "indentation is how definition continuations work"), so the inert reference
 // reserves a number (computeNextFootnoteNumber returns 91, not 3) and
 // reindex / punctuation / apply-prefix rewrite inside the code block. A
 // Protecting these blocks must remain context-aware because indentation is

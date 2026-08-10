@@ -1,6 +1,6 @@
 import {
     computeNextFootnoteNumber,
-    footnoteMarkerMatches,
+    footnoteReferenceMatches,
     footnotePrefixProblem,
 } from "../../insert-or-navigate-footnotes";
 import {
@@ -17,7 +17,7 @@ import { FootnoteRule } from "../rule";
 // QOL rule (2026-07-18): footnotes written before the note got its
 // footnote-prefix property stay unprefixed — this renames them to carry
 // the prefix. Plain numbered footnotes convert in first-appearance order
-// (markers first, then orphaned definitions), numbered AFTER the highest
+// (references first, then orphaned definitions), numbered AFTER the highest
 // existing prefixed footnote so nothing collides. Named footnotes keep
 // their name behind the prefix ("[^note]" → "[^2.note]", A6 bug
 // 2026-07-20) — except when the prefixed name already exists as another
@@ -38,7 +38,7 @@ export function applyFootnotePrefix(markdown: string, prefix: string): string {
     const isProtected = protectedLines(lines);
     const blocks = findDefinitionBlocks(lines, isProtected);
 
-    // one scan collects both: distinct plain-numbered names by first marker
+    // one scan collects both: distinct plain-numbered names by first reference
     // appearance then orphaned definitions (numbers have no casing, so no
     // folding needed for `order`), and every id in the note (folded) for
     // the named-rename collision guard below
@@ -54,7 +54,7 @@ export function applyFootnotePrefix(markdown: string, prefix: string): string {
     };
     for (let i = 0; i < lines.length; i++) {
         if (isProtected[i]) continue;
-        for (const match of footnoteMarkerMatches(maskInlineRegions(lines[i]))) {
+        for (const match of footnoteReferenceMatches(maskInlineRegions(lines[i]))) {
             // re-slice the original: a code span inside the name masks to
             // NULs in match[1], and the rewrite below compares original ids
             const start = match.index ?? 0;
@@ -91,7 +91,7 @@ export function applyFootnotePrefix(markdown: string, prefix: string): string {
         const masked = maskInlineRegions(line);
         let result = "";
         let copied = 0;
-        for (const match of footnoteMarkerMatches(masked)) {
+        for (const match of footnoteReferenceMatches(masked)) {
             const start = match.index ?? 0;
             // re-slice the original for the id: a code span inside the
             // name masks to NULs in match[1]

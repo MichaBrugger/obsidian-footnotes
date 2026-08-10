@@ -2,13 +2,13 @@ import { Editor, EditorChange, EditorPosition } from "obsidian";
 import { describe, expect, it } from "vitest";
 
 import FootnotePlugin from "../../src/main";
-import { shouldCreateFootnoteMarker } from "../../src/insert-or-navigate-footnotes";
+import { shouldCreateFootnoteReference } from "../../src/insert-or-navigate-footnotes";
 
 // BUG: pressing the named-footnote hotkey twice in a row (before typing a name)
-// nests a second empty marker inside the first: "[^]" becomes "[^[^]]". The
+// nests a second empty reference inside the first: "[^]" becomes "[^[^]]". The
 // first press leaves "[^]" with the caret between the brackets; the second press
-// falls all the way to shouldCreateFootnoteMarker, which blindly inserts another
-// "[^]" at the caret. The empty "[^]" doesn't match AllMarkers (which requires a
+// falls all the way to shouldCreateFootnoteReference, which blindly inserts another
+// "[^]" at the caret. The empty "[^]" doesn't match AllReferences (which requires a
 // non-empty name), so every earlier cascade step misses it. The inline command
 // already handles the equivalent double-press by hopping the caret out; the
 // named command has no guard.
@@ -51,12 +51,12 @@ function fakePlugin(overrides: Record<string, unknown> = {}): FootnotePlugin {
     } as unknown as FootnotePlugin;
 }
 
-describe("bug: double-pressing the named hotkey nests [^] markers", () => {
-    it("does not insert a second [^] inside the empty marker", () => {
+describe("bug: double-pressing the named hotkey nests [^] references", () => {
+    it("does not insert a second [^] inside the empty reference", () => {
         const line = "[^]";
         const doc = fakeEditor([line]);
         // caret between the brackets, where the first press left it
-        shouldCreateFootnoteMarker(line, { line: 0, ch: 2 }, doc, fakePlugin());
+        shouldCreateFootnoteReference(line, { line: 0, ch: 2 }, doc, fakePlugin());
         const inserted = doc.appliedChanges.some(
             (change) => change.text === "[^]" && change.from.ch === 2,
         );

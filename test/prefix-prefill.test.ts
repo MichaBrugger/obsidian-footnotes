@@ -4,9 +4,9 @@ import { describe, expect, it, vi } from "vitest";
 import FootnotePlugin from "../src/main";
 import {
     shouldCreateAutonumFootnote,
-    shouldCreateFootnoteMarker,
-    shouldCreateMatchingFootnoteDetail,
-    warnPrefilledMarkerIfInside,
+    shouldCreateFootnoteReference,
+    shouldCreateMatchingFootnoteDefinition,
+    warnPrefilledReferenceIfInside,
 } from "../src/insert-or-navigate-footnotes";
 
 vi.mock("obsidian", async (importOriginal) => ({
@@ -15,12 +15,12 @@ vi.mock("obsidian", async (importOriginal) => ({
 }));
 
 // Prefix-at-bracket-creation (requested 2026-07-20, replacing the
-// detail-time rename): with an active footnote-prefix the named command
+// definition-time rename): with an active footnote-prefix the named command
 // creates "[^7-]" with the caret right after the prefix — the user SEES
 // the namespace while typing the name. A press inside the untouched
 // placeholder keeps the caret where it is and asks for a suffix instead
 // (2026-08-05; it used to hop out, which was harder to understand).
-// Detail creation no longer renames anything.
+// Definition creation no longer renames anything.
 
 interface FakeDoc extends Editor {
     appliedChanges: EditorChange[];
@@ -67,13 +67,13 @@ function fakePlugin(enablePrefix: boolean): FootnotePlugin {
 
 const FRONTMATTER = ["---", "footnote-prefix: 7-", "---"];
 
-describe("named command prefills the footnote-prefix into the new marker", () => {
+describe("named command prefills the footnote-prefix into the new reference", () => {
     it("creates [^7-] with the caret right after the prefix", () => {
         const doc = fakeEditor([...FRONTMATTER, "Alpha bravo"], {
             line: 3,
             ch: 11,
         });
-        shouldCreateFootnoteMarker(
+        shouldCreateFootnoteReference(
             "Alpha bravo",
             { line: 3, ch: 11 },
             doc,
@@ -91,7 +91,7 @@ describe("named command prefills the footnote-prefix into the new marker", () =>
             line: 3,
             ch: 11,
         });
-        shouldCreateFootnoteMarker(
+        shouldCreateFootnoteReference(
             "Alpha bravo",
             { line: 3, ch: 11 },
             doc,
@@ -111,7 +111,7 @@ describe("named command prefills the footnote-prefix into the new marker", () =>
             ch: 5,
         });
         vi.mocked(Notice).mockClear();
-        shouldCreateFootnoteMarker(
+        shouldCreateFootnoteReference(
             "Alpha",
             { line: 3, ch: 5 },
             doc,
@@ -150,7 +150,7 @@ describe("named command prefills the footnote-prefix into the new marker", () =>
             line: 3,
             ch: 5,
         });
-        shouldCreateFootnoteMarker(
+        shouldCreateFootnoteReference(
             "Alpha",
             { line: 3, ch: 5 },
             doc,
@@ -162,14 +162,14 @@ describe("named command prefills the footnote-prefix into the new marker", () =>
     });
 });
 
-describe("warnPrefilledMarkerIfInside (the [^7-] placeholder toast)", () => {
+describe("warnPrefilledReferenceIfInside (the [^7-] placeholder toast)", () => {
     it("keeps the caret in place and asks for a suffix", () => {
         const doc = fakeEditor([...FRONTMATTER, "Alpha [^7-] bravo"], {
             line: 3,
             ch: 9,
         });
         vi.mocked(Notice).mockClear();
-        expect(warnPrefilledMarkerIfInside(fakePlugin(true), doc, null)).toBe(
+        expect(warnPrefilledReferenceIfInside(fakePlugin(true), doc, null)).toBe(
             true,
         );
         // the caret does NOT move — the toast is the whole response
@@ -185,7 +185,7 @@ describe("warnPrefilledMarkerIfInside (the [^7-] placeholder toast)", () => {
             line: 3,
             ch: 9,
         });
-        expect(warnPrefilledMarkerIfInside(fakePlugin(true), doc, null)).toBe(
+        expect(warnPrefilledReferenceIfInside(fakePlugin(true), doc, null)).toBe(
             false,
         );
     });
@@ -195,7 +195,7 @@ describe("warnPrefilledMarkerIfInside (the [^7-] placeholder toast)", () => {
             line: 3,
             ch: 9,
         });
-        expect(warnPrefilledMarkerIfInside(fakePlugin(false), doc, null)).toBe(
+        expect(warnPrefilledReferenceIfInside(fakePlugin(false), doc, null)).toBe(
             false,
         );
     });
@@ -205,14 +205,14 @@ describe("warnPrefilledMarkerIfInside (the [^7-] placeholder toast)", () => {
             line: 3,
             ch: 2,
         });
-        expect(warnPrefilledMarkerIfInside(fakePlugin(true), doc, null)).toBe(
+        expect(warnPrefilledReferenceIfInside(fakePlugin(true), doc, null)).toBe(
             false,
         );
     });
 });
 
-describe("detail creation no longer applies the prefix", () => {
-    it("a hand-typed unprefixed marker gets a matching unprefixed detail", () => {
+describe("definition creation no longer applies the prefix", () => {
+    it("a hand-typed unprefixed reference gets a matching unprefixed definition", () => {
         // the lint pass owns prefixing after the fact; the insert flow
         // applies the prefix at bracket creation only
         const doc = fakeEditor([...FRONTMATTER, "Alpha [^tag] b"], {
@@ -220,7 +220,7 @@ describe("detail creation no longer applies the prefix", () => {
             ch: 9,
         });
         expect(
-            shouldCreateMatchingFootnoteDetail(
+            shouldCreateMatchingFootnoteDefinition(
                 "Alpha [^tag] b",
                 { line: 3, ch: 9 },
                 fakePlugin(true),

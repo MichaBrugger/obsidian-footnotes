@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { endOfWordOffset } from "../src/insert-or-navigate-footnotes";
 
 // Cell-local twin of the main editor's end-of-word adjustment: used when
-// inserting a marker inside an actively edited table cell, where the main
+// inserting a reference inside an actively edited table cell, where the main
 // editor's wordAt() can't see the cell text.
 
 describe("endOfWordOffset", () => {
@@ -58,7 +58,7 @@ describe("endOfWordOffset", () => {
 
 // Unicode awareness (hunt 2026-07-17): a bare per-code-unit /\w/ walk matched
 // neither combining marks (U+0301) nor precomposed accented letters (U+00E9),
-// so a marker inserted in a table cell could land mid-grapheme or mid-word.
+// so a reference inserted in a table cell could land mid-grapheme or mid-word.
 // Strings use \u escapes so decomposed vs precomposed is exact.
 describe("endOfWordOffset and unicode graphemes/words", () => {
     const COMBINING_ACUTE = String.fromCharCode(0x0301);

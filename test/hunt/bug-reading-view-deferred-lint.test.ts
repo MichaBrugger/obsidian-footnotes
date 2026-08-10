@@ -70,7 +70,7 @@ function pluginFor(
             footnoteSectionHeading: "# Footnotes",
             enableRemoveBlankLastLines: true,
             renumberNamedFootnotes: false,
-            lintDeleteOrphanedMarkers: false,
+            lintDeleteOrphanedReferences: false,
             lintDeleteOrphanedDefinitions: false,
             lintFixPunctuation: true,
             lintMoveToBottom: true,

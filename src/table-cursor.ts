@@ -121,8 +121,8 @@ export function resolveTableCellCursor(editor: Editor): EditorPosition | null {
     // the raw text. The walk is escape-aware: the cell editor shows "\|"
     // as a bare "|", so each escape byte before the caret consumes a
     // source column but no cell-editor column — plain addition resolved
-    // one column short per escape and read a caret just inside a marker
-    // as OUTSIDE it, nesting a new marker (bug-table-escape-offset).
+    // one column short per escape and read a caret just inside a reference
+    // as OUTSIDE it, nesting a new reference (bug-table-escape-offset).
     const rawCell = lineText.slice(span.from, span.to);
     const cellText = cellView.state.doc.toString();
     let start = rawCell.length - rawCell.trimStart().length;

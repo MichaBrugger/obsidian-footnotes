@@ -6,7 +6,7 @@ import { footnoteAfterPunctuation } from "../../src/linting/rules/footnote-after
 // ("> [^1]: def") as a live footnote definition?
 // Hunt: 2026-08-09. Lens: contexts.
 // DefinitionStart anchors at column 0, so the blockquoted label reads as a
-// MARKER followed by a colon and the punctuation rule swaps the marker across
+// REFERENCE followed by a colon and the punctuation rule swaps the reference across
 // its own colon: "> [^1]: def." currently becomes "> :[^1] def.". If Obsidian
 // renders blockquoted definitions live (markdown-it-footnote does), this
 // corrupts a definition label; if not, the swap is harmless.

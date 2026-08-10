@@ -43,7 +43,7 @@ export default class FootnotePlugin extends Plugin {
   // The active markdown view, but only when its text can actually be
   // edited on screen: the text-editing commands disappear from the palette
   // in Reading view, where the editor API would edit the HIDDEN buffer —
-  // invisible insertions and toasts about markers the user can't see
+  // invisible insertions and toasts about references the user can't see
   // (reported 2026-08-08). "Set footnote prefix" deliberately stays
   // available there; a frontmatter edit is legitimate in Reading view.
   editableMarkdownView(): MarkdownView | null {
@@ -264,7 +264,7 @@ export default class FootnotePlugin extends Plugin {
           delete legacyOrphans.keepOrphanedDefinitions;
         }
         if (legacyOrphans.lintOrphanedMarkers !== undefined) {
-          this.settings.lintDeleteOrphanedMarkers =
+          this.settings.lintDeleteOrphanedReferences =
             legacyOrphans.lintOrphanedMarkers === "delete";
           delete legacyOrphans.lintOrphanedMarkers;
         }

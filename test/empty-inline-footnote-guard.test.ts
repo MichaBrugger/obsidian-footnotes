@@ -11,7 +11,7 @@ import {
 // Manual combo-test feedback (Jason, 2026-08-08): a second press of the
 // inline hotkey while the just-inserted "^[]" was still EMPTY silently
 // hopped the caret out, stranding an inline footnote with no text. Like
-// the empty "[^]" marker, every footnote command now warns to fill it out
+// the empty "[^]" reference, every footnote command now warns to fill it out
 // and keeps the caret in place. A FILLED inline footnote keeps the hop:
 // there the second press is the deliberate "done typing" gesture.
 

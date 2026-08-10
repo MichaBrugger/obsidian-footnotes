@@ -5,7 +5,7 @@ import { exitInlineFootnoteIfInside } from "../src/insert-or-navigate-footnotes"
 
 // QOL (2026-07-18): the numbered/named hotkeys pressed INSIDE an inline
 // footnote hop the caret past its closing bracket instead of nesting a
-// "[^x]" marker in there, which would end the inline footnote early
+// "[^x]" reference in there, which would end the inline footnote early
 // ("^[in [^named]line]").
 
 function fakeEditor(line: string, ch: number) {
@@ -32,7 +32,7 @@ describe("exitInlineFootnoteIfInside", () => {
         expect(moves).toEqual([]);
     });
 
-    // bracket-walking details (nesting, escapes, unclosed) are the pure
+    // bracket-walking definitions (nesting, escapes, unclosed) are the pure
     // core's spec — see inline-footnote-exit.test.ts; this file only pins
     // the wrapper's delegation and editor plumbing
 

@@ -3,13 +3,13 @@ import { describe, expect, it } from "vitest";
 
 import {
     isValidFootnoteName,
-    shouldCreateMatchingFootnoteDetail,
+    shouldCreateMatchingFootnoteDefinition,
 } from "../src/insert-or-navigate-footnotes";
 import type FootnotePlugin from "../src/main";
 
 // Regression (reported 2026-07-14): footnote names containing spaces are a
 // common authoring mistake that Obsidian won't render. Instead of silently
-// creating a broken detail for them, the plugin warns the user.
+// creating a broken definition for them, the plugin warns the user.
 
 describe("isValidFootnoteName", () => {
     it("accepts alphanumeric names", () => {
@@ -41,8 +41,8 @@ describe("isValidFootnoteName", () => {
     });
 });
 
-describe("shouldCreateMatchingFootnoteDetail with an invalid name", () => {
-    it("warns and stops instead of creating a detail", () => {
+describe("shouldCreateMatchingFootnoteDefinition with an invalid name", () => {
+    it("warns and stops instead of creating a definition", () => {
         const line = "alpha[^my note] bravo";
         const doc = {
             getLine: () => line,
@@ -51,7 +51,7 @@ describe("shouldCreateMatchingFootnoteDetail with an invalid name", () => {
 
         // returning true consumes the hotkey press; the fake editor has no
         // transaction method, so reaching the creation path would throw
-        const handled = shouldCreateMatchingFootnoteDetail(
+        const handled = shouldCreateMatchingFootnoteDefinition(
             line,
             { line: 0, ch: 7 }, // cursor inside [^my note]
             {} as FootnotePlugin,
@@ -67,7 +67,7 @@ describe("shouldCreateMatchingFootnoteDetail with an invalid name", () => {
             lineCount: () => 1,
         } as unknown as Editor;
 
-        const handled = shouldCreateMatchingFootnoteDetail(
+        const handled = shouldCreateMatchingFootnoteDefinition(
             line,
             { line: 0, ch: 8 }, // cursor inside [^`c`]
             {} as FootnotePlugin,

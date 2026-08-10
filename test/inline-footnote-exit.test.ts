@@ -67,7 +67,7 @@ describe("inlineFootnoteExitCh", () => {
         expect(inlineFootnoteExitCh("a^[unclosed", 5)).toBeNull();
     });
 
-    it("does not treat a [^1] reference marker as an inline footnote", () => {
+    it("does not treat a [^1] reference reference as an inline footnote", () => {
         expect(inlineFootnoteExitCh("a[^1]b", 3)).toBeNull();
     });
 });

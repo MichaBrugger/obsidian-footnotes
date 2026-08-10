@@ -2,14 +2,14 @@ import { Editor, EditorChange, EditorPosition } from "obsidian";
 import { describe, expect, it } from "vitest";
 
 import FootnotePlugin from "../../src/main";
-import { shouldJumpFromDetailToMarker } from "../../src/insert-or-navigate-footnotes";
+import { shouldJumpFromDefinitionToReference } from "../../src/insert-or-navigate-footnotes";
 
-// spec question: with the caret on [^b]'s marker inside [^a]'s indented
-// continuation line, should the hotkey navigate to [^b]'s detail, or jump
-// back to [^a]'s marker?
+// spec question: with the caret on [^b]'s reference inside [^a]'s indented
+// continuation line, should the hotkey navigate to [^b]'s definition, or jump
+// back to [^a]'s reference?
 // Hunt: 2026-08-09. Lens: grammar.
 // The cascade's definition-block-membership check runs FIRST and claims the
-// press (jumping to [^a]'s first marker), so the marker→detail path for [^b]
+// press (jumping to [^a]'s first reference), so the reference→definition path for [^b]
 // never runs. The order is deliberate — the 2026-07-17 jump-back fix depends
 // on it — but the navigation target can surprise a user who aimed at [^b].
 
@@ -55,7 +55,7 @@ function fakePlugin(): FootnotePlugin {
 }
 
 describe("spec question: navigation priority inside a continuation line", () => {
-    it.fails("caret on ANOTHER footnote's marker inside a continuation line jumps to THAT detail", () => {
+    it.fails("caret on ANOTHER footnote's reference inside a continuation line jumps to THAT definition", () => {
         const lines = [
             "text[^a] more[^b]",
             "",
@@ -65,8 +65,8 @@ describe("spec question: navigation priority inside a continuation line", () => 
             "[^b]: second",
         ];
         const doc = fakeEditor(lines, { line: 3, ch: 17 }); // inside [^b]
-        const handled = shouldJumpFromDetailToMarker(lines[3], doc.cursor, doc, fakePlugin());
-        // user intent: navigate to [^b]'s detail on line 5
+        const handled = shouldJumpFromDefinitionToReference(lines[3], doc.cursor, doc, fakePlugin());
+        // user intent: navigate to [^b]'s definition on line 5
         expect(handled).toBe(false);
     });
 });

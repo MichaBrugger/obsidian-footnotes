@@ -11,7 +11,7 @@ import { lintBlockedByPrefix } from "../src/linting/linter";
 // numbered footnotes namespaced (e.g. [^2.1] in chapter 2) so the combined
 // export has no colliding numbers. The prefix comes from a per-note
 // frontmatter property `footnote-prefix`; the autonumbered command then
-// counts and creates only markers carrying that prefix.
+// counts and creates only references carrying that prefix.
 
 describe("footnotePrefix", () => {
     it("returns empty for a note without frontmatter", () => {
@@ -50,15 +50,15 @@ describe("footnotePrefix", () => {
 });
 
 describe("computeNextFootnoteNumber with a prefix", () => {
-    it("counts only markers carrying the prefix", () => {
+    it("counts only references carrying the prefix", () => {
         expect(computeNextFootnoteNumber("a[^2.1] b[^2.3]", "2.")).toBe(4);
     });
 
-    it("plain numbered markers do not count under a prefix", () => {
+    it("plain numbered references do not count under a prefix", () => {
         expect(computeNextFootnoteNumber("a[^9] b[^2.1]", "2.")).toBe(2);
     });
 
-    it("prefixed markers do not count without the prefix", () => {
+    it("prefixed references do not count without the prefix", () => {
         expect(computeNextFootnoteNumber("a[^9] b[^2.1]")).toBe(10);
     });
 
@@ -73,7 +73,7 @@ describe("computeNextFootnoteNumber with a prefix", () => {
         ).toBe(1);
     });
 
-    it("counts prefixed details as reserving their number", () => {
+    it("counts prefixed definitions as reserving their number", () => {
         expect(computeNextFootnoteNumber("[^2.7]: orphan", "2.")).toBe(8);
     });
 });

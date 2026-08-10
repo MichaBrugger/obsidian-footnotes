@@ -10,10 +10,10 @@ import {
 } from "../src/insert-or-navigate-footnotes";
 
 // QOL sweep (2026-08-07): any footnote command pressed with the caret inside
-// an abandoned empty marker "[^]" warns ("give it a name") and leaves the
+// an abandoned empty reference "[^]" warns ("give it a name") and leaves the
 // caret in place, instead of the old per-command chaos: the named command
 // hopped out past the bracket, and the numbered/inline commands — which
-// never see "[^]" because the marker regexes require a non-empty name —
+// never see "[^]" because the reference regexes require a non-empty name —
 // nested a new insertion INTO it ("[^[^1]]", "[^^[]]"), corrupting the note.
 
 interface FakeDoc extends Editor {
@@ -71,7 +71,7 @@ afterEach(() => {
 const LINE = "word [^] more";
 const INSIDE = { line: 0, ch: 7 };
 
-describe("footnote commands inside an empty [^] marker", () => {
+describe("footnote commands inside an empty [^] reference", () => {
     it("numbered command warns instead of nesting [^N] into it", async () => {
         const doc = fakeEditor([LINE], { ...INSIDE });
         await insertAutonumFootnote(fakePlugin(doc));
@@ -103,7 +103,7 @@ describe("footnote commands inside an empty [^] marker", () => {
         expect(doc.cursor).toEqual(INSIDE);
     });
 
-    it("a caret outside the empty marker inserts normally", async () => {
+    it("a caret outside the empty reference inserts normally", async () => {
         const doc = fakeEditor([LINE], { line: 0, ch: 0 });
         await insertAutonumFootnote(fakePlugin(doc));
         expect(doc.appliedChanges.length).toBeGreaterThan(0);

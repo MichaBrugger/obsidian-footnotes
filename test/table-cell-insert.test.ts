@@ -59,14 +59,14 @@ describe("insertInTableCell", () => {
         ]);
     });
 
-    it("places the caret between the brackets of a named marker", () => {
+    it("places the caret between the brackets of a named reference", () => {
         const { cell, dispatched } = fakeCell("Sit", 3);
         insertInTableCell(cell, fakePlugin(false), "[^]", 2);
         // anchor = insertion point + 2 → between "[^" and "]"
         expect(dispatched[0]?.selection).toEqual({ anchor: 5 });
     });
 
-    it("places the caret after a full autonumbered marker", () => {
+    it("places the caret after a full autonumbered reference", () => {
         const { cell, dispatched } = fakeCell("Sit", 3);
         insertInTableCell(cell, fakePlugin(false), "[^12]", "[^12]".length);
         expect(dispatched[0]?.selection).toEqual({ anchor: 8 });
