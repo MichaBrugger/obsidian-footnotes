@@ -70,8 +70,12 @@ export function applyFootnotePrefix(markdown: string, prefix: string): string {
     }
 
     // plain numbers continue after the highest footnote already carrying
-    // the prefix
-    let nextNumber = computeNextFootnoteNumber(text, prefix);
+    // the prefix (the masked twin is already in hand — no re-mask, perf F1)
+    let nextNumber = computeNextFootnoteNumber(
+        text,
+        prefix,
+        maskedLines.join("\n"),
+    );
     const numberedRenames = new Map<string, string>();
     for (const name of order) {
         numberedRenames.set(name, `${prefix}${nextNumber++}`);

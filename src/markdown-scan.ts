@@ -186,12 +186,14 @@ export function maskLineRegions(
     return { masked: chars.join(""), endsInComment: false };
 }
 
-/** The two per-line facts the whole-document walk produces. */
+/** The per-line facts the whole-document walk produces. */
 export interface DocumentScan {
     /** Whole-line protected: YAML frontmatter, fenced code (delimiters included), and multi-line comment INTERIOR lines. Comment boundary lines are NOT here — their live portions stay scannable, with the comment part masked (bug-comment-boundary-lines). */
     isProtected: boolean[];
     /** Line `i` begins inside a multi-line HTML comment (it is a closer or interior line). */
     startsInComment: boolean[];
+    /** A line appended at EOF would itself be protected: an unclosed comment, or an unclosed DOCUMENT-LEVEL fence, runs to EOF (a blockquoted fence dies at the append point — the appended line ends its quote). Replaces move-to-bottom's probe re-scan (perf F6). */
+    endsProtected: boolean;
 }
 
 /**
@@ -274,7 +276,11 @@ export function scanDocument(lines: string[]): DocumentScan {
             inComment = maskLineRegions(src[i], false).endsInComment;
         }
     }
-    return { isProtected, startsInComment };
+    return {
+        isProtected,
+        startsInComment,
+        endsProtected: inComment || (fence !== null && fence.depth === 0),
+    };
 }
 
 /**

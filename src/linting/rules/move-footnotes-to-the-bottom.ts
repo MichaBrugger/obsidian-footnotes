@@ -2,6 +2,7 @@ import {
     findDefinitionBlocks,
     normalizeEol,
     protectedLines,
+    scanDocument,
     removeLineRanges,
     restoreEol,
 } from "../../markdown-scan";
@@ -42,15 +43,15 @@ export function moveFootnoteDefinitionsToBottom(
         trailingNewlines++;
     }
 
-    const isProtected = protectedLines(lines);
+    const scan = scanDocument(lines);
+    const isProtected = scan.isProtected;
     const blocks = findDefinitionBlocks(lines, isProtected);
     if (blocks.length === 0) return markdown;
 
-    // probe whether a line appended at EOF would itself be protected (an
-    // unclosed fence or comment runs to EOF) — relocating definitions into
-    // such a region would sever them from their references
-    const probe = protectedLines([...lines, "", "probe"]);
-    if (probe[probe.length - 1]) return markdown;
+    // a line appended at EOF would itself be protected (an unclosed fence
+    // or comment runs to EOF) — relocating definitions into such a region
+    // would sever them from their references
+    if (scan.endsProtected) return markdown;
 
     const definitions = blocks
         .map((block) => lines.slice(block.start, block.end + 1).join("\n"))

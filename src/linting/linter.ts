@@ -226,6 +226,10 @@ export function countEmptyFootnoteReferences(
     prefix = "",
 ): number {
     const needles = prefix ? ["[^]", `[^${prefix}]`] : ["[^]"];
+    // masking only ever REMOVES needle occurrences, so a raw miss is
+    // definitive — this runs on every lint, and most notes have no "[^]"
+    // (perf F4: skip the whole-document masking pass)
+    if (!needles.some((needle) => markdown.includes(needle))) return 0;
     let count = 0;
     const lines = maskProtectedLines(normalizeEol(markdown).text.split("\n"));
     for (const line of lines) {

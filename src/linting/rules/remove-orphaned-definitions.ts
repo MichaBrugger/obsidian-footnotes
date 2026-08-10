@@ -102,6 +102,9 @@ function deadBlocks(scan: ReferenceScan): DefinitionBlock[] {
  * the next lint.
  */
 export function orphanedFootnoteDefinitionNames(markdown: string): string[] {
+    // no "[^" anywhere means no definitions (and no orphans) — this alert
+    // scan runs on every lint (perf F4)
+    if (!markdown.includes("[^")) return [];
     const lines = normalizeEol(markdown).text.split("\n");
     const scan = scanReferences(lines, scanDocument(lines));
     const referenced = new Set(scan.liveRefs.keys());

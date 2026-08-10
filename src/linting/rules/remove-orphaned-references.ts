@@ -58,6 +58,9 @@ export function orphanedFootnoteReferenceNames(
     markdown: string,
     safePrefix = "",
 ): string[] {
+    // no "[^" anywhere means no references (and no orphans) — this alert
+    // scan runs on every lint (perf F4)
+    if (!markdown.includes("[^")) return [];
     const lines = normalizeEol(markdown).text.split("\n");
     const masked = maskProtectedLines(lines);
     const definitions = definitionNamesFolded(lines, masked);

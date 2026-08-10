@@ -9,7 +9,7 @@ import {
 import FootnotePlugin from "./main";
 import { openFootnotePopup, popupEditingAvailable, runAfterNextPopupSettle, settleFootnotePopupWithFeedback, toggleCloseFootnotePopup } from "./footnote-popup";
 import { lintAfterFootnoteCreation } from "./linting/linter";
-import { findDefinitionBlocks, maskInlineRegions, maskProtectedLines, maskedLineAt, protectedLines, scanDocument } from "./markdown-scan";
+import { DocumentScan, findDefinitionBlocks, maskInlineRegions, maskLineRegions, maskProtectedLines, maskedLineAt, scanDocument } from "./markdown-scan";
 import { EditorWithCm, VaultWithConfig, WindowWithVim } from "./obsidian-internals";
 import { activeTableCellEditor, resolveTableCellCursor, TableCellEditor } from "./table-cursor";
 
@@ -86,15 +86,60 @@ function docLines(doc: Editor): string[] {
     return lines;
 }
 
+/**
+ * One press's shared read-only view of the document (perf F1): the cascade
+ * steps used to each re-materialize the lines and re-walk the protection
+ * scan — 3–5 full-document passes per press. Every step takes an optional
+ * DocContext (defaulting to a fresh one, so direct/unit callers are
+ * unchanged) and the command entry points build ONE per press. Masking is
+ * lazy: per line on demand, whole-twin memoized on first full need. Built
+ * strictly BEFORE any edit of the press — creation steps edit last, so the
+ * context never goes stale within a press.
+ */
+export interface DocContext {
+    lines: string[];
+    scan: DocumentScan;
+    /** Line `i` of the masked twin ("" when out of range), cached per line. */
+    maskedLine(i: number): string;
+    /** The whole masked twin, memoized. */
+    maskedLines(): string[];
+}
+
+export function docContext(doc: Editor): DocContext {
+    const lines = docLines(doc);
+    const scan = scanDocument(lines);
+    const perLine: (string | undefined)[] = new Array<string | undefined>(
+        lines.length,
+    );
+    let full: string[] | null = null;
+    const maskedLine = (i: number): string => {
+        const line = lines[i];
+        if (line === undefined) return "";
+        if (full) return full[i];
+        let masked = perLine[i];
+        if (masked === undefined) {
+            masked = scan.isProtected[i]
+                ? "\0".repeat(line.length)
+                : maskLineRegions(line, scan.startsInComment[i]).masked;
+            perLine[i] = masked;
+        }
+        return masked;
+    };
+    const maskedLines = (): string[] =>
+        full ?? (full = maskProtectedLines(lines, scan));
+    return { lines, scan, maskedLine, maskedLines };
+}
+
 /** Names of all footnote definitions ("[^x]: …" lines) in document order, one per line at most. Code blocks don't count. */
 export function listExistingFootnoteDefinitions(
-    doc: Editor
+    doc: Editor,
+    ctx: DocContext = docContext(doc),
 ) {
     const definitionNames: string[] = [];
 
     //search each line for footnote definitions and add their names to the list
-    const lines = docLines(doc);
-    const masked = maskProtectedLines(lines);
+    const lines = ctx.lines;
+    const masked = ctx.maskedLines();
     for (let i = 0; i < lines.length; i++) {
         const match = masked[i].match(DefinitionInLine);
         if (match) {
@@ -188,7 +233,8 @@ export function shouldJumpFromDefinitionToReference(
     lineText: string,
     cursorPosition: EditorPosition,
     doc: Editor,
-    plugin: FootnotePlugin
+    plugin: FootnotePlugin,
+    ctx?: DocContext,
 ) {
     // check if we're in a footnote definition line ("[^1]: footnote") or one of
     // its continuation lines; if so, jump back to the footnote in the text
@@ -204,10 +250,12 @@ export function shouldJumpFromDefinitionToReference(
     // #41: a "[^x]:" inside a code block is not a definition, and a reference
     // inside code is not a jump target — resolve against protected-aware
     // definition blocks and scan the masked twin
-    const lines = docLines(doc);
-    // one protection scan feeds both the block lookup and the masking below
-    const scan = scanDocument(lines);
-    const block = findDefinitionBlocks(lines, scan.isProtected).find(
+    // built only past the raw-line gate above (the gate exists because
+    // this runs on every press — perf F1/F8)
+    ctx ??= docContext(doc);
+    const lines = ctx.lines;
+    // the press's one protection scan feeds the block lookup and masking
+    const block = findDefinitionBlocks(lines, ctx.scan.isProtected).find(
         (candidate) =>
             cursorPosition.line >= candidate.start &&
             cursorPosition.line <= candidate.end,
@@ -216,7 +264,7 @@ export function shouldJumpFromDefinitionToReference(
         // ids are case-insensitive, so the reference may differ in casing from
         // the definition's label ("[^Note]" ↔ "[^note]:") — fold both to compare
         const name = block.name.toLowerCase();
-        const masked = maskProtectedLines(lines, scan);
+        const masked = ctx.maskedLines();
 
         // find the FIRST reference use of this footnote. footnoteReferenceMatches
         // skips a definition's own column-0 label, so a definition line — this
@@ -256,12 +304,13 @@ export function jumpToFootnoteDefinition(
     footnoteName: string,
     cursorPosition: EditorPosition,
     doc: Editor,
-    plugin: FootnotePlugin
+    plugin: FootnotePlugin,
+    ctx: DocContext = docContext(doc),
 ) {
     // find the first line with this definition reference name in it — matching
     // the masked twin so definition-shaped lines inside code don't count (#41)
-    const lines = docLines(doc);
-    const masked = maskProtectedLines(lines);
+    const lines = ctx.lines;
+    const masked = ctx.maskedLines();
     for (let i = 0; i < masked.length; i++) {
         const lineMatch = masked[i].match(DefinitionInLine);
         // ids are case-insensitive: the definition label may differ in casing
@@ -310,7 +359,8 @@ export function shouldJumpFromReferenceToDefinition(
     lineText: string,
     cursorPosition: EditorPosition,
     doc: Editor,
-    plugin: FootnotePlugin
+    plugin: FootnotePlugin,
+    ctx?: DocContext,
 ) {
     // Jump cursor TO definition reference:
     // find the reference whose brackets contain the cursor on this line,
@@ -329,9 +379,11 @@ export function shouldJumpFromReferenceToDefinition(
     // inline code is plain text, so the press falls through to insertion.
     // The reference TEXT is re-sliced from the raw line: a code span inside
     // the name masks to NULs, and the masked name would break the definition
-    // lookup and jump below (bug-masked-name-identity)
-    const maskedLine =
-        maskedLineAt(docLines(doc), cursorPosition.line);
+    // lookup and jump below (bug-masked-name-identity).
+    // The context is built only past the raw gate — this step runs on
+    // every press, most of which sit on plain text (perf F1)
+    ctx ??= docContext(doc);
+    const maskedLine = ctx.maskedLine(cursorPosition.line);
     const referencesOnLine = footnoteReferenceMatches(maskedLine).map((match) => {
         const start = match.index ?? 0;
         return {
@@ -349,17 +401,19 @@ export function shouldJumpFromReferenceToDefinition(
 
             // references without a definition line fall through to the
             // definition-creation paths (ids compared case-insensitively)
-            if (!idListIncludes(listExistingFootnoteDefinitions(doc), footnoteName)) {
+            if (!idListIncludes(listExistingFootnoteDefinitions(doc, ctx), footnoteName)) {
                 return false;
             }
 
             if (popupEditingAvailable(plugin)) {
+                // the popup's close callback runs LATER, after its save may
+                // have edited the document — it must build a FRESH context
                 void openFootnotePopup(plugin, footnoteName, () =>
                     jumpToFootnoteDefinition(footnoteName, cursorPosition, doc, plugin)
                 );
                 return true;
             }
-            return jumpToFootnoteDefinition(footnoteName, cursorPosition, doc, plugin);
+            return jumpToFootnoteDefinition(footnoteName, cursorPosition, doc, plugin, ctx);
         }
     }
     return false;
@@ -402,9 +456,10 @@ export function buildDefinitionAppend(
     footnoteId: string,
     isFirstFootnote: boolean,
     plugin: FootnotePlugin,
+    ctx: DocContext = docContext(doc),
 ): { change: EditorChange; cursor: EditorPosition } {
-    const lines = docLines(doc);
-    const isProtected = protectedLines(lines);
+    const lines = ctx.lines;
+    const isProtected = ctx.scan.isProtected;
     const blocks = findDefinitionBlocks(lines, isProtected);
     // a non-blank line directly below the new definition would be pulled INTO
     // it — Obsidian lazily continues a definition into the next line — so
@@ -699,8 +754,14 @@ function activeFootnotePrefix(
 // inside code blocks or frontmatter don't reserve anything (#41). With a
 // `prefix`, only references carrying it count ("[^2.7]" under prefix "2."),
 // and plain numbered references belong to the "" prefix only.
-export function computeNextFootnoteNumber(markdownText: string, prefix = ""): number {
-    const masked = maskProtectedLines(markdownText.split("\n")).join("\n");
+export function computeNextFootnoteNumber(
+    markdownText: string,
+    prefix = "",
+    // callers holding the document's masked twin already (a press context
+    // or a lint rule) pass it to skip the re-mask — it must correspond to
+    // `markdownText` (perf F1)
+    masked: string = maskProtectedLines(markdownText.split("\n")).join("\n"),
+): number {
     const escaped = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     // /i: footnote ids are case-insensitive in Obsidian, so "[^P.1]" lives
     // in prefix "p."'s namespace and must reserve its number — a
@@ -756,20 +817,23 @@ export async function insertAutonumFootnote(plugin: FootnotePlugin) {
     if (warnPrefilledReferenceIfInside(plugin, doc, cell)) return;
     const run = (cursorPosition: EditorPosition) => {
         const lineText = doc.getLine(cursorPosition.line);
+        // ONE shared document view for the whole cascade (perf F1) — built
+        // inside run() so the table-fallback path reads post-sync state
+        const ctx = docContext(doc);
 
-        if (shouldJumpFromDefinitionToReference(lineText, cursorPosition, doc, plugin))
+        if (shouldJumpFromDefinitionToReference(lineText, cursorPosition, doc, plugin, ctx))
             return;
-        if (shouldJumpFromReferenceToDefinition(lineText, cursorPosition, doc, plugin))
+        if (shouldJumpFromReferenceToDefinition(lineText, cursorPosition, doc, plugin, ctx))
             return;
         // caret inside a reference with NO definition: continue the half-built
         // footnote (create its definition) instead of nesting "[^N]" into the
         // brackets — parity with the named and inline keys, so an
         // accidental numbered press mid-naming is just the next step
         // (reported from beta.9 phone testing, 2026-08-09)
-        if (shouldCreateMatchingFootnoteDefinition(lineText, cursorPosition, plugin, doc))
+        if (shouldCreateMatchingFootnoteDefinition(lineText, cursorPosition, plugin, doc, ctx))
             return;
 
-        shouldCreateAutonumFootnote(lineText, cursorPosition, plugin, doc, cell);
+        shouldCreateAutonumFootnote(lineText, cursorPosition, plugin, doc, cell, ctx);
     };
     if (cell) run(resolveTableCellCursor(doc) ?? doc.getCursor());
     else runOutsideTableCell(doc, run);
@@ -782,31 +846,36 @@ export function shouldCreateAutonumFootnote(
     cursorPosition: EditorPosition,
     plugin: FootnotePlugin,
     doc: Editor,
-    cell: TableCellEditor | null = null
+    cell: TableCellEditor | null = null,
+    ctx: DocContext = docContext(doc),
 ) {
     // create new footnote with the next numerical index — namespaced by the
     // note's footnote-prefix property when set (#31) — reading the editor
     // document (the view's data buffer lags editor edits by a tick, so it
     // can't be trusted here)
-    const markdownText = doc.getValue();
+    const markdownText = ctx.lines.join("\n");
     const prefix = activeFootnotePrefix(plugin, markdownText);
     // an invalid prefix blocks the insert outright (the Notice already
     // explained why) — no unprefixed fallback footnote to clean up
     if (prefix === null) return;
-    const currentMax = computeNextFootnoteNumber(markdownText, prefix);
+    const currentMax = computeNextFootnoteNumber(
+        markdownText,
+        prefix,
+        ctx.maskedLines().join("\n"),
+    );
 
     const footnoteId = `${prefix}${currentMax}`;
     const footnoteReference = `[^${footnoteId}]`;
 
     const isFirstFootnote =
-        listExistingFootnoteDefinitions(doc).length === 0 && currentMax === 1;
+        listExistingFootnoteDefinitions(doc, ctx).length === 0 && currentMax === 1;
 
     if (cell) {
         // the reference goes through the cell's own editor (never the main
         // editor — that races the cell's sync-back and corrupts the table);
         // the definition append is outside the table, so the main editor is safe
         insertInTableCell(cell, plugin, footnoteReference, footnoteReference.length);
-        const definition = buildDefinitionAppend(doc, footnoteId, isFirstFootnote, plugin);
+        const definition = buildDefinitionAppend(doc, footnoteId, isFirstFootnote, plugin, ctx);
         if (popupEditingAvailable(plugin)) {
             doc.transaction({ changes: [definition.change] });
             void openFootnotePopup(plugin, footnoteId, () =>
@@ -819,7 +888,7 @@ export function shouldCreateAutonumFootnote(
     }
 
     cursorPosition = adjustFootnotePosition(cursorPosition, doc, lineText, plugin);
-    const definition = buildDefinitionAppend(doc, footnoteId, isFirstFootnote, plugin);
+    const definition = buildDefinitionAppend(doc, footnoteId, isFirstFootnote, plugin, ctx);
     const changes: EditorChange[] = [
         { from: cursorPosition, text: footnoteReference },
         definition.change,
@@ -989,18 +1058,19 @@ export function navigateReferenceIfInside(
     if (referenceAtCursor(rawReferences, cursorPosition.ch) === null) return false;
 
     // the masked twin decides for real: a "[^x]" inside code is plain text,
-    // and inserting an inline footnote there is fine (#41 semantics)
-    const maskedLine =
-        maskedLineAt(docLines(doc), cursorPosition.line);
+    // and inserting an inline footnote there is fine (#41 semantics).
+    // One shared context past the gate serves the rest of the press (F1)
+    const ctx = docContext(doc);
+    const maskedLine = ctx.maskedLine(cursorPosition.line);
     const referencesOnLine = footnoteReferenceMatches(maskedLine).map((match) => ({
         footnote: match[0],
         startIndex: match.index ?? 0,
     }));
     if (referenceAtCursor(referencesOnLine, cursorPosition.ch) === null) return false;
 
-    if (shouldJumpFromReferenceToDefinition(lineText, cursorPosition, doc, plugin))
+    if (shouldJumpFromReferenceToDefinition(lineText, cursorPosition, doc, plugin, ctx))
         return true;
-    if (shouldCreateMatchingFootnoteDefinition(lineText, cursorPosition, plugin, doc))
+    if (shouldCreateMatchingFootnoteDefinition(lineText, cursorPosition, plugin, doc, ctx))
         return true;
     // however the cascade resolved (e.g. an invalid name's warning), the
     // press is handled — "^[…]" must never land inside the reference
@@ -1171,13 +1241,15 @@ export async function insertNamedFootnote(plugin: FootnotePlugin) {
     if (warnPrefilledReferenceIfInside(plugin, doc, cell)) return;
     const run = (cursorPosition: EditorPosition) => {
         const lineText = doc.getLine(cursorPosition.line);
+        // ONE shared document view for the whole cascade (perf F1)
+        const ctx = docContext(doc);
 
-        if (shouldJumpFromDefinitionToReference(lineText, cursorPosition, doc, plugin))
+        if (shouldJumpFromDefinitionToReference(lineText, cursorPosition, doc, plugin, ctx))
             return;
-        if (shouldJumpFromReferenceToDefinition(lineText, cursorPosition, doc, plugin))
+        if (shouldJumpFromReferenceToDefinition(lineText, cursorPosition, doc, plugin, ctx))
             return;
 
-        if (shouldCreateMatchingFootnoteDefinition(lineText, cursorPosition, plugin, doc))
+        if (shouldCreateMatchingFootnoteDefinition(lineText, cursorPosition, plugin, doc, ctx))
             return;
         shouldCreateFootnoteReference(lineText, cursorPosition, doc, plugin, cell);
     };
@@ -1190,7 +1262,8 @@ export function shouldCreateMatchingFootnoteDefinition(
     lineText: string,
     cursorPosition: EditorPosition,
     plugin: FootnotePlugin,
-    doc: Editor
+    doc: Editor,
+    ctx?: DocContext,
 ) {
     // Create matching footnote definition for footnote reference
 
@@ -1205,8 +1278,9 @@ export function shouldCreateMatchingFootnoteDefinition(
     }));
     if (referenceAtCursor(rawReferences, cursorPosition.ch) === null) return;
 
-    const maskedLine =
-        maskedLineAt(docLines(doc), cursorPosition.line);
+    // built only past the raw gate (perf F1)
+    ctx ??= docContext(doc);
+    const maskedLine = ctx.maskedLine(cursorPosition.line);
     // re-slice the raw line for the reference text — a code span inside the
     // name masks to NULs, and creating a definition from the masked name wrote
     // literal NUL bytes into the note (bug-masked-name-identity)
@@ -1238,14 +1312,14 @@ export function shouldCreateMatchingFootnoteDefinition(
                 return true;
             }
 
-            const list = listExistingFootnoteDefinitions(doc);
+            const list = listExistingFootnoteDefinitions(doc, ctx);
 
             // Check if the list doesn't include current footnote (ids are
             // case-insensitive — a "[^note]:" definition already covers a
             // "[^Note]" reference, so this must navigate, not create a duplicate)
             // if so, add definition for the current footnote
             if (!idListIncludes(list, footnoteId)) {
-                const definition = buildDefinitionAppend(doc, footnoteId, list.length === 0, plugin);
+                const definition = buildDefinitionAppend(doc, footnoteId, list.length === 0, plugin, ctx);
 
                 if (popupEditingAvailable(plugin)) {
                     // type the definition in a popup instead of jumping to the
