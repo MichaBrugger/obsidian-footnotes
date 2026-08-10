@@ -1,0 +1,9 @@
+{
+    // Report TypeScript errors for EVERY file in the project, not just the
+    // ones currently open in the editor (VS Code's default only checks
+    // open files, so Problems-panel errors appear and vanish as files are
+    // opened and closed). Experimental but stable in practice; if it ever
+    // misbehaves, the fallback is a `tsc -noEmit -watch` task with the
+    // $tsc-watch problem matcher.
+    "typescript.tsserver.experimental.enableProjectDiagnostics": true
+}
