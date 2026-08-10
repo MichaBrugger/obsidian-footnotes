@@ -99,28 +99,35 @@ function isFenceOpener(bareLine: string, delim: string): boolean {
 }
 
 /**
- * One left-to-right scan of a line for inline code spans and HTML comments,
- * NULing both, CommonMark-style: whichever construct opens first claims its
- * content — backticks inside a comment are literal, "<!--" inside a code
- * span is code (bug-comment-mask-order / bug-backticked-comment-opener).
- * Backslash-escaped openers of either kind are literal text
+ * One left-to-right scan of a line for inline code spans, HTML comments,
+ * and math ($…$ / $$…$$), NULing all three, CommonMark-style: whichever
+ * construct opens first claims its content — backticks inside a comment
+ * are literal, "<!--" inside a code span is code (bug-comment-mask-order /
+ * bug-backticked-comment-opener), "$" inside either is just a dollar.
+ * Backslash-escaped openers of every kind are literal text
  * (bug-escaped-comment-opener), and the abbreviated comments "<!-->" and
  * "<!--->" are complete per CommonMark §6.6 (bug-short-form-comment).
- * `startInComment` continues a multi-line comment from the previous line;
- * `endsInComment` reports one left open at the end of this one (its opener
- * masked through EOL).
+ * Inline math needs a non-empty content that neither starts nor ends with
+ * a space (Obsidian's rule — "$5 and $10" stays prose). `startInComment` /
+ * `startInMath` continue a multi-line region from the previous line;
+ * `endsInComment` / `endsInMath` report one left open at EOL (its opener
+ * masked through the end of the line). Math protection is Jason's 2026-08-10
+ * ruling: linting never touches math.
  */
 export function maskLineRegions(
     line: string,
     startInComment = false,
-): { masked: string; endsInComment: boolean } {
-    // fast path: nothing on the line can open or close either construct
+    startInMath = false,
+): { masked: string; endsInComment: boolean; endsInMath: boolean } {
+    // fast path: nothing on the line can open or close any construct
     if (
         !startInComment &&
+        !startInMath &&
         !line.includes("`") &&
-        !line.includes("<!--")
+        !line.includes("<!--") &&
+        !line.includes("$")
     ) {
-        return { masked: line, endsInComment: false };
+        return { masked: line, endsInComment: false, endsInMath: false };
     }
 
     const chars = line.split("");
@@ -133,10 +140,26 @@ export function maskLineRegions(
         // comment content is literal — the first "-->" closes, full stop
         const close = line.indexOf("-->");
         if (close === -1) {
-            return { masked: "\0".repeat(line.length), endsInComment: true };
+            return {
+                masked: "\0".repeat(line.length),
+                endsInComment: true,
+                endsInMath: false,
+            };
         }
         blot(0, close + 3);
         i = close + 3;
+    } else if (startInMath) {
+        // display-math content is literal — the first "$$" closes it
+        const close = line.indexOf("$$");
+        if (close === -1) {
+            return {
+                masked: "\0".repeat(line.length),
+                endsInComment: false,
+                endsInMath: true,
+            };
+        }
+        blot(0, close + 2);
+        i = close + 2;
     }
 
     while (i < line.length) {
@@ -185,24 +208,72 @@ export function maskLineRegions(
             if (close === -1) {
                 // a multi-line comment opens here and runs past EOL
                 blot(i, line.length);
-                return { masked: chars.join(""), endsInComment: true };
+                return {
+                    masked: chars.join(""),
+                    endsInComment: true,
+                    endsInMath: false,
+                };
             }
             blot(i, close + 3);
             i = close + 3;
             continue;
         }
+        if (c === "$") {
+            if (line.startsWith("$$", i)) {
+                const close = line.indexOf("$$", i + 2);
+                if (close === -1) {
+                    // display math opens here and runs past EOL
+                    blot(i, line.length);
+                    return {
+                        masked: chars.join(""),
+                        endsInComment: false,
+                        endsInMath: true,
+                    };
+                }
+                blot(i, close + 2);
+                i = close + 2;
+                continue;
+            }
+            // inline math: closing "$" with non-empty content that neither
+            // starts nor ends with a space — otherwise the dollar is prose
+            let close = -1;
+            for (let j = i + 1; j < line.length; j++) {
+                if (line[j] === "\\") {
+                    j++;
+                    continue;
+                }
+                if (line[j] === "$") {
+                    close = j;
+                    break;
+                }
+            }
+            if (
+                close === -1 ||
+                close === i + 1 ||
+                line[i + 1] === " " ||
+                line[close - 1] === " "
+            ) {
+                i++; // not math — the closing candidate may open its own
+                continue;
+            }
+            blot(i, close + 1);
+            i = close + 1;
+            continue;
+        }
         i++;
     }
-    return { masked: chars.join(""), endsInComment: false };
+    return { masked: chars.join(""), endsInComment: false, endsInMath: false };
 }
 
 /** The per-line facts the whole-document walk produces. */
 export interface DocumentScan {
-    /** Whole-line protected: YAML frontmatter, fenced code (delimiters included), and multi-line comment INTERIOR lines. Comment boundary lines are NOT here — their live portions stay scannable, with the comment part masked (bug-comment-boundary-lines). */
+    /** Whole-line protected: YAML frontmatter, fenced code (delimiters included), standalone indented code, and multi-line comment/math INTERIOR lines. Boundary lines are NOT here — their live portions stay scannable, with the comment/math part masked (bug-comment-boundary-lines). */
     isProtected: boolean[];
     /** Line `i` begins inside a multi-line HTML comment (it is a closer or interior line). */
     startsInComment: boolean[];
-    /** A line appended at EOF would itself be protected: an unclosed comment, or an unclosed DOCUMENT-LEVEL fence, runs to EOF (a blockquoted fence dies at the append point — the appended line ends its quote). Replaces move-to-bottom's probe re-scan (perf F6). */
+    /** Line `i` begins inside a multi-line $$ math block (closer or interior line). */
+    startsInMath: boolean[];
+    /** A line appended at EOF would itself be protected: an unclosed comment, math block, or DOCUMENT-LEVEL fence runs to EOF (a blockquoted fence dies at the append point — the appended line ends its quote). Replaces move-to-bottom's probe re-scan (perf F6). */
     endsProtected: boolean;
 }
 
@@ -221,6 +292,7 @@ export function scanDocument(lines: string[]): DocumentScan {
     const src = stripCr(lines);
     const isProtected = new Array<boolean>(lines.length).fill(false);
     const startsInComment = new Array<boolean>(lines.length).fill(false);
+    const startsInMath = new Array<boolean>(lines.length).fill(false);
     let i = 0;
 
     if (src[0] === "---") {
@@ -235,6 +307,7 @@ export function scanDocument(lines: string[]): DocumentScan {
 
     let fence: { char: string; length: number; depth: number } | null = null;
     let inComment = false;
+    let inMath = false;
     // indented-code state (C21): `prevBlank` marks a block boundary (doc
     // start included), `inDefinition` mirrors findDefinitionBlocks' reach —
     // a "[^x]:" line plus its indented continuations and the blank runs
@@ -253,8 +326,25 @@ export function scanDocument(lines: string[]): DocumentScan {
                 continue;
             }
             // the closer line keeps its live suffix — and that suffix can
-            // itself open code, another comment, even a NEW multi-line one
-            inComment = maskLineRegions(src[i], true).endsInComment;
+            // itself open code, another comment, math, even a NEW
+            // multi-line region of either kind
+            const closed = maskLineRegions(src[i], true);
+            inComment = closed.endsInComment;
+            inMath = closed.endsInMath;
+            continue;
+        }
+        if (inMath) {
+            startsInMath[i] = true;
+            inIndentedCode = false;
+            inDefinition = false;
+            prevBlank = false;
+            if (!src[i].includes("$$")) {
+                isProtected[i] = true; // interior: nothing live on it
+                continue;
+            }
+            const closed = maskLineRegions(src[i], false, true);
+            inMath = closed.endsInMath;
+            inComment = closed.endsInComment;
             continue;
         }
         // a fence lives in the CONTAINER that opened it (CommonMark):
@@ -329,16 +419,21 @@ export function scanDocument(lines: string[]): DocumentScan {
         }
         // a multi-line HTML comment (an unescaped opener outside code with
         // no closer) hides everything through its closing line — a "[^x]:"
-        // inside it is commented-out text, not a live definition. The
-        // opener line itself stays live before the opener.
-        if (src[i].includes("<!--")) {
-            inComment = maskLineRegions(src[i], false).endsInComment;
+        // inside it is commented-out text, not a live definition. Same for
+        // an unclosed "$$" opening a display-math block. The opener line
+        // itself stays live before the opener.
+        if (src[i].includes("<!--") || src[i].includes("$$")) {
+            const opened = maskLineRegions(src[i], false, false);
+            inComment = opened.endsInComment;
+            inMath = opened.endsInMath;
         }
     }
     return {
         isProtected,
         startsInComment,
-        endsProtected: inComment || (fence !== null && fence.depth === 0),
+        startsInMath,
+        endsProtected:
+            inComment || inMath || (fence !== null && fence.depth === 0),
     };
 }
 
@@ -441,7 +536,8 @@ export function maskProtectedLines(
     return lines.map((line, i) =>
         scan.isProtected[i]
             ? "\0".repeat(line.length)
-            : maskLineRegions(line, scan.startsInComment[i]).masked,
+            : maskLineRegions(line, scan.startsInComment[i], scan.startsInMath[i])
+                  .masked,
     );
 }
 
@@ -458,7 +554,8 @@ export function maskedLineAt(lines: string[], i: number): string {
     const scan = scanDocument(lines);
     return scan.isProtected[i]
         ? "\0".repeat(line.length)
-        : maskLineRegions(line, scan.startsInComment[i]).masked;
+        : maskLineRegions(line, scan.startsInComment[i], scan.startsInMath[i])
+              .masked;
 }
 
 /**

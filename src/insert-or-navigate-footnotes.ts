@@ -60,13 +60,15 @@ function idListIncludes(ids: string[], id: string): boolean {
     return ids.some((name) => name.toLowerCase() === lower);
 }
 
-// Obsidian won't render a footnote whose name contains whitespace or
-// backticks (Jason's call, 2026-08-10: backticked names are disallowed
-// outright rather than supported), and an empty name isn't a footnote at
-// all; the reference regexes stay permissive so such names can be caught and
-// warned about instead of silently misbehaving
+// Obsidian won't render a footnote whose name contains whitespace,
+// backticks, or dollar signs (Jason's calls, 2026-08-10: such names are
+// disallowed outright rather than supported — a "$" pair in nearby ids
+// forms an inline-math span in Obsidian's own renderer, exactly as it does
+// in the plugin's math-protected scans), and an empty name isn't a footnote
+// at all; the reference regexes stay permissive so such names can be
+// caught and warned about instead of silently misbehaving
 export function isValidFootnoteName(name: string): boolean {
-    return name.length > 0 && !/[\s`]/.test(name);
+    return name.length > 0 && !/[\s`$]/.test(name);
 }
 
 
@@ -120,7 +122,11 @@ export function docContext(doc: Editor): DocContext {
         if (masked === undefined) {
             masked = scan.isProtected[i]
                 ? "\0".repeat(line.length)
-                : maskLineRegions(line, scan.startsInComment[i]).masked;
+                : maskLineRegions(
+                      line,
+                      scan.startsInComment[i],
+                      scan.startsInMath[i],
+                  ).masked;
             perLine[i] = masked;
         }
         return masked;
@@ -719,7 +725,7 @@ export function footnotePrefixFromEditor(doc: Editor): string {
 export function footnotePrefixProblem(prefix: string): string | null {
     if (!prefix) return null;
     if (!isValidFootnoteName(prefix) || /[[\]]/.test(prefix)) {
-        return "The footnote prefix can't contain spaces, backticks, or brackets.";
+        return "The footnote prefix can't contain spaces, backticks, dollar signs, or brackets.";
     }
     if (/\d$/.test(prefix)) {
         return "The footnote prefix can't end in a number. Its footnotes would be indistinguishable from plain numbered ones.";
@@ -1308,7 +1314,9 @@ export function shouldCreateMatchingFootnoteDefinition(
             if (!isValidFootnoteName(footnoteId)) {
                 const offender = footnoteId.includes("`")
                     ? "backticks"
-                    : "spaces";
+                    : footnoteId.includes("$")
+                      ? "dollar signs"
+                      : "spaces";
                 new Notice(
                     `Footnote name "${footnoteId}" contains ${offender}, so Obsidian won't render it as a footnote. Remove the ${offender}.`,
                     8000,

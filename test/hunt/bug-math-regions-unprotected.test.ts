@@ -15,23 +15,23 @@ import { reindexFootnotes } from "../../src/linting/rules/re-index-footnotes";
 // cause: no math region anywhere in markdown-scan (IgnoreType.Math is
 // declaration-only).
 
-describe("bug: math regions are treated as Markdown footnotes", () => {
-    it.fails("a reference inside inline math does not reserve a number", () => {
+describe("fixed 2026-08-10: math regions are protected (Jason: linting never touches math)", () => {
+    it("a reference inside inline math does not reserve a number", () => {
         expect(computeNextFootnoteNumber("cost $[^7]$ real[^1]")).toBe(2);
     });
 
-    it.fails("a reference inside display math does not reserve a number", () => {
+    it("a reference inside display math does not reserve a number", () => {
         expect(computeNextFootnoteNumber("$$\nx[^7]\n$$\nreal[^1]")).toBe(2);
     });
 
-    it.fails("reindex leaves reference-shaped inline and display math unchanged", () => {
+    it("reindex leaves reference-shaped inline and display math unchanged", () => {
         const input = "$x[^9]$ real[^2]\n$$\ny[^8]\n$$\n\n[^2]: real";
         const out = reindexFootnotes(input);
         expect(out).toContain("$x[^9]$");
         expect(out).toContain("$$\ny[^8]\n$$");
     });
 
-    it.fails("move-to-bottom does not extract a definition-shaped display-math line", () => {
+    it("move-to-bottom does not extract a definition-shaped display-math line", () => {
         const input = [
             "$$",
             "[^9]: mathematical label",
@@ -45,7 +45,7 @@ describe("bug: math regions are treated as Markdown footnotes", () => {
         expect(out).toContain("$$\n[^9]: mathematical label\n$$");
     });
 
-    it.fails("the composed lint preserves all math content", () => {
+    it("the composed lint preserves all math content", () => {
         const input =
             "---\nfootnote-prefix: 4.\n---\n$x[^9].$ real[^2].\n$$\n[^8]: mathematical label\ny[^7]\n$$\n\n[^2]: real";
         const out = lintFootnotes(input, {

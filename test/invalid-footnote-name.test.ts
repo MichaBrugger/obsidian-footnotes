@@ -76,3 +76,12 @@ describe("shouldCreateMatchingFootnoteDefinition with an invalid name", () => {
         expect(handled).toBe(true);
     });
 });
+
+// "$" joined the banned set with the math ruling (Jason, 2026-08-10): a
+// pair of dollar-signed ids forms an inline-math span in Obsidian itself
+describe("dollar signs in footnote names", () => {
+    it("rejects names containing a dollar sign", () => {
+        expect(isValidFootnoteName("a$1")).toBe(false);
+        expect(isValidFootnoteName("cost$")).toBe(false);
+    });
+});
