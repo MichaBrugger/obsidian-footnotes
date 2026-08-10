@@ -1,6 +1,7 @@
 import { footnoteReferenceMatches } from "../../insert-or-navigate-footnotes";
 import {
     DefinitionBlock,
+    definitionLabelIn,
     DocumentScan,
     findDefinitionBlocks,
     maskProtectedLines,
@@ -35,6 +36,32 @@ function scanReferences(
     scan: DocumentScan,
 ): ReferenceScan {
     const blocks = findDefinitionBlocks(lines, scan.isProtected);
+
+    // document-aware masked twin: protected lines are all-NUL (no matches),
+    // and comment portions of boundary lines are invisible
+    const maskedLines = maskProtectedLines(lines, scan);
+
+    // C22 follow-through (parallel-review probe, 2026-08-10): a
+    // blockquoted/callout label ("> [^x]: …") is a LIVE definition — as a
+    // single-line block, since blockquoted continuations aren't a thing —
+    // and NO definition label of either shape counts as a reference (a
+    // label defines; treating it as a reference kept orphans alive)
+    const labelStartAt = new Array<number>(lines.length).fill(-1);
+    for (let i = 0; i < lines.length; i++) {
+        if (scan.isProtected[i]) continue;
+        const label = definitionLabelIn(maskedLines[i]);
+        if (!label) continue;
+        labelStartAt[i] = label.nameStart - 2;
+        if (label.nameStart > 2) {
+            blocks.push({
+                name: lines[i].slice(label.nameStart, label.nameEnd),
+                start: i,
+                end: i,
+            });
+        }
+    }
+    blocks.sort((a, b) => a.start - b.start);
+
     const blockAtLine = new Array<number>(lines.length).fill(-1);
     blocks.forEach((block, i) => {
         for (let line = block.start; line <= block.end; line++) {
@@ -42,15 +69,15 @@ function scanReferences(
         }
     });
 
-    // document-aware masked twin: protected lines are all-NUL (no matches),
-    // and comment portions of boundary lines are invisible
-    const maskedLines = maskProtectedLines(lines, scan);
     const liveRefs = new Map<string, number>();
     const blockRefs: string[][] = blocks.map(() => []);
     for (let i = 0; i < lines.length; i++) {
         for (const match of footnoteReferenceMatches(maskedLines[i])) {
-            // re-slice the original for the name (a code span masks to NULs)
             const start = match.index ?? 0;
+            // column-0 labels are excluded by footnoteReferenceMatches;
+            // blockquoted ones read as mid-line references — skip them here
+            if (start === labelStartAt[i]) continue;
+            // re-slice the original for the name (a code span masks to NULs)
             const name = lines[i]
                 .slice(start + 2, start + match[0].length - 1)
                 .toLowerCase();

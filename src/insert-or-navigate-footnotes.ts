@@ -298,18 +298,16 @@ export function shouldJumpFromDefinitionToReference(
         const masked = ctx.maskedLines();
 
         // find the FIRST reference use of this footnote. footnoteReferenceMatches
-        // skips a definition's own column-0 label, so a definition line — this
-        // one included — is never its own jump target
+        // skips a definition's own column-0 label; blockquoted labels read
+        // as mid-line references, so they are skipped here — a label
+        // ANYWHERE defines, it doesn't reference, and jumping to a
+        // blockquoted duplicate's label was a phantom target
+        // (parallel-review probe, 2026-08-10)
         for (let i = 0; i < masked.length; i++) {
+            const lineLabel = definitionLabelIn(masked[i]);
             for (const use of footnoteReferenceMatches(masked[i])) {
                 const useStart = use.index ?? 0;
-                // a blockquoted label reads as a mid-line reference on its
-                // own line — it must not be its own jump target either
-                if (
-                    caretLineLabel &&
-                    i === cursorPosition.line &&
-                    useStart === caretLineLabel.nameStart - 2
-                ) {
+                if (lineLabel && useStart === lineLabel.nameStart - 2) {
                     continue;
                 }
                 // re-slice the ORIGINAL line for the name: a code span
@@ -617,11 +615,15 @@ export function endOfWordOffset(text: string, offset: number): number {
     // words in table cells (bug-astral-word-walk)
     const isWordCp = (cp: number | undefined) =>
         cp !== undefined && /[\p{L}\p{N}\p{M}_]/u.test(String.fromCodePoint(cp));
-    // the code point ENDING at `i` (stepping over a low surrogate to the
-    // pair's start), or undefined at the text's start
+    // the code point touching `i` from the left — stepping over a low
+    // surrogate to the pair's start, and treating a mid-pair `i` as inside
+    // its own pair — or undefined at the text's start
     const cpBefore = (i: number): number | undefined => {
         if (i <= 0) return undefined;
         const prev = text.charCodeAt(i - 1);
+        if (prev >= 0xd800 && prev <= 0xdbff) {
+            return text.codePointAt(i - 1); // `i` sits mid-pair
+        }
         if (prev >= 0xdc00 && prev <= 0xdfff && i >= 2) {
             return text.codePointAt(i - 2);
         }
@@ -631,6 +633,11 @@ export function endOfWordOffset(text: string, offset: number): number {
         return offset;
     }
     let end = offset;
+    // a mid-pair start (found by fast-check, 2026-08-10) snaps back to its
+    // code point's boundary so the walk — and the returned caret — always
+    // land between code points
+    const unitAtEnd = text.charCodeAt(end);
+    if (unitAtEnd >= 0xdc00 && unitAtEnd <= 0xdfff) end--;
     for (;;) {
         const cp = text.codePointAt(end);
         if (!isWordCp(cp)) break;

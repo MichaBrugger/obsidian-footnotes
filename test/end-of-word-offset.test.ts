@@ -82,3 +82,12 @@ describe("endOfWordOffset and unicode graphemes/words", () => {
         expect(endOfWordOffset(text, 2)).toBe(4);
     });
 });
+
+// found by fast-check on its first run (2026-08-10): a caret offset landing
+// mid-surrogate-pair snaps back to the code point boundary before walking
+describe("mid-surrogate-pair offsets", () => {
+    it("snaps a mid-pair start to the pair's boundary and walks the word", () => {
+        // "𐐀 " — offset 1 is inside the astral letter; the word ends at 2
+        expect(endOfWordOffset("\uD801\uDC00 ", 1)).toBe(2);
+    });
+});
