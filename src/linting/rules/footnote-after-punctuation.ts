@@ -35,7 +35,7 @@ function swapInSegment(original: string, masked: string): string {
     let out = "";
     let copied = 0;
     for (const match of masked.matchAll(ReferencesBeforePunctuation)) {
-        const start = match.index ?? 0;
+        const start = match.index;
         // a reference run already sitting AFTER punctuation is settled — the
         // punctuation following it belongs to the next clause, and swapping
         // again would drift it away from its text (idempotence)

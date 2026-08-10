@@ -61,8 +61,12 @@ export async function settleFootnotePopupWithFeedback(): Promise<void> {
         feedback.notice = new Notice("Saving the previous footnote…", 0);
     }, 150);
     try {
-        while (pendingTeardown !== null) {
-            await pendingTeardown;
+        // re-read through a function each pass: the awaited teardown can
+        // chain a successor into pendingTeardown, which the checker's
+        // narrowing of the module variable (from the guard above) can't see
+        const currentTeardown = () => pendingTeardown;
+        for (let t = currentTeardown(); t !== null; t = currentTeardown()) {
+            await t;
         }
     } finally {
         window.clearTimeout(noticeTimer);
@@ -74,7 +78,7 @@ export function popupEditingAvailable(plugin: FootnotePlugin): boolean {
     // embedRegistry is undocumented API, so degrade to the legacy
     // jump-to-bottom behavior if it ever changes shape
     const registry = (plugin.app as AppWithEmbedRegistry).embedRegistry;
-    return plugin.settings.enablePopupEditor === true
+    return plugin.settings.enablePopupEditor
         && typeof registry?.embedByExtension?.md === "function";
 }
 
@@ -130,8 +134,12 @@ export async function openFootnotePopup(
     // start a second one whose file saves race this one's — rapid
     // consecutive footnotes used to lose the later references exactly that
     // way (regression, reported 2026-07-16). Until the DOM exists, closing
-    // just abandons the setup (the awaits below re-check `closed`).
+    // just abandons the setup. `close` flips the flag from event handlers
+    // during the awaits below, which the checker's narrowing can't see —
+    // so every re-check reads through popupClosed() (call results are
+    // never narrowed).
     let closed = false;
+    const popupClosed = () => closed;
     let domTeardown: ((focusEditor: boolean) => void) | null = null;
 
     const focusMainEditor = () => {
@@ -175,18 +183,18 @@ export async function openFootnotePopup(
     // immediately before falling back to coarse 50ms polls, so the popup
     // doesn't spend a blind 50ms on what is typically a ~1ms wait
     let pollDelay = 0;
-    while (!closed && !mdView.data.includes(definitionToken) && Date.now() < dataDeadline) {
+    while (!popupClosed() && !mdView.data.includes(definitionToken) && Date.now() < dataDeadline) {
         await new Promise((resolve) => win.setTimeout(resolve, pollDelay));
         pollDelay = pollDelay === 0 ? 10 : 50;
     }
-    if (closed) return;
+    if (popupClosed()) return;
     // the embed reads the FILE, so unsaved view changes must be written
     // first — but only when the view actually differs from disk; a
     // per-popup unconditional save is disk latency plus Syncthing churn
     if (mdView.data !== (await plugin.app.vault.cachedRead(file))) {
         await mdView.save();
     }
-    if (closed) return;
+    if (popupClosed()) return;
 
     // anchor just below the cursor, flipping above it near the window bottom.
     // When focus is in a sub-editor (a table cell being edited), the main
@@ -396,7 +404,7 @@ export async function openFootnotePopup(
         const deadline = Date.now() + 3000;
         while (Date.now() < deadline) {
             await waitForCacheChange();
-            if (closed) return true;
+            if (popupClosed()) return true;
             embed.unload();
             embedEl.empty();
             embed = buildEmbed();
@@ -407,13 +415,13 @@ export async function openFootnotePopup(
 
     showEditor()
         .then((shown) => {
-            if (!shown && !closed) {
+            if (!shown && !popupClosed()) {
                 close(false);
                 onUnavailable?.();
             }
         })
         .catch(() => {
-            if (!closed) {
+            if (!popupClosed()) {
                 close(false);
                 onUnavailable?.();
             }

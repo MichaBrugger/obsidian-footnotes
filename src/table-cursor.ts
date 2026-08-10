@@ -131,8 +131,12 @@ export function resolveTableCellCursor(editor: Editor): EditorPosition | null {
     if (line > editor.lastLine()) return null;
 
     const lineText = editor.getLine(line);
-    const span = tableRowCellSpans(lineText)[(td as HTMLTableCellElement).cellIndex];
-    if (!span) return null;
+    // a rendered column can outrun the source row's cells — bounds-check
+    // instead of trusting the index
+    const spans = tableRowCellSpans(lineText);
+    const cellIndex = (td as HTMLTableCellElement).cellIndex;
+    if (cellIndex < 0 || cellIndex >= spans.length) return null;
+    const span = spans[cellIndex];
 
     // the sub-editor's doc is the cell's source sans padding; anchor it
     // inside the raw cell, then walk the sub-editor's caret offset through

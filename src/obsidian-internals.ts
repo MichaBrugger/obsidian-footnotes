@@ -1,4 +1,12 @@
-import { App, Editor, EditorPosition, EventRef, TFile, Vault } from "obsidian";
+import {
+    App,
+    Editor,
+    EditorPosition,
+    EventRef,
+    MarkdownView,
+    TFile,
+    Vault,
+} from "obsidian";
 
 // Typed views of the undocumented Obsidian / CodeMirror internals this plugin
 // relies on. Only the members actually used are declared, and every entry
@@ -20,6 +28,16 @@ export interface ObsidianEditorView {
 
 export interface EditorWithCm extends Editor {
     cm?: ObsidianEditorView;
+}
+
+/**
+ * `view.editor` as reality has it: the typings promise an Editor, but a
+ * deferred MarkdownView (Obsidian 1.7+ lazy tab loading) has none until the
+ * view actually loads. Every command entry point guards through this instead
+ * of trusting the declared type.
+ */
+export function viewEditor(view: MarkdownView): Editor | null {
+    return (view as { editor?: Editor }).editor ?? null;
 }
 
 /** The editable markdown embed produced by the embed registry. */
@@ -76,7 +94,11 @@ export interface AppWithCommands extends App {
     commands?: {
         commands?: Record<
             string,
-            { checkCallback?: (checking: boolean) => boolean | void } | undefined
+            // boolean | undefined rather than Obsidian's `boolean | void`:
+            // wrappers store and forward the result, and void is not a
+            // legal union member under strict-type-checked
+            | { checkCallback?: (checking: boolean) => boolean | undefined }
+            | undefined
         >;
         executeCommandById?(id: string): boolean;
     };

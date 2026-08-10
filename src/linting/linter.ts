@@ -14,7 +14,7 @@ import {
     runOutsideTableCell,
 } from "../insert-or-navigate-footnotes";
 import { maskProtectedLines, normalizeEol, restoreEol } from "../markdown-scan";
-import { AppWithCommands, AppWithPlugins, WindowWithVim } from "../obsidian-internals";
+import { AppWithCommands, AppWithPlugins, viewEditor, WindowWithVim } from "../obsidian-internals";
 import { activeTableCellEditor, nestedSubEditorOwnsFocus } from "../table-cursor";
 import { applyFootnotePrefix } from "./rules/apply-footnote-prefix";
 import { footnoteAfterPunctuation } from "./rules/footnote-after-punctuation";
@@ -338,11 +338,12 @@ export function lintBlockedByPrefix(markdown: string): string | null {
 // this right before delegating, so the save writes the linted text.
 function lintActiveNoteIfSafe(plugin: FootnotePlugin) {
     const mdView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
-    if (!mdView || !mdView.editor) return;
+    // viewEditor: a deferred view has no editor despite the typings
+    const doc = mdView && viewEditor(mdView);
+    if (!mdView || !doc) return;
     // Reading view: never edit the hidden buffer (2026-08-08)
     if (readingViewActive(mdView)) return;
     if (footnotePopupBusy()) return; // a pending popup save owns the file
-    const doc = mdView.editor;
     if (activeTableCellEditor(doc) || nestedSubEditorOwnsFocus(doc)) return;
     // same message as the Lint footnotes command: with every rule off the
     // pipeline is a no-op by construction, and "No linting needed." would
@@ -486,7 +487,9 @@ export function lintAfterFootnoteCreation(
 ) {
     if (!plugin.settings.lintOnFootnoteCreation) return;
     const mdView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
-    if (!mdView || !mdView.editor) return;
+    // viewEditor: a deferred view has no editor despite the typings
+    const doc = mdView && viewEditor(mdView);
+    if (!mdView || !doc) return;
     // Reading view: never edit the hidden buffer (2026-08-08) — the popup
     // path defers this call, so the user may have flipped modes since the
     // footnote was created (no leaf change fires on a mode flip)
@@ -495,7 +498,6 @@ export function lintAfterFootnoteCreation(
     // user has since switched to
     if (expectedFilePath && mdView.file?.path !== expectedFilePath) return;
     if (footnotePopupBusy()) return;
-    const doc = mdView.editor;
     if (activeTableCellEditor(doc) || nestedSubEditorOwnsFocus(doc)) return;
     const before = doc.getValue();
     // silent on a blocked prefix: the insert path already explained it
@@ -532,10 +534,11 @@ export async function runFootnoteTransformCommand(
     await settleFootnotePopupWithFeedback();
 
     const mdView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
-    if (!mdView || !mdView.editor) return;
+    // viewEditor: a deferred view has no editor despite the typings
+    const doc = mdView && viewEditor(mdView);
+    if (!mdView || !doc) return;
     // Reading view: never edit the hidden buffer (2026-08-08)
     if (readingViewActive(mdView)) return;
-    const doc = mdView.editor;
 
     // same guard as the insert commands: never edit the document while a
     // table cell sub-editor owns focus — its sync-back rewrites its region

@@ -285,5 +285,5 @@ export const reIndexFootnotesRule: FootnoteRule<ReindexOptions> = {
             after: "a[^1] b[^2].\n\n[^1]: three\n[^2]: seven",
         },
     ],
-    apply: (text, options = {}) => reindexFootnotes(text, options),
+    apply: (text, options) => reindexFootnotes(text, options),
 };

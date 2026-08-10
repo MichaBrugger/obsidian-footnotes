@@ -608,8 +608,8 @@ export function maskProtectedLines(
  * them (perf, 2026-08-07). Out-of-range `i` returns "".
  */
 export function maskedLineAt(lines: string[], i: number): string {
+    if (i < 0 || i >= lines.length) return "";
     const line = lines[i];
-    if (line === undefined) return "";
     const scan = scanDocument(lines);
     return scan.isProtected[i]
         ? "\0".repeat(line.length)

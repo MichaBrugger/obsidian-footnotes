@@ -11,7 +11,7 @@ import {
   Plugin
 } from "obsidian";
 
-import { VaultWithConfigEvents } from "./obsidian-internals";
+import { VaultWithConfigEvents, viewEditor } from "./obsidian-internals";
 import { FootnotePluginSettingTab, FootnotePluginSettings, DEFAULT_SETTINGS } from "./settings";
 import { dismissFootnotePopup } from "./footnote-popup";
 import {
@@ -120,7 +120,7 @@ export default class FootnotePlugin extends Plugin {
         new SetFootnotePrefixModal(
           this,
           mdView.file,
-          footnotePrefix(mdView.editor?.getValue() ?? ""),
+          footnotePrefix(viewEditor(mdView)?.getValue() ?? ""),
         ).open();
       },
     });
@@ -174,7 +174,9 @@ export default class FootnotePlugin extends Plugin {
     this.registerEvent(
       (this.app.vault as unknown as VaultWithConfigEvents).on(
         "config-changed",
-        () => installVimWriteHook(this),
+        () => {
+          installVimWriteHook(this);
+        },
       ),
     );
   }
@@ -230,28 +232,39 @@ export default class FootnotePlugin extends Plugin {
 
         // the linting settings shipped under tidy* keys in beta.5/6: copy
         // each saved tidy* value onto its lint* name and drop the old key,
-        // so beta testers keep their toggle choices
-        const tidyKeyRenames: Record<string, string> = {
-          tidyFixPunctuation: "lintFixPunctuation",
-          tidyMoveToBottom: "lintMoveToBottom",
-          tidyReindex: "lintReindex",
-          tidyOnSave: "lintOnSave",
+        // so beta testers keep their toggle choices. Spelled out per key
+        // (rather than a rename map) so each move is statically typed —
+        // withTidyKeys is the same object as this.settings, so writing
+        // here sets the real lint* setting
+        const withTidyKeys = this.settings as FootnotePluginSettings & {
+          tidyFixPunctuation?: boolean;
+          tidyMoveToBottom?: boolean;
+          tidyReindex?: boolean;
+          tidyOnSave?: boolean;
+          lintOnFileChange?: unknown;
+          tidyOnFileChange?: unknown;
         };
-        const withTidyKeys = this.settings as FootnotePluginSettings &
-          Record<string, unknown>;
-        for (const [oldKey, newKey] of Object.entries(tidyKeyRenames)) {
-          if (oldKey in withTidyKeys) {
-            // withTidyKeys is the same object as this.settings, so writing
-            // here sets the real lint* setting
-            withTidyKeys[newKey] = withTidyKeys[oldKey];
-            delete withTidyKeys[oldKey];
-          }
+        if (withTidyKeys.tidyFixPunctuation !== undefined) {
+          withTidyKeys.lintFixPunctuation = withTidyKeys.tidyFixPunctuation;
+          delete withTidyKeys.tidyFixPunctuation;
+        }
+        if (withTidyKeys.tidyMoveToBottom !== undefined) {
+          withTidyKeys.lintMoveToBottom = withTidyKeys.tidyMoveToBottom;
+          delete withTidyKeys.tidyMoveToBottom;
+        }
+        if (withTidyKeys.tidyReindex !== undefined) {
+          withTidyKeys.lintReindex = withTidyKeys.tidyReindex;
+          delete withTidyKeys.tidyReindex;
+        }
+        if (withTidyKeys.tidyOnSave !== undefined) {
+          withTidyKeys.lintOnSave = withTidyKeys.tidyOnSave;
+          delete withTidyKeys.tidyOnSave;
         }
         // the lint-on-focused-file-change trigger was replaced by lint on
         // footnote creation (2026-08-05) — its saved keys are dropped rather
         // than carried over, since the semantics are different
-        delete withTidyKeys["lintOnFileChange"];
-        delete withTidyKeys["tidyOnFileChange"];
+        delete withTidyKeys.lintOnFileChange;
+        delete withTidyKeys.tidyOnFileChange;
       }
 
       if (this.settings.settingsVersion < 2) {

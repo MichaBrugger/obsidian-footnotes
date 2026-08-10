@@ -160,6 +160,6 @@ export const removeOrphanedReferencesRule: FootnoteRule<{ safePrefix?: string }>
                 after: "see[^Note]\n\n[^note]: n",
             },
         ],
-        apply: (text, options = {}) =>
+        apply: (text, options) =>
             removeOrphanedFootnoteReferences(text, options.safePrefix ?? ""),
     };

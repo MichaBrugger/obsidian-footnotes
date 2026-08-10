@@ -149,5 +149,5 @@ export const applyFootnotePrefixRule: FootnoteRule<{ prefix?: string }> = {
             after: "x[^3.note] end\n\n[^3.note]: n",
         },
     ],
-    apply: (text, options = {}) => applyFootnotePrefix(text, options.prefix ?? ""),
+    apply: (text, options) => applyFootnotePrefix(text, options.prefix ?? ""),
 };

@@ -158,6 +158,6 @@ export const moveFootnotesToTheBottomRule: FootnoteRule<string> = {
             after: "a[^2].\n\nb[^1].\n\n[^2]: two\n[^1]: one",
         },
     ],
-    apply: (text, sectionHeading = "") =>
+    apply: (text, sectionHeading) =>
         moveFootnoteDefinitionsToBottom(text, sectionHeading),
 };

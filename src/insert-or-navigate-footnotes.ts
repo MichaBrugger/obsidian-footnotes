@@ -10,7 +10,7 @@ import FootnotePlugin from "./main";
 import { footnotePopupBusy, openFootnotePopup, popupEditingAvailable, runAfterNextPopupSettle, settleFootnotePopupWithFeedback, toggleCloseFootnotePopup } from "./footnote-popup";
 import { lintAfterFootnoteCreation } from "./linting/linter";
 import { definitionLabelIn, DocumentScan, findDefinitionBlocks, maskInlineRegions, maskLineRegions, maskProtectedLines, maskedLineAt, scanDocument, TrailingPunctuationChars } from "./markdown-scan";
-import { EditorWithCm, VaultWithConfig, WindowWithVim } from "./obsidian-internals";
+import { EditorWithCm, VaultWithConfig, viewEditor, WindowWithVim } from "./obsidian-internals";
 import { activeTableCellEditor, nestedSubEditorOwnsFocus, resolveTableCellCursor, TableCellEditor } from "./table-cursor";
 
 // Core logic for both hotkey commands. Each press walks the same decision
@@ -46,7 +46,7 @@ export const ExtractNameFromFootnote = /(\[\^)([^[\]]+)(?=\])/;
 export function footnoteReferenceMatches(line: string): RegExpMatchArray[] {
     const matches: RegExpMatchArray[] = [];
     for (const match of line.matchAll(AllReferences)) {
-        const start = match.index ?? 0;
+        const start = match.index;
         if (start === 0 && line[match[0].length] === ":") continue;
         // a backslash-escaped "[" is literal text per CommonMark — the
         // "reference" is prose the user typed on purpose (bug-escaped-marker)
@@ -86,8 +86,10 @@ export function isValidFootnoteName(name: string): boolean {
 }
 
 
-/** Whether `mdView` is in Reading view — where every text-editing command must be inert (getMode is optionally called so bare test fakes count as editable). */
-export function readingViewActive(mdView: MarkdownView): boolean {
+/** Whether `mdView` is in Reading view — where every text-editing command must be inert. The structural parameter type keeps getMode honestly optional: bare test fakes without it count as editable. */
+export function readingViewActive(mdView: {
+    getMode?: MarkdownView["getMode"];
+}): boolean {
     return mdView.getMode?.() === "preview";
 }
 
@@ -129,8 +131,8 @@ export function docContext(doc: Editor): DocContext {
     );
     let full: string[] | null = null;
     const maskedLine = (i: number): string => {
+        if (i < 0 || i >= lines.length) return "";
         const line = lines[i];
-        if (line === undefined) return "";
         if (full) return full[i];
         let masked = perLine[i];
         if (masked === undefined) {
@@ -278,7 +280,6 @@ export function shouldJumpFromDefinitionToReference(
             cursorPosition.line <= candidate.end,
     );
     let definitionName: string | null = null;
-    let caretLineLabel: { nameStart: number } | null = null;
     if (block) {
         definitionName = block.name;
     } else {
@@ -288,7 +289,6 @@ export function shouldJumpFromDefinitionToReference(
         const label = definitionLabelIn(ctx.maskedLine(cursorPosition.line));
         if (label && label.nameStart > 2) {
             definitionName = lineText.slice(label.nameStart, label.nameEnd);
-            caretLineLabel = label;
         }
     }
     if (definitionName !== null) {
@@ -567,7 +567,7 @@ export function buildDefinitionAppend(
 
     let fromLine = doc.lastLine();
     let to: EditorPosition | undefined;
-    if (plugin.settings.enableRemoveBlankLastLines === true) {
+    if (plugin.settings.enableRemoveBlankLastLines) {
         while (fromLine > 0 && doc.getLine(fromLine).length === 0) {
             fromLine--;
         }
@@ -731,9 +731,9 @@ function scheduleCreationLintAfterPopup(plugin: FootnotePlugin): () => void {
     if (!plugin.settings.lintOnFootnoteCreation) return () => {};
     const path =
         plugin.app.workspace.getActiveViewOfType(MarkdownView)?.file?.path;
-    return runAfterNextPopupSettle(() =>
-        lintAfterFootnoteCreation(plugin, false, path),
-    );
+    return runAfterNextPopupSettle(() => {
+        lintAfterFootnoteCreation(plugin, false, path);
+    });
 }
 
 //FUNCTIONS FOR AUTONUMBERED FOOTNOTES
@@ -758,7 +758,10 @@ export function footnotePrefix(markdownText: string): string {
         // (bug-prefix-yaml-comment)
         const match = lines[i].match(/^footnote-prefix:(?:\s+(.*))?$/);
         if (match) {
-            let value = (match[1] ?? "").trim();
+            // the "(?:\s+(.*))?" group is genuinely optional — the
+            // RegExpMatchArray index signature hides that from the checker
+            const captured = match[1] as string | undefined;
+            let value = (captured ?? "").trim();
             // a value that IS a comment is an empty value
             if (value.startsWith("#")) return "";
             // quotes end the value — anything after the closing quote
@@ -785,7 +788,7 @@ export function footnotePrefix(markdownText: string): string {
 export function footnotePrefixFromEditor(doc: Editor): string {
     const stripCr = (line: string) =>
         line.endsWith("\r") ? line.slice(0, -1) : line;
-    if (stripCr(doc.getLine(0) ?? "") !== "---") return "";
+    if (stripCr(doc.getLine(0)) !== "---") return "";
     const lines = ["---"];
     for (let i = 1; i < doc.lineCount(); i++) {
         const line = stripCr(doc.getLine(i));
@@ -858,7 +861,7 @@ export function computeNextFootnoteNumber(
         : AllNumberedReferences;
     let currentMax = 1;
     for (const match of masked.matchAll(numberedReferences)) {
-        const start = match.index ?? 0;
+        const start = match.index;
         // the same exclusions footnoteReferenceMatches applies: an escaped
         // "\[^9]" is literal prose (bug-escaped-marker), and "^[^9]" is
         // inline-footnote content (bug-inline-footnote-double-parse)
@@ -892,8 +895,9 @@ export async function insertAutonumFootnote(plugin: FootnotePlugin) {
     if (toggleCloseFootnotePopup()) return;
 
     const mdView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
-
-    if (!mdView || !mdView.editor) return;
+    // viewEditor: a deferred view has no editor despite the typings
+    const doc = mdView && viewEditor(mdView);
+    if (!mdView || !doc) return;
     // Reading view: the editor API happily edits the HIDDEN buffer — one
     // press invisibly inserted "[^]" and the next press toasted about a
     // reference the user could not see (reported 2026-08-08, probed live).
@@ -901,7 +905,6 @@ export async function insertAutonumFootnote(plugin: FootnotePlugin) {
     // in the palette, this guards programmatic invocation.
     if (readingViewActive(mdView)) return;
 
-    const doc = mdView.editor;
     // an actively edited table cell owns the real caret; getCursor() is
     // stale there, and editing the row via the main editor corrupts the
     // table — reads use the resolved position, writes go through the cell
@@ -977,9 +980,9 @@ export function shouldCreateAutonumFootnote(
         const definition = buildDefinitionAppend(doc, footnoteId, isFirstFootnote, plugin, ctx);
         if (popupEditingAvailable(plugin)) {
             doc.transaction({ changes: [definition.change] });
-            void openFootnotePopup(plugin, footnoteId, () =>
-                moveCursorAndSetJumpPoint(doc, cursorPosition, definition.cursor, plugin, undefined, true)
-            );
+            void openFootnotePopup(plugin, footnoteId, () => {
+                moveCursorAndSetJumpPoint(doc, cursorPosition, definition.cursor, plugin, undefined, true);
+            });
         } else {
             moveCursorAndSetJumpPoint(doc, cursorPosition, definition.cursor, plugin, [definition.change], true);
         }
@@ -1068,8 +1071,8 @@ function insertInlineText(
     caretOffsetInText: number,
 ) {
     const mdView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
-    if (!mdView || !mdView.editor) return;
-    const doc = mdView.editor;
+    const doc = mdView && viewEditor(mdView);
+    if (!doc) return;
 
     const cell = activeTableCellEditor(doc);
     if (cell) {
@@ -1196,10 +1199,10 @@ export async function insertInlineFootnote(plugin: FootnotePlugin) {
     if (toggleCloseFootnotePopup()) return;
 
     const mdView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
-    if (!mdView || !mdView.editor) return;
+    const doc = mdView && viewEditor(mdView);
+    if (!mdView || !doc) return;
     // inert in Reading view — see insertAutonumFootnote
     if (readingViewActive(mdView)) return;
-    const doc = mdView.editor;
 
     const cell = activeTableCellEditor(doc);
     // inside an EMPTY inline footnote, ask for its text instead of hopping
@@ -1280,20 +1283,21 @@ export async function pasteInlineFootnote(plugin: FootnotePlugin) {
     if (toggleCloseFootnotePopup()) return;
 
     const mdView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
-    if (!mdView || !mdView.editor) return;
+    const doc = mdView && viewEditor(mdView);
+    if (!mdView || !doc) return;
     // inert in Reading view — see insertAutonumFootnote
     if (readingViewActive(mdView)) return;
-    const pasteCell = activeTableCellEditor(mdView.editor);
+    const pasteCell = activeTableCellEditor(doc);
     // inside an inline footnote, hop out instead of nesting "^[...]" in it —
     // the same guard every other insert command runs (missed here until the
     // 2026-08-07 QOL sweep; pinned by test/paste-inline-in-inline.test.ts)
     // inside an EMPTY inline footnote, ask for its text instead of hopping
-    if (warnEmptyInlineFootnoteIfInside(mdView.editor, pasteCell)) return;
-    if (exitInlineFootnoteIfInside(mdView.editor, pasteCell)) return;
+    if (warnEmptyInlineFootnoteIfInside(doc, pasteCell)) return;
+    if (exitInlineFootnoteIfInside(doc, pasteCell)) return;
     // inside an abandoned "[^]", ask for a name instead of nesting the paste
-    if (warnEmptyReferenceIfInside(mdView.editor, pasteCell)) return;
-    if (warnPrefilledReferenceIfInside(plugin, mdView.editor, pasteCell)) return;
-    if (navigateReferenceIfInside(plugin, mdView.editor, pasteCell)) return;
+    if (warnEmptyReferenceIfInside(doc, pasteCell)) return;
+    if (warnPrefilledReferenceIfInside(plugin, doc, pasteCell)) return;
+    if (navigateReferenceIfInside(plugin, doc, pasteCell)) return;
 
     // read the clipboard BEFORE resolving positions — it's the only await,
     // and everything position-dependent should happen after it
@@ -1323,12 +1327,11 @@ export async function insertNamedFootnote(plugin: FootnotePlugin) {
     if (toggleCloseFootnotePopup()) return;
 
     const mdView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
-
-    if (!mdView || !mdView.editor) return;
+    const doc = mdView && viewEditor(mdView);
+    if (!mdView || !doc) return;
     // inert in Reading view — see insertAutonumFootnote
     if (readingViewActive(mdView)) return;
 
-    const doc = mdView.editor;
     // an actively edited table cell owns the real caret; getCursor() is
     // stale there, and editing the row via the main editor corrupts the
     // table — reads use the resolved position, writes go through the cell
