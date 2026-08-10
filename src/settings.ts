@@ -66,8 +66,8 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
     getSettingDefinitions(): SettingDefinitionItem[] {
         return [
             {
-                name: "Insert footnote at end of word",
-                desc: "A new footnote is only inserted at the end of the word and after any punctuation.",
+                name: "Insert footnote reference at end of word",
+                desc: "A new footnote reference is only inserted at the end of the word and after any punctuation.",
                 control: { type: "toggle", key: "insertAtEndOfWord" },
             },
             {
@@ -86,7 +86,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                 items: [
                     {
                         name: "Enable section heading",
-                        desc: "Automatically adds a heading separating footnotes at the bottom of the note from the rest of the text. If the section heading is already present, it will be used instead of adding a new one.",
+                        desc: "Automatically adds a heading separating footnote definitions at the bottom of the note from the rest of the text. If the section heading is already present, it will be used instead of adding a new one.",
                         control: { type: "toggle", key: "enableFootnoteSectionHeading" },
                     },
                     {
@@ -132,7 +132,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                     },
                     {
                         name: "Lint on footnote creation",
-                        desc: "Lint the note right after a new footnote definition is created in it.",
+                        desc: "Lint the note right after a new footnote is created in it.",
                         control: { type: "toggle", key: "lintOnFootnoteCreation" },
                     },
                     {
@@ -150,6 +150,25 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                                 control: { type: "toggle", key: "lintMoveToBottom" },
                             },
                             {
+                                name: "Apply the note's footnote prefix",
+                                desc: "When the per-note footnote prefix feature is on and the note has a footnote-prefix property, linting renames plain numbered and named footnotes to carry the prefix, and renumbers prefixed footnotes within their namespace. While off, footnotes carrying the prefix are treated as named footnotes and keep their ids.",
+                                control: {
+                                    type: "toggle",
+                                    key: "lintApplyPrefix",
+                                    disabled: () => !this.plugin.settings.enableFootnotePrefix,
+                                },
+                            },
+                        ],
+                    },
+                    {
+                        // orphans get their own section (Jason, 2026-08-10):
+                        // the two toggles mirror each other, and while one is
+                        // off linting ALERTS about that orphan kind instead —
+                        // orphans are never silent
+                        type: "group",
+                        heading: "Orphans",
+                        items: [
+                            {
                                 name: "Delete orphaned references",
                                 desc: "Linting deletes footnote references that have no definition (a [^5] with no \"[^5]:\" line, which Obsidian renders as plain text). While off, linting alerts you about them instead.",
                                 control: {
@@ -163,15 +182,6 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                                 control: {
                                     type: "toggle",
                                     key: "lintDeleteOrphanedDefinitions",
-                                },
-                            },
-                            {
-                                name: "Apply the note's footnote prefix",
-                                desc: "When the per-note footnote prefix feature is on and the note has a footnote-prefix property, linting renames plain numbered and named footnotes to carry the prefix, and renumbers prefixed footnotes within their namespace. While off, footnotes carrying the prefix are treated as named footnotes and keep their ids.",
-                                control: {
-                                    type: "toggle",
-                                    key: "lintApplyPrefix",
-                                    disabled: () => !this.plugin.settings.enableFootnotePrefix,
                                 },
                             },
                         ],
