@@ -1,12 +1,13 @@
 import { footnoteReferenceMatches } from "../../insert-or-navigate-footnotes";
 import {
     DefinitionBlock,
+    DocumentScan,
     findDefinitionBlocks,
-    maskInlineRegions,
+    maskProtectedLines,
     normalizeEol,
-    protectedLines,
     removeLineRanges,
     restoreEol,
+    scanDocument,
 } from "../../markdown-scan";
 import { IgnoreType } from "../ignore-types";
 import { FootnoteRule } from "../rule";
@@ -31,9 +32,9 @@ interface ReferenceScan {
 
 function scanReferences(
     lines: string[],
-    isProtected: boolean[],
+    scan: DocumentScan,
 ): ReferenceScan {
-    const blocks = findDefinitionBlocks(lines, isProtected);
+    const blocks = findDefinitionBlocks(lines, scan.isProtected);
     const blockAtLine = new Array<number>(lines.length).fill(-1);
     blocks.forEach((block, i) => {
         for (let line = block.start; line <= block.end; line++) {
@@ -41,11 +42,13 @@ function scanReferences(
         }
     });
 
+    // document-aware masked twin: protected lines are all-NUL (no matches),
+    // and comment portions of boundary lines are invisible
+    const maskedLines = maskProtectedLines(lines, scan);
     const liveRefs = new Map<string, number>();
     const blockRefs: string[][] = blocks.map(() => []);
     for (let i = 0; i < lines.length; i++) {
-        if (isProtected[i]) continue;
-        for (const match of footnoteReferenceMatches(maskInlineRegions(lines[i]))) {
+        for (const match of footnoteReferenceMatches(maskedLines[i])) {
             // re-slice the original for the name (a code span masks to NULs)
             const start = match.index ?? 0;
             const name = lines[i]
@@ -100,7 +103,7 @@ function deadBlocks(scan: ReferenceScan): DefinitionBlock[] {
  */
 export function orphanedFootnoteDefinitionNames(markdown: string): string[] {
     const lines = normalizeEol(markdown).text.split("\n");
-    const scan = scanReferences(lines, protectedLines(lines));
+    const scan = scanReferences(lines, scanDocument(lines));
     const referenced = new Set(scan.liveRefs.keys());
     for (const refs of scan.blockRefs) {
         for (const name of refs) referenced.add(name);
@@ -119,16 +122,16 @@ export function orphanedFootnoteDefinitionNames(markdown: string): string[] {
 /** The definition blocks the reference graph can't keep alive (transitive — see module note). Shared with reindex's keepOrphanedDefinitions:false path, so both deletion routes agree at any chain depth. */
 export function orphanedDefinitionBlocks(
     lines: string[],
-    isProtected: boolean[],
+    scan: DocumentScan,
 ): DefinitionBlock[] {
-    return deadBlocks(scanReferences(lines, isProtected));
+    return deadBlocks(scanReferences(lines, scan));
 }
 
 /** Every unreferenced definition block removed (transitively — see module note). Protected regions and everything referenced stay put. */
 export function removeOrphanedFootnoteDefinitions(markdown: string): string {
     const { text, eol } = normalizeEol(markdown);
     const lines = text.split("\n");
-    const dead = orphanedDefinitionBlocks(lines, protectedLines(lines));
+    const dead = orphanedDefinitionBlocks(lines, scanDocument(lines));
     if (dead.length === 0) return markdown;
     return restoreEol(removeLineRanges(lines, dead).join("\n"), eol);
 }

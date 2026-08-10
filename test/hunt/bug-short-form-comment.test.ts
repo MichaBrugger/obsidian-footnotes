@@ -8,16 +8,16 @@ import { computeNextFootnoteNumber } from "../../src/insert-or-navigate-footnote
 // Hunt: 2026-08-09. Lens: contexts.
 // Root cause: indexOf("-->", open+4) misses the overlapping closer.
 
-describe("bug: complete short comments <!--> and <!---> mid-line", () => {
-    it.fails("<!--> mid-line is a complete comment, not an opener", () => {
+describe("fixed 2026-08-10: complete short comments <!--> and <!---> mid-line", () => {
+    it("<!--> mid-line is a complete comment, not an opener", () => {
         expect(computeNextFootnoteNumber("x <!-->\nreal[^1]")).toBe(2);
     });
 
-    it.fails("<!---> mid-line is a complete comment, not an opener", () => {
+    it("<!---> mid-line is a complete comment, not an opener", () => {
         expect(computeNextFootnoteNumber("x <!--->\nreal[^1]")).toBe(2);
     });
 
-    it.fails("text after a complete <!--> on the same line is live", () => {
+    it("text after a complete <!--> on the same line is live", () => {
         expect(computeNextFootnoteNumber("x <!--> [^9]\nreal[^1]")).toBe(10);
     });
 });

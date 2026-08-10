@@ -9,7 +9,7 @@ import {
 import FootnotePlugin from "./main";
 import { openFootnotePopup, popupEditingAvailable, runAfterNextPopupSettle, settleFootnotePopupWithFeedback, toggleCloseFootnotePopup } from "./footnote-popup";
 import { lintAfterFootnoteCreation } from "./linting/linter";
-import { findDefinitionBlocks, maskInlineRegions, maskProtectedLines, maskedLineAt, protectedLines } from "./markdown-scan";
+import { findDefinitionBlocks, maskInlineRegions, maskProtectedLines, maskedLineAt, protectedLines, scanDocument } from "./markdown-scan";
 import { EditorWithCm, VaultWithConfig, WindowWithVim } from "./obsidian-internals";
 import { activeTableCellEditor, resolveTableCellCursor, TableCellEditor } from "./table-cursor";
 
@@ -206,8 +206,8 @@ export function shouldJumpFromDefinitionToReference(
     // definition blocks and scan the masked twin
     const lines = docLines(doc);
     // one protection scan feeds both the block lookup and the masking below
-    const isProtected = protectedLines(lines);
-    const block = findDefinitionBlocks(lines, isProtected).find(
+    const scan = scanDocument(lines);
+    const block = findDefinitionBlocks(lines, scan.isProtected).find(
         (candidate) =>
             cursorPosition.line >= candidate.start &&
             cursorPosition.line <= candidate.end,
@@ -216,7 +216,7 @@ export function shouldJumpFromDefinitionToReference(
         // ids are case-insensitive, so the reference may differ in casing from
         // the definition's label ("[^Note]" ↔ "[^note]:") — fold both to compare
         const name = block.name.toLowerCase();
-        const masked = maskProtectedLines(lines, isProtected);
+        const masked = maskProtectedLines(lines, scan);
 
         // find the FIRST reference use of this footnote. footnoteReferenceMatches
         // skips a definition's own column-0 label, so a definition line — this

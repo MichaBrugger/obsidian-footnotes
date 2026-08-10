@@ -6,9 +6,9 @@ import {
 import {
     DefinitionStart,
     findDefinitionBlocks,
-    maskInlineRegions,
+    maskProtectedLines,
     normalizeEol,
-    protectedLines,
+    scanDocument,
     restoreEol,
 } from "../../markdown-scan";
 import { IgnoreType } from "../ignore-types";
@@ -35,7 +35,11 @@ export function applyFootnotePrefix(markdown: string, prefix: string): string {
 
     const { text, eol } = normalizeEol(markdown);
     const lines = text.split("\n");
-    const isProtected = protectedLines(lines);
+    // document-aware masking: comment portions of multi-line boundary
+    // lines are invisible, their live portions are not
+    const scan = scanDocument(lines);
+    const isProtected = scan.isProtected;
+    const maskedLines = maskProtectedLines(lines, scan);
     const blocks = findDefinitionBlocks(lines, isProtected);
 
     // one scan collects both: distinct plain-numbered names by first reference
@@ -54,7 +58,7 @@ export function applyFootnotePrefix(markdown: string, prefix: string): string {
     };
     for (let i = 0; i < lines.length; i++) {
         if (isProtected[i]) continue;
-        for (const match of footnoteReferenceMatches(maskInlineRegions(lines[i]))) {
+        for (const match of footnoteReferenceMatches(maskedLines[i])) {
             // re-slice the original: a code span inside the name masks to
             // NULs in match[1], and the rewrite below compares original ids
             const start = match.index ?? 0;
@@ -88,7 +92,7 @@ export function applyFootnotePrefix(markdown: string, prefix: string): string {
 
     const rewritten = lines.map((line, i) => {
         if (isProtected[i]) return line;
-        const masked = maskInlineRegions(line);
+        const masked = maskedLines[i];
         let result = "";
         let copied = 0;
         for (const match of footnoteReferenceMatches(masked)) {

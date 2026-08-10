@@ -5,9 +5,9 @@ import {
 import {
     DefinitionStart,
     findDefinitionBlocks,
-    maskInlineRegions,
+    maskProtectedLines,
     normalizeEol,
-    protectedLines,
+    scanDocument,
     removeLineRanges,
     restoreEol,
 } from "../../markdown-scan";
@@ -47,13 +47,13 @@ export interface ReindexOptions {
  */
 function referenceAppearanceOrder(
     lines: string[],
-    isProtected: boolean[],
+    maskedLines: string[],
 ): string[] {
     const order: string[] = [];
     const seen = new Set<string>();
     for (let i = 0; i < lines.length; i++) {
-        if (isProtected[i]) continue;
-        for (const match of footnoteReferenceMatches(maskInlineRegions(lines[i]))) {
+        // protected lines are all-NUL in the masked twin — no matches
+        for (const match of footnoteReferenceMatches(maskedLines[i])) {
             // re-slice the original: a code span inside the name masks to
             // NULs, which would split the reference's identity from its raw
             // definition label (bug-masked-name-identity)
@@ -70,9 +70,12 @@ function referenceAppearanceOrder(
     return order;
 }
 
-/** All references on the line rewritten through `renames` (code spans and the definition label skipped; ids matched case-insensitively); the map is complete, so swaps can't collide. */
-function rewriteReferences(line: string, renames: Map<string, string>): string {
-    const masked = maskInlineRegions(line);
+/** All references on the line rewritten through `renames` (code spans and the definition label skipped; ids matched case-insensitively); the map is complete, so swaps can't collide. `masked` is the line's document-aware masked twin. */
+function rewriteReferences(
+    line: string,
+    masked: string,
+    renames: Map<string, string>,
+): string {
     let out = "";
     let copied = 0;
     for (const match of footnoteReferenceMatches(masked)) {
@@ -155,9 +158,10 @@ function reindexOnce(
 
     const { text, eol } = normalizeEol(markdown);
     let lines = text.split("\n");
-    let isProtected = protectedLines(lines);
-    let blocks = findDefinitionBlocks(lines, isProtected);
-    let referenceOrder = referenceAppearanceOrder(lines, isProtected);
+    let scan = scanDocument(lines);
+    let maskedLines = maskProtectedLines(lines, scan);
+    let blocks = findDefinitionBlocks(lines, scan.isProtected);
+    let referenceOrder = referenceAppearanceOrder(lines, maskedLines);
 
     if (!keepOrphans) {
         // the shared reference-graph deletion: transitive chains of any
@@ -165,14 +169,15 @@ function reindexOnce(
         // link per iteration and its cap returned mid-chain on 21+-deep
         // chains — bug-reindex-orphan-cap), while definitions referencing
         // each other in a cycle count as referenced and survive
-        const orphans = orphanedDefinitionBlocks(lines, isProtected);
+        const orphans = orphanedDefinitionBlocks(lines, scan);
         if (orphans.length > 0) {
             // cut the orphan blocks out, then re-derive everything — line
             // numbers shifted, and a cut can even change fence pairing
             lines = removeLineRanges(lines, orphans);
-            isProtected = protectedLines(lines);
-            blocks = findDefinitionBlocks(lines, isProtected);
-            referenceOrder = referenceAppearanceOrder(lines, isProtected);
+            scan = scanDocument(lines);
+            maskedLines = maskProtectedLines(lines, scan);
+            blocks = findDefinitionBlocks(lines, scan.isProtected);
+            referenceOrder = referenceAppearanceOrder(lines, maskedLines);
         }
     }
 
@@ -215,8 +220,8 @@ function reindexOnce(
     }
 
     const rewritten = lines.map((line, i) => {
-        if (isProtected[i]) return line;
-        let result = rewriteReferences(line, renames);
+        if (scan.isProtected[i]) return line;
+        let result = rewriteReferences(line, maskedLines[i], renames);
         const definition = line.match(DefinitionStart);
         if (definition) {
             const newName = renames.get(definition[1].toLowerCase());

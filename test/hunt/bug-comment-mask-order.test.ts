@@ -8,8 +8,8 @@ import { computeNextFootnoteNumber } from "../../src/insert-or-navigate-footnote
 // Root cause: maskInlineRegions masks inline code FIRST, so the backtick run
 // swallows the "-->" and the comment never gets masked.
 
-describe("bug: inline-code masking runs before comment masking", () => {
-    it.fails(
+describe("fixed 2026-08-10: one left-to-right scan orders code vs comments", () => {
+    it(
         "a backtick inside a one-line comment does not unmask the comment's reference",
         () => {
             expect(

@@ -170,7 +170,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                         items: [
                             {
                                 name: "Delete orphaned references",
-                                desc: "Linting deletes footnote references that have no definition (a [^5] with no \"[^5]:\" line, which Obsidian renders as plain text). While off, linting alerts you about them instead.",
+                                desc: "Linting deletes footnote references that have no definition (a \"[^5]\" with no \"[^5]:\" line, which Obsidian renders as plain text). While off, linting alerts you about them instead.",
                                 control: {
                                     type: "toggle",
                                     key: "lintDeleteOrphanedReferences",
@@ -178,7 +178,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                             },
                             {
                                 name: "Delete orphaned definitions",
-                                desc: "Linting deletes footnote definitions that have no references  (a \"[^6]:\" line with no [^6], which Obsidian doesn't render). While off, linting alerts you about them instead and reindexing numbers them after everything else.",
+                                desc: "Linting deletes footnote definitions that have no references  (a \"[^6]:\" line with no \"[^6]\", which Obsidian doesn't render). While off, linting alerts you about them instead and reindexing numbers them after everything else.",
                                 control: {
                                     type: "toggle",
                                     key: "lintDeleteOrphanedDefinitions",
@@ -192,7 +192,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                         items: [
                             {
                                 name: "Reindex",
-                                desc: "The lint command also renumbers footnotes and reorders their definitions, following the options in this reindexing section below.",
+                                desc: "The lint command also renumbers footnotes and reorders their definitions by order of appearance, following the options in this reindexing section below.",
                                 control: { type: "toggle", key: "lintReindex" },
                             },
                             {

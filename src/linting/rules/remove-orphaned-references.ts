@@ -6,7 +6,7 @@ import {
     DefinitionStart,
     maskProtectedLines,
     normalizeEol,
-    protectedLines,
+    scanDocument,
     restoreEol,
 } from "../../markdown-scan";
 import { IgnoreType } from "../ignore-types";
@@ -93,13 +93,13 @@ export function removeOrphanedFootnoteReferences(
 ): string {
     const { text, eol } = normalizeEol(markdown);
     const lines = text.split("\n");
-    const isProtected = protectedLines(lines);
-    const masked = maskProtectedLines(lines, isProtected);
+    const scan = scanDocument(lines);
+    const masked = maskProtectedLines(lines, scan);
     const definitions = definitionNamesFolded(lines, masked);
     const safeFolded = safePrefix.toLowerCase();
 
     const out = lines.map((line, i) => {
-        if (isProtected[i]) return line;
+        if (scan.isProtected[i]) return line;
         let result = "";
         let copied = 0;
         let changed = false;

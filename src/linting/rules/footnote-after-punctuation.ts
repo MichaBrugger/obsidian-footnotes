@@ -1,8 +1,8 @@
 import {
     DefinitionStart,
-    maskInlineRegions,
+    maskProtectedLines,
     normalizeEol,
-    protectedLines,
+    scanDocument,
     restoreEol,
 } from "../../markdown-scan";
 import { IgnoreType } from "../ignore-types";
@@ -47,11 +47,15 @@ function swapInSegment(original: string, masked: string): string {
 export function footnoteAfterPunctuation(markdown: string): string {
     const { text, eol } = normalizeEol(markdown);
     const lines = text.split("\n");
-    const isProtected = protectedLines(lines);
+    // document-aware masking: the comment portions of multi-line boundary
+    // lines are masked while their live portions still get the swap
+    // (bug-comment-boundary-lines)
+    const scan = scanDocument(lines);
+    const maskedLines = maskProtectedLines(lines, scan);
 
     const result = lines.map((line, i) => {
-        if (isProtected[i]) return line;
-        const masked = maskInlineRegions(line);
+        if (scan.isProtected[i]) return line;
+        const masked = maskedLines[i];
         // a definition's own "[^x]:" prefix must not be treated as a
         // reference-before-colon — skip past it
         const prefixLength = line.match(DefinitionStart)?.[0].length ?? 0;

@@ -1350,6 +1350,23 @@ async function main() {
         }
     });
 
+    await test("comment boundary lines stay live outside the comment (2026-08-10 A4)", async () => {
+        // the opener/closer lines of a multi-line comment used to be
+        // whole-line protected: the swap-worthy reference before "<!--"
+        // was invisible and autonumbering reused hidden numbers
+        resetSettings({ lintMoveToBottom: false, lintReindex: false });
+        await setupNote("Alpha[^1]. <!-- draft\n--> done\n\n[^1]: one");
+        setCursorAndRun(0, 0, CMD_LINT);
+        await expectEditorText("Alpha.[^1] <!-- draft\n--> done\n\n[^1]: one");
+        // and the next autonumber respects a reference on a boundary line
+        setCursorAndRun(1, 8, CMD_AUTONUM); // after "done"
+        await pollUntil(
+            "the [^2] reference",
+            `(${EDITOR}).editor.getValue()`,
+            (v) => typeof v === "string" && v.includes("done[^2]"),
+        );
+    });
+
     // LAST before cleanup: this test flips the view mode, and a failure
     // between flip and flip-back must not poison the tests after it
     await test("deferred creation-lint stays inert after a flip to Reading view (2026-08-10 A7)", async () => {

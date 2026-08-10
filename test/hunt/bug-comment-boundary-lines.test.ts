@@ -23,41 +23,44 @@ function fakeEditor(lines: string[]): Editor {
     } as unknown as Editor;
 }
 
-describe("bug: multi-line comment boundary lines hide live text", () => {
-    it.fails("a reference before an inline comment opener still counts", () => {
+describe("fixed 2026-08-10: multi-line comment boundary lines keep live text live", () => {
+    it("a reference before an inline comment opener still counts", () => {
         expect(
             computeNextFootnoteNumber("a[^7] <!-- draft\n--> done[^6]"),
         ).toBe(8);
     });
 
-    it.fails("a reference after an inline comment closer still counts", () => {
+    it("a reference after an inline comment closer still counts", () => {
         expect(
             computeNextFootnoteNumber("a <!-- draft\n--> done[^7]"),
         ).toBe(8);
     });
 
-    it.fails(
+    it(
         "reindex renumbers references and definitions consistently across comment boundary lines",
         () => {
             const input = "x[^9] <!-- hidden\n--> y[^8]\n\n[^8]: eight\n[^9]: nine";
+            // the definitions also REORDER to appearance order ([^9] is
+            // used first), matching reindex's pinned policy — the hunt's
+            // original expectation kept them in place, which contradicted it
             const expected =
-                "x[^1] <!-- hidden\n--> y[^2]\n\n[^2]: eight\n[^1]: nine";
+                "x[^1] <!-- hidden\n--> y[^2]\n\n[^1]: nine\n[^2]: eight";
             expect(reindexFootnotes(input)).toBe(expected);
         },
     );
 
-    it.fails("punctuation swap still applies before an inline comment opener", () => {
+    it("punctuation swap still applies before an inline comment opener", () => {
         expect(footnoteAfterPunctuation("a[^1]. <!-- draft\n--> b")).toBe(
             "a.[^1] <!-- draft\n--> b",
         );
     });
 
-    it.fails("autonumbering sees a reference sitting before the comment opener", () => {
+    it("autonumbering sees a reference sitting before the comment opener", () => {
         const doc = "a [^5] <!-- draft\nstill comment\n--> done";
         expect(computeNextFootnoteNumber(doc)).toBe(6);
     });
 
-    it.fails("a definition whose body opens a comment is still a definition", () => {
+    it("a definition whose body opens a comment is still a definition", () => {
         const lines = ["text [^5]", "", "[^5]: body <!-- open", "cont -->"];
         expect(listExistingFootnoteDefinitions(fakeEditor(lines))).toEqual(["5"]);
     });

@@ -64,14 +64,123 @@ function isFenceOpener(bareLine: string, delim: string): boolean {
 }
 
 /**
- * Lines the transforms must not read or touch: YAML frontmatter, fenced
- * code blocks (both fence delimiter lines included, including fences nested
- * in blockquotes/callouts), and multi-line HTML comments. Indented code
- * blocks are NOT detected — indentation is how definition continuations work.
+ * One left-to-right scan of a line for inline code spans and HTML comments,
+ * NULing both, CommonMark-style: whichever construct opens first claims its
+ * content — backticks inside a comment are literal, "<!--" inside a code
+ * span is code (bug-comment-mask-order / bug-backticked-comment-opener).
+ * Backslash-escaped openers of either kind are literal text
+ * (bug-escaped-comment-opener), and the abbreviated comments "<!-->" and
+ * "<!--->" are complete per CommonMark §6.6 (bug-short-form-comment).
+ * `startInComment` continues a multi-line comment from the previous line;
+ * `endsInComment` reports one left open at the end of this one (its opener
+ * masked through EOL).
  */
-export function protectedLines(lines: string[]): boolean[] {
+export function maskLineRegions(
+    line: string,
+    startInComment = false,
+): { masked: string; endsInComment: boolean } {
+    // fast path: nothing on the line can open or close either construct
+    if (
+        !startInComment &&
+        !line.includes("`") &&
+        !line.includes("<!--")
+    ) {
+        return { masked: line, endsInComment: false };
+    }
+
+    const chars = line.split("");
+    const blot = (from: number, to: number) => {
+        for (let k = from; k < to; k++) chars[k] = "\0";
+    };
+    let i = 0;
+
+    if (startInComment) {
+        // comment content is literal — the first "-->" closes, full stop
+        const close = line.indexOf("-->");
+        if (close === -1) {
+            return { masked: "\0".repeat(line.length), endsInComment: true };
+        }
+        blot(0, close + 3);
+        i = close + 3;
+    }
+
+    while (i < line.length) {
+        const c = line[i];
+        if (c === "\\") {
+            i += 2; // an escaped character can't open a span or a comment
+            continue;
+        }
+        if (c === "`") {
+            const runStart = i;
+            while (line[i] === "`") i++;
+            const runLength = i - runStart;
+            // find the next backtick run of exactly the same length.
+            // Backslashes are literal inside a code span, so the closing
+            // search does NOT skip escapes — only the opener is unescaped.
+            let close = -1;
+            for (let j = i; j < line.length; ) {
+                if (line[j] !== "`") {
+                    j++;
+                    continue;
+                }
+                const candidate = j;
+                while (line[j] === "`") j++;
+                if (j - candidate === runLength) {
+                    close = candidate;
+                    break;
+                }
+            }
+            if (close === -1) continue; // unclosed run: literal backticks
+            blot(runStart, close + runLength);
+            i = close + runLength;
+            continue;
+        }
+        if (line.startsWith("<!--", i)) {
+            if (line.startsWith("<!-->", i)) {
+                blot(i, i + 5);
+                i += 5;
+                continue;
+            }
+            if (line.startsWith("<!--->", i)) {
+                blot(i, i + 6);
+                i += 6;
+                continue;
+            }
+            const close = line.indexOf("-->", i + 4);
+            if (close === -1) {
+                // a multi-line comment opens here and runs past EOL
+                blot(i, line.length);
+                return { masked: chars.join(""), endsInComment: true };
+            }
+            blot(i, close + 3);
+            i = close + 3;
+            continue;
+        }
+        i++;
+    }
+    return { masked: chars.join(""), endsInComment: false };
+}
+
+/** The two per-line facts the whole-document walk produces. */
+export interface DocumentScan {
+    /** Whole-line protected: YAML frontmatter, fenced code (delimiters included), and multi-line comment INTERIOR lines. Comment boundary lines are NOT here — their live portions stay scannable, with the comment part masked (bug-comment-boundary-lines). */
+    isProtected: boolean[];
+    /** Line `i` begins inside a multi-line HTML comment (it is a closer or interior line). */
+    startsInComment: boolean[];
+}
+
+/**
+ * The whole-document protection walk: YAML frontmatter, fenced code blocks
+ * (both delimiter lines included, including fences nested in
+ * blockquotes/callouts), and multi-line HTML comments — whose state is
+ * tracked by the same escape- and code-span-aware scanner that does the
+ * masking, so the two can't disagree. Indented code blocks are NOT
+ * detected — indentation is how definition continuations work.
+ */
+export function scanDocument(lines: string[]): DocumentScan {
     const src = stripCr(lines);
     const isProtected = new Array<boolean>(lines.length).fill(false);
+    const startsInComment = new Array<boolean>(lines.length).fill(false);
     let i = 0;
 
     if (src[0] === "---") {
@@ -88,8 +197,14 @@ export function protectedLines(lines: string[]): boolean[] {
     let inComment = false;
     for (; i < src.length; i++) {
         if (inComment) {
-            isProtected[i] = true;
-            if (src[i].includes("-->")) inComment = false;
+            startsInComment[i] = true;
+            if (!src[i].includes("-->")) {
+                isProtected[i] = true; // interior: nothing live on it
+                continue;
+            }
+            // the closer line keeps its live suffix — and that suffix can
+            // itself open code, another comment, even a NEW multi-line one
+            inComment = maskLineRegions(src[i], true).endsInComment;
             continue;
         }
         // blockquote/callout markers don't change the fence delimiters
@@ -112,19 +227,24 @@ export function protectedLines(lines: string[]): boolean[] {
             isProtected[i] = true;
             continue;
         }
-        // a multi-line HTML comment (an opener with no closer on its own
-        // line) hides everything through its closing line — a "[^x]:" inside
-        // it is commented-out text, not a live definition
-        const commentOpen = src[i].indexOf("<!--");
-        if (
-            commentOpen !== -1 &&
-            src[i].indexOf("-->", commentOpen + 4) === -1
-        ) {
-            inComment = true;
-            isProtected[i] = true;
+        // a multi-line HTML comment (an unescaped opener outside code with
+        // no closer) hides everything through its closing line — a "[^x]:"
+        // inside it is commented-out text, not a live definition. The
+        // opener line itself stays live before the opener.
+        if (src[i].includes("<!--")) {
+            inComment = maskLineRegions(src[i], false).endsInComment;
         }
     }
-    return isProtected;
+    return { isProtected, startsInComment };
+}
+
+/**
+ * Lines the transforms must not read or touch AT ALL — see DocumentScan.
+ * Callers that also scan line content should use maskProtectedLines, which
+ * additionally masks the comment portions of boundary lines.
+ */
+export function protectedLines(lines: string[]): boolean[] {
+    return scanDocument(lines).isProtected;
 }
 
 /**
@@ -196,41 +316,45 @@ export function maskCommentSpans(line: string): string {
     return chars.join("");
 }
 
-/** Inline code spans and single-line HTML comments blotted out, indices preserved. */
+/** Inline code spans and complete HTML comments blotted out, indices preserved. Single-line contexts only (table cell text) — document lines need maskProtectedLines, which knows about multi-line comment state. */
 export function maskInlineRegions(line: string): string {
-    return maskCommentSpans(maskInlineCode(line));
+    return maskLineRegions(line, false).masked;
 }
 
 /**
  * Every line with code, comments, and frontmatter blotted out: protected
- * lines become all-NUL strings, inline code spans and one-line HTML
- * comments are masked in the rest. Lengths and indices line up with the
- * originals, so scans over these see no code while every match position
- * stays valid in the real line. Pass a precomputed `isProtected` to avoid
- * re-deriving it when the caller already ran protectedLines.
+ * lines become all-NUL strings; in the rest, inline code spans, complete
+ * comments, and the comment PORTIONS of multi-line boundary lines are
+ * masked. Lengths and indices line up with the originals, so scans over
+ * these see no code while every match position stays valid in the real
+ * line. Pass a precomputed `scan` to avoid re-walking the document when
+ * the caller already ran scanDocument.
  */
 export function maskProtectedLines(
     lines: string[],
-    isProtected: boolean[] = protectedLines(lines),
+    scan: DocumentScan = scanDocument(lines),
 ): string[] {
     return lines.map((line, i) =>
-        isProtected[i] ? "\0".repeat(line.length) : maskInlineRegions(line),
+        scan.isProtected[i]
+            ? "\0".repeat(line.length)
+            : maskLineRegions(line, scan.startsInComment[i]).masked,
     );
 }
 
 /**
  * Line `i` of the document's masked twin, without masking the other lines.
  * The per-keypress paths need exactly the caret's line: protection state
- * still requires the whole-document fence scan (cheap line-prefix checks),
- * but the expensive inline-region masking runs on one line instead of all
- * of them (perf, 2026-08-07). Out-of-range `i` returns "".
+ * still requires the whole-document walk (cheap line-prefix checks), but
+ * the expensive inline-region masking runs on one line instead of all of
+ * them (perf, 2026-08-07). Out-of-range `i` returns "".
  */
 export function maskedLineAt(lines: string[], i: number): string {
     const line = lines[i];
     if (line === undefined) return "";
-    return protectedLines(lines)[i]
+    const scan = scanDocument(lines);
+    return scan.isProtected[i]
         ? "\0".repeat(line.length)
-        : maskInlineRegions(line);
+        : maskLineRegions(line, scan.startsInComment[i]).masked;
 }
 
 /**
