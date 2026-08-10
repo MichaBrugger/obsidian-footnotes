@@ -4,12 +4,12 @@
 
 This hotkey lets you:
 
-- Insert a new numbered footnote reference (e.g. `[^1]`) with auto-incremented index in your text
-- Insert a new named footnote reference (e.g. `[^Citation]`) in your text
-- Adds the corresponding footnote definition (e.g. `[^1]: ` or `[^Citation]: `) at the bottom of your text
-- Places your cursor so you can fill in the definitions quickly
-- Jump from your footnote TO the footnote definition
-- Jump from your footnote definition BACK to the footnote
+- Insert a new numbered footnote marker (e.g. `[^1]`) with auto-incremented index in your text
+- Insert a new named footnote marker (e.g. `[^Citation]`) in your text
+- Adds the corresponding footnote detail (e.g. `[^1]: ` or `[^Citation]: `) at the bottom of your text
+- Places your cursor so you can fill in the details quickly
+- Jump from your footnote TO the footnote detail
+- Jump from your footnote detail BACK to the footnote
 
 ![Overview](https://user-images.githubusercontent.com/68677082/228686351-fe71a0ec-be56-4d70-93c1-01925dd6380f.gif)
 
@@ -36,18 +36,18 @@ If you would like, you can further customize the plugin's behavior in Footnote S
 
 1. Given my cursor is where I want a numbered footnote to exist (e.g. `Foo bar baz▊`)
 2. When I hit `auto-numbered footnote hotkey`
-3. Then a new footnote reference (e.g. `[^1]`) is inserted where my cursor was (e.g. `Foo bar baz[^1]`)
-4. And a new footnote definitions reference (e.g. `[^1]: `) is inserted on the last line of the document
-5. And my cursor is now placed at the end of the definition reference (e.g. `[^1]: ▊`)
+3. Then a new footnote marker (e.g. `[^1]`) is inserted where my cursor was (e.g. `Foo bar baz[^1]`)
+4. And a new footnote details marker (e.g. `[^1]: `) is inserted on the last line of the document
+5. And my cursor is now placed at the end of the detail marker (e.g. `[^1]: ▊`)
 
 #### Scenario: Previous numbered (e.g. "[^1]") footnotes exist
 
 1. Given there is one or more numbered footnotes in my text
 2. And my cursor is where I want a numbered footnote to exist (e.g. `Foo bar[^1] baz▊`)
 3. When I hit `auto-numbered footnote hotkey`
-4. Then a new footnote reference with the next numbered index (e.g. `[^2]`) is inserted where my cursor was (e.g. `Foo bar[^1] baz[^2]`)
-5. And a new footnote definitions reference (e.g. `[^2]: `) is inserted on the last line of the document
-6. And my cursor is now placed at the end of the definition reference (e.g. `[^2]: ▊`)
+4. Then a new footnote marker with the next numbered index (e.g. `[^2]`) is inserted where my cursor was (e.g. `Foo bar[^1] baz[^2]`)
+5. And a new footnote details marker (e.g. `[^2]: `) is inserted on the last line of the document
+6. And my cursor is now placed at the end of the detail marker (e.g. `[^2]: ▊`)
 
 #### Scenario: Chapter notes that merge into one document (footnote prefix)
 
@@ -64,17 +64,17 @@ If you would like, you can further customize the plugin's behavior in Footnote S
 
 1. Given my cursor is where I want a named footnote to exist (e.g. `Foo bar baz▊`)
 2. When I hit `named footnote hotkey`
-3. Then an empty footnote reference (e.g. `[^]`) is inserted around my cursor (e.g. `Foo bar baz[^▊]`)
+3. Then an empty footnote marker (e.g. `[^]`) is inserted around my cursor (e.g. `Foo bar baz[^▊]`)
 4. Then, I fill in the name I want (e.g. `Foo bar baz[^customName]`)
 5. When I hit `named footnote hotkey` again
-6. A matching footnote definitions reference (e.g. `[^customName]: `) is inserted on the last line of the document
-7. And my cursor is now placed at the end of the definition reference (e.g. `[^customName]: ▊`)
+6. A matching footnote details marker (e.g. `[^customName]: `) is inserted on the last line of the document
+7. And my cursor is now placed at the end of the detail marker (e.g. `[^customName]: ▊`)
 
 ### Universal
 
 #### Footnote Popup Editing
 
-- creating or jumping to a footnote opens its definition in a small editor right at your cursor, instead of moving your cursor to the bottom of the note
+- creating or jumping to a footnote opens its detail in a small editor right at your cursor, instead of moving your cursor to the bottom of the note
 - close the popup by pressing the footnote hotkey again, hitting `Escape`, or clicking outside it
 - can be disabled in settings to restore the classic jump-to-bottom behavior
 
@@ -85,9 +85,9 @@ If you would like, you can further customize the plugin's behavior in Footnote S
 
 ![ezgif com-video-to-gif](https://github.com/MichaBrugger/obsidian-footnotes/assets/68677082/6e53a654-eac0-4077-a2cf-fc76d5ef3961)
 
-#### Scenario: Jumping TO a footnote definition
+#### Scenario: Jumping TO a footnote detail
 
-1. Given I'm on a footnote definition line (e.g. `[^1]: ▊`)
+1. Given I'm on a footnote detail line (e.g. `[^1]: ▊`)
 2. When I hit `auto-numbered footnote hotkey` OR `named footnote hotkey`
 3. Then my cursor is placed right after the *first* occurence of this footnote in my text (e.g. `[^1]▊`)
 
