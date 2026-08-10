@@ -123,7 +123,7 @@ export interface DocContext {
     maskedLines(): string[];
 }
 
-export function docContext(doc: Editor): DocContext {
+function docContext(doc: Editor): DocContext {
     const lines = docLines(doc);
     const scan = scanDocument(lines);
     const perLine: (string | undefined)[] = new Array<string | undefined>(
@@ -1228,7 +1228,7 @@ export async function insertInlineFootnote(plugin: FootnotePlugin) {
  * footnote is not this guard's business — there the press falls through
  * to exitInlineFootnoteIfInside, the deliberate "done typing" hop.
  */
-export function warnEmptyInlineFootnoteIfInside(
+function warnEmptyInlineFootnoteIfInside(
     doc: Editor,
     cell: TableCellEditor | null,
 ): boolean {
@@ -1541,7 +1541,7 @@ function caretInsidePlaceholder(
  * out — a warning is the one response that tells the user what the
  * fragment is and how to fix it.
  */
-export function warnEmptyReferenceIfInside(
+function warnEmptyReferenceIfInside(
     doc: Editor,
     cell: TableCellEditor | null,
 ): boolean {

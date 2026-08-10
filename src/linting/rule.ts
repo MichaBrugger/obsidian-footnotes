@@ -6,11 +6,13 @@
 
 import { IgnoreType } from "./ignore-types";
 
-/** A worked before/after pair, lifted from the rule's pinned tests. */
-export interface RuleExample {
+/** A worked before/after pair, lifted from the rule's pinned tests. Executed by test/rule-examples.test.ts, so examples can never drift from the transforms. */
+interface RuleExample<O = void> {
     description: string;
     before: string;
     after: string;
+    /** The options `apply` needs for this example (rules whose apply dereferences its options always set it). */
+    options?: O;
 }
 
 /**
@@ -26,6 +28,6 @@ export interface FootnoteRule<O = void> {
     name: string;
     description: string;
     ignoreTypes: IgnoreType[];
-    examples: RuleExample[];
+    examples: RuleExample<O>[];
     apply(text: string, options: O): string;
 }

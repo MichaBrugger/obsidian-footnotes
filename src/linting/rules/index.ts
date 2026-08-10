@@ -12,7 +12,9 @@ import { reIndexFootnotesRule } from "./re-index-footnotes";
 import { removeOrphanedDefinitionsRule } from "./remove-orphaned-definitions";
 import { removeOrphanedReferencesRule } from "./remove-orphaned-references";
 
-export const footnoteRules: FootnoteRule<never>[] = [
+// `unknown` erases each rule's own options type so they share one list; the
+// examples carry their own options, so consumers never need the erased type
+export const footnoteRules: FootnoteRule<unknown>[] = [
     removeOrphanedReferencesRule,
     removeOrphanedDefinitionsRule,
     footnoteAfterPunctuationRule,

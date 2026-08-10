@@ -153,11 +153,13 @@ export const removeOrphanedReferencesRule: FootnoteRule<{ safePrefix?: string }>
                 description: "A reference with no definition is removed",
                 before: "keep[^1] drop[^9] end\n\n[^1]: one",
                 after: "keep[^1] drop end\n\n[^1]: one",
+                options: {},
             },
             {
                 description: "A definition in any casing keeps its references",
                 before: "see[^Note]\n\n[^note]: n",
                 after: "see[^Note]\n\n[^note]: n",
+                options: {},
             },
         ],
         apply: (text, options) =>

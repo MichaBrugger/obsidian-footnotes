@@ -37,17 +37,13 @@ export function runAfterNextPopupSettle(callback: () => void): () => void {
     };
 }
 
-export function whenFootnotePopupSettled(): Promise<void> {
-    return pendingTeardown ?? Promise.resolve();
-}
-
 /** Whether a popup is open or a closed one's save is still in flight — automatic edits must stay away while true. */
 export function footnotePopupBusy(): boolean {
     return activePopup !== null || pendingTeardown !== null;
 }
 
 /**
- * whenFootnotePopupSettled, plus user feedback: when the wait is long
+ * Await any pending teardown, plus user feedback: when the wait is long
  * enough to feel like a dropped keypress, a notice explains what's
  * happening and clears the moment the command proceeds. The keypress is
  * never discarded — it runs as soon as the pending save has landed.
@@ -313,7 +309,7 @@ export async function openFootnotePopup(
         }
 
         // block document edits until the typed definition has fully landed
-        // (whenFootnotePopupSettled) so the save can't clobber them
+        // (settleFootnotePopupWithFeedback) so the save can't clobber them
         let settle: () => void;
         pendingTeardown = new Promise<void>((resolve) => {
             settle = resolve;

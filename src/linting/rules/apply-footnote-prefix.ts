@@ -142,11 +142,13 @@ export const applyFootnotePrefixRule: FootnoteRule<{ prefix?: string }> = {
             description: "Prefixes plain footnotes in appearance order",
             before: "b[^2] a[^1] end\n\n[^1]: one\n[^2]: two",
             after: "b[^3.1] a[^3.2] end\n\n[^3.2]: one\n[^3.1]: two",
+            options: { prefix: "3." },
         },
         {
             description: "Named footnotes keep their name behind the prefix",
             before: "x[^note] end\n\n[^note]: n",
             after: "x[^3.note] end\n\n[^3.note]: n",
+            options: { prefix: "3." },
         },
     ],
     apply: (text, options) => applyFootnotePrefix(text, options.prefix ?? ""),

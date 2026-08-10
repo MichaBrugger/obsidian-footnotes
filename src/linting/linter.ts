@@ -42,7 +42,7 @@ function configuredSectionHeading(plugin: FootnotePlugin): string {
 }
 
 /** The reindex policy the user picked in the settings tab. Orphaned-definition deletion is NOT reindex's job on the lint path anymore — the standalone rule handles it (2026-08-10), so reindex always keeps (and numbers) whatever orphans remain. */
-export function reindexOptionsFromSettings(
+function reindexOptionsFromSettings(
     plugin: FootnotePlugin,
 ): ReindexOptions {
     return {

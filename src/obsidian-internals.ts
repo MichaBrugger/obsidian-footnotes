@@ -14,7 +14,7 @@ import {
 // callers degrade gracefully instead of crashing.
 
 /** CodeMirror 6 EditorView, reachable through the undocumented `Editor.cm`. */
-export interface ObsidianEditorView {
+interface ObsidianEditorView {
     state: { selection: { main: { head: number } } };
     coordsAtPos(pos: number): { left: number; top: number; bottom: number } | null;
     /** Maps a DOM node inside the editor — including widget DOM such as the
@@ -41,7 +41,7 @@ export function viewEditor(view: MarkdownView): Editor | null {
 }
 
 /** The editable markdown embed produced by the embed registry. */
-export interface MarkdownEmbed {
+interface MarkdownEmbed {
     editable: boolean;
     dirty?: boolean;
     saving?: boolean;
@@ -64,7 +64,7 @@ export interface MarkdownEmbed {
     save?(): Promise<void> | void;
 }
 
-export type EmbedCreator = (
+type EmbedCreator = (
     context: {
         app: App;
         linktext: string;

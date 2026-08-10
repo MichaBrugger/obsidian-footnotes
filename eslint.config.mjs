@@ -1,7 +1,6 @@
 // ESLint flat config using the official Obsidian plugin guidelines
 // (https://github.com/obsidianmd/eslint-plugin) plus typescript-eslint's
 // strict-type-checked preset (adopted 2026-08-10)
-import tsparser from "@typescript-eslint/parser";
 import { defineConfig } from "eslint/config";
 import obsidianmd from "eslint-plugin-obsidianmd";
 import tseslint from "typescript-eslint";
@@ -12,7 +11,7 @@ export default defineConfig([
 	{
 		files: ["**/*.ts"],
 		languageOptions: {
-			parser: tsparser,
+			parser: tseslint.parser,
 			parserOptions: { project: "./tsconfig.json" },
 		},
 		rules: {

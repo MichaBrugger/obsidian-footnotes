@@ -151,11 +151,13 @@ export const moveFootnotesToTheBottomRule: FootnoteRule<string> = {
             description: "A mid-document definition moves to the bottom",
             before: "para one[^1].\n\n[^1]: def\n\npara two",
             after: "para one[^1].\n\npara two\n\n[^1]: def",
+            options: "",
         },
         {
             description: "Definitions keep their relative order",
             before: "a[^2].\n\n[^2]: two\n\nb[^1].\n\n[^1]: one",
             after: "a[^2].\n\nb[^1].\n\n[^2]: two\n[^1]: one",
+            options: "",
         },
     ],
     apply: (text, sectionHeading) =>

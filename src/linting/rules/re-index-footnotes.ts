@@ -278,11 +278,13 @@ export const reIndexFootnotesRule: FootnoteRule<ReindexOptions> = {
             description: "Renumbers by first reference appearance",
             before: "bravo[^2] alpha[^1].\n\n[^1]: one\n[^2]: two",
             after: "bravo[^1] alpha[^2].\n\n[^1]: two\n[^2]: one",
+            options: {},
         },
         {
             description: "Closes gaps in the numbering",
             before: "a[^3] b[^7].\n\n[^3]: three\n[^7]: seven",
             after: "a[^1] b[^2].\n\n[^1]: three\n[^2]: seven",
+            options: {},
         },
     ],
     apply: (text, options) => reindexFootnotes(text, options),
