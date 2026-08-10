@@ -145,7 +145,7 @@ export default class FootnotePlugin extends Plugin {
         void runFootnoteTransformCommand(
           this,
           (markdown, sectionHeading) =>
-            lintFootnotes(markdown, lintOptionsFromSettings(this, sectionHeading)),
+            lintFootnotes(markdown, lintOptionsFromSettings(this, sectionHeading, markdown)),
           {
             done: "Footnotes linted.",
             noop: "No linting needed.",

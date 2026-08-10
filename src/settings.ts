@@ -18,6 +18,8 @@ export interface FootnotePluginSettings {
 
     keepOrphanedDefinitions: boolean;
     renumberNamedFootnotes: boolean;
+    /** What linting does about markers with no definition: report them ("alert") or remove them from the text ("delete"). Always one or the other — orphans are never silent (Jason, 2026-08-10). */
+    lintOrphanedMarkers: "alert" | "delete";
     lintFixPunctuation: boolean;
     lintMoveToBottom: boolean;
     lintReindex: boolean;
@@ -42,6 +44,7 @@ export const DEFAULT_SETTINGS: FootnotePluginSettings = {
 
     keepOrphanedDefinitions: true,
     renumberNamedFootnotes: false,
+    lintOrphanedMarkers: "alert",
     lintFixPunctuation: true,
     lintMoveToBottom: true,
     lintReindex: true,
@@ -146,6 +149,19 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                                 control: { type: "toggle", key: "lintMoveToBottom" },
                             },
                             {
+                                name: "Orphaned markers",
+                                desc: "What linting does about footnote markers that have no definition (a [^5] with no \"[^5]:\" line, which Obsidian renders as plain text): alert you, or delete the markers from the text.",
+                                control: {
+                                    type: "dropdown",
+                                    key: "lintOrphanedMarkers",
+                                    defaultValue: "alert",
+                                    options: {
+                                        alert: "Alert",
+                                        delete: "Delete",
+                                    },
+                                },
+                            },
+                            {
                                 name: "Apply the note's footnote prefix",
                                 desc: "When the per-note footnote prefix feature is on and the note has a footnote-prefix property, linting renames plain numbered and named footnotes to carry the prefix, and renumbers prefixed footnotes within their namespace. While off, footnotes carrying the prefix are treated as named footnotes and keep their ids.",
                                 control: {
@@ -167,7 +183,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                             },
                             {
                                 name: "Keep orphaned definitions",
-                                desc: "Reindexing keeps definitions that no marker references, numbering them after everything else. Turn off to delete them instead.",
+                                desc: "Reindexing keeps definitions that no marker references, numbering them after everything else; linting alerts you about the ones it keeps. Turn off to delete them instead.",
                                 control: {
                                     type: "toggle",
                                     key: "keepOrphanedDefinitions",

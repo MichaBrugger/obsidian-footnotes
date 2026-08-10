@@ -21,6 +21,7 @@ function pluginWith(overrides: Record<string, boolean>): FootnotePlugin {
             lintReindex: true,
             keepOrphanedDefinitions: true,
             renumberNamedFootnotes: false,
+            lintOrphanedMarkers: "alert",
             ...overrides,
         },
     } as unknown as FootnotePlugin;
@@ -38,7 +39,7 @@ const NOTE = [
 
 describe("prefix-aware reindexing is gated on the apply-prefix rule", () => {
     it("apply ON: prefixed footnotes renumber within their namespace", () => {
-        const options = lintOptionsFromSettings(pluginWith({}), "");
+        const options = lintOptionsFromSettings(pluginWith({}), "", NOTE);
         expect(options.prefixAware).toBe(true);
         const result = lintFootnotes(NOTE, options);
         expect(result).toContain("b[^2.1] a[^2.2] end");
@@ -48,6 +49,7 @@ describe("prefix-aware reindexing is gated on the apply-prefix rule", () => {
         const options = lintOptionsFromSettings(
             pluginWith({ lintApplyPrefix: false }),
             "",
+            NOTE,
         );
         expect(options.prefixAware).toBe(false);
         const result = lintFootnotes(NOTE, options);
@@ -63,6 +65,7 @@ describe("prefix-aware reindexing is gated on the apply-prefix rule", () => {
         const options = lintOptionsFromSettings(
             pluginWith({ enableFootnotePrefix: false }),
             "",
+            NOTE,
         );
         expect(options.prefixAware).toBe(false);
         expect(options.applyNotePrefix).toBe(false);

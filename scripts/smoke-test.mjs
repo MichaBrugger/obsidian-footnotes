@@ -1291,6 +1291,50 @@ async function main() {
         if (!line.includes("\\|")) throw new Error(`the escaped pipe was lost: ${line}`);
     });
 
+    await test("lint alerts about markers with no definition (2026-08-10)", async () => {
+        resetSettings(); // "Orphaned markers" defaults to Alert
+        await setupNote("Ref[^1] and stray[^stray] end\n\n[^1]: one");
+        setCursorAndRun(0, 0, CMD_LINT);
+        await pollUntil(
+            "the orphaned-marker alert",
+            `[...document.querySelectorAll('.notice')].map(n => n.textContent).join('|')`,
+            (v) =>
+                typeof v === "string" &&
+                v.includes("no definition") &&
+                v.includes("[^stray]"),
+        );
+        // alert only — the marker itself stays in the text
+        const text = readJson(`(${EDITOR}).editor.getValue()`);
+        if (!text.includes("[^stray]")) {
+            throw new Error(`alert mode removed the marker: ${JSON.stringify(text)}`);
+        }
+    });
+
+    await test("lint deletes orphaned markers when the setting says so (2026-08-10)", async () => {
+        resetSettings({ lintOrphanedMarkers: "delete" });
+        await setupNote("Keep[^1] drop[^stray] end\n\n[^1]: one");
+        setCursorAndRun(0, 0, CMD_LINT);
+        await expectEditorText("Keep[^1] drop end\n\n[^1]: one");
+    });
+
+    await test("lint alerts about kept orphaned definitions (2026-08-10)", async () => {
+        resetSettings(); // keepOrphanedDefinitions defaults to on
+        await setupNote("plain text[^1]\n\n[^1]: used\n[^stray]: unused");
+        setCursorAndRun(0, 0, CMD_LINT);
+        await pollUntil(
+            "the orphaned-definition alert",
+            `[...document.querySelectorAll('.notice')].map(n => n.textContent).join('|')`,
+            (v) =>
+                typeof v === "string" &&
+                v.includes("no marker references") &&
+                v.includes("[^stray]"),
+        );
+        const text = readJson(`(${EDITOR}).editor.getValue()`);
+        if (!text.includes("[^stray]: unused")) {
+            throw new Error(`the kept orphan was altered: ${JSON.stringify(text)}`);
+        }
+    });
+
     // LAST before cleanup: this test flips the view mode, and a failure
     // between flip and flip-back must not poison the tests after it
     await test("deferred creation-lint stays inert after a flip to Reading view (2026-08-10 A7)", async () => {

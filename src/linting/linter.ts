@@ -19,7 +19,15 @@ import { activeTableCellEditor } from "../table-cursor";
 import { applyFootnotePrefix } from "./rules/apply-footnote-prefix";
 import { footnoteAfterPunctuation } from "./rules/footnote-after-punctuation";
 import { moveFootnoteDefinitionsToBottom } from "./rules/move-footnotes-to-the-bottom";
-import { reindexFootnotes, ReindexOptions } from "./rules/re-index-footnotes";
+import {
+    orphanedFootnoteDefinitionNames,
+    reindexFootnotes,
+    ReindexOptions,
+} from "./rules/re-index-footnotes";
+import {
+    orphanedFootnoteMarkerNames,
+    removeOrphanedFootnoteMarkers,
+} from "./rules/remove-orphaned-markers";
 
 // The whole-document footnote linter: each pure rule (see src/linting/rules/)
 // gets a command, plus one "lint" command composing all three. This module
@@ -43,10 +51,11 @@ export function reindexOptionsFromSettings(
     };
 }
 
-/** The lint pipeline (steps + reindex policy) the user picked in the settings tab. */
+/** The lint pipeline (steps + reindex policy) the user picked in the settings tab. `markdown` is the text about to be linted — its frontmatter names the bare-prefix placeholder orphan deletion must never touch. */
 export function lintOptionsFromSettings(
     plugin: FootnotePlugin,
     sectionHeading: string,
+    markdown: string,
 ): LintOptions {
     return {
         sectionHeading,
@@ -54,6 +63,9 @@ export function lintOptionsFromSettings(
         moveDefinitionsToBottom: plugin.settings.lintMoveToBottom,
         reindex: plugin.settings.lintReindex,
         reindexOptions: reindexOptionsFromSettings(plugin),
+        removeOrphanedMarkers:
+            plugin.settings.lintOrphanedMarkers === "delete",
+        orphanSafePrefix: alertPrefix(plugin, markdown),
         // BOTH prefix behaviors ride the apply-prefix rule (and the whole
         // feature toggle): with the rule off, footnotes carrying the
         // note's prefix are treated as NAMED footnotes and keep their ids —
@@ -79,6 +91,10 @@ export interface LintOptions {
     reindex?: boolean;
     /** Passed through to reindexFootnotes. */
     reindexOptions?: ReindexOptions;
+    /** Delete markers that have no definition anywhere in the note (default off; the caller gates on the "Orphaned markers" setting). */
+    removeOrphanedMarkers?: boolean;
+    /** The note's own valid footnote-prefix while the prefix feature is on: its untouched "[^2.]" placeholder is an in-progress footnote, never an orphan to delete. */
+    orphanSafePrefix?: string;
     /** Rename plain numbered AND named footnotes to carry the note's own footnote-prefix property (default off; the caller gates on settings). */
     applyNotePrefix?: boolean;
     /** Treat footnotes matching the note's own footnote-prefix as NUMBERED — reindex renumbers them within the namespace like plain ones (default off; set when the per-note prefix feature is on). */
@@ -94,6 +110,15 @@ export function lintFootnotes(
     // original endings are restored a single time on the way out
     const { text, eol } = normalizeEol(markdown);
     let result = text;
+    // FIRST: markers slated for deletion shouldn't be punctuation-swapped,
+    // prefixed, or handed numbers by the reindex below — and removing them
+    // can't orphan any definition (an orphaned marker has none)
+    if (options.removeOrphanedMarkers) {
+        result = removeOrphanedFootnoteMarkers(
+            result,
+            options.orphanSafePrefix ?? "",
+        );
+    }
     if (options.fixPunctuation ?? true) {
         result = footnoteAfterPunctuation(result);
     }
@@ -170,7 +195,10 @@ export function lintRulesAllDisabled(plugin: FootnotePlugin): boolean {
         !s.lintFixPunctuation &&
         !s.lintMoveToBottom &&
         !s.lintReindex &&
-        !(s.enableFootnotePrefix && s.lintApplyPrefix)
+        !(s.enableFootnotePrefix && s.lintApplyPrefix) &&
+        // orphan-marker DELETION is a transform; the Alert mode is not
+        // (and the alerts deliberately stay silent when every rule is off)
+        s.lintOrphanedMarkers !== "delete"
     );
 }
 
@@ -211,8 +239,6 @@ function alertPrefix(plugin: FootnotePlugin, markdown: string): string {
     return prefix && footnotePrefixProblem(prefix) === null ? prefix : "";
 }
 
-// every lint entry point calls this with the post-lint text, so the alert
-// fires whether or not the rules changed anything
 function noticeEmptyMarkers(plugin: FootnotePlugin, markdown: string) {
     const prefix = alertPrefix(plugin, markdown);
     const count = countEmptyFootnoteMarkers(markdown, prefix);
@@ -224,6 +250,51 @@ function noticeEmptyMarkers(plugin: FootnotePlugin, markdown: string) {
             : `This note has ${count} unnamed footnote markers (${hint}). Give them names or delete them.`,
         8000,
     );
+}
+
+/** "[^a], [^b], …" — at most three names spelled out, an ellipsis for the rest. */
+function markerList(names: string[]): string {
+    const shown = names.slice(0, 3).map((name) => `[^${name}]`).join(", ");
+    return names.length > 3 ? `${shown}, …` : shown;
+}
+
+// the "Orphaned markers" setting's Alert mode; in Delete mode the lint
+// already removed them, so the post-lint scan below finds nothing anyway
+function noticeOrphanedMarkers(plugin: FootnotePlugin, markdown: string) {
+    if (plugin.settings.lintOrphanedMarkers !== "alert") return;
+    const names = orphanedFootnoteMarkerNames(
+        markdown,
+        alertPrefix(plugin, markdown),
+    );
+    if (names.length === 0) return;
+    new Notice(
+        names.length === 1
+            ? `This note has a footnote marker with no definition (${markerList(names)}). Write its definition or delete the marker.`
+            : `This note has ${names.length} footnote markers with no definition (${markerList(names)}). Write their definitions or delete the markers.`,
+        8000,
+    );
+}
+
+// kept orphaned definitions alert too (Jason, 2026-08-10) — every orphan
+// kind is either deleted or surfaced, never silently preserved. No settings
+// gate: when deletion is on and reindex ran, none survive to report.
+function noticeOrphanedDefinitions(plugin: FootnotePlugin, markdown: string) {
+    const names = orphanedFootnoteDefinitionNames(markdown);
+    if (names.length === 0) return;
+    new Notice(
+        names.length === 1
+            ? `This note has a footnote definition no marker references (${markerList(names)}). Add its marker in the text or delete the definition.`
+            : `This note has ${names.length} footnote definitions no marker references (${markerList(names)}). Add their markers in the text or delete the definitions.`,
+        8000,
+    );
+}
+
+// every lint entry point calls this with the POST-lint text, so the alerts
+// fire whether or not the rules changed anything
+function noticeLintAlerts(plugin: FootnotePlugin, markdown: string) {
+    noticeEmptyMarkers(plugin, markdown);
+    noticeOrphanedMarkers(plugin, markdown);
+    noticeOrphanedDefinitions(plugin, markdown);
 }
 
 // ---------- automatic linting (Linter-style triggers) ----------
@@ -273,7 +344,7 @@ function lintActiveNoteIfSafe(plugin: FootnotePlugin) {
     }
     const after = lintFootnotes(
         before,
-        lintOptionsFromSettings(plugin, configuredSectionHeading(plugin)),
+        lintOptionsFromSettings(plugin, configuredSectionHeading(plugin), before),
     );
     // a manual save (Ctrl+S / vim :w) is an explicit user command, so it
     // reports its outcome either way — same as the Lint footnotes command
@@ -286,7 +357,7 @@ function lintActiveNoteIfSafe(plugin: FootnotePlugin) {
         replaceMinimal(doc, before, after);
         new Notice("Footnotes linted.");
     }
-    noticeEmptyMarkers(plugin, after);
+    noticeLintAlerts(plugin, after);
 }
 
 /**
@@ -399,15 +470,15 @@ export function lintAfterFootnoteCreation(
     if (lintBlockedByPrefix(before)) return;
     const after = lintFootnotes(
         before,
-        lintOptionsFromSettings(plugin, configuredSectionHeading(plugin)),
+        lintOptionsFromSettings(plugin, configuredSectionHeading(plugin), before),
     );
     if (after === before) {
-        noticeEmptyMarkers(plugin, after);
+        noticeLintAlerts(plugin, after);
         return;
     }
     replaceMinimal(doc, before, after);
     new Notice("Footnotes linted.");
-    noticeEmptyMarkers(plugin, after);
+    noticeLintAlerts(plugin, after);
     if (relandCursor) {
         const target = uniqueEmptyDetailName(doc);
         if (target !== null) {
@@ -453,6 +524,6 @@ export async function runFootnoteTransformCommand(
             replaceMinimal(doc, before, after);
             new Notice(notices.done);
         }
-        noticeEmptyMarkers(plugin, after);
+        noticeLintAlerts(plugin, after);
     });
 }
