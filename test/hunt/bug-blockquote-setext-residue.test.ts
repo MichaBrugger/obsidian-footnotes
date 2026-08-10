@@ -7,8 +7,8 @@ import { reindexFootnotes } from "../../src/linting/rules/re-index-footnotes";
 // Hunt: 2026-08-09. Lens: contexts.
 // Root cause: the pinned setext fix's adjacency regex can't match "> ---".
 
-describe("bug: orphan deletion leaves a setext heading inside a blockquote", () => {
-    it.fails("does not create a setext heading inside a blockquote when deleting an orphan", () => {
+describe("fixed 2026-08-10: orphan deletion and setext headings inside a blockquote", () => {
+    it("does not create a setext heading inside a blockquote when deleting an orphan", () => {
         const input = [
             "> closing words[^1]",
             "[^9]: orphan",

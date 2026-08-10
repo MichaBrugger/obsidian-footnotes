@@ -9,8 +9,8 @@ import { protectedLines } from "../../src/markdown-scan";
 // Hunt: 2026-08-09. Lens: properties.
 // Root cause: removeLineRanges' setext guard only fires mid-document (out.length > 0), so a cut at line 0 can leave "---" at document start where it parses as frontmatter.
 
-describe("bug: a cut stranding '---' at document start manufactures frontmatter", () => {
-    it.fails("move-to-bottom does not turn live prose into a frontmatter block", () => {
+describe("fixed 2026-08-10: a cut stranding '---' at document start manufactures frontmatter", () => {
+    it("move-to-bottom does not turn live prose into a frontmatter block", () => {
         const doc = "[^1]: def\n---\ntext[^1]\n---\nmore";
         const out = moveFootnoteDefinitionsToBottom(doc);
         const lines = out.split("\n");
@@ -18,7 +18,7 @@ describe("bug: a cut stranding '---' at document start manufactures frontmatter"
         expect(protectedLines(lines)[proseLine]).toBe(false);
     });
 
-    it.fails("reindex drop-orphans keeps the definition whose reference sits after a stranded '---'", () => {
+    it("reindex drop-orphans keeps the definition whose reference sits after a stranded '---'", () => {
         const doc = "[^9]: orphan\n---\ntext[^1]\n---\n\n[^1]: def";
         const out = reindexFootnotes(doc, {
             keepOrphanedDefinitions: false,
@@ -26,7 +26,7 @@ describe("bug: a cut stranding '---' at document start manufactures frontmatter"
         expect(out).toContain("[^1]: def");
     });
 
-    it.fails("the composed lint does not manufacture frontmatter either", () => {
+    it("the composed lint does not manufacture frontmatter either", () => {
         const doc = "[^1]: def\n---\ntext[^1]\n---\nmore";
         const out = lintFootnotes(doc);
         const lines = out.split("\n");

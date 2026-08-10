@@ -259,7 +259,8 @@ export function removeLineRanges(
         ) {
             continue; // still merging until a non-blank line arrives
         }
-        // a cut must not drop a paragraph directly onto a "---"/"===" line:
+        // a cut must not drop a paragraph directly onto a "---"/"===" line
+        // (blockquoted "> ---" included — bug-blockquote-setext-residue):
         // that would turn the stranded text into a setext heading. Only when
         // the adjacency is new (mergeBlanks — no blank line survived the cut
         // between them) do we reinstate a blank separator.
@@ -267,8 +268,16 @@ export function removeLineRanges(
             mergeBlanks &&
             out.length > 0 &&
             out[out.length - 1] !== "" &&
-            /^\s{0,3}(-+|=+)\s*$/.test(lines[i])
+            /^\s{0,3}(-+|=+)\s*$/.test(lines[i].replace(BlockquotePrefix, ""))
         ) {
+            out.push("");
+        }
+        // nor may a cut promote a "---" to DOCUMENT START: there it parses
+        // as a frontmatter opener and swallows live prose up to the next
+        // divider — and drop-orphans reindex then deletes the definitions
+        // whose references it hid (bug-stranded-frontmatter). A leading
+        // blank line keeps it an ordinary divider.
+        if (mergeBlanks && out.length === 0 && lines[i] === "---") {
             out.push("");
         }
         mergeBlanks = false;
