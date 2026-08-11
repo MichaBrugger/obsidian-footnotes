@@ -688,8 +688,10 @@ export function maskedLineAt(lines: string[], i: number): string {
     const scan = scanDocument(lines);
     return scan.isProtected[i]
         ? "\0".repeat(line.length)
-        : maskLineRegions(line, scan.startsInComment[i], scan.startsInMath[i])
-              .masked;
+        : maskLineRegions(line, {
+              comment: scan.startsInComment[i],
+              math: scan.startsInMath[i],
+          }).masked;
 }
 
 /**

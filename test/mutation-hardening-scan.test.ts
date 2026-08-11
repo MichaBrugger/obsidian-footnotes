@@ -162,7 +162,7 @@ describe("maskLineRegions: multi-line comment continuation (startInComment)", ()
     it("an interior line with no closer stays fully masked and open", () => {
         const { masked, endsInComment, endsInMath } = maskLineRegions(
             "no closer on this line",
-            true,
+            { comment: true },
         );
         expect(masked).toBe(NUL("no closer on this line".length));
         expect(endsInComment).toBe(true);
@@ -187,8 +187,7 @@ describe("maskLineRegions: multi-line math continuation (startInMath)", () => {
     it("an interior math line with no closer stays fully masked and open", () => {
         const { masked, endsInMath, endsInComment } = maskLineRegions(
             "still inside the block",
-            false,
-            true,
+            { math: true },
         );
         expect(masked).toBe(NUL("still inside the block".length));
         expect(endsInMath).toBe(true);
