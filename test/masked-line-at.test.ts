@@ -51,7 +51,9 @@ describe("maskLineRegions", () => {
     });
 
     it("a line starting in a comment is masked up to its closer", () => {
-        const { masked, endsInComment } = maskLineRegions("gone --> live", true);
+        const { masked, endsInComment } = maskLineRegions("gone --> live", {
+            comment: true,
+        });
         expect(masked).toBe(NUL("gone -->".length) + " live");
         expect(endsInComment).toBe(false);
     });

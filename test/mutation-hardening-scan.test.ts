@@ -174,7 +174,7 @@ describe("maskLineRegions: multi-line comment continuation (startInComment)", ()
     // region to a fresh code-span scan, changing the final mask.
     it("resumes scanning exactly after the comment closer, not before it", () => {
         const line = "`ab--> cd`e";
-        const { masked } = maskLineRegions(line, true);
+        const { masked } = maskLineRegions(line, { comment: true });
         // close+3 correctly skips past "-->"; only "cd`" ... "`e" remain,
         // and the lone leftover backtick at index 9 never re-pairs with
         // the opener backtick at index 0 (that's already behind us)
@@ -198,7 +198,7 @@ describe("maskLineRegions: multi-line math continuation (startInMath)", () => {
     // line 199: `i` must resume exactly after "$$" (2 chars), not before.
     it("resumes scanning exactly after the math closer, not before it", () => {
         const line = "`ab$$ cd`e";
-        const { masked } = maskLineRegions(line, false, true);
+        const { masked } = maskLineRegions(line, { math: true });
         expect(masked).toBe(NUL(5) + " cd`e");
     });
 });

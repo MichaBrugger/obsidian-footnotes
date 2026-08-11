@@ -169,11 +169,10 @@ function docContext(doc: Editor): DocContext {
         if (masked === undefined) {
             masked = scan.isProtected[i]
                 ? "\0".repeat(line.length)
-                : maskLineRegions(
-                      line,
-                      scan.startsInComment[i],
-                      scan.startsInMath[i],
-                  ).masked;
+                : maskLineRegions(line, {
+                      comment: scan.startsInComment[i],
+                      math: scan.startsInMath[i],
+                  }).masked;
             perLine[i] = masked;
         }
         return masked;

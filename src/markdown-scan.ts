@@ -154,9 +154,12 @@ function dollarInsideReference(line: string, i: number): boolean {
 
 export function maskLineRegions(
     line: string,
-    startInComment = false,
-    startInMath = false,
+    // named state instead of two positional booleans — call sites like
+    // `maskLineRegions(line, { math: true })` say which region continues
+    startsIn: { comment?: boolean; math?: boolean } = {},
 ): { masked: string; endsInComment: boolean; endsInMath: boolean } {
+    const startInComment = startsIn.comment ?? false;
+    const startInMath = startsIn.math ?? false;
     // fast path: nothing on the line can open or close any construct
     if (
         !startInComment &&
@@ -422,7 +425,7 @@ export function scanDocument(lines: string[]): DocumentScan {
             // the closer line keeps its live suffix — and that suffix can
             // itself open code, another comment, math, even a NEW
             // multi-line region of either kind
-            const closed = maskLineRegions(src[i], true);
+            const closed = maskLineRegions(src[i], { comment: true });
             inComment = closed.endsInComment;
             inMath = closed.endsInMath;
             // the closer's live suffix can open a NEW region — at this
@@ -448,7 +451,7 @@ export function scanDocument(lines: string[]): DocumentScan {
                 isProtected[i] = true; // interior: nothing live on it
                 continue;
             }
-            const closed = maskLineRegions(src[i], false, true);
+            const closed = maskLineRegions(src[i], { math: true });
             inMath = closed.endsInMath;
             inComment = closed.endsInComment;
             // same as the comment branch: a reopened region lives at this
@@ -616,7 +619,7 @@ export function scanDocument(lines: string[]): DocumentScan {
         // an unclosed "$$" opening a display-math block. The opener line
         // itself stays live before the opener.
         if (src[i].includes("<!--") || src[i].includes("$$")) {
-            const opened = maskLineRegions(src[i], false, false);
+            const opened = maskLineRegions(src[i]);
             inComment = opened.endsInComment;
             inMath = opened.endsInMath;
             if (inComment || inMath) regionDepth = depth;
@@ -645,7 +648,7 @@ export function protectedLines(lines: string[]): boolean[] {
 
 /** Inline code spans and complete HTML comments blotted out, indices preserved. Single-line contexts only (table cell text) — document lines need maskProtectedLines, which knows about multi-line comment state. */
 export function maskInlineRegions(line: string): string {
-    return maskLineRegions(line, false).masked;
+    return maskLineRegions(line).masked;
 }
 
 /**
@@ -664,7 +667,10 @@ export function maskProtectedLines(
     return lines.map((line, i) =>
         scan.isProtected[i]
             ? "\0".repeat(line.length)
-            : maskLineRegions(line, scan.startsInComment[i], scan.startsInMath[i])
+            : maskLineRegions(line, {
+                  comment: scan.startsInComment[i],
+                  math: scan.startsInMath[i],
+              })
                   .masked,
     );
 }
