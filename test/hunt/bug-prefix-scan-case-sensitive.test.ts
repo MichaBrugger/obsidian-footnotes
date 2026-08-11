@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { computeNextFootnoteNumber } from "../../src/insert-or-navigate-footnotes";
+import { computeNextFootnoteNumber } from "../../src/footnote-grammar";
 import { applyFootnotePrefix } from "../../src/linting/rules/apply-footnote-prefix";
 
 // Scenario: a case-variant prefixed footnote ([^P.1] under prefix "p.") doesn't

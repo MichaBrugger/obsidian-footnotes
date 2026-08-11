@@ -1,10 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import {
-    computeNextFootnoteNumber,
-    footnotePrefix,
-    footnotePrefixProblem,
-} from "../src/insert-or-navigate-footnotes";
+import { footnotePrefix, footnotePrefixProblem } from "../src/insert-or-navigate-footnotes";
+import { computeNextFootnoteNumber } from "../src/footnote-grammar";
 import { lintBlockedByPrefix } from "../src/linting/linter";
 
 // Issue #31: notes that are chapters of a larger document need their

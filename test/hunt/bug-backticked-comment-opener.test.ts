@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { computeNextFootnoteNumber } from "../../src/insert-or-navigate-footnotes";
+import { computeNextFootnoteNumber } from "../../src/footnote-grammar";
 
 // BUG: a backticked "<!--" (inline code) on an earlier line is treated as a
 // real multi-line comment opener, hiding the rest of the note.

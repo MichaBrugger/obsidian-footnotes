@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { computeNextFootnoteNumber } from "../../src/insert-or-navigate-footnotes";
+import { computeNextFootnoteNumber } from "../../src/footnote-grammar";
 import { moveFootnoteDefinitionsToBottom } from "../../src/linting/rules/move-footnotes-to-the-bottom";
 
 // BUG: an unclosed fence inside a blockquote ends when the blockquote ends

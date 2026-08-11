@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { computeNextFootnoteNumber } from "../../src/insert-or-navigate-footnotes";
+import { computeNextFootnoteNumber } from "../../src/footnote-grammar";
 
 // BUG: a fence opened inside a blockquote dies when the quote ends; a bare
 // ``` after it OPENS a new document-level fence per CommonMark, but the

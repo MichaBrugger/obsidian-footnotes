@@ -1,10 +1,8 @@
 import { Editor } from "obsidian";
 import { describe, expect, it } from "vitest";
 
-import {
-    computeNextFootnoteNumber,
-    listExistingFootnoteReferencesAndLocations,
-} from "../../src/insert-or-navigate-footnotes";
+import { listExistingFootnoteReferencesAndLocations } from "../../src/insert-or-navigate-footnotes";
+import { computeNextFootnoteNumber } from "../../src/footnote-grammar";
 import { reindexFootnotes } from "../../src/linting/rules/re-index-footnotes";
 
 // Scenario: a backslash-escaped reference "\[^9]" is literal text per CommonMark

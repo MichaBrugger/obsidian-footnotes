@@ -1,4 +1,4 @@
-import { referenceOccurrences } from "../../insert-or-navigate-footnotes";
+import { referenceOccurrences } from "../../footnote-grammar";
 import {
     DefinitionBlock,
     definitionLabelIn,

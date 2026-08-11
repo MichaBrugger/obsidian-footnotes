@@ -1,10 +1,8 @@
 import { Editor } from "obsidian";
 import { describe, expect, it } from "vitest";
 
-import {
-    isValidFootnoteName,
-    createMatchingFootnoteDefinition,
-} from "../src/insert-or-navigate-footnotes";
+import { createMatchingFootnoteDefinition } from "../src/insert-or-navigate-footnotes";
+import { isValidFootnoteName } from "../src/footnote-grammar";
 import type FootnotePlugin from "../src/main";
 
 // Regression (reported 2026-07-14): footnote names containing spaces are a

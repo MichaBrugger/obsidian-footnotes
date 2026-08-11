@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { computeNextFootnoteNumber } from "../../src/insert-or-navigate-footnotes";
+import { computeNextFootnoteNumber } from "../../src/footnote-grammar";
 
 // With an existing [^9007199254740991] (MAX_SAFE_INTEGER), the autonumber mints 9007199254740992, which later scans skip via the isSafeInteger guard, so the NEXT press mints the same id AGAIN — duplicate footnote ids.
 // Hunt: 2026-08-10. Lens: regressions.

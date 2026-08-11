@@ -1,7 +1,4 @@
-import {
-    isValidFootnoteName,
-    referenceOccurrences,
-} from "../../insert-or-navigate-footnotes";
+import { isValidFootnoteName, referenceOccurrences } from "../../footnote-grammar";
 import {
     definitionLabelIn,
     maskProtectedLines,

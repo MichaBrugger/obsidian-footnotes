@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { footnoteReferenceMatches } from "../../src/insert-or-navigate-footnotes";
+import { footnoteReferenceMatches } from "../../src/footnote-grammar";
 import { applyFootnotePrefix } from "../../src/linting/rules/apply-footnote-prefix";
 import { reindexFootnotes } from "../../src/linting/rules/re-index-footnotes";
 

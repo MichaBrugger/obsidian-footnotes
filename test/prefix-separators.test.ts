@@ -1,10 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import {
-    computeNextFootnoteNumber,
-    footnotePrefix,
-    footnotePrefixProblem,
-} from "../src/insert-or-navigate-footnotes";
+import { footnotePrefix, footnotePrefixProblem } from "../src/insert-or-navigate-footnotes";
+import { computeNextFootnoteNumber } from "../src/footnote-grammar";
 import { countEmptyFootnoteReferences, lintFootnotes } from "../src/linting/linter";
 import { applyFootnotePrefix } from "../src/linting/rules/apply-footnote-prefix";
 import { reindexFootnotes } from "../src/linting/rules/re-index-footnotes";

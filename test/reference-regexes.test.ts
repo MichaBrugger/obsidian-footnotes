@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-    AllReferences,
-    ExtractNameFromFootnote,
-    footnoteReferenceMatches,
-} from "../src/insert-or-navigate-footnotes";
+import { AllReferences, ExtractNameFromFootnote, footnoteReferenceMatches } from "../src/footnote-grammar";
 
 // AllReferences is a /g regex: matchAll (used everywhere in src) is stateless,
 // but .test()/.exec() would advance lastIndex between calls — these tests

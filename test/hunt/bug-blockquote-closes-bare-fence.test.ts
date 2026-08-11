@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { computeNextFootnoteNumber } from "../../src/insert-or-navigate-footnotes";
+import { computeNextFootnoteNumber } from "../../src/footnote-grammar";
 
 // BUG: a "> ```" (or "> ~~~") line CLOSES a fence opened at document level;
 // per CommonMark a blockquote line is fence content (containers can't

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { computeNextFootnoteNumber } from "../../src/insert-or-navigate-footnotes";
+import { computeNextFootnoteNumber } from "../../src/footnote-grammar";
 
 // BUG: autonumbering goes through a JavaScript Number, so a reference with a huge
 // number (beyond 2^53) makes the next footnote id render in scientific notation.

@@ -1,8 +1,5 @@
-import {
-    computeNextFootnoteNumber,
-    footnotePrefixProblem,
-    referenceOccurrences,
-} from "../../insert-or-navigate-footnotes";
+import { footnotePrefixProblem } from "../../insert-or-navigate-footnotes";
+import { computeNextFootnoteNumber, referenceOccurrences } from "../../footnote-grammar";
 import {
     DefinitionStart,
     findDefinitionBlocks,
