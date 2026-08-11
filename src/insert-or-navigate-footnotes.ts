@@ -18,10 +18,12 @@ import {
 } from "./footnote-grammar";
 import { footnotePopupBusy, openFootnotePopup, popupEditingAvailable, runAfterNextPopupSettle, settleFootnotePopupWithFeedback, toggleCloseFootnotePopup } from "./footnote-popup";
 import { activeFootnotePrefix, footnotePrefix, footnotePrefixFromEditor, footnotePrefixProblem } from "./footnote-prefix";
+import { adjustFootnotePosition, endOfWordOffset, moveCursorAndSetJumpPoint } from "./cursor-motion";
+import { DocContext, docContext, docLines, readingViewActive } from "./doc-context";
 import { lintAfterFootnoteCreation } from "./linting/linter";
-import { definitionLabelIn, DocumentScan, findDefinitionBlocks, maskInlineRegions, maskLineRegions, maskProtectedLines, maskedLineAt, scanDocument, TrailingPunctuationChars } from "./markdown-scan";
-import { EditorWithCm, VaultWithConfig, viewEditor, WindowWithVim } from "./obsidian-internals";
-import { activeTableCellEditor, nestedSubEditorOwnsFocus, resolveTableCellCursor, runOutsideTableCell, TableCellEditor } from "./table-cursor";
+import { definitionLabelIn, findDefinitionBlocks, maskInlineRegions, maskProtectedLines, maskedLineAt, scanDocument } from "./markdown-scan";
+import { viewEditor } from "./obsidian-internals";
+import { activeTableCellEditor, resolveTableCellCursor, runOutsideTableCell, TableCellEditor } from "./table-cursor";
 
 // Core logic for both hotkey commands. Each press walks the same decision
 // cascade against the caret position:
@@ -34,71 +36,6 @@ import { activeTableCellEditor, nestedSubEditorOwnsFocus, resolveTableCellCursor
 // Table caveat (see table-cursor.ts): when the caret is in an actively
 // edited table cell, reads use the position resolved from the cell's
 // sub-editor and reference writes are dispatched INTO that sub-editor.
-
-/** Whether `mdView` is in Reading view — where every text-editing command must be inert. The structural parameter type keeps getMode honestly optional: bare test fakes without it count as editable. */
-export function readingViewActive(mdView: {
-    getMode?: MarkdownView["getMode"];
-}): boolean {
-    return mdView.getMode?.() === "preview";
-}
-
-// Scans run against the document's masked twin (code and frontmatter
-// blotted out, indices preserved): a "[^x]" inside a code sample is plain
-// text, not a footnote (issue #41).
-function docLines(doc: Editor): string[] {
-    const lines: string[] = [];
-    for (let i = 0; i < doc.lineCount(); i++) {
-        lines.push(doc.getLine(i));
-    }
-    return lines;
-}
-
-/**
- * One press's shared read-only view of the document (perf F1): the cascade
- * steps used to each re-materialize the lines and re-walk the protection
- * scan — 3–5 full-document passes per press. Every step takes an optional
- * DocContext (defaulting to a fresh one, so direct/unit callers are
- * unchanged) and the command entry points build ONE per press. Masking is
- * lazy: per line on demand, whole-twin memoized on first full need. Built
- * strictly BEFORE any edit of the press — creation steps edit last, so the
- * context never goes stale within a press.
- */
-export interface DocContext {
-    lines: string[];
-    scan: DocumentScan;
-    /** Line `i` of the masked twin ("" when out of range), cached per line. */
-    maskedLine(i: number): string;
-    /** The whole masked twin, memoized. */
-    maskedLines(): string[];
-}
-
-function docContext(doc: Editor): DocContext {
-    const lines = docLines(doc);
-    const scan = scanDocument(lines);
-    const perLine: (string | undefined)[] = new Array<string | undefined>(
-        lines.length,
-    );
-    let full: string[] | null = null;
-    const maskedLine = (i: number): string => {
-        if (i < 0 || i >= lines.length) return "";
-        const line = lines[i];
-        if (full) return full[i];
-        let masked = perLine[i];
-        if (masked === undefined) {
-            masked = scan.isProtected[i]
-                ? "\0".repeat(line.length)
-                : maskLineRegions(line, {
-                      comment: scan.startsInComment[i],
-                      math: scan.startsInMath[i],
-                  }).masked;
-            perLine[i] = masked;
-        }
-        return masked;
-    };
-    const maskedLines = (): string[] =>
-        full ?? (full = maskProtectedLines(lines, scan));
-    return { lines, scan, maskedLine, maskedLines };
-}
 
 /** Names of all footnote definitions ("[^x]: …" lines) in document order, one per line at most. Code blocks don't count. */
 export function listExistingFootnoteDefinitions(
@@ -146,53 +83,6 @@ export function listExistingFootnoteReferencesAndLocations(
         }
     }
     return references;
-}
-
-function moveCursorAndSetJumpPoint(
-    doc: Editor,
-    oldCursorPos: EditorPosition,
-    newCursorPos: EditorPosition,
-    plugin: FootnotePlugin,
-    changes?: EditorChange[],
-    center = false,
-): void {
-    // when focus sits in a sub-editor (a table cell being edited — its
-    // contentDOM is nested inside the main editor's), return it to the main
-    // editor BEFORE moving the cursor: a jump out of the table would
-    // otherwise leave keystrokes going to the abandoned cell editor, while
-    // a jump into a table re-activates cell editing on its own
-    const cmView = (doc as EditorWithCm).cm;
-    if (cmView && nestedSubEditorOwnsFocus(doc)) {
-        cmView.focus();
-    }
-
-    if (changes && changes.length > 0) {
-        // text edits and the cursor move must go out as ONE transaction:
-        // while a table cell is being edited (Obsidian 1.5+ table editor),
-        // separate dispatches in the same tick race the cell editor's
-        // sync-back and corrupt the document (issue #28). `selection` here
-        // is resolved against the post-change document.
-        doc.transaction({ changes, selection: { from: newCursorPos } });
-    } else {
-        doc.setCursor(newCursorPos);
-    }
-
-    // jumps land CENTERED: Obsidian's minimal scrolling would park the
-    // cursor at the viewport edge — on mobile, nearly off screen. Local
-    // inserts pass center=false so the view doesn't shift underfoot.
-    if (center) {
-        doc.scrollIntoView({ from: newCursorPos, to: newCursorPos }, true);
-    }
-
-    // if user has vim mode enabled, set jump point
-    // getConfig is private API, like the vim internals below
-    if ((plugin.app.vault as VaultWithConfig).getConfig?.("vimMode")) {
-        (activeWindow as WindowWithVim).CodeMirrorAdapter?.Vim.getVimGlobalState_().jumpList.add(
-            (doc as EditorWithCm).cm?.cm, // SIC two levels deep
-            oldCursorPos,
-            newCursorPos,
-        );
-    }
 }
 
 /** Cascade step 1: caret on a definition line → jump to the first use of its reference. Returns whether it handled the press. */
@@ -532,76 +422,6 @@ export function buildDefinitionAppend(
         }
     }
     return { change: { from, to, text }, cursor, prepend };
-}
-
-/** Whether `c` is trailing punctuation (TrailingPunctuationChars in markdown-scan — ASCII + CJK, shared with the lint rule). Guards the empty string explicitly — `"…".includes("")` is true, and `text[i]` past EOL yields undefined at some call sites. */
-function isTrailingPunctuation(c: string | undefined): boolean {
-    return !!c && TrailingPunctuationChars.includes(c);
-}
-
-/**
- * The end-of-word insertion point within plain text: from `offset`, the end
- * of the word under (or just before) the cursor, plus one trailing
- * punctuation mark. Offsets with no word touching them are returned
- * unchanged. This is `adjustFootnotePosition` for table cells, where the
- * main editor's `wordAt` can't see the cell sub-editor's text. Word
- * characters are unicode letters/numbers/marks — combining accents belong
- * to the word they follow, matching the grapheme-aware `wordAt`.
- */
-export function endOfWordOffset(text: string, offset: number): number {
-    // walk by CODE POINTS: astral letters (Deseret, CJK Ext-B like 𠮷) are
-    // two UTF-16 units, and testing lone surrogates against \p{L} split
-    // words in table cells (bug-astral-word-walk)
-    const isWordCp = (cp: number | undefined) =>
-        cp !== undefined && /[\p{L}\p{N}\p{M}_]/u.test(String.fromCodePoint(cp));
-    // the code point touching `i` from the left — stepping over a low
-    // surrogate to the pair's start, and treating a mid-pair `i` as inside
-    // its own pair — or undefined at the text's start
-    const cpBefore = (i: number): number | undefined => {
-        if (i <= 0) return undefined;
-        const prev = text.charCodeAt(i - 1);
-        if (prev >= 0xd800 && prev <= 0xdbff) {
-            return text.codePointAt(i - 1); // `i` sits mid-pair
-        }
-        if (prev >= 0xdc00 && prev <= 0xdfff && i >= 2) {
-            return text.codePointAt(i - 2);
-        }
-        return prev;
-    };
-    if (!isWordCp(text.codePointAt(offset)) && !isWordCp(cpBefore(offset))) {
-        return offset;
-    }
-    let end = offset;
-    // a mid-pair start (found by fast-check, 2026-08-10) snaps back to its
-    // code point's boundary so the walk — and the returned caret — always
-    // land between code points
-    const unitAtEnd = text.charCodeAt(end);
-    if (unitAtEnd >= 0xdc00 && unitAtEnd <= 0xdfff) end--;
-    for (;;) {
-        const cp = text.codePointAt(end);
-        if (!isWordCp(cp)) break;
-        end += (cp as number) > 0xffff ? 2 : 1;
-    }
-    if (isTrailingPunctuation(text[end])) end++;
-    return end;
-}
-
-/** adjust cursor position to insert a footnote only at the end of word */
-function adjustFootnotePosition(
-    cursorPosition: EditorPosition,
-    doc: Editor,
-    lineText: string,
-    plugin: FootnotePlugin
-) {
-    if (!plugin.settings.insertAtEndOfWord) return cursorPosition;
-    const endOfWordUnderCursor = doc.wordAt(cursorPosition)?.to;
-    if (!endOfWordUnderCursor) return cursorPosition; // no word under cursor
-
-    // adjust cursor position to insert a footnote only at the end of word
-    const nextChar = lineText.charAt(endOfWordUnderCursor.ch);
-    if (isTrailingPunctuation(nextChar)) endOfWordUnderCursor.ch++;
-    cursorPosition = endOfWordUnderCursor;
-    return cursorPosition;
 }
 
 // Insert `text` at the caret of an actively edited table cell, through the

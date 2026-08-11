@@ -6,7 +6,8 @@ import {
     settleFootnotePopupWithFeedback,
     toggleCloseFootnotePopup,
 } from "../footnote-popup";
-import { jumpToFootnoteDefinition, readingViewActive } from "../insert-or-navigate-footnotes";
+import { jumpToFootnoteDefinition } from "../insert-or-navigate-footnotes";
+import { readingViewActive } from "../doc-context";
 import { footnotePrefix, footnotePrefixProblem } from "../footnote-prefix";
 import { maskProtectedLines, normalizeEol, restoreEol } from "../markdown-scan";
 import { AppWithCommands, AppWithPlugins, viewEditor, WindowWithVim } from "../obsidian-internals";

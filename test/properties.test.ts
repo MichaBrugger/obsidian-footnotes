@@ -6,7 +6,8 @@ import { gfmFootnote } from "micromark-extension-gfm-footnote";
 import { math } from "micromark-extension-math";
 import { describe, expect, it } from "vitest";
 
-import { endOfWordOffset, inlineFootnoteSpanAt, sanitizeInlineFootnoteContent } from "../src/insert-or-navigate-footnotes";
+import { inlineFootnoteSpanAt, sanitizeInlineFootnoteContent } from "../src/insert-or-navigate-footnotes";
+import { endOfWordOffset } from "../src/cursor-motion";
 import { footnoteReferenceMatches } from "../src/footnote-grammar";
 import { lintFootnotes, LintOptions } from "../src/linting/linter";
 import {
