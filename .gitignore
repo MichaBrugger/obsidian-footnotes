@@ -26,3 +26,7 @@ scripts/.smoke-settings.bak.json
 .stryker-tmp/
 reports/
 stryker.log
+
+# coverage output and mutation-survivor working dumps
+coverage/
+survivors-*.json
