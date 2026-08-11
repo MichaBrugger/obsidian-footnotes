@@ -1,3 +1,4 @@
+import { referenceOccurrences } from "../../footnote-grammar";
 import {
     definitionLabelIn,
     maskProtectedLines,
@@ -19,34 +20,53 @@ const PunctuationClass = TrailingPunctuationChars.replace(
     /[.*+?^${}()|[\]\\-]/g,
     "\\$&",
 );
-
-// a run of references directly followed by a run of punctuation; matching both
-// as runs makes a single pass idempotent ("[^1][^2]?!" swaps as one unit)
-const ReferencesBeforePunctuation = new RegExp(
-    `((?:\\[\\^[^[\\]]+\\])+)([${PunctuationClass}]+)`,
-    "g",
-);
 const SinglePunctuation = new RegExp(`[${PunctuationClass}]`);
 
-// Swap every reference-run/punctuation-run pair in one segment of a line. The
-// scan runs on the code-masked text but the output is assembled from the
-// original (a reference name could otherwise pick up mask characters).
+// Swap every reference-run/punctuation-run pair in one segment of a line.
+// References come from referenceOccurrences — the grammar's exclusions
+// (escaped "\[^1]" is literal prose, "^[…]" brackets belong to their
+// inline footnote) apply here too: a hand-rolled regex used to swap those,
+// turning text the user typed on purpose into a live reference
+// (2026-08-11 review bug #1). The scan runs on the code-masked text but
+// the output is assembled from the original (a reference name could
+// otherwise pick up mask characters).
 function swapInSegment(original: string, masked: string): string {
+    const occurrences = referenceOccurrences(original, masked);
     let out = "";
     let copied = 0;
-    for (const match of masked.matchAll(ReferencesBeforePunctuation)) {
-        const start = match.index;
+    let k = 0;
+    while (k < occurrences.length) {
+        // a run of back-to-back references swaps as one unit — an excluded
+        // shape between two references breaks the run
+        let last = k;
+        while (
+            last + 1 < occurrences.length &&
+            occurrences[last + 1].start === occurrences[last].end
+        ) {
+            last++;
+        }
+        const start = occurrences[k].start;
+        const end = occurrences[last].end;
+        k = last + 1;
+        // the punctuation run directly after; matching both as runs makes a
+        // single pass idempotent ("[^1][^2]?!" swaps as one unit)
+        let punctuationEnd = end;
+        while (
+            punctuationEnd < masked.length &&
+            SinglePunctuation.test(masked[punctuationEnd])
+        ) {
+            punctuationEnd++;
+        }
+        if (punctuationEnd === end) continue;
         // a reference run already sitting AFTER punctuation is settled — the
         // punctuation following it belongs to the next clause, and swapping
         // again would drift it away from its text (idempotence)
         if (start > 0 && SinglePunctuation.test(masked[start - 1])) continue;
-        const punctuationStart = start + match[1].length;
-        const end = start + match[0].length;
         out +=
             original.slice(copied, start) +
-            original.slice(punctuationStart, end) +
-            original.slice(start, punctuationStart);
-        copied = end;
+            original.slice(end, punctuationEnd) +
+            original.slice(start, end);
+        copied = punctuationEnd;
     }
     return out + original.slice(copied);
 }
@@ -111,6 +131,12 @@ export const footnoteAfterPunctuationRule: FootnoteRule = {
             description: "References inside inline code are left alone",
             before: "use `x[^1].` as-is",
             after: "use `x[^1].` as-is",
+        },
+        {
+            description:
+                "An escaped literal \\[^1] is prose, not a reference — never moved",
+            before: "prose \\[^1]. tail",
+            after: "prose \\[^1]. tail",
         },
     ],
     apply: (text) => footnoteAfterPunctuation(text),

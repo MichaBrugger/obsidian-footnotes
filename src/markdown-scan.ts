@@ -142,12 +142,16 @@ function isFenceOpener(bareLine: string, delim: string): boolean {
  * first, so a dollar inside a reference renders as part of the footnote id —
  * it never opens or closes a math span. Nearest bracket wins: a "[" with a
  * "^" behind it and no "]" in between means we're inside a reference.
+ * The walk reads the MASKED-SO-FAR characters, not the raw line: a "[^"
+ * fragment already claimed by a code span or comment is not a live bracket,
+ * and used to falsely suppress math masking for the rest of the line
+ * (bug-dollar-inside-masked-bracket) — a NUL therefore ends the walk.
  */
-function dollarInsideReference(line: string, i: number): boolean {
+function dollarInsideReference(chars: readonly string[], i: number): boolean {
     for (let j = i - 1; j >= 0; j--) {
-        const c = line[j];
-        if (c === "]") return false;
-        if (c === "[") return line[j + 1] === "^";
+        const c = chars[j];
+        if (c === "\0" || c === "]") return false;
+        if (c === "[") return chars[j + 1] === "^";
     }
     return false;
 }
@@ -261,7 +265,7 @@ export function maskLineRegions(
         }
         if (c === "$") {
             // a dollar inside "[^…]" is footnote-id text, not math
-            if (dollarInsideReference(line, i)) {
+            if (dollarInsideReference(chars, i)) {
                 i++;
                 continue;
             }
@@ -289,7 +293,7 @@ export function maskLineRegions(
                     j++;
                     continue;
                 }
-                if (line[j] === "$" && !dollarInsideReference(line, j)) {
+                if (line[j] === "$" && !dollarInsideReference(chars, j)) {
                     close = j;
                     break;
                 }

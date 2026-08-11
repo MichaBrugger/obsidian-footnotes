@@ -24,6 +24,11 @@ const inlinePieceArb = fc.constantFrom(
     "$m[^79]$",
     "\\[^80]",
     "$5 or $6",
+    // punctuation directly after excluded reference shapes — the class the
+    // punctuation rule's regex bypass corrupted (2026-08-11 review bug #1)
+    "\\[^81].",
+    "^[^shadow]?!",
+    "`[^` $[^83].$",
 );
 const linePieceArb = fc.oneof(
     fc.constantFrom(...WORDS),

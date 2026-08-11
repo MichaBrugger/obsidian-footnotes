@@ -58,6 +58,44 @@ describe("footnoteAfterPunctuation", () => {
         expect(footnoteAfterPunctuation(text)).toBe(text);
     });
 
+    // Bug (2026-08-11 review, both reviewers): the rule's hand-rolled regex
+    // didn't know the grammar's exclusions — an escaped "\[^1]" is literal
+    // prose per CommonMark, and "^[…]" opens an inline footnote whose
+    // bracket belongs to it. Swapping either turns text the user typed on
+    // purpose into a live reference (which orphan-deletion then eats) or
+    // guts the inline footnote. The swap must see references through
+    // referenceOccurrences, the one home of those exclusions.
+    it("never moves an escaped literal reference (grammar exclusions)", () => {
+        const text = "prose \\[^1]. tail";
+        expect(footnoteAfterPunctuation(text)).toBe(text);
+    });
+
+    it("never tears the tail reference out of an inline footnote", () => {
+        const text = "see ^[^1]. end";
+        expect(footnoteAfterPunctuation(text)).toBe(text);
+    });
+
+    it("moves the live reference on a line while leaving the escaped one", () => {
+        expect(
+            footnoteAfterPunctuation("real[^1]. and a literal \\[^1]. end"),
+        ).toBe("real.[^1] and a literal \\[^1]. end");
+    });
+
+    it("an escaped caret before the bracket is a real reference and still moves", () => {
+        // "\^" is a literal caret, so the "[^x]" after it is NOT inline-
+        // footnote content — same branch as footnoteReferenceMatches
+        expect(footnoteAfterPunctuation("odd \\^[^x]. end")).toBe(
+            "odd \\^.[^x] end",
+        );
+    });
+
+    it("a reference run broken by an escaped reference only moves the live part", () => {
+        // the old regex treated "[^2]" inside "\[^2]" as continuing the
+        // run; the escaped shape must break it
+        const text = "word[^1]\\[^2]. end";
+        expect(footnoteAfterPunctuation(text)).toBe(text);
+    });
+
     it("ignores fenced code blocks and frontmatter", () => {
         const text = "---\ntitle: x[^1].\n---\n```\ncode[^2].\n```\nreal[^3].";
         expect(footnoteAfterPunctuation(text)).toBe(

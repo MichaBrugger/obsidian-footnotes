@@ -111,7 +111,32 @@ export function buildDefinitionAppend(
 
     let fromLine = doc.lastLine();
     let to: EditorPosition | undefined;
-    if (plugin.settings.enableRemoveBlankLastLines) {
+    if (ctx.scan.endsProtected) {
+        // the note ends inside an UNCLOSED fence/comment/math (2026-08-11
+        // review bug #10): a definition appended at EOF would be born as
+        // inert code — and the next lint would then delete its live
+        // reference as an orphan. Land it above the unclosed region: walk
+        // up to the last prefix a definition can live after, then past
+        // blank lines. Trailing-blank trimming must not fire here — its
+        // `to` spans to EOF and would delete the region itself.
+        while (
+            fromLine >= 0 &&
+            scanDocument(lines.slice(0, fromLine + 1)).endsProtected
+        ) {
+            fromLine--;
+        }
+        while (fromLine >= 0 && lines[fromLine].trim() === "") fromLine--;
+        if (fromLine < 0) {
+            // the unclosed region starts at line 0 — plant the definition
+            // on top, blank-separated from whatever follows
+            const topText =
+                `[^${footnoteId}]: \n` + (lines[0].trim() === "" ? "" : "\n");
+            return {
+                change: { from: { line: 0, ch: 0 }, text: topText },
+                cursor: { line: 0, ch: `[^${footnoteId}]: `.length },
+            };
+        }
+    } else if (plugin.settings.enableRemoveBlankLastLines) {
         while (fromLine > 0 && doc.getLine(fromLine).length === 0) {
             fromLine--;
         }
@@ -136,6 +161,11 @@ export function buildDefinitionAppend(
         line: fromLine + linesAdded,
         ch: text.length - text.lastIndexOf("\n") - 1,
     };
+
+    // with the insertion sitting mid-document (above an unclosed region),
+    // a non-blank line directly below it would be pulled INTO the new
+    // definition — same A4 hazard as the other insertion points
+    if (ctx.scan.endsProtected && needsSeparator(fromLine)) text += "\n";
 
     // The first footnote's section heading can carry a column-0 "---"
     // divider; if the note's first line is a bare unclosed "---" (a

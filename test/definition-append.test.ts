@@ -204,6 +204,59 @@ describe("blank line between the new definition and following content", () => {
     });
 });
 
+// Bug #10 (2026-08-11 review, Opus): with the note ending inside an
+// UNCLOSED fence / comment / math block, the EOF append minted the new
+// definition INSIDE that region — born as inert code, and the next lint
+// then deleted its live reference as an orphan (the same endsProtected
+// hazard move-footnotes-to-the-bottom refuses). The definition must land
+// above the unclosed region instead, and the trailing-blank trimming must
+// not fire (its `to` spanning to EOF would delete the region itself).
+describe("never appending into an unclosed region at EOF (2026-08-11 bug #10)", () => {
+    it("lands the definition above an unclosed fence", () => {
+        const doc = fakeEditor(["prose[^9]?", "", "```", "code"]);
+        const { change, cursor } = buildDefinitionAppend(doc, "1", false, fakePlugin());
+        expect(change).toEqual({
+            from: { line: 0, ch: "prose[^9]?".length },
+            text: "\n[^1]: ",
+        });
+        expect(cursor).toEqual({ line: 1, ch: 6 });
+    });
+
+    it("lands the definition above an unclosed comment opener line", () => {
+        const doc = fakeEditor(["alpha[^1].", "", "text <!-- open", "hidden"]);
+        const { change } = buildDefinitionAppend(doc, "2", false, fakePlugin());
+        expect(change).toEqual({
+            from: { line: 0, ch: "alpha[^1].".length },
+            text: "\n[^2]: ",
+        });
+    });
+
+    it("keeps the unclosed opener out of the definition with a blank separator", () => {
+        const doc = fakeEditor(["a[^1]!", "$$", "E=mc^2"]);
+        const { change } = buildDefinitionAppend(doc, "2", false, fakePlugin());
+        expect(change).toEqual({
+            from: { line: 0, ch: "a[^1]!".length },
+            text: "\n[^2]: \n",
+        });
+    });
+
+    it("a note that is one unclosed fence from line 0 gets the definition planted on top", () => {
+        const doc = fakeEditor(["```", "code"]);
+        const { change, cursor } = buildDefinitionAppend(doc, "1", false, fakePlugin());
+        expect(change).toEqual({
+            from: { line: 0, ch: 0 },
+            text: "[^1]: \n\n",
+        });
+        expect(cursor).toEqual({ line: 0, ch: 6 });
+    });
+
+    it("a CLOSED fence at the end of the note still appends at EOF", () => {
+        const doc = fakeEditor(["prose[^9]?", "", "```", "code", "```"]);
+        const { change } = buildDefinitionAppend(doc, "1", false, fakePlugin());
+        expect(change.from).toEqual({ line: 4, ch: 3 });
+    });
+});
+
 describe("slotting under an existing section heading (QOL follow-up to #55)", () => {
     const headingOn = () =>
         fakePlugin({ enableFootnoteSectionHeading: true });
