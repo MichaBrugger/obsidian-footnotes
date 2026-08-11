@@ -11,6 +11,10 @@ import { footnoteRules } from "../src/linting/rules";
 
 describe("rule registry", () => {
     it("has unique ids and at least one worked example per rule", () => {
+        // guard against vacuity: an emptied registry would pass every
+        // per-rule loop below by never running it (a Stryker survivor
+        // pointed this out — the array-emptying mutant lived)
+        expect(footnoteRules.length).toBeGreaterThan(0);
         const ids = footnoteRules.map((rule) => rule.id);
         expect(new Set(ids).size).toBe(ids.length);
         for (const rule of footnoteRules) {
