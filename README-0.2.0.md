@@ -130,6 +130,8 @@ Created by Alexis Rondeau, maintained and expanded by Micha Brugger and Jason Qi
 ## For developers
 
 - **Build**: `npm install`, then `npm run build` (type-checks with `tsc` and bundles with esbuild). `npm run dev` watches for changes.
-- **Tests**: `npm test` runs the [Vitest](https://vitest.dev/) unit suite in `test/`; behavioral policies (reindexing rules, reference parsing, edge cases) are pinned there. `manual-tests/` contains scripted in-app scenarios, and `scripts/smoke-test.mjs` drives a live Obsidian instance.
-- **Architecture**: `src/main.ts` registers commands and settings; the insert/navigate cascade lives in `src/insert-or-navigate-footnotes.ts`; the popup editor in `src/footnote-popup.ts`; the linter and its pure rules in `src/linting/`.
+- **Tests**: `npm test` runs the [Vitest](https://vitest.dev/) unit suite in `test/`; behavioral policies (reindexing rules, reference parsing, edge cases) are pinned there, and `test/properties.test.ts` adds [fast-check](https://fast-check.dev/) property-based tests over randomly generated documents — including a differential oracle that re-parses every document with [micromark](https://github.com/micromark/micromark) before and after linting. `manual-tests/` contains scripted in-app scenarios, and `scripts/smoke-test.mjs` drives a live Obsidian instance.
+- **Static checks**: `npm run lint` (ESLint with the Obsidian plugin guidelines plus typescript-eslint's `strict-type-checked`) and `npm run knip` (dead exports, unused files/dependencies — kept at zero findings).
+- **Mutation testing**: `npm run mutation` runs [Stryker](https://stryker-mutator.io/) locally as a pre-release audit (incremental cache makes re-runs fast). Not wired into CI on purpose.
+- **Architecture**: `src/main.ts` registers commands and settings; the insert/navigate cascade lives in `src/insert-or-navigate-footnotes.ts`; the popup editor in `src/footnote-popup.ts`; the linter and its pure rules in `src/linting/`; the shared markdown scanner (protection, masking, definition blocks) in `src/markdown-scan.ts`.
 - Contributions welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) and [TESTING.md](TESTING.md).

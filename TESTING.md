@@ -1,10 +1,12 @@
 # Testing
 
-Two layers, run with two commands:
+Four layers, four commands:
 
 | Layer | Command | What it covers | Needs Obsidian running? |
 | --- | --- | --- | --- |
-| Unit (vitest) | `npm test` | Pure logic, TDD-style | No |
+| Unit + property (vitest) | `npm test` | Pure logic: pinned behavior + random-document invariants | No |
+| Static analysis | `npm run lint`, `npm run knip` | Type-aware lint rules; dead exports/files/dependencies | No |
+| Mutation (Stryker) | `npm run mutation` | Whether the suite actually notices logic changes | No |
 | Smoke (integration) | `npm run test:smoke` | The real plugin inside the real app | Yes |
 
 ## Unit tests — `npm test`
@@ -14,31 +16,74 @@ definitions only, so `vitest.config.ts` aliases it to the runtime stub in
 `test/mocks/obsidian.ts` — extend the stub (empty classes / no-ops) if a
 new import breaks test startup.
 
-Suite map (one file per unit under test):
+The suite has three kinds of files:
 
-- `next-footnote-number.test.ts` — autonumbering policy (gaps not reused,
-  named references ignored)
-- `list-footnotes.test.ts` — document scans for definitions and references
-- `section-header.test.ts` — heading/divider blank-line rules
-- `reference-regexes.test.ts` — the exported reference regexes
-- `invalid-footnote-name.test.ts` — spaced-name guard (warns via Notice)
-- `end-of-word-offset.test.ts` — cell-local end-of-word insertion point
-- `table-cell-insert.test.ts` — the edit dispatched into a table cell editor
-- `table-cursor.test.ts` — escape-aware table-row cell spans
-- `inline-footnote-content.test.ts` — clipboard sanitizing for ^[...] bodies
-- `inline-footnote-exit.test.ts` — second-press exit past the closing bracket
-- `reference-at-cursor.test.ts` — the strict "inside a reference" rule (issue #49)
+- **Feature specs** (`test/*.test.ts`) — one file per unit under test:
+  autonumbering, reference regexes, the insert cascade guards, table-cell
+  editing, the linter and each of its rules, prefixes, the popup guards.
+  `test/rule-examples.test.ts` executes every lint rule's worked examples
+  from the rule registry, so the examples can never drift from the code.
+- **Bug pins** (`test/hunt/bug-*.test.ts`) — every bug ever found gets a
+  failing test before its fix and keeps it as a regression pin. Spec
+  rulings live next to them as `test/hunt/spec-*.test.ts`.
+- **Properties** (`test/properties.test.ts`) — fast-check invariants over
+  randomly generated documents and option combos: lint idempotence, no
+  mask (NUL) leakage, protected-region preservation, reference/definition
+  conservation, scanner self-agreement, plus a **differential oracle**
+  that parses each document with micromark (GFM footnotes + math) before
+  and after linting and requires identical footnote structure. Failures
+  shrink to a minimal counterexample automatically.
+
+Properties run 200 cases each by default. Before a release, soak them:
+
+```powershell
+$env:FC_NUM_RUNS = "5000"; npx vitest run test/properties.test.ts
+```
 
 Standing rules:
 
 - **Every reported bug gets a failing test before the fix** (unit if the
-  logic is pure, smoke if it needs the live editor).
+  logic is pure, smoke if it needs the live editor). When a property or
+  the oracle finds one, the shrunk counterexample becomes a deterministic
+  pin in `test/hunt/` — properties discover, pins remember.
+- New *generic* invariants ("lint never does X to any document") belong in
+  `test/properties.test.ts`; new *specific* behavior gets a normal spec.
 - Tests marked *characterization* pin current behavior that hasn't been
   blessed as intended — flip the expectation to change the spec.
 - **Unit tests defend against our changes; smoke tests defend against
   Obsidian's.** Anything that touches undocumented internals (table cell
   sub-editors, embedRegistry) must keep a smoke test — a mocked unit test
   would just encode our assumptions and stay green when Obsidian changes.
+- When a classification is contested (is this line code? frontmatter? a
+  definition continuation?), get ground truth from the real app:
+  `Obsidian.com eval` + `metadataCache.getFileCache(file).sections` shows
+  exactly how Obsidian reads the markdown.
+
+## Static analysis — `npm run lint` and `npm run knip`
+
+- `npm run lint`: ESLint over `src/` with the official Obsidian plugin
+  guidelines plus typescript-eslint's `strict-type-checked` preset
+  (type-aware). Fix findings with typed code, not disable comments.
+- `npm run knip`: dead exports, unused files, unused/unlisted
+  dependencies. The repo is kept at **zero findings** — if knip flags new
+  code, either wire it in (see rule-examples.test.ts for the pattern) or
+  delete it.
+
+## Mutation testing — `npm run mutation`
+
+Stryker mutates the pure-logic modules (`src/markdown-scan.ts`,
+`src/linting/`, `src/insert-or-navigate-footnotes.ts`,
+`src/table-cursor.ts`) and reruns the covering tests per mutant
+(`coverageAnalysis: perTest`). A surviving mutant is a logic change no
+test noticed — either add a test or accept it knowingly.
+
+- **Local only, by design** — it is a pre-release audit, not CI.
+- Results cache in `reports/stryker-incremental.json` (gitignored), so
+  re-runs after small changes take seconds to minutes; the first full run
+  takes much longer.
+- The HTML report lands at `reports/mutation.html`.
+- The npm script pins `FC_NUM_RUNS=25` so the property suite stays cheap
+  per mutant.
 
 ## Smoke tests — `npm run test:smoke`
 
@@ -47,7 +92,12 @@ instance** through the Obsidian CLI: it deploys the current build, creates a
 scratch note, moves the cursor, executes the plugin's commands, and asserts
 on the real editor contents — the same loop used to verify the v0.2 features
 (end-of-word insertion, numbering, section headings, blank-line trimming,
-popup open/toggle-close).
+popup open/toggle-close, orphan handling, fences/callouts/math protection).
+
+The script is fully repeatable: it backs up your plugin settings to a
+sidecar file, forces the note into live preview, restores everything on
+every exit path (finish, failure, Ctrl+C), and heals from a leftover
+backup if a previous run was killed.
 
 Requirements:
 
@@ -57,6 +107,9 @@ Requirements:
   override with the `OBSIDIAN_CLI` env var if needed)
 - the **hot-reload** community plugin enabled, so the deployed build is
   picked up automatically
+- the Obsidian window visible (the render loop stalls while hidden or
+  minimized; the script nudges the window awake but can't fight a
+  deliberate minimize)
 
 Flags: `npm run test:smoke -- --no-deploy` tests whatever build is already
 loaded instead of deploying first.
@@ -75,6 +128,9 @@ Notes for writing new smoke tests:
 ## When to run what
 
 - While developing pure logic: `npm test` (watch mode).
+- Before committing: `npm run lint` — and `npm run knip` if you added or
+  removed exports.
 - Before committing anything that touches editor behavior: `npm run
   test:smoke`.
-- Before a release: both.
+- Before a release: all of the above, a property soak (`FC_NUM_RUNS`),
+  and `npm run mutation`.
