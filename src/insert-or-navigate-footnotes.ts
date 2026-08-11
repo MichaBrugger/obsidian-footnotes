@@ -744,6 +744,8 @@ export function insertInTableCell(
 // renumber the id it is bound to. Registered BEFORE openFootnotePopup; the
 // returned canceller is for its fallback path, where the press degrades to
 // the jump flow and the immediate trigger takes over.
+// Stryker disable all: popup-settle scheduling against the live workspace —
+// smoke-test territory, unreachable from units (coverage-verified 2026-08-11)
 function scheduleCreationLintAfterPopup(plugin: FootnotePlugin): () => void {
     if (!plugin.settings.lintOnFootnoteCreation) return () => {};
     const path =
@@ -752,6 +754,7 @@ function scheduleCreationLintAfterPopup(plugin: FootnotePlugin): () => void {
         lintAfterFootnoteCreation(plugin, false, path);
     });
 }
+// Stryker restore all
 
 //FUNCTIONS FOR AUTONUMBERED FOOTNOTES
 

@@ -1,0 +1,398 @@
+[
+ {
+  "line": 217,
+  "col": 29,
+  "mutator": "EqualityOperator",
+  "replacement": "j <= line.length"
+ },
+ {
+  "line": 203,
+  "col": 12,
+  "mutator": "EqualityOperator",
+  "replacement": "i <= line.length"
+ },
+ {
+  "line": 261,
+  "col": 49,
+  "mutator": "BlockStatement",
+  "replacement": "{}"
+ },
+ {
+  "line": 261,
+  "col": 17,
+  "mutator": "ConditionalExpression",
+  "replacement": "false"
+ },
+ {
+  "line": 267,
+  "col": 21,
+  "mutator": "ConditionalExpression",
+  "replacement": "true"
+ },
+ {
+  "line": 284,
+  "col": 33,
+  "mutator": "EqualityOperator",
+  "replacement": "j <= line.length"
+ },
+ {
+  "line": 296,
+  "col": 17,
+  "mutator": "ConditionalExpression",
+  "replacement": "false"
+ },
+ {
+  "line": 296,
+  "col": 27,
+  "mutator": "ArithmeticOperator",
+  "replacement": "i - 1"
+ },
+ {
+  "line": 304,
+  "col": 17,
+  "mutator": "ArithmeticOperator",
+  "replacement": "close - 1"
+ },
+ {
+  "line": 354,
+  "col": 25,
+  "mutator": "EqualityOperator",
+  "replacement": "j <= src.length"
+ },
+ {
+  "line": 355,
+  "col": 17,
+  "mutator": "Regex",
+  "replacement": "/(---|\\.\\.\\.)\\s*$/"
+ },
+ {
+  "line": 357,
+  "col": 21,
+  "mutator": "ArithmeticOperator",
+  "replacement": "j - 1"
+ },
+ {
+  "line": 430,
+  "col": 17,
+  "mutator": "ConditionalExpression",
+  "replacement": "true"
+ },
+ {
+  "line": 434,
+  "col": 17,
+  "mutator": "ConditionalExpression",
+  "replacement": "true"
+ },
+ {
+  "line": 434,
+  "col": 17,
+  "mutator": "LogicalOperator",
+  "replacement": "!inComment || !inMath"
+ },
+ {
+  "line": 436,
+  "col": 46,
+  "mutator": "StringLiteral",
+  "replacement": "\"\""
+ },
+ {
+  "line": 456,
+  "col": 17,
+  "mutator": "ConditionalExpression",
+  "replacement": "true"
+ },
+ {
+  "line": 459,
+  "col": 17,
+  "mutator": "ConditionalExpression",
+  "replacement": "true"
+ },
+ {
+  "line": 459,
+  "col": 17,
+  "mutator": "LogicalOperator",
+  "replacement": "!inComment || !inMath"
+ },
+ {
+  "line": 461,
+  "col": 46,
+  "mutator": "StringLiteral",
+  "replacement": "\"\""
+ },
+ {
+  "line": 476,
+  "col": 30,
+  "mutator": "BooleanLiteral",
+  "replacement": "true"
+ },
+ {
+  "line": 478,
+  "col": 29,
+  "mutator": "BooleanLiteral",
+  "replacement": "true"
+ },
+ {
+  "line": 488,
+  "col": 24,
+  "mutator": "ConditionalExpression",
+  "replacement": "true"
+ },
+ {
+  "line": 488,
+  "col": 24,
+  "mutator": "EqualityOperator",
+  "replacement": "lead <= rest.length"
+ },
+ {
+  "line": 491,
+  "col": 50,
+  "mutator": "Regex",
+  "replacement": "/(`{3,}|~{3,})\\s*$/"
+ },
+ {
+  "line": 491,
+  "col": 50,
+  "mutator": "Regex",
+  "replacement": "/^(`{3,}|~{3,})\\S*$/"
+ },
+ {
+  "line": 532,
+  "col": 29,
+  "mutator": "BooleanLiteral",
+  "replacement": "true"
+ },
+ {
+  "line": 542,
+  "col": 29,
+  "mutator": "BooleanLiteral",
+  "replacement": "true"
+ },
+ {
+  "line": 565,
+  "col": 25,
+  "mutator": "ConditionalExpression",
+  "replacement": "false"
+ },
+ {
+  "line": 565,
+  "col": 25,
+  "mutator": "LogicalOperator",
+  "replacement": "listStack.length > 0 || indentWidth < listStack[listStack.length - 1]"
+ },
+ {
+  "line": 565,
+  "col": 25,
+  "mutator": "ConditionalExpression",
+  "replacement": "true"
+ },
+ {
+  "line": 566,
+  "col": 25,
+  "mutator": "ConditionalExpression",
+  "replacement": "true"
+ },
+ {
+  "line": 565,
+  "col": 25,
+  "mutator": "EqualityOperator",
+  "replacement": "listStack.length >= 0"
+ },
+ {
+  "line": 566,
+  "col": 25,
+  "mutator": "EqualityOperator",
+  "replacement": "indentWidth <= listStack[listStack.length - 1]"
+ },
+ {
+  "line": 565,
+  "col": 25,
+  "mutator": "EqualityOperator",
+  "replacement": "listStack.length <= 0"
+ },
+ {
+  "line": 566,
+  "col": 25,
+  "mutator": "EqualityOperator",
+  "replacement": "indentWidth >= listStack[listStack.length - 1]"
+ },
+ {
+  "line": 566,
+  "col": 49,
+  "mutator": "ArithmeticOperator",
+  "replacement": "listStack.length + 1"
+ },
+ {
+  "line": 571,
+  "col": 25,
+  "mutator": "ConditionalExpression",
+  "replacement": "true"
+ },
+ {
+  "line": 571,
+  "col": 25,
+  "mutator": "ConditionalExpression",
+  "replacement": "false"
+ },
+ {
+  "line": 571,
+  "col": 25,
+  "mutator": "EqualityOperator",
+  "replacement": "item[3].length !== 0"
+ },
+ {
+  "line": 571,
+  "col": 49,
+  "mutator": "EqualityOperator",
+  "replacement": "item[3].length >= 4"
+ },
+ {
+  "line": 598,
+  "col": 40,
+  "mutator": "Regex",
+  "replacement": "/( {0,3})(`{3,}|~{3,})/"
+ },
+ {
+  "line": 598,
+  "col": 40,
+  "mutator": "Regex",
+  "replacement": "/^( {0,3})(`{3,}|~)/"
+ },
+ {
+  "line": 608,
+  "col": 32,
+  "mutator": "ArithmeticOperator",
+  "replacement": "rest.length - fenceLine.length - open[1].length"
+ },
+ {
+  "line": 622,
+  "col": 17,
+  "mutator": "ConditionalExpression",
+  "replacement": "true"
+ },
+ {
+  "line": 633,
+  "col": 32,
+  "mutator": "ConditionalExpression",
+  "replacement": "true"
+ },
+ {
+  "line": 680,
+  "col": 9,
+  "mutator": "ConditionalExpression",
+  "replacement": "false"
+ },
+ {
+  "line": 711,
+  "col": 14,
+  "mutator": "ConditionalExpression",
+  "replacement": "true"
+ },
+ {
+  "line": 722,
+  "col": 13,
+  "mutator": "ConditionalExpression",
+  "replacement": "true"
+ },
+ {
+  "line": 723,
+  "col": 13,
+  "mutator": "ConditionalExpression",
+  "replacement": "true"
+ },
+ {
+  "line": 722,
+  "col": 13,
+  "mutator": "EqualityOperator",
+  "replacement": "out.length >= 0"
+ },
+ {
+  "line": 723,
+  "col": 17,
+  "mutator": "ArithmeticOperator",
+  "replacement": "out.length + 1"
+ },
+ {
+  "line": 723,
+  "col": 37,
+  "mutator": "StringLiteral",
+  "replacement": "\"Stryker was here!\""
+ },
+ {
+  "line": 724,
+  "col": 13,
+  "mutator": "Regex",
+  "replacement": "/^\\S{0,3}(-+|=+)\\s*$/"
+ },
+ {
+  "line": 724,
+  "col": 13,
+  "mutator": "Regex",
+  "replacement": "/^\\s{0,3}(-+|=+)\\S*$/"
+ },
+ {
+  "line": 724,
+  "col": 13,
+  "mutator": "Regex",
+  "replacement": "/^\\s{0,3}(-+|=)\\s*$/"
+ },
+ {
+  "line": 757,
+  "col": 33,
+  "mutator": "BlockStatement",
+  "replacement": "{}"
+ },
+ {
+  "line": 777,
+  "col": 20,
+  "mutator": "EqualityOperator",
+  "replacement": "k <= lines.length"
+ },
+ {
+  "line": 777,
+  "col": 40,
+  "mutator": "MethodExpression",
+  "replacement": "lines[k]"
+ },
+ {
+  "line": 779,
+  "col": 17,
+  "mutator": "LogicalOperator",
+  "replacement": "k < lines.length || !isProtected[k]"
+ },
+ {
+  "line": 779,
+  "col": 17,
+  "mutator": "ConditionalExpression",
+  "replacement": "true"
+ },
+ {
+  "line": 779,
+  "col": 17,
+  "mutator": "ConditionalExpression",
+  "replacement": "true"
+ },
+ {
+  "line": 757,
+  "col": 17,
+  "mutator": "ConditionalExpression",
+  "replacement": "false"
+ },
+ {
+  "line": 779,
+  "col": 17,
+  "mutator": "EqualityOperator",
+  "replacement": "k <= lines.length"
+ },
+ {
+  "line": 773,
+  "col": 17,
+  "mutator": "MethodExpression",
+  "replacement": "lines[j]"
+ },
+ {
+  "line": 773,
+  "col": 17,
+  "mutator": "ConditionalExpression",
+  "replacement": "false"
+ }
+]

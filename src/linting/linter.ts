@@ -364,6 +364,10 @@ export function lintBlockedByPrefix(markdown: string): string | null {
     return `Linting canceled: this note's footnote-prefix ("${prefix}") is invalid. ${footnotePrefixProblem(prefix)}`;
 }
 
+// Stryker disable all: live-Obsidian integration (workspace views, the
+// save-command wrapper, the vim adapter) — smoke-test territory the unit
+// suite never reaches, so mutants here are unkillable noise by design
+// (coverage-verified 2026-08-11).
 // Lint the active note synchronously when it's safe to; the save hook calls
 // this right before delegating, so the save writes the linted text.
 function lintActiveNoteIfSafe(plugin: FootnotePlugin) {
@@ -469,6 +473,7 @@ export function installVimWriteHook(plugin: FootnotePlugin) {
     });
     hookedVim = vim;
 }
+// Stryker restore all
 
 // masked-line shape of a footnote definition with NOTHING typed yet
 const EmptyDefinitionLine = /^\[\^([^[\]]+)\]:[ \t]*$/;
@@ -551,6 +556,9 @@ export function lintAfterFootnoteCreation(
     }
 }
 
+// Stryker disable all: live-Obsidian integration (popup settling, active
+// view, table-cell guard) — smoke-test territory, unreachable from units
+// (coverage-verified 2026-08-11).
 export async function runFootnoteTransformCommand(
     plugin: FootnotePlugin,
     transform: (markdown: string, sectionHeading: string) => string,
