@@ -14,14 +14,8 @@ import {
 import { VaultWithConfigEvents, viewEditor } from "./obsidian-internals";
 import { FootnotePluginSettingTab, FootnotePluginSettings, DEFAULT_SETTINGS } from "./settings";
 import { dismissFootnotePopup } from "./footnote-popup";
-import {
-  footnotePrefix,
-  insertAutonumFootnote,
-  insertInlineFootnote,
-  insertNamedFootnote,
-  pasteInlineFootnote,
-  readingViewActive,
-} from "./insert-or-navigate-footnotes";
+import { insertAutonumFootnote, insertInlineFootnote, insertNamedFootnote, pasteInlineFootnote, readingViewActive } from "./insert-or-navigate-footnotes";
+import { footnotePrefix } from "./footnote-prefix";
 import { SetFootnotePrefixModal } from "./set-footnote-prefix";
 import {
   installLintOnSave,

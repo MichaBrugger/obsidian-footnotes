@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { protectedLines } from "../../src/markdown-scan";
-import { footnotePrefix } from "../../src/insert-or-navigate-footnotes";
+import { footnotePrefix } from "../../src/footnote-prefix";
 import { computeNextFootnoteNumber } from "../../src/footnote-grammar";
 
 // BUG: CRLF line endings defeat frontmatter protection AND the footnote-prefix

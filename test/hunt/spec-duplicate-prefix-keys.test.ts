@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { footnotePrefix } from "../../src/insert-or-navigate-footnotes";
+import { footnotePrefix } from "../../src/footnote-prefix";
 
 // DECIDED (Jason, 2026-08-10): duplicate footnote-prefix keys aren't a state
 // Obsidian's properties panel produces, so the plugin's first-wins read

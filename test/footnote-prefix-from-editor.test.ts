@@ -1,10 +1,7 @@
 import { Editor } from "obsidian";
 import { describe, expect, it } from "vitest";
 
-import {
-    footnotePrefix,
-    footnotePrefixFromEditor,
-} from "../src/insert-or-navigate-footnotes";
+import { footnotePrefix, footnotePrefixFromEditor } from "../src/footnote-prefix";
 
 // Perf helper (2026-08-07): footnotePrefixFromEditor reads only the
 // frontmatter block through the editor line API, replacing the per-press

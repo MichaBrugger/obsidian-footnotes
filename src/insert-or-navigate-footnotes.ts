@@ -17,6 +17,7 @@ import {
     referenceOccurrences,
 } from "./footnote-grammar";
 import { footnotePopupBusy, openFootnotePopup, popupEditingAvailable, runAfterNextPopupSettle, settleFootnotePopupWithFeedback, toggleCloseFootnotePopup } from "./footnote-popup";
+import { activeFootnotePrefix, footnotePrefix, footnotePrefixFromEditor, footnotePrefixProblem } from "./footnote-prefix";
 import { lintAfterFootnoteCreation } from "./linting/linter";
 import { definitionLabelIn, DocumentScan, findDefinitionBlocks, maskInlineRegions, maskLineRegions, maskProtectedLines, maskedLineAt, scanDocument, TrailingPunctuationChars } from "./markdown-scan";
 import { EditorWithCm, VaultWithConfig, viewEditor, WindowWithVim } from "./obsidian-internals";
@@ -642,108 +643,6 @@ function scheduleCreationLintAfterPopup(plugin: FootnotePlugin): () => void {
 // Stryker restore all
 
 //FUNCTIONS FOR AUTONUMBERED FOOTNOTES
-
-/**
- * The note's `footnote-prefix` frontmatter value, or "" when absent. Chapter
- * notes of a combined document set this (e.g. "2.") so the autonumbered
- * command creates "[^2.1]", "[^2.2]", … — unique across the merged export
- * (issue #31).
- */
-export function footnotePrefix(markdownText: string): string {
-    // strip trailing "\r" so CRLF notes match the exact "---" fence and the
-    // "$"-anchored property regex below (a "\r" defeats both otherwise)
-    const lines = markdownText
-        .split("\n")
-        .map((line) => (line.endsWith("\r") ? line.slice(0, -1) : line));
-    if (lines[0] !== "---") return "";
-    for (let i = 1; i < lines.length; i++) {
-        if (/^(---|\.\.\.)\s*$/.test(lines[i])) break;
-        // YAML needs whitespace after the colon — "footnote-prefix:2." is a
-        // plain scalar Obsidian doesn't show as a property, not a mapping
-        // (bug-prefix-yaml-comment)
-        const match = lines[i].match(/^footnote-prefix:(?:\s+(.*))?$/);
-        if (match) {
-            // the "(?:\s+(.*))?" group is genuinely optional — the
-            // RegExpMatchArray index signature hides that from the checker
-            const captured = match[1] as string | undefined;
-            let value = (captured ?? "").trim();
-            // a value that IS a comment is an empty value
-            if (value.startsWith("#")) return "";
-            // quotes end the value — anything after the closing quote
-            // (typically a comment) is not part of it
-            const quoted = value.match(/^(["'])(.*?)\1/);
-            if (quoted) return quoted[2];
-            // an unquoted value ends at a whitespace-preceded "#" (YAML
-            // comments); a "#" glued to text is value content
-            const commentAt = value.search(/(?:^|\s)#/);
-            if (commentAt !== -1) value = value.slice(0, commentAt).trim();
-            return value;
-        }
-    }
-    return "";
-}
-
-/**
- * footnotePrefix, reading only the note's frontmatter block through the
- * editor line API. The per-press guards used to call doc.getValue(), which
- * materializes the whole document on every command press while the prefix
- * feature is on (perf, 2026-08-07); this stops at the closing fence
- * instead. Parsing is delegated to footnotePrefix so the two can't drift.
- */
-export function footnotePrefixFromEditor(doc: Editor): string {
-    const stripCr = (line: string) =>
-        line.endsWith("\r") ? line.slice(0, -1) : line;
-    if (stripCr(doc.getLine(0)) !== "---") return "";
-    const lines = ["---"];
-    for (let i = 1; i < doc.lineCount(); i++) {
-        const line = stripCr(doc.getLine(i));
-        lines.push(line);
-        if (/^(---|\.\.\.)\s*$/.test(line)) break;
-    }
-    return footnotePrefix(lines.join("\n"));
-}
-
-/**
- * Why `prefix` can't be used as a footnote prefix, or null when it can.
- * Shared by the Set-footnote-prefix modal, the insert path, and the lint
- * guard. Digit-ending prefixes are the dangerous case: with prefix "10"
- * the first footnote is [^101] — indistinguishable from a plain numbered
- * footnote, which reindexing then renumbers, collapsing the namespace the
- * prefix exists to preserve.
- */
-export function footnotePrefixProblem(prefix: string): string | null {
-    if (!prefix) return null;
-    if (!isValidFootnoteName(prefix) || /[[\]]/.test(prefix)) {
-        return "The footnote prefix can't contain spaces, backticks, or brackets.";
-    }
-    if (/\d$/.test(prefix)) {
-        return "The footnote prefix can't end in a number. Its footnotes would be indistinguishable from plain numbered ones.";
-    }
-    return null;
-}
-
-// the feature is enabled in settings, and a prefix that can't work BLOCKS
-// the insert (null) with an explanation — falling back to an unprefixed
-// footnote just left the user something to delete (reported 2026-08-07).
-// Takes the already-extracted prefix so callers pick the cheap read:
-// footnotePrefixFromEditor per press, footnotePrefix when the full text is
-// already in hand (F1 — no whole-document materialization per keypress)
-function activeFootnotePrefix(
-    plugin: FootnotePlugin,
-    prefix: string,
-): string | null {
-    if (!plugin.settings.enableFootnotePrefix) return "";
-    if (!prefix) return "";
-    const problem = footnotePrefixProblem(prefix);
-    if (problem) {
-        new Notice(
-            `No footnote was created: this note's footnote-prefix ("${prefix}") is invalid. ${problem}`,
-            8000,
-        );
-        return null;
-    }
-    return prefix;
-}
 
 /**
  * The shared entry preamble of every footnote command: settle a pending

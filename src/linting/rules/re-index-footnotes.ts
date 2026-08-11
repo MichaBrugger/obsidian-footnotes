@@ -1,4 +1,4 @@
-import { footnotePrefixProblem } from "../../insert-or-navigate-footnotes";
+import { footnotePrefixProblem } from "../../footnote-prefix";
 import { referenceOccurrences } from "../../footnote-grammar";
 import {
     DefinitionStart,

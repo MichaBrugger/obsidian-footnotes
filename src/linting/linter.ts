@@ -6,12 +6,8 @@ import {
     settleFootnotePopupWithFeedback,
     toggleCloseFootnotePopup,
 } from "../footnote-popup";
-import {
-    footnotePrefix,
-    footnotePrefixProblem,
-    jumpToFootnoteDefinition,
-    readingViewActive,
-} from "../insert-or-navigate-footnotes";
+import { jumpToFootnoteDefinition, readingViewActive } from "../insert-or-navigate-footnotes";
+import { footnotePrefix, footnotePrefixProblem } from "../footnote-prefix";
 import { maskProtectedLines, normalizeEol, restoreEol } from "../markdown-scan";
 import { AppWithCommands, AppWithPlugins, viewEditor, WindowWithVim } from "../obsidian-internals";
 import { activeTableCellEditor, nestedSubEditorOwnsFocus, runOutsideTableCell } from "../table-cursor";
