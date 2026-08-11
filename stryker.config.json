@@ -9,6 +9,13 @@
     "timeoutFactor": 1.25,
     "mutate": [
         "src/markdown-scan.ts",
+        "src/footnote-grammar.ts",
+        "src/footnote-prefix.ts",
+        "src/doc-context.ts",
+        "src/cursor-motion.ts",
+        "src/definition-append.ts",
+        "src/inline-footnotes.ts",
+        "src/navigation.ts",
         "src/linting/**/*.ts",
         "src/insert-or-navigate-footnotes.ts",
         "src/table-cursor.ts"
