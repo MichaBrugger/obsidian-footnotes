@@ -917,3 +917,678 @@ describe("findDefinitionBlocks", () => {
         ]);
     });
 });
+
+// Round 2: hardening against the 66 mutants that survived round 1's suite
+// (survivors-scan-round2.json), verified by hand-applying each mutation to a
+// scratch copy of the source and confirming the exact output divergence
+// before writing the assertion below. Organized in file order, matching
+// round 1's convention. Equivalence proofs for the mutants that cannot be
+// distinguished through the exported API are collected in the trailing
+// comment block.
+
+describe("round 2", () => {
+    describe("dollarInsideReference: reference-internal dollar must not leak into math scanning", () => {
+        // line 261: the guard that skips a "$" sitting inside "[^…]" — both
+        // the BlockStatement "{}" mutant (empties the skip body) and the
+        // ConditionalExpression "false" mutant (never takes the skip branch)
+        // let that "$" fall into the ordinary math-opener logic instead.
+        // With a footnote reference immediately followed (no separator) by
+        // a real math span, the reference's internal "$" then pairs with
+        // the LATER "]$" as a bogus closer before the scanner ever reaches
+        // the genuine "$y$" — a completely different mask than leaving the
+        // reference alone and masking only "$y$".
+        it("a dollar immediately after a reference is not treated as a math opener", () => {
+            const line = "[^a$b]$y$";
+            expect(maskLineRegions(line).masked).toBe("[^a$b]" + NUL(3));
+        });
+    });
+
+    describe("maskLineRegions: display math close-not-found guard", () => {
+        // line 267: forcing "close === -1" to always true makes a CLOSED
+        // "$$...$$" span on one line get treated as unclosed — blotting to
+        // end of line and wrongly reporting endsInMath, instead of closing
+        // normally and leaving the trailing prose live.
+        it("a closed display-math span on one line does not blot past its closer", () => {
+            const { masked, endsInMath } = maskLineRegions("x $$disp$$ y");
+            expect(masked).toBe("x " + NUL("$$disp$$".length) + " y");
+            expect(endsInMath).toBe(false);
+        });
+    });
+
+    describe("maskLineRegions: inline math closer resume cursor", () => {
+        // line 304: after a successful inline-math match, "i" must resume
+        // at "close + 1" — the ArithmeticOperator mutant "close - 1" rewinds
+        // INTO the just-matched span's last content character, letting it
+        // reopen as a fresh code-span/math scan and blot a different (wider,
+        // in this case: also swallowing "` `" after the math) region than
+        // the correct one.
+        it("resumes exactly after the closing dollar, not one character early", () => {
+            const line = "$a`$ `z`";
+            expect(maskLineRegions(line).masked).toBe(NUL(4) + " " + NUL(3));
+        });
+    });
+
+    describe("scanDocument: YAML frontmatter closer regex and resume index", () => {
+        // line 355: the closer regex must be anchored at the start ("^") —
+        // dropping the anchor lets a line that merely ENDS with "---"
+        // (e.g. arbitrary prose) falsely close the frontmatter early,
+        // before the real "---" delimiter is reached.
+        it("a line that only ends with \"---\" does not close frontmatter early", () => {
+            const doc = "---\nnotaclose---\nkey: 1\n---\nafter";
+            expect(protectedLines(doc.split("\n"))).toEqual([
+                true,
+                true,
+                true,
+                true,
+                false,
+            ]);
+        });
+
+        // line 357: after closing frontmatter, the main scan must resume at
+        // "j + 1" (right after the closer) — the ArithmeticOperator mutant
+        // "j - 1" rewinds the main scan into the frontmatter body itself,
+        // re-processing a line that happens to look like a fence opener and
+        // letting that bogus fence swallow the real closer and everything
+        // after it.
+        it("resumes the main scan exactly after the frontmatter closer, not inside it", () => {
+            const doc = "---\n```\n---\nafter\n```\nmore";
+            expect(protectedLines(doc.split("\n"))).toEqual([
+                true,
+                true,
+                true,
+                false,
+                true,
+                true,
+            ]);
+        });
+    });
+
+    describe("scanDocument: comment/math closer's own block-boundary decision", () => {
+        // line 434: the bare-closer-ends-a-block check's full condition
+        // (ConditionalExpression "true") — forcing it true makes EVERY
+        // comment closer end a block, even one with live trailing text
+        // still on the line, wrongly opening fresh indented code right
+        // after it.
+        it("a comment closer with live trailing text does not open code on the next line", () => {
+            const doc = "<!--\nhidden\n--> tail\n    cont";
+            const scan = scanDocument(doc.split("\n"));
+            expect(scan.isProtected).toEqual([false, true, false, false]);
+        });
+
+        // line 434: the LogicalOperator mutant ("&&" -> "||" between the
+        // two negated flags) only diverges when the closer's suffix
+        // reopens EXACTLY ONE of comment/math — this iteration's wrongly
+        // forced blockBoundary=true is normally overwritten before it can
+        // matter (the very next line re-enters the interior branch, which
+        // resets it), UNLESS that next line's blockquote depth is shallow
+        // enough to end the reopened region via the depth-drop path
+        // (which does not touch blockBoundary). A comment reopening MATH
+        // one quote-level deeper, followed by a plain (unquoted) indented
+        // line, exposes the stale wrongly-true value as bogus fresh code.
+        it("a deeper same-line region reopen does not leak a stale block boundary past the quote drop", () => {
+            const doc = "> <!--\n> > --> $$\n    indented";
+            const scan = scanDocument(doc.split("\n"));
+            expect(scan.isProtected).toEqual([false, false, false]);
+        });
+
+        // line 459: the math-branch mirror of the two checks above.
+        it("a math closer with live trailing text does not open code on the next line", () => {
+            const doc = "$$\nx\n$$ tail\n    cont";
+            const scan = scanDocument(doc.split("\n"));
+            expect(scan.isProtected).toEqual([false, true, false, false]);
+        });
+        it("a deeper same-line comment reopen (from a math closer) does not leak a stale block boundary", () => {
+            const doc = "> $$\n> > $$ <!--\n    indented";
+            const scan = scanDocument(doc.split("\n"));
+            expect(scan.isProtected).toEqual([false, false, false]);
+        });
+    });
+
+    describe("scanDocument: fence closer indent while-loop", () => {
+        // line 488: the leading-space-count while-loop's condition —
+        // forcing it to "true" drops the "rest[lead] === ' '" check
+        // entirely, so the loop never terminates (lead climbs forever
+        // with no bound). Any fence-closer check reaches this loop, so a
+        // nested-blockquote closer at the exact contentIndent+3 boundary
+        // both pins the boundary AND would hang forever under this mutant.
+        it("a doubly-quoted fence closes with a closer at exactly contentIndent + 3", () => {
+            const doc = "> > ```\n> > code\n> >    ```\n> > after";
+            expect(protectedLines(doc.split("\n"))).toEqual([
+                true,
+                true,
+                true,
+                false,
+            ]);
+        });
+    });
+
+    describe("scanDocument: fence closer regex anchoring and character run", () => {
+        // line 491: dropping the "^" anchor lets text BEFORE the closing
+        // run (e.g. leftover content on a content line) satisfy the
+        // closer pattern as long as it ENDS with a valid delimiter run —
+        // a content line like "xyz```" must NOT close the fence.
+        it("a content line that merely ends with backticks does not close the fence", () => {
+            const doc = "```\ncode\nxyz```\nafter";
+            expect(protectedLines(doc.split("\n"))).toEqual([
+                true,
+                true,
+                true,
+                true,
+            ]);
+        });
+
+        // line 491: changing the trailing "\s*$" to "\S*$" rejects a
+        // closer that has trailing WHITESPACE after its delimiter run,
+        // even though CommonMark allows that.
+        it("a closer with trailing whitespace after the delimiter still closes the fence", () => {
+            const doc = "```\ncode\n```   \nafter";
+            expect(protectedLines(doc.split("\n"))).toEqual([
+                true,
+                true,
+                true,
+                false,
+            ]);
+        });
+    });
+
+    describe("scanDocument: indented-code branches' own blockBoundary write", () => {
+        // line 542: the branch that OPENS a fresh indented-code block sets
+        // blockBoundary=false — forcing it "true" (BooleanLiteral) leaks a
+        // false block-boundary signal into the very next line's list-stack
+        // pop decision (line 519), which can wrongly pop a list item that
+        // is still open, lowering the code-indent threshold for a later
+        // line that should NOT yet qualify as code.
+        it("opening indented code does not leak a stale block boundary into the next line's list-stack pop", () => {
+            const doc = "- item\n\n      one\n# h\n    four";
+            expect(protectedLines(doc.split("\n"))).toEqual([
+                false,
+                false,
+                true,
+                false,
+                false,
+            ]);
+        });
+
+        // line 532: same shape, but for the branch that CONTINUES an
+        // already-open indented-code block (needs a second consecutive
+        // indented line to reach the mutated branch instead of the
+        // opening one).
+        it("continuing indented code does not leak a stale block boundary into the next line's list-stack pop", () => {
+            const doc = "- item\n\n      one\n      two\n# h\n    four";
+            expect(protectedLines(doc.split("\n"))).toEqual([
+                false,
+                false,
+                true,
+                true,
+                false,
+                false,
+            ]);
+        });
+    });
+
+    describe("scanDocument: list-marker pop loop (a NEW marker popping shallower items)", () => {
+        // line 565: forcing the pop loop's condition to "false" (and,
+        // identically in effect, the EqualityOperator mutant that turns
+        // "listStack.length > 0" into "listStack.length <= 0", which is
+        // false whenever the length check would matter) means a new,
+        // narrower list marker never pops a wider sibling that came
+        // before it. The stale wide entry stays buried under the new
+        // marker's own (immediately-matching) push, invisible until a
+        // later query pops back down THROUGH the new top and re-exposes
+        // it — at which point a code-indent threshold survives that
+        // should have been cleared.
+        it("a narrower sibling list marker correctly pops away a wider marker that preceded it", () => {
+            const doc = "- a\n123456789. b\n\n     d";
+            expect(protectedLines(doc.split("\n"))).toEqual([
+                false,
+                false,
+                false,
+                true,
+            ]);
+        });
+
+        // line 565: forcing the condition to "true" turns the loop into
+        // "while (true) listStack.pop();" — an unconditional infinite
+        // loop the instant any list marker is seen at all, since pop() on
+        // an empty array is a silent no-op that never breaks it.
+        it("does not hang when a list marker line is scanned (565 while-true guard)", () => {
+            const doc = "- a\n  b";
+            expect(protectedLines(doc.split("\n"))).toEqual([false, false]);
+        });
+
+        // line 566: the EqualityOperator mutant "indentWidth <= top"
+        // (instead of "<") also pops when a NESTED marker's indent lands
+        // EXACTLY ON its parent's content column — which should nest
+        // INSIDE the parent, not replace it. The same doubly-nested +
+        // reveal shape as above (526's arithmetic sibling: pop the shared
+        // top, see what is left underneath) exposes the wrongly-cleared
+        // parent as a missing code-indent threshold.
+        it("a nested marker landing exactly on its parent's content column nests instead of replacing it", () => {
+            const doc = "- a\n  - b\n\n  para\n\n     d";
+            expect(protectedLines(doc.split("\n"))).toEqual([
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+            ]);
+        });
+
+        // line 566: forcing the whole condition to "true" is the same
+        // unconditional-infinite-pop hazard as 565's true-mutant.
+        it("does not hang when a list marker line is scanned (566 while-true guard)", () => {
+            const doc = "- a\n  b";
+            expect(protectedLines(doc.split("\n"))).toEqual([false, false]);
+        });
+    });
+
+    describe("scanDocument: list-marker gap-width collapse rule", () => {
+        // line 571: a marker with NOTHING after it (matched via the "$"
+        // alternative in the marker regex) captures an EMPTY gap group.
+        // The ConditionalExpression "false" mutant (never collapses,
+        // always uses the literal — here 0) and the EqualityOperator
+        // mutant "length !== 0" (collapses on any NON-zero length instead
+        // of on zero) both mishandle this zero-length case, giving the
+        // bare marker the wrong content indent.
+        it("a bare list marker with nothing after it still gets content indent = marker width + 1", () => {
+            const doc = "-\n\n     code";
+            expect(protectedLines(doc.split("\n"))).toEqual([
+                false,
+                false,
+                false,
+            ]);
+        });
+
+        // line 571: a gap of EXACTLY 4 spaces must use its LITERAL width
+        // (CommonMark: only 5+ collapses to 1) — the ConditionalExpression
+        // "true" mutant (always collapses to 1) and the EqualityOperator
+        // mutant "length >= 4" (collapses starting at 4, not 5) both
+        // wrongly collapse this boundary case.
+        it("a four-space gap after the marker uses its literal width, not the collapse rule", () => {
+            const doc = "-    item\n\n       code";
+            expect(protectedLines(doc.split("\n"))).toEqual([
+                false,
+                false,
+                false,
+            ]);
+        });
+    });
+
+    describe("scanDocument: fence-open regex on a stripped list-marker remainder", () => {
+        // line 598: dropping the "^" anchor lets ordinary prose text
+        // BEFORE a backtick run (after the list marker is stripped) count
+        // as a fence opener, as long as it ENDS with 3+ backticks.
+        it("prose ending in backticks after a list marker does not open a fence", () => {
+            const doc = "- xyz```\ncontent\nafter";
+            expect(protectedLines(doc.split("\n"))).toEqual([
+                false,
+                false,
+                false,
+            ]);
+        });
+
+        // line 598: dropping the "{3,}" quantifier on the tilde branch
+        // (leaving a bare "~") lets just ONE or TWO tildes open a fence,
+        // even though CommonMark requires 3+.
+        it("two tildes after a list marker do not open a fence", () => {
+            const doc = "- ~~text\ncontent\nafter";
+            expect(protectedLines(doc.split("\n"))).toEqual([
+                false,
+                false,
+                false,
+            ]);
+        });
+    });
+
+    describe("scanDocument: list-item fence contentIndent arithmetic", () => {
+        // line 608: contentIndent must ADD the fence opener's own leading
+        // spaces to the stripped-prefix length — the ArithmeticOperator
+        // mutant subtracts them instead, which goes negative whenever the
+        // opener itself is indented (no list marker involved: the
+        // "stripped-prefix length" term is 0, isolating the sign flip).
+        // A negative contentIndent then rejects a closer indented to
+        // match the opener, which CommonMark explicitly allows.
+        it("a document-level fence opener with leading spaces still accepts a closer indented to match it", () => {
+            const doc = "   ```\ncode\n   ```\nafter";
+            expect(protectedLines(doc.split("\n"))).toEqual([
+                true,
+                true,
+                true,
+                false,
+            ]);
+        });
+    });
+
+    describe("scanDocument: endsProtected's fence clause", () => {
+        // line 633: forcing the fence clause to "true" makes endsProtected
+        // always true, even for a document with no fence, comment, or math
+        // open at all.
+        it("endsProtected is false for a document with nothing open at EOF", () => {
+            expect(scanDocument("plain\ntext".split("\n")).endsProtected).toBe(
+                false,
+            );
+        });
+    });
+
+    describe("maskedLineAt: negative index guard", () => {
+        // line 680: forcing the range guard to "false" means a NEGATIVE
+        // index also falls through to "lines[i]" (undefined) instead of
+        // returning "" — round 1 only pinned the upper bound (i ===
+        // lines.length); this pins the lower bound, which crashes instead
+        // of just returning a wrong value.
+        it("returns empty string for a negative index instead of crashing", () => {
+            expect(maskedLineAt(["only"], -1)).toBe("");
+        });
+    });
+
+    describe("removeLineRanges: blank-swallow guard's third clause", () => {
+        // line 711: forcing the "out is empty OR ends in a blank" clause
+        // to "true" swallows a blank line after a cut even when the
+        // surviving output so far is non-blank — a blank that legitimately
+        // separates two paragraphs must survive the cut, not vanish.
+        it("does not swallow a blank line that legitimately separates two surviving paragraphs", () => {
+            const out = removeLineRanges(
+                ["keep", "cut1", "", "after"],
+                [{ start: 1, end: 1 }],
+            );
+            expect(out).toEqual(["keep", "", "after"]);
+        });
+    });
+
+    describe("removeLineRanges: setext-residue guard's own gating clauses", () => {
+        // line 722/723: the guard must require BOTH out.length > 0 AND the
+        // last output line to be non-blank. The EqualityOperator mutant
+        // "length >= 0" (always true — length is never negative) drops the
+        // length gate; proven with an EMPTY out where the survivor is
+        // "===" (a valid setext underline but not literally "---", so the
+        // separate doc-start rule at line 733 does not also fire and mask
+        // the difference).
+        it("does not add a setext guard blank when out is still empty (length gate)", () => {
+            const out = removeLineRanges(["cut1", "==="], [{ start: 0, end: 0 }]);
+            expect(out).toEqual(["==="]);
+        });
+
+        // line 723: the guard must not fire when the last output line IS
+        // already blank (a blank already separates the surviving text from
+        // the setext-looking line, so no extra guard blank is needed).
+        // This single case kills all three col-723 mutants: the
+        // ConditionalExpression "true", the ArithmeticOperator
+        // "length + 1" (reads one past the array, always undefined, always
+        // "!== \"\""), and the StringLiteral swap to a string the array
+        // will never contain (also always "!== " that string) — all three
+        // make this clause unconditionally true.
+        it("does not add a redundant setext guard blank when the last output line is already blank", () => {
+            const out = removeLineRanges(
+                ["para", "", "cut1", "---"],
+                [{ start: 2, end: 2 }],
+            );
+            expect(out).toEqual(["para", "", "---"]);
+        });
+    });
+
+    describe("removeLineRanges: setext-residue regex shape", () => {
+        // line 724: swapping the leading "\s{0,3}" for "\S{0,3}" rejects a
+        // setext underline that has 1-3 leading spaces (CommonMark allows
+        // up to 3) — the class-swap only matters when there IS leading
+        // whitespace to consume, since "{0,3}" is satisfied trivially by
+        // zero characters either way.
+        it("a setext underline with leading whitespace (within CommonMark's 3-space limit) is still guarded", () => {
+            const out = removeLineRanges(
+                ["para", "cut1", "  ---"],
+                [{ start: 1, end: 1 }],
+            );
+            expect(out).toEqual(["para", "", "  ---"]);
+        });
+
+        // line 724: swapping the trailing "\s*$" for "\S*$" rejects a
+        // setext underline that has trailing whitespace after the
+        // delimiter run.
+        it("a setext underline with trailing whitespace is still guarded", () => {
+            const out = removeLineRanges(
+                ["para", "cut1", "---   "],
+                [{ start: 1, end: 1 }],
+            );
+            expect(out).toEqual(["para", "", "---   "]);
+        });
+
+        // line 724: dropping the "+" quantifier on the equals branch
+        // (leaving a bare "=") rejects a MULTI-character "===" run, since
+        // the bare "=" can only consume one character, leaving the rest
+        // unconsumed before the trailing "\s*$" anchor.
+        it("a multi-character equals-run setext underline is still guarded", () => {
+            const out = removeLineRanges(
+                ["para", "cut1", "==="],
+                [{ start: 1, end: 1 }],
+            );
+            expect(out).toEqual(["para", "", "==="]);
+        });
+    });
+
+    describe("findDefinitionBlocks: protected-line absorb guard", () => {
+        // line 757: the BlockStatement "{}" mutant (empties the whole
+        // isProtected-handling branch) and the ConditionalExpression
+        // "false" mutant (never enters it) both have the SAME externally
+        // visible effect — a protected line falls through to the
+        // IndentedContent/blank-run checks below instead of being
+        // absorbed-or-broken by its own logic. An indented comment-region
+        // OPENER line (itself unprotected, absorbed normally by the
+        // IndentedContent check) followed by its INDENTED-looking but
+        // PROTECTED interior line exposes the difference: the real code
+        // absorbs the interior via the comment-aware branch and keeps
+        // scanning; with the branch gone, IndentedContent no longer
+        // applies (the interior line has no leading whitespace) so it
+        // breaks one line too early.
+        it("absorbs a comment region's protected interior line via the comment-aware branch, not by falling through", () => {
+            const doc = "[^1]: a\n    <!--\nhidden\n-->";
+            const lines = doc.split("\n");
+            const scan = scanDocument(lines);
+            expect(findDefinitionBlocks(lines, scan.isProtected, scan)).toEqual([
+                { name: "1", start: 0, end: 2 },
+            ]);
+        });
+    });
+
+    describe("findDefinitionBlocks: blank-run walk bound and whitespace-only lines", () => {
+        // line 777: the MethodExpression mutant drops ".trim()" from the
+        // blank-run walk's own condition, so a WHITESPACE-ONLY line (not
+        // truly empty, but blank in effect) stops the walk instead of
+        // being swept over — the walk must treat it exactly like an empty
+        // line.
+        it("a whitespace-only line within a blank run is swept over like an empty line", () => {
+            const doc = ["[^1]: a", "   ", "    more"];
+            const isProtected = scanDocument(doc).isProtected;
+            expect(findDefinitionBlocks(doc, isProtected)).toEqual([
+                { name: "1", start: 0, end: 2 },
+            ]);
+        });
+
+        // line 777: the EqualityOperator mutant "k <= lines.length" lets
+        // the walk step one past the array when a blank run reaches
+        // EXACTLY end-of-document, reading "lines[lines.length].trim()" —
+        // "undefined" has no ".trim" method, so this crashes instead of
+        // the walk cleanly stopping at the document boundary.
+        it("a blank run reaching exactly end-of-document does not overrun the array", () => {
+            const doc = ["[^1]: a", ""];
+            const isProtected = scanDocument(doc).isProtected;
+            expect(findDefinitionBlocks(doc, isProtected)).toEqual([
+                { name: "1", start: 0, end: 0 },
+            ]);
+        });
+    });
+
+    describe("findDefinitionBlocks: post-walk absorb guard", () => {
+        // line 779: the LogicalOperator mutant ("&&" -> "||" on the first
+        // two clauses) and both ConditionalExpression "true" mutants make
+        // this guard ignore isProtected once "k < lines.length" alone is
+        // satisfied — a blank run landing exactly on a PROTECTED fence
+        // opener (itself indented, so it still matches IndentedContent)
+        // then gets wrongly absorbed into the definition block instead of
+        // correctly ending it.
+        it("a blank run landing on a protected (indented) fence opener does not get absorbed", () => {
+            const doc = ["[^1]: a", "", " ```", " code", " ```"];
+            const isProtected = scanDocument(doc).isProtected;
+            expect(findDefinitionBlocks(doc, isProtected)).toEqual([
+                { name: "1", start: 0, end: 0 },
+            ]);
+        });
+    });
+
+    describe("findDefinitionBlocks: non-blank break check", () => {
+        // line 773: the MethodExpression mutant drops ".trim()" here too
+        // (the OUTER non-blank check, distinct from the 777 walk above) —
+        // reusing the same whitespace-only-line shape: without ".trim()",
+        // "   " !== "" is true, breaking the block one line before the
+        // real indented continuation is ever reached.
+        it("a whitespace-only line does not end the block via the outer non-blank check", () => {
+            const doc = ["[^1]: a", "   ", "    more"];
+            const isProtected = scanDocument(doc).isProtected;
+            expect(findDefinitionBlocks(doc, isProtected)).toEqual([
+                { name: "1", start: 0, end: 2 },
+            ]);
+        });
+    });
+});
+
+/*
+ * Round 2 equivalence / unreachability proofs
+ * ============================================
+ * For each of the following survivors, no test was written: tracing the
+ * exact reachable value ranges shows the mutation can never produce an
+ * externally observable difference through the exported API.
+ *
+ * --- Harmless "read one past the end" off-by-ones (203:12, 217:29,
+ * 284:33, 354:25) ---
+ * All four change a loop's "<" bound to "<=", letting the index reach
+ * exactly `line.length` / `src.length` for one extra iteration. In every
+ * case the body only ever READS the out-of-range slot (never assigns
+ * through it), and JS returns `undefined` for both string- and
+ * array-index access past the end:
+ *   - 203 (main mask loop) and 217 (backtick-run search): `line[i]` is
+ *     undefined, which fails every "===" character check in the loop body
+ *     (undefined !== "`", !== "$", startsWith(..., i) is false past the
+ *     end), so the extra iteration takes the fallback "just advance i"
+ *     path and calls `blot` zero times — output identical.
+ *   - 284 (inline-math closer search): same shape — `line[j]` undefined
+ *     fails both the backslash-escape check and the "$" check, so the
+ *     loop body is a no-op for that iteration.
+ *   - 354 (frontmatter closer search): `/^(---|\.\.\.)\s*$/.test(undefined)`
+ *     coerces to the string "undefined", which does not match the
+ *     pattern, so the extra iteration never finds a spurious closer.
+ * Verified empirically against a scratch-mutated copy of the source: every
+ * constructed probe (including inputs specifically shaped to reach the
+ * boundary, e.g. an all-whitespace tail or a frontmatter block with no
+ * closer at all) produced byte-identical output with and without each
+ * mutation.
+ *
+ * --- 296:17 (drop the "close === i + 1" OR-clause) and 296:27
+ * (i + 1 -> i - 1) ---
+ * Already identified as equivalent in this file's round-1 notes (see the
+ * "content starting with a space" describe block above): two adjacent
+ * unescaped dollars are always caught by the "$$" display-math branch
+ * before reaching this single-dollar code path, so `close` can never come
+ * back equal to `i + 1` here — the clause is dead in every reachable
+ * state. Re-confirmed for round 2: since `close` is otherwise always -1 or
+ * >= i + 1 (found by a forward search starting at i + 1), and the
+ * ArithmeticOperator variant's "close === i - 1" can only be true when
+ * i === 0 and close === -1 (the only i for which i - 1 could equal a
+ * legal close value), that same state already satisfies the FIRST clause
+ * "close === -1" — so the OR's overall result is identical whether or not
+ * this dead clause is mutated.
+ *
+ * --- regionDepth's own guard: 430:17, 456:17, 622:17 (all
+ * "if (inComment || inMath) regionDepth = depth" forced to "true") ---
+ * regionDepth is read exactly once, at line 404, and every read is itself
+ * gated by "(inComment || inMath)". Every place inComment/inMath can
+ * transition to (or remain) true — the comment-closer reopen (430), the
+ * math-closer reopen (456), and a fresh opener (622) — immediately writes
+ * regionDepth in that SAME statement in the unmutated code. So: when the
+ * guard would have been true anyway, the mutant changes nothing; when the
+ * guard is false (no region is actually open), the stale write is inert
+ * because the next time regionDepth is read with inComment||inMath true,
+ * that read is preceded by a fresh, correctly-guarded write from whichever
+ * of these three sites opened it. The value written by a "false"-guard
+ * write is provably never read while stale. Verified empirically: forcing
+ * each of the three guards to "true" produced identical isProtected/
+ * startsInComment/startsInMath output across every regression probe,
+ * including ones specifically built to chain a region close, a false
+ * reopen, and a subsequent depth-sensitive read.
+ *
+ * --- 436:46 and 461:46 (StringLiteral: the NUL->" " replacement in
+ * `closed.masked.replace(/\0/g, " ").trim() === ""` becomes NUL->"") ---
+ * The check only cares whether the string is ENTIRELY whitespace after the
+ * substitution. Every character in `closed.masked` is either NUL or an
+ * already-real character (space or otherwise) untouched by the replace.
+ * Substituting NUL with " " or with "" changes only how many whitespace
+ * characters are present, never whether a NON-whitespace character exists
+ * — and `.trim() === ""` depends only on the latter. So both substitutions
+ * agree on every input. Verified empirically with mixed NUL/real-space
+ * masked strings.
+ *
+ * --- 476:30 and 478:29 (BooleanLiteral: the fence-interior branch's own
+ * `inIndentedCode = false` / `blockBoundary = false` resets forced to
+ * "true") ---
+ * Both flags are re-derived unconditionally the moment the fence closes or
+ * the line stops being fenced:
+ *   - blockBoundary: line 501 unconditionally sets it to `true` the instant
+ *     the fence actually closes (overwriting any per-iteration value from
+ *     478, mutated or not), and while the fence stays open the flag is
+ *     never read by anything (the fence branch's own logic at 484-503
+ *     never consults it). So 478's mutation is invisible both during and
+ *     after the fence.
+ *   - inIndentedCode: right after a fence closes, `!inDefinition` is
+ *     ALWAYS true (line 477 forces `inDefinition = false` on every fenced
+ *     line, so it cannot be stale-true) and `blockBoundary` is ALWAYS true
+ *     (per the point above) — so the very next line's own branch-535 check
+ *     ("indented && !inDefinition && blockBoundary") reduces to just
+ *     "indented" and independently reaches the identical isProtected
+ *     verdict that a wrongly-true inIndentedCode would have produced via
+ *     branch 530. When that next line is NOT indented, inIndentedCode gets
+ *     unconditionally reset to false at line 551 before it could matter.
+ * Verified empirically across fence-then-indented, fence-then-plain, and
+ * list-nested-fence-then-deep-indent probes: identical output in all three.
+ *
+ * --- 488:24 EqualityOperator ("lead < rest.length" -> "lead <=") ---
+ * Same "harmless read-one-past-the-end" shape as the 203/217/284/354
+ * group above: at `lead === rest.length`, `rest[lead]` is undefined, which
+ * fails the loop's own second clause ("=== ' '"), so the extra iteration
+ * the mutant allows is immediately rejected by the AND's second half —
+ * `lead`'s final value is identical either way. Verified empirically,
+ * including with a rest string that is ENTIRELY spaces (the case most
+ * likely to expose an off-by-one).
+ *
+ * --- 565:25 EqualityOperator ("listStack.length > 0" -> ">= 0") ---
+ * Array length is never negative, so "length >= 0" is unconditionally
+ * true — but so is the ORIGINAL clause whenever length actually is > 0,
+ * and the ONLY case they'd disagree (length === 0) is already covered by
+ * the loop's own second clause: `listStack[listStack.length - 1]` on an
+ * empty array is `listStack[-1]` = undefined, and `indentWidth <
+ * undefined` is always false. So at length === 0 the mutant's condition
+ * reduces to `true && false` = false, identical to the original's
+ * `false && ...` short-circuit. Verified empirically against every probe
+ * built for the surrounding (non-equivalent) 565/566 mutants.
+ *
+ * --- 779:17 EqualityOperator ("k < lines.length" -> "k <=") ---
+ * Same shape again: at k === lines.length, `isProtected[k]` and
+ * `lines[k]` are both undefined; `!isProtected[k]` becomes `!undefined` =
+ * true (harmless on its own), but `IndentedContent.test(lines[k])` coerces
+ * `undefined` to the string "undefined", which has no leading whitespace
+ * and so never matches `/^\s+\S/`. The three-clause AND is therefore false
+ * either way, and the block ends via the same `else { break; }` path.
+ * Verified empirically with a blank run that runs to exactly
+ * end-of-document.
+ *
+ * --- 773:17 ConditionalExpression ("lines[j].trim() !== \"\"" -> "false")
+ * ---
+ * Reaching this line already guarantees `IndentedContent.test(lines[j])`
+ * was false one line above (769), and `isProtected[j]` was false (757
+ * would otherwise have absorbed-or-broken first). If the mutant skips the
+ * direct break, execution falls into the blank-run walk immediately below:
+ * since `lines[j]` is non-blank, the walk's own while-loop (777) does not
+ * advance (k stays at j), and the walk's absorb guard (779) re-tests the
+ * IDENTICAL `IndentedContent.test(lines[j])` that already failed — so it
+ * takes the `else { break; }` branch at line 786, the same outcome the
+ * direct break would have produced. Verified empirically with both a
+ * whitespace-only line and an ordinary non-indented, non-blank line
+ * (neither distinguishes the mutant from the original).
+ */
