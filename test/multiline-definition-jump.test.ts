@@ -2,7 +2,7 @@ import { Editor, EditorPosition } from "obsidian";
 import { describe, expect, it } from "vitest";
 
 import FootnotePlugin from "../src/main";
-import { shouldJumpFromDefinitionToReference } from "../src/insert-or-navigate-footnotes";
+import { shouldJumpFromDefinitionToReference } from "../src/navigation";
 
 // Bug (reported 2026-07-17, manual testing): jumping TO a multi-line definition
 // lands the caret on the LAST continuation line by design, but jumping BACK

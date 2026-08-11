@@ -1,7 +1,7 @@
 // Settings shape, defaults, and the settings tab. Requires Obsidian 1.13+:
 // the tab renders from getSettingDefinitions() (declarative, auto-saving).
 import { App, PluginSettingTab, SettingDefinitionItem } from "obsidian";
-import FootnotePlugin from "./main";
+import type FootnotePlugin from "./main";
 import { AppWithPlugins } from "./obsidian-internals";
 
 export interface FootnotePluginSettings {

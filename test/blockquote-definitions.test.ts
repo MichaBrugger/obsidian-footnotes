@@ -2,11 +2,8 @@ import { Editor, EditorPosition } from "obsidian";
 import { describe, expect, it } from "vitest";
 
 import FootnotePlugin from "../src/main";
-import {
-    listExistingFootnoteDefinitions,
-    shouldJumpFromDefinitionToReference,
-    shouldJumpFromReferenceToDefinition,
-} from "../src/insert-or-navigate-footnotes";
+import { listExistingFootnoteDefinitions } from "../src/doc-context";
+import { shouldJumpFromDefinitionToReference, shouldJumpFromReferenceToDefinition } from "../src/navigation";
 import { removeOrphanedFootnoteReferences } from "../src/linting/rules/remove-orphaned-references";
 
 // C22 (Jason, 2026-08-10): footnote creation, navigation, and linting work

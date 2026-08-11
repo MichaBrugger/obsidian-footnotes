@@ -2,7 +2,7 @@ import { Editor, EditorPosition } from "obsidian";
 import { describe, expect, it } from "vitest";
 
 import FootnotePlugin from "../src/main";
-import { shouldJumpFromDefinitionToReference } from "../src/insert-or-navigate-footnotes";
+import { shouldJumpFromDefinitionToReference } from "../src/navigation";
 import { tableRowCellSpans } from "../src/table-cursor";
 import { removeOrphanedFootnoteReferences } from "../src/linting/rules/remove-orphaned-references";
 

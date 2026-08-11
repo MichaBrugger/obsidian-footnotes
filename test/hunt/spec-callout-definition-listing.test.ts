@@ -1,7 +1,7 @@
 import { Editor } from "obsidian";
 import { describe, expect, it } from "vitest";
 
-import { listExistingFootnoteDefinitions } from "../../src/insert-or-navigate-footnotes";
+import { listExistingFootnoteDefinitions } from "../../src/doc-context";
 
 // spec question: does Obsidian treat a definition inside a callout/blockquote
 // ("> [^1]: def") as live? (Same Obsidian-semantics question as

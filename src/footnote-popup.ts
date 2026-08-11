@@ -1,6 +1,6 @@
 import { MarkdownView, Notice } from "obsidian";
 
-import FootnotePlugin from "./main";
+import type FootnotePlugin from "./main";
 import { AppWithEmbedRegistry, EditorWithCm } from "./obsidian-internals";
 
 // A small popup anchored at the cursor containing Obsidian's own editable

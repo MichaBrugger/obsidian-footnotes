@@ -1,6 +1,8 @@
 import { Editor, MarkdownView } from "obsidian";
 
+import { footnoteReferenceMatches } from "./footnote-grammar";
 import {
+    definitionLabelIn,
     DocumentScan,
     maskLineRegions,
     maskProtectedLines,
@@ -46,6 +48,54 @@ export interface DocContext {
     maskedLine(i: number): string;
     /** The whole masked twin, memoized. */
     maskedLines(): string[];
+}
+
+/** Names of all footnote definitions ("[^x]: …" lines) in document order, one per line at most. Code blocks don't count. */
+export function listExistingFootnoteDefinitions(
+    doc: Editor,
+    ctx: DocContext = docContext(doc),
+) {
+    const definitionNames: string[] = [];
+
+    //search each line for footnote definitions — column-0 labels and
+    //blockquote/callout ones ("> [^x]: …", C22) — and list their names
+    const lines = ctx.lines;
+    const masked = ctx.maskedLines();
+    for (let i = 0; i < lines.length; i++) {
+        const label = definitionLabelIn(masked[i]);
+        if (label) {
+            // re-slice the ORIGINAL line: a code span inside the name masks
+            // to NULs, and the masked name would otherwise leak them into
+            // saved output (its reference sibling re-slices for the same reason)
+            definitionNames.push(lines[i].slice(label.nameStart, label.nameEnd));
+        }
+    }
+    return definitionNames;
+}
+
+/** Every reference occurrence with its position — repeated references appear once per use. Code blocks don't count. */
+export function listExistingFootnoteReferencesAndLocations(
+    doc: Editor
+) {
+    const references: { footnote: string; lineNum: number; startIndex: number }[] = [];
+
+    //search each line for footnote references
+    //for each, add their name, line number, and start index to the list
+    const lines = docLines(doc);
+    const masked = maskProtectedLines(lines);
+    for (let i = 0; i < lines.length; i++) {
+        for (const match of footnoteReferenceMatches(masked[i])) {
+            const start = match.index ?? 0;
+            references.push({
+                // slice the original: the masked match text could carry
+                // mask characters when code sits inside the brackets
+                footnote: lines[i].slice(start, start + match[0].length),
+                lineNum: i,
+                startIndex: start,
+            });
+        }
+    }
+    return references;
 }
 
 export function docContext(doc: Editor): DocContext {

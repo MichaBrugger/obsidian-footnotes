@@ -1,10 +1,7 @@
 import { Editor } from "obsidian";
 import { describe, expect, it } from "vitest";
 
-import {
-    listExistingFootnoteDefinitions,
-    listExistingFootnoteReferencesAndLocations,
-} from "../src/insert-or-navigate-footnotes";
+import { listExistingFootnoteDefinitions, listExistingFootnoteReferencesAndLocations } from "../src/doc-context";
 
 // The two document-scanning functions the navigation cascade is built on:
 // definitions (definitions) and reference occurrences with positions. Includes the

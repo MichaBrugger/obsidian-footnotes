@@ -1,6 +1,6 @@
 import { MarkdownView, Modal, Notice, Setting, TFile } from "obsidian";
 
-import FootnotePlugin from "./main";
+import type FootnotePlugin from "./main";
 import { footnotePrefixProblem } from "./footnote-prefix";
 
 // The "Set footnote prefix" command's modal: one text input that writes the

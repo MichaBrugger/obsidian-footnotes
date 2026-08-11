@@ -1,7 +1,7 @@
 import { Editor } from "obsidian";
 import { describe, expect, it } from "vitest";
 
-import { listExistingFootnoteReferencesAndLocations } from "../../src/insert-or-navigate-footnotes";
+import { listExistingFootnoteReferencesAndLocations } from "../../src/doc-context";
 import { computeNextFootnoteNumber } from "../../src/footnote-grammar";
 import { reindexFootnotes } from "../../src/linting/rules/re-index-footnotes";
 

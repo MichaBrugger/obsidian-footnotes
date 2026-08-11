@@ -1,12 +1,12 @@
 import { Editor, MarkdownView, Notice } from "obsidian";
 
-import FootnotePlugin from "../main";
+import type FootnotePlugin from "../main";
 import {
     footnotePopupBusy,
     settleFootnotePopupWithFeedback,
     toggleCloseFootnotePopup,
 } from "../footnote-popup";
-import { jumpToFootnoteDefinition } from "../insert-or-navigate-footnotes";
+import { jumpToFootnoteDefinition } from "../navigation";
 import { readingViewActive } from "../doc-context";
 import { footnotePrefix, footnotePrefixProblem } from "../footnote-prefix";
 import { maskProtectedLines, normalizeEol, restoreEol } from "../markdown-scan";

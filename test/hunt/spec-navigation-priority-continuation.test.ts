@@ -2,7 +2,7 @@ import { Editor, EditorChange, EditorPosition } from "obsidian";
 import { describe, expect, it } from "vitest";
 
 import FootnotePlugin from "../../src/main";
-import { shouldJumpFromDefinitionToReference } from "../../src/insert-or-navigate-footnotes";
+import { shouldJumpFromDefinitionToReference } from "../../src/navigation";
 
 // spec question: with the caret on [^b]'s reference inside [^a]'s indented
 // continuation line, should the hotkey navigate to [^b]'s definition, or jump

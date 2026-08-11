@@ -2,11 +2,8 @@ import { Editor, EditorPosition } from "obsidian";
 import { describe, expect, it } from "vitest";
 
 import FootnotePlugin from "../src/main";
-import {
-    listExistingFootnoteDefinitions,
-    shouldJumpFromDefinitionToReference,
-    shouldJumpFromReferenceToDefinition,
-} from "../src/insert-or-navigate-footnotes";
+import { listExistingFootnoteDefinitions } from "../src/doc-context";
+import { shouldJumpFromDefinitionToReference, shouldJumpFromReferenceToDefinition } from "../src/navigation";
 
 // Issue #50: jumping between the reference and definition of a named footnote
 // whose name contains ":" (e.g. [^arXiv:1234.5678]) used to fail — the
