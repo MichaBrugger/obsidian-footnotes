@@ -61,8 +61,11 @@ describe("blockquoteDepth (via scanDocument's container-depth reach)", () => {
     it("a fourth leading space keeps the nested \">\" as literal text, not a marker", () => {
         const doc = [">     > ```", "after"].join("\n");
         // depth stays 1; rest is "    > ```" (leading spaces + literal ">"),
-        // which is not a fence opener — nothing is protected
-        expect(protectedLines(doc.split("\n"))).toEqual([false, false]);
+        // which never opens a fence — since bug-blockquote-indented-code
+        // (2026-08-11, ground-truth probe P10) it is quote-relative
+        // INDENTED CODE instead, so the line is protected as code and the
+        // next line is live (a fence would have swallowed it)
+        expect(protectedLines(doc.split("\n"))).toEqual([true, false]);
     });
 
     // line 81: the ONE optional space after a ">" marker belongs to the

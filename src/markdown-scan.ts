@@ -58,7 +58,12 @@ export function restoreEol(text: string, eol: "\n" | "\r\n"): string {
 
 // A leading blockquote/callout prefix ("> ", "> > ", …): a fenced code block
 // can sit inside a blockquote/callout, and its delimiters carry that prefix.
-const BlockquotePrefix = /^(?: {0,3}>)+ ?/;
+// Each ">" marker owns one optional trailing space, and the NEXT marker may
+// sit up to 3 spaces further in — the same walk blockquoteDepth does. The
+// old /^(?: {0,3}>)+ ?/ didn't consume the per-marker space, so a legal
+// ">    > [^1]: x" (4 gap = marker space + 3 indent) lost its second marker
+// and the label behind it went invisible (2026-08-11 review bug #5).
+const BlockquotePrefix = /^(?: {0,3}> ?)+/;
 
 /**
  * The line's blockquote nesting depth (number of leading ">" markers, each
@@ -403,6 +408,18 @@ export function scanDocument(lines: string[]): DocumentScan {
     // content indent, not at column 4 of the document. Doc-level only;
     // quoted lists ride their quote's existing rules.
     const listStack: number[] = [];
+    // quote-relative indented code (2026-08-11 review bug #4, ground-
+    // truthed in the live reading view): quote content indented ≥ 4 columns
+    // past the innermost ">" marker is code when it opens at a boundary
+    // INSIDE the quote — the quote's start or a blank ">" line — but stays
+    // LIVE as a lazy paragraph continuation or a definition continuation.
+    // Innermost-quote state only; a depth change re-enters at a boundary.
+    let quote: {
+        depth: number;
+        boundary: boolean;
+        inDefinition: boolean;
+        inCode: boolean;
+    } | null = null;
     for (; i < src.length; i++) {
         // the blockquote nesting where this line's container constructs
         // count — fences and comment/math regions live in the container
@@ -517,7 +534,43 @@ export function scanDocument(lines: string[]): DocumentScan {
             // findDefinitionBlocks) nor an indented chunk (code blocks
             // continue across blanks when more indented lines follow)
             blockBoundary = true;
+            quote = null; // a blank line ends every open blockquote
             continue; // nothing on a blank line can open a fence or comment
+        }
+        if (depth === 0) {
+            quote = null;
+        } else {
+            if (!quote || quote.depth !== depth) {
+                quote = {
+                    depth,
+                    boundary: true,
+                    inDefinition: false,
+                    inCode: false,
+                };
+            }
+            if (rest.trim() === "") {
+                // a blank ">" line is a block boundary within the quote
+                quote.boundary = true;
+            } else if (leadingIndentWidth(rest) >= 4) {
+                if (quote.inCode || (quote.boundary && !quote.inDefinition)) {
+                    quote.inCode = true;
+                    quote.boundary = false;
+                    isProtected[i] = true;
+                    // code text: nothing on it opens a fence or a region,
+                    // and it interrupts doc-level blocks like any quoted line
+                    inIndentedCode = false;
+                    inDefinition = false;
+                    blockBoundary = false;
+                    continue;
+                }
+                // live: a lazy paragraph continuation or a definition
+                // continuation — an open quoted definition stays open
+                quote.boundary = false;
+            } else {
+                quote.inCode = false;
+                quote.boundary = false;
+                quote.inDefinition = definitionLabelIn(src[i]) !== null;
+            }
         }
         const indentWidth = leadingIndentWidth(src[i]);
         // a non-blank line at a block boundary closes every list item it
@@ -605,6 +658,21 @@ export function scanDocument(lines: string[]): DocumentScan {
                 open = fenceLine.match(/^( {0,3})(`{3,}|~{3,})/);
             }
         }
+        // inside a list item, fence indent measures from the ITEM's content
+        // column, not the document margin (2026-08-11 review bug #3,
+        // ground-truthed in the live reading view): "    ```" under "- a"
+        // sits at relative indent 2 — a real fence, whose closer aligns to
+        // the item's content column
+        let listFenceContentIndent: number | null = null;
+        if (!open && depth === 0 && listStack.length > 0) {
+            const contentColumn = listStack[listStack.length - 1];
+            const wide = rest.match(/^( *)(`{3,}|~{3,})/);
+            if (wide && wide[1].length <= contentColumn + 3) {
+                fenceLine = rest;
+                open = wide;
+                listFenceContentIndent = contentColumn;
+            }
+        }
         if (open && isFenceOpener(fenceLine, open[2])) {
             fence = {
                 char: open[2][0],
@@ -612,7 +680,9 @@ export function scanDocument(lines: string[]): DocumentScan {
                 depth,
                 // the stripped list marker plus the opener's own indent IS
                 // the container content column the closer aligns to
-                contentIndent: rest.length - fenceLine.length + open[1].length,
+                contentIndent:
+                    listFenceContentIndent ??
+                    rest.length - fenceLine.length + open[1].length,
             };
             isProtected[i] = true;
             continue;

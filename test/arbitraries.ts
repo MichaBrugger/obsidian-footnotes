@@ -75,6 +75,14 @@ const specialBlockArb = fc.constantFrom(
     "> $$\n> quoted math[^75]",
     "# Heading\n    code-shaped[^76]",
     "[^note]: formula\n    $$\n    E = mc^2\n    $$",
+    // shapes from the 2026-08-11 review batch, ground-truthed in the live
+    // reading view: list-relative fence indent, quote-relative indented
+    // code (open/lazy-live), wide-gap nested quote markers
+    "- item\n    ```\n    fenced[^84]\n    ```",
+    ">     quoted code[^85]",
+    "> para\n>     lazy live[^86]",
+    ">    > nested[^87]\n>    > [^87]: wide-gap definition",
+    ">     > gap code[^88]",
 );
 
 const blockArb = fc.oneof(
