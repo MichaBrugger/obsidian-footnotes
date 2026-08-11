@@ -71,43 +71,51 @@ export default class FootnotePlugin extends Plugin {
 
     // No default hotkeys, per Obsidian's plugin guidelines (considered and
     // reverted 2026-08-07): the README tells users to bind their own and
-    // recommends Alt+0 / Alt+- for these two core commands.
-    this.addCommand({
-      id: "insert-autonumbered-footnote",
-      name: "Insert / navigate auto-numbered footnote",
-      icon: "footnote-numbered",
-      checkCallback: (checking: boolean) => {
-        if (checking) return !!this.editableMarkdownView();
-        void insertAutonumFootnote(this);
+    // recommends Alt+0 / Alt+- for these two core commands. All four
+    // insert commands share one registration shape: available exactly
+    // while an editable markdown view is active.
+    const insertCommands: Array<{
+      id: string;
+      name: string;
+      icon: string;
+      run: (plugin: FootnotePlugin) => Promise<void>;
+    }> = [
+      {
+        id: "insert-autonumbered-footnote",
+        name: "Insert / navigate auto-numbered footnote",
+        icon: "footnote-numbered",
+        run: insertAutonumFootnote,
       },
-    });
-    this.addCommand({
-      id: "insert-named-footnote",
-      name: "Insert / navigate named footnote",
-      icon: "footnote-named",
-      checkCallback: (checking: boolean) => {
-        if (checking) return !!this.editableMarkdownView();
-        void insertNamedFootnote(this);
-      }
-    });
-    this.addCommand({
-      id: "insert-inline-footnote",
-      name: "Insert inline footnote",
-      icon: "footnote-inline-cursor",
-      checkCallback: (checking: boolean) => {
-        if (checking) return !!this.editableMarkdownView();
-        void insertInlineFootnote(this);
-      }
-    });
-    this.addCommand({
-      id: "paste-inline-footnote",
-      name: "Insert inline footnote from clipboard",
-      icon: "footnote-inline-paste",
-      checkCallback: (checking: boolean) => {
-        if (checking) return !!this.editableMarkdownView();
-        void pasteInlineFootnote(this);
-      }
-    });
+      {
+        id: "insert-named-footnote",
+        name: "Insert / navigate named footnote",
+        icon: "footnote-named",
+        run: insertNamedFootnote,
+      },
+      {
+        id: "insert-inline-footnote",
+        name: "Insert inline footnote",
+        icon: "footnote-inline-cursor",
+        run: insertInlineFootnote,
+      },
+      {
+        id: "paste-inline-footnote",
+        name: "Insert inline footnote from clipboard",
+        icon: "footnote-inline-paste",
+        run: pasteInlineFootnote,
+      },
+    ];
+    for (const command of insertCommands) {
+      this.addCommand({
+        id: command.id,
+        name: command.name,
+        icon: command.icon,
+        checkCallback: (checking: boolean) => {
+          if (checking) return !!this.editableMarkdownView();
+          void command.run(this);
+        },
+      });
+    }
     this.addCommand({
       id: "set-footnote-prefix",
       name: "Set footnote prefix",
@@ -199,95 +207,16 @@ export default class FootnotePlugin extends Plugin {
     // existed, or a fresh install (where everything below no-ops). All
     // migrations share ONE save at the end.
     if (this.settings.settingsVersion < CURRENT_SETTINGS_VERSION) {
-      // each block is gated on the version it upgrades FROM, so a later
-      // bump can never re-run an earlier shape-based rewrite on values the
-      // user saved deliberately in the meantime (the heading-mangle bug)
+      // each migration is gated on the version it upgrades FROM, so a
+      // later bump can never re-run an earlier shape-based rewrite on
+      // values the user saved deliberately in the meantime (the
+      // heading-mangle bug)
       if (this.settings.settingsVersion < 1) {
-        // saved data from 0.1.x used a PascalCase key for the section heading
-        const legacySettings = this.settings as FootnotePluginSettings & {
-          FootnoteSectionHeading?: string;
-          enableAutoSuggest?: boolean;
-        };
-        // when the saved data SOMEHOW carries both keys (a downgrade or a
-        // data.json sync merge — no real upgrade path produces it), the
-        // newer camelCase value wins (decided 2026-08-10)
-        if (
-          typeof legacySettings.FootnoteSectionHeading === "string" &&
-          typeof saved?.footnoteSectionHeading !== "string"
-        ) {
-          this.settings.footnoteSectionHeading = legacySettings.FootnoteSectionHeading;
-        }
-        delete legacySettings.FootnoteSectionHeading;
-
-        // migrate pre-0.2.0 section heading values: the old text input
-        // implied an H1, the textarea takes literal markdown
-        const heading = this.settings.footnoteSectionHeading;
-        if (heading && !/^(#{1,6} |---|\*\*\*|___)/.test(heading)) {
-          this.settings.footnoteSectionHeading = `# ${heading}`;
-        }
-
-        // drop the setting for the removed autosuggest feature (Obsidian now
-        // suggests footnotes natively)
-        delete legacySettings.enableAutoSuggest;
-
-        // the linting settings shipped under tidy* keys in beta.5/6: copy
-        // each saved tidy* value onto its lint* name and drop the old key,
-        // so beta testers keep their toggle choices. Spelled out per key
-        // (rather than a rename map) so each move is statically typed —
-        // withTidyKeys is the same object as this.settings, so writing
-        // here sets the real lint* setting
-        const withTidyKeys = this.settings as FootnotePluginSettings & {
-          tidyFixPunctuation?: boolean;
-          tidyMoveToBottom?: boolean;
-          tidyReindex?: boolean;
-          tidyOnSave?: boolean;
-          lintOnFileChange?: unknown;
-          tidyOnFileChange?: unknown;
-        };
-        if (withTidyKeys.tidyFixPunctuation !== undefined) {
-          withTidyKeys.lintFixPunctuation = withTidyKeys.tidyFixPunctuation;
-          delete withTidyKeys.tidyFixPunctuation;
-        }
-        if (withTidyKeys.tidyMoveToBottom !== undefined) {
-          withTidyKeys.lintMoveToBottom = withTidyKeys.tidyMoveToBottom;
-          delete withTidyKeys.tidyMoveToBottom;
-        }
-        if (withTidyKeys.tidyReindex !== undefined) {
-          withTidyKeys.lintReindex = withTidyKeys.tidyReindex;
-          delete withTidyKeys.tidyReindex;
-        }
-        if (withTidyKeys.tidyOnSave !== undefined) {
-          withTidyKeys.lintOnSave = withTidyKeys.tidyOnSave;
-          delete withTidyKeys.tidyOnSave;
-        }
-        // the lint-on-focused-file-change trigger was replaced by lint on
-        // footnote creation (2026-08-05) — its saved keys are dropped rather
-        // than carried over, since the semantics are different
-        delete withTidyKeys.lintOnFileChange;
-        delete withTidyKeys.tidyOnFileChange;
+        migrateSettingsToV1(this.settings, saved);
       }
-
       if (this.settings.settingsVersion < 2) {
-        // v2 (2026-08-10): the two orphan settings became symmetric delete
-        // toggles. keepOrphanedDefinitions (shipped in the betas) carries
-        // over with its polarity flipped; the short-lived lintOrphanedMarkers
-        // dropdown only existed in dev builds but maps just as cheaply.
-        const legacyOrphans = this.settings as FootnotePluginSettings & {
-          keepOrphanedDefinitions?: boolean;
-          lintOrphanedMarkers?: string;
-        };
-        if (typeof legacyOrphans.keepOrphanedDefinitions === "boolean") {
-          this.settings.lintDeleteOrphanedDefinitions =
-            !legacyOrphans.keepOrphanedDefinitions;
-          delete legacyOrphans.keepOrphanedDefinitions;
-        }
-        if (legacyOrphans.lintOrphanedMarkers !== undefined) {
-          this.settings.lintDeleteOrphanedReferences =
-            legacyOrphans.lintOrphanedMarkers === "delete";
-          delete legacyOrphans.lintOrphanedMarkers;
-        }
+        migrateSettingsToV2(this.settings);
       }
-
       this.settings.settingsVersion = CURRENT_SETTINGS_VERSION;
       await this.saveSettings();
     }
@@ -295,5 +224,95 @@ export default class FootnotePlugin extends Plugin {
 
   async saveSettings() {
     await this.saveData(this.settings);
+  }
+}
+
+// ---- one-time settings migrations, one function per version bump ----
+// (gated in loadSettings on the version being upgraded FROM)
+
+/** v1: the 0.1.x → 0.2.0-beta shape — PascalCase heading key, implied-H1 heading text, the removed autosuggest toggle, and the beta.5/6 tidy* → lint* renames. */
+function migrateSettingsToV1(
+  settings: FootnotePluginSettings,
+  saved: Partial<FootnotePluginSettings> | null,
+) {
+  // saved data from 0.1.x used a PascalCase key for the section heading
+  const legacySettings = settings as FootnotePluginSettings & {
+    FootnoteSectionHeading?: string;
+    enableAutoSuggest?: boolean;
+  };
+  // when the saved data SOMEHOW carries both keys (a downgrade or a
+  // data.json sync merge — no real upgrade path produces it), the
+  // newer camelCase value wins (decided 2026-08-10)
+  if (
+    typeof legacySettings.FootnoteSectionHeading === "string" &&
+    typeof saved?.footnoteSectionHeading !== "string"
+  ) {
+    settings.footnoteSectionHeading = legacySettings.FootnoteSectionHeading;
+  }
+  delete legacySettings.FootnoteSectionHeading;
+
+  // migrate pre-0.2.0 section heading values: the old text input
+  // implied an H1, the textarea takes literal markdown
+  const heading = settings.footnoteSectionHeading;
+  if (heading && !/^(#{1,6} |---|\*\*\*|___)/.test(heading)) {
+    settings.footnoteSectionHeading = `# ${heading}`;
+  }
+
+  // drop the setting for the removed autosuggest feature (Obsidian now
+  // suggests footnotes natively)
+  delete legacySettings.enableAutoSuggest;
+
+  // the linting settings shipped under tidy* keys in beta.5/6: copy
+  // each saved tidy* value onto its lint* name and drop the old key,
+  // so beta testers keep their toggle choices. Spelled out per key
+  // (rather than a rename map) so each move is statically typed —
+  // withTidyKeys is the same object as `settings`, so writing here
+  // sets the real lint* setting
+  const withTidyKeys = settings as FootnotePluginSettings & {
+    tidyFixPunctuation?: boolean;
+    tidyMoveToBottom?: boolean;
+    tidyReindex?: boolean;
+    tidyOnSave?: boolean;
+    lintOnFileChange?: unknown;
+    tidyOnFileChange?: unknown;
+  };
+  if (withTidyKeys.tidyFixPunctuation !== undefined) {
+    withTidyKeys.lintFixPunctuation = withTidyKeys.tidyFixPunctuation;
+    delete withTidyKeys.tidyFixPunctuation;
+  }
+  if (withTidyKeys.tidyMoveToBottom !== undefined) {
+    withTidyKeys.lintMoveToBottom = withTidyKeys.tidyMoveToBottom;
+    delete withTidyKeys.tidyMoveToBottom;
+  }
+  if (withTidyKeys.tidyReindex !== undefined) {
+    withTidyKeys.lintReindex = withTidyKeys.tidyReindex;
+    delete withTidyKeys.tidyReindex;
+  }
+  if (withTidyKeys.tidyOnSave !== undefined) {
+    withTidyKeys.lintOnSave = withTidyKeys.tidyOnSave;
+    delete withTidyKeys.tidyOnSave;
+  }
+  // the lint-on-focused-file-change trigger was replaced by lint on
+  // footnote creation (2026-08-05) — its saved keys are dropped rather
+  // than carried over, since the semantics are different
+  delete withTidyKeys.lintOnFileChange;
+  delete withTidyKeys.tidyOnFileChange;
+}
+
+/** v2 (2026-08-10): the two orphan settings became symmetric delete toggles. keepOrphanedDefinitions (shipped in the betas) carries over with its polarity flipped; the short-lived lintOrphanedMarkers dropdown only existed in dev builds but maps just as cheaply. */
+function migrateSettingsToV2(settings: FootnotePluginSettings) {
+  const legacyOrphans = settings as FootnotePluginSettings & {
+    keepOrphanedDefinitions?: boolean;
+    lintOrphanedMarkers?: string;
+  };
+  if (typeof legacyOrphans.keepOrphanedDefinitions === "boolean") {
+    settings.lintDeleteOrphanedDefinitions =
+      !legacyOrphans.keepOrphanedDefinitions;
+    delete legacyOrphans.keepOrphanedDefinitions;
+  }
+  if (legacyOrphans.lintOrphanedMarkers !== undefined) {
+    settings.lintDeleteOrphanedReferences =
+      legacyOrphans.lintOrphanedMarkers === "delete";
+    delete legacyOrphans.lintOrphanedMarkers;
   }
 }

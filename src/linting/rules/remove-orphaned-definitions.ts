@@ -92,12 +92,13 @@ function scanReferences(
 
 /**
  * The blocks the reference graph can't keep alive: repeatedly kill every
- * definition whose (folded) name has zero remaining references, retiring the
- * dead block's own body references as it goes. Duplicate definitions of one
- * name share a fate. Terminates because every round kills at least one block.
+ * definition whose (folded) name has zero remaining references, retiring
+ * each removed orphan's own body references as it goes. Duplicate
+ * definitions of one name share a fate. Terminates because every round
+ * removes at least one block.
  */
-function deadBlocks(scan: ReferenceScan): DefinitionBlock[] {
-    const { blocks, liveRefs, blockRefs } = scan;
+function orphanedBlocks(referenceScan: ReferenceScan): DefinitionBlock[] {
+    const { blocks, liveRefs, blockRefs } = referenceScan;
     const refCount = new Map(liveRefs);
     for (const refs of blockRefs) {
         for (const name of refs) {
@@ -132,14 +133,14 @@ export function orphanedFootnoteDefinitionNames(markdown: string): string[] {
     // scan runs on every lint (perf F4)
     if (!markdown.includes("[^")) return [];
     const lines = normalizeEol(markdown).text.split("\n");
-    const scan = scanReferences(lines, scanDocument(lines));
-    const referenced = new Set(scan.liveRefs.keys());
-    for (const refs of scan.blockRefs) {
+    const referenceScan = scanReferences(lines, scanDocument(lines));
+    const referenced = new Set(referenceScan.liveRefs.keys());
+    for (const refs of referenceScan.blockRefs) {
         for (const name of refs) referenced.add(name);
     }
     const names: string[] = [];
     const seen = new Set<string>();
-    for (const block of scan.blocks) {
+    for (const block of referenceScan.blocks) {
         const folded = block.name.toLowerCase();
         if (referenced.has(folded) || seen.has(folded)) continue;
         seen.add(folded);
@@ -153,7 +154,7 @@ export function orphanedDefinitionBlocks(
     lines: string[],
     scan: DocumentScan,
 ): DefinitionBlock[] {
-    return deadBlocks(scanReferences(lines, scan));
+    return orphanedBlocks(scanReferences(lines, scan));
 }
 
 /** Every unreferenced definition block removed (transitively — see module note). Protected regions and everything referenced stay put. */
