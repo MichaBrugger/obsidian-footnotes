@@ -11,11 +11,10 @@ import {
     footnotePrefixProblem,
     jumpToFootnoteDefinition,
     readingViewActive,
-    runOutsideTableCell,
 } from "../insert-or-navigate-footnotes";
 import { maskProtectedLines, normalizeEol, restoreEol } from "../markdown-scan";
 import { AppWithCommands, AppWithPlugins, viewEditor, WindowWithVim } from "../obsidian-internals";
-import { activeTableCellEditor, nestedSubEditorOwnsFocus } from "../table-cursor";
+import { activeTableCellEditor, nestedSubEditorOwnsFocus, runOutsideTableCell } from "../table-cursor";
 import { applyFootnotePrefix } from "./rules/apply-footnote-prefix";
 import { footnoteAfterPunctuation } from "./rules/footnote-after-punctuation";
 import { moveFootnoteDefinitionsToBottom } from "./rules/move-footnotes-to-the-bottom";

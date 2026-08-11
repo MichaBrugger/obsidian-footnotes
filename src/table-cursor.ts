@@ -45,6 +45,42 @@ export function nestedSubEditorOwnsFocus(editor: Editor): boolean {
     );
 }
 
+// Fallback for the rare state where focus sits in a nested sub-editor whose
+// EditorView isn't reachable (activeTableCellEditor returned null): editing
+// the document while a sub-editor owns focus races its sync-back on blur —
+// the sub-editor rewrites its region from pre-edit state, which at best
+// swallows the inserted footnote and at worst displaces a table row's pipes
+// (regression reported 2026-07-14; same family as issue #28). Hand focus
+// back to the main editor and only edit once the sync-back has settled.
+// The primary table-cell path dispatches through the cell's own editor
+// instead — see createAutonumFootnote / createFootnoteReference.
+export function runOutsideTableCell(
+    doc: Editor,
+    run: (cursorPosition: EditorPosition) => void,
+) {
+    const cursorPosition = resolveTableCellCursor(doc) ?? doc.getCursor();
+    const cm = (doc as EditorWithCm).cm;
+    if (!cm || !nestedSubEditorOwnsFocus(doc)) {
+        run(cursorPosition);
+        return;
+    }
+    cm.focus();
+    // rAF stalls entirely while the window is hidden (same reason the popup
+    // teardown uses a timeout), which would swallow the command outright —
+    // whichever of the two fires first runs the edit. Timers come from the
+    // editor's OWN window, so a note popped out into a separate window
+    // isn't scheduled on the main one (E37)
+    const win = cm.contentDOM.ownerDocument.defaultView ?? window;
+    let ran = false;
+    const invoke = () => {
+        if (ran) return;
+        ran = true;
+        run(cursorPosition);
+    };
+    win.requestAnimationFrame(invoke);
+    win.setTimeout(invoke, 100);
+}
+
 /**
  * The EditorView of the actively edited table cell, or null when focus
  * isn't inside a table cell sub-editor.
