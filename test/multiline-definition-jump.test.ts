@@ -2,7 +2,10 @@ import { Editor, EditorPosition } from "obsidian";
 import { describe, expect, it } from "vitest";
 
 import FootnotePlugin from "../src/main";
-import { shouldJumpFromDefinitionToReference } from "../src/navigation";
+import {
+    jumpToFootnoteDefinition,
+    shouldJumpFromDefinitionToReference,
+} from "../src/navigation";
 
 // Bug (reported 2026-07-17, manual testing): jumping TO a multi-line definition
 // lands the caret on the LAST continuation line by design, but jumping BACK
@@ -100,5 +103,53 @@ describe("jumping back from a multi-line definition", () => {
             doc,
         );
         expect(handled).toBeFalsy();
+    });
+});
+
+// Bug #12 (2026-08-11 review, Kimi): jumping TO a definition hand-rolled a
+// weaker continuation walk than findDefinitionBlocks — it stopped at blank
+// lines and at protected region interiors, so the caret landed mid-
+// definition on blank-separated paragraphs and on definitions carrying an
+// indented math/comment region. The jump must land where the BLOCK ends.
+describe("jumping TO a definition lands at the block's real end", () => {
+    it("crosses a blank-separated second paragraph", () => {
+        const lines = [
+            "ref[^m] here",
+            "",
+            "[^m]: first paragraph",
+            "",
+            "    second paragraph",
+        ];
+        const { doc, cursorMoves } = fakeEditor(lines);
+        const handled = jumpToFootnoteDefinition(
+            "m",
+            { line: 0, ch: 5 },
+            fakePlugin,
+            doc,
+        );
+        expect(handled).toBe(true);
+        expect(cursorMoves).toEqual([
+            { line: 4, ch: "    second paragraph".length },
+        ]);
+    });
+
+    it("crosses an indented math region belonging to the definition", () => {
+        const lines = [
+            "ref[^m] here",
+            "",
+            "[^m]: formula",
+            "    $$",
+            "    E = mc^2",
+            "    $$",
+        ];
+        const { doc, cursorMoves } = fakeEditor(lines);
+        const handled = jumpToFootnoteDefinition(
+            "m",
+            { line: 0, ch: 5 },
+            fakePlugin,
+            doc,
+        );
+        expect(handled).toBe(true);
+        expect(cursorMoves).toEqual([{ line: 5, ch: "    $$".length }]);
     });
 });

@@ -22,8 +22,19 @@ export function footnotePrefix(markdownText: string): string {
         .split("\n")
         .map((line) => (line.endsWith("\r") ? line.slice(0, -1) : line));
     if (lines[0] !== "---") return "";
+    // Obsidian surfaces NO properties from an UNCLOSED "---" block
+    // (2026-08-11 review bug #11, ground-truthed via metadataCache) — a
+    // prefix in one would namespace footnotes from a setting the user
+    // cannot see, so the block must close before anything is honored
+    let close = -1;
     for (let i = 1; i < lines.length; i++) {
-        if (/^(---|\.\.\.)\s*$/.test(lines[i])) break;
+        if (/^(---|\.\.\.)\s*$/.test(lines[i])) {
+            close = i;
+            break;
+        }
+    }
+    if (close === -1) return "";
+    for (let i = 1; i < close; i++) {
         // YAML needs whitespace after the colon — "footnote-prefix:2." is a
         // plain scalar Obsidian doesn't show as a property, not a mapping
         // (bug-prefix-yaml-comment)

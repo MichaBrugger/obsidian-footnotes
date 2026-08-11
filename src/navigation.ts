@@ -124,17 +124,19 @@ export function jumpToFootnoteDefinition(
                 footnoteName.toLowerCase()
         ) {
             // land at the END of the definition (indented lines belong to
-            // it) so the user can backspace/type without arrow keys — but a
-            // PROTECTED indented line (e.g. inside a fence that follows the
-            // definition) is not a continuation, matching findDefinitionBlocks
-            let endLine = i;
-            while (
-                endLine < doc.lastLine() &&
-                !ctx.scan.isProtected[endLine + 1] &&
-                /^\s+\S/.test(lines[endLine + 1])
-            ) {
-                endLine++;
-            }
+            // it) so the user can backspace/type without arrow keys. The
+            // block's reach comes from findDefinitionBlocks itself — a
+            // hand-rolled walk here stopped at blank runs and at region
+            // interiors the block walk absorbs, landing the caret
+            // mid-definition (2026-08-11 review bug #12). A blockquoted
+            // label is never part of a column-0 block; its own line is the
+            // landing spot.
+            const block = findDefinitionBlocks(
+                lines,
+                ctx.scan.isProtected,
+                ctx.scan,
+            ).find((candidate) => candidate.start === i);
+            const endLine = block ? block.end : i;
             const newCursorPos = { line: endLine, ch: doc.getLine(endLine).length };
             moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos, plugin, undefined, true);
             return true;

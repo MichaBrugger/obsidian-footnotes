@@ -22,6 +22,7 @@ function fakeEditor(line: string, ch: number): FakeDoc {
         cursor: { line: 0, ch },
         getCursor: () => doc.cursor,
         getLine: () => line,
+        lineCount: () => 1,
         setCursor(pos: EditorPosition) {
             doc.cursor = pos;
         },

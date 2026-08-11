@@ -19,6 +19,18 @@ describe("footnotePrefix", () => {
         expect(footnotePrefix("---\ntitle: t\n---\nbody")).toBe("");
     });
 
+    // Bug #11 (2026-08-11 review, Kimi; ground-truthed via metadataCache):
+    // Obsidian surfaces NO properties from an unclosed "---" block, so a
+    // footnote-prefix in one must not namespace footnotes — the plugin was
+    // minting prefixed ids from a setting the user cannot see
+    it("ignores a footnote-prefix inside UNCLOSED frontmatter", () => {
+        expect(footnotePrefix("---\nfootnote-prefix: 2.\nbody")).toBe("");
+    });
+
+    it("ignores an unclosed block even when the property is its last line", () => {
+        expect(footnotePrefix("---\nfootnote-prefix: 2.")).toBe("");
+    });
+
     it("reads the prefix from frontmatter", () => {
         expect(footnotePrefix("---\nfootnote-prefix: 2.\n---\nbody")).toBe(
             "2.",

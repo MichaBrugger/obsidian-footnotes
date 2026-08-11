@@ -23,17 +23,20 @@ let activePopup: ActivePopup | null = null;
 // edit the document await this before touching anything.
 let pendingTeardown: Promise<void> | null = null;
 
-// One-shot callback fired after the NEXT popup teardown fully settles (its
+// One-shot callbacks fired after the NEXT popup teardown fully settles (its
 // definition save landed). "Lint on footnote creation" uses this: a footnote
 // created with the popup open must not be linted until the popup closes —
 // linting earlier could renumber the very id the popup is bound to.
-let afterSettleOnce: (() => void) | null = null;
+// A QUEUE, not a single slot: two registrations before a settle used to
+// silently drop the first (2026-08-11 review bug #14 — latent, since every
+// caller awaited the pending teardown first, but undefended).
+let afterSettleQueue: (() => void)[] = [];
 
-/** Register `callback` to run once after the next popup teardown settles. Returns a canceller (a no-op once the callback has fired or been replaced). */
+/** Register `callback` to run once after the next popup teardown settles. Returns a canceller (a no-op once the callback has fired). */
 export function runAfterNextPopupSettle(callback: () => void): () => void {
-    afterSettleOnce = callback;
+    afterSettleQueue.push(callback);
     return () => {
-        if (afterSettleOnce === callback) afterSettleOnce = null;
+        afterSettleQueue = afterSettleQueue.filter((c) => c !== callback);
     };
 }
 
@@ -103,7 +106,14 @@ export async function openFootnotePopup(
     dismissFootnotePopup();
 
     const mdView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
-    if (!mdView || !mdView.file) return;
+    if (!mdView || !mdView.file) {
+        // same degradation as a missing registry: without the fallback the
+        // caller's jump and its deferred creation lint would strand, and an
+        // armed after-settle callback would later fire against a stale path
+        // (2026-08-11 review bug #13)
+        onUnavailable?.();
+        return;
+    }
 
     // callers gate on popupEditingAvailable, but re-check so a registry
     // shape change degrades to the legacy jump instead of throwing
@@ -311,9 +321,10 @@ export async function openFootnotePopup(
         // block document edits until the typed definition has fully landed
         // (settleFootnotePopupWithFeedback) so the save can't clobber them
         let settle: () => void;
-        pendingTeardown = new Promise<void>((resolve) => {
+        const teardownPromise = new Promise<void>((resolve) => {
             settle = resolve;
         });
+        pendingTeardown = teardownPromise;
         void (async () => {
             // the embed saves edits on its own DEBOUNCE (1-2s); flush the
             // save NOW and await its exact completion — this wait gates the
@@ -345,13 +356,19 @@ export async function openFootnotePopup(
                 // the main view before anyone edits it (a timeout on
                 // purpose: rAF stalls entirely while the window is hidden)
                 win.setTimeout(() => {
-                    pendingTeardown = null;
+                    // clear the slot only if a LATER teardown hasn't
+                    // replaced it — nulling a successor's promise would
+                    // drop the busy gate while its save is still in flight
+                    // (2026-08-11 review bug #14)
+                    if (pendingTeardown === teardownPromise) {
+                        pendingTeardown = null;
+                    }
                     settle();
                     // after-settle work (lint-on-footnote-creation) runs
                     // only now, when the saved definition is fully reconciled
-                    const callback = afterSettleOnce;
-                    afterSettleOnce = null;
-                    callback?.();
+                    const callbacks = afterSettleQueue;
+                    afterSettleQueue = [];
+                    for (const callback of callbacks) callback();
                 }, 50);
             };
             teardown();

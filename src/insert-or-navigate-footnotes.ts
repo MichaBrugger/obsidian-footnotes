@@ -134,16 +134,24 @@ async function withEditableEditor(
  * commands additionally navigate from inside a real reference
  * (navigateReferenceIfInside) at their call sites — the autonum/named
  * commands run their own jump cascade instead.
+ *
+ * `cursorPosition` is the RESOLVED caret: the autonum/named commands call
+ * this inside runOutsideTableCell's callback, whose sub-editor fallback
+ * resolves the real position — the guards used to run before it with a
+ * stale getCursor() (2026-08-11 review bug #9).
  */
 function caretGuardsHandled(
     plugin: FootnotePlugin,
     doc: Editor,
     cell: TableCellEditor | null,
+    cursorPosition?: EditorPosition,
 ): boolean {
-    if (warnEmptyInlineFootnoteIfInside(doc, cell)) return true;
-    if (exitInlineFootnoteIfInside(doc, cell)) return true;
-    if (warnEmptyReferenceIfInside(doc, cell)) return true;
-    if (warnPrefilledReferenceIfInside(plugin, doc, cell)) return true;
+    if (warnEmptyInlineFootnoteIfInside(doc, cell, cursorPosition)) return true;
+    if (exitInlineFootnoteIfInside(doc, cell, cursorPosition)) return true;
+    if (warnEmptyReferenceIfInside(doc, cell, cursorPosition)) return true;
+    if (warnPrefilledReferenceIfInside(plugin, doc, cell, cursorPosition)) {
+        return true;
+    }
     return false;
 }
 
@@ -178,8 +186,10 @@ export async function insertAutonumFootnote(plugin: FootnotePlugin) {
         // stale there, and editing the row via the main editor corrupts the
         // table — reads use the resolved position, writes go through the cell
         const cell = activeTableCellEditor(doc);
-        if (caretGuardsHandled(plugin, doc, cell)) return;
         const run = (cursorPosition: EditorPosition) => {
+            // guards run INSIDE run(): the sub-editor fallback resolves the
+            // real caret first (2026-08-11 review bug #9)
+            if (caretGuardsHandled(plugin, doc, cell, cursorPosition)) return;
             const lineText = doc.getLine(cursorPosition.line);
             // ONE shared document view for the whole cascade (perf F1) — built
             // inside run() so the table-fallback path reads post-sync state
@@ -233,8 +243,11 @@ export function createAutonumFootnote(
     const footnoteId = `${prefix}${currentMax}`;
     const footnoteReference = `[^${footnoteId}]`;
 
-    const isFirstFootnote =
-        listExistingFootnoteDefinitions(doc, ctx).length === 0 && currentMax === 1;
+    // "first footnote" = first DEFINITION, matching the named command and
+    // move-to-bottom's fixed point — the old "&& currentMax === 1" skipped
+    // the section heading when the note's only artifact was an orphan
+    // reference (2026-08-11 review bug #8)
+    const isFirstFootnote = listExistingFootnoteDefinitions(doc, ctx).length === 0;
 
     if (cell) {
         // the reference goes through the cell's own editor (never the main
@@ -400,6 +413,13 @@ export async function pasteInlineFootnote(plugin: FootnotePlugin) {
             new Notice("Couldn't read the clipboard.");
             return;
         }
+        // re-check the view mode after the await: the user (or a script)
+        // can flip to Reading view while the clipboard prompt is up, and
+        // the editor API would then edit the hidden buffer (Kimi,
+        // 2026-08-11 review — same hazard the preamble guards against)
+        const viewAfterAwait =
+            plugin.app.workspace.getActiveViewOfType(MarkdownView);
+        if (!viewAfterAwait || readingViewActive(viewAfterAwait)) return;
         const content = sanitizeInlineFootnoteContent(raw);
         if (!content) {
             new Notice("The clipboard is empty, so there is nothing to put in an inline footnote.");
@@ -419,8 +439,9 @@ export async function insertNamedFootnote(plugin: FootnotePlugin) {
         // stale there, and editing the row via the main editor corrupts the
         // table — reads use the resolved position, writes go through the cell
         const cell = activeTableCellEditor(doc);
-        if (caretGuardsHandled(plugin, doc, cell)) return;
         const run = (cursorPosition: EditorPosition) => {
+            // guards run INSIDE run() — same rationale as the autonum command
+            if (caretGuardsHandled(plugin, doc, cell, cursorPosition)) return;
             const lineText = doc.getLine(cursorPosition.line);
             // ONE shared document view for the whole cascade (perf F1)
             const ctx = docContext(doc);
@@ -543,20 +564,23 @@ export function warnPrefilledReferenceIfInside(
     plugin: FootnotePlugin,
     doc: Editor,
     cell: TableCellEditor | null,
+    cursorPosition?: EditorPosition,
 ): boolean {
     if (!plugin.settings.enableFootnotePrefix) return false;
     // cheap gate before any document work: no "[^" near the caret means no
     // placeholder to warn about, and this guard runs on EVERY command press
     const rawText = cell
         ? cell.state.doc.toString()
-        : doc.getLine(doc.getCursor().line);
+        : doc.getLine((cursorPosition ?? doc.getCursor()).line);
     if (!rawText.includes("[^")) return false;
     const prefix = footnotePrefixFromEditor(doc);
     // silent validity check — the invalid-prefix Notice belongs to the
     // insert path, not to every caret movement guard
     if (!prefix || footnotePrefixProblem(prefix) !== null) return false;
     const placeholder = `[^${prefix}]`;
-    if (!caretInsidePlaceholder(doc, cell, placeholder)) return false;
+    if (!caretInsidePlaceholder(doc, cell, placeholder, cursorPosition)) {
+        return false;
+    }
     new Notice("Please add a footnote suffix after the prefix.");
     return true;
 }
@@ -573,6 +597,7 @@ function caretInsidePlaceholder(
     doc: Editor,
     cell: TableCellEditor | null,
     placeholder: string,
+    cursorPosition?: EditorPosition,
 ): boolean {
     if (cell) {
         const head = cell.state.selection.main.head;
@@ -581,14 +606,13 @@ function caretInsidePlaceholder(
         // cell text is a single line, so line-local masking suffices
         return emptyReferenceStart(maskInlineRegions(cellText), head, placeholder) !== null;
     }
-    const cursorPosition = doc.getCursor();
-    const lineText = doc.getLine(cursorPosition.line);
-    if (emptyReferenceStart(lineText, cursorPosition.ch, placeholder) === null) {
+    const pos = cursorPosition ?? doc.getCursor();
+    const lineText = doc.getLine(pos.line);
+    if (emptyReferenceStart(lineText, pos.ch, placeholder) === null) {
         return false;
     }
-    const maskedLine =
-        maskedLineAt(docLines(doc), cursorPosition.line);
-    return emptyReferenceStart(maskedLine, cursorPosition.ch, placeholder) !== null;
+    const maskedLine = maskedLineAt(docLines(doc), pos.line);
+    return emptyReferenceStart(maskedLine, pos.ch, placeholder) !== null;
 }
 
 /**
@@ -604,8 +628,9 @@ function caretInsidePlaceholder(
 function warnEmptyReferenceIfInside(
     doc: Editor,
     cell: TableCellEditor | null,
+    cursorPosition?: EditorPosition,
 ): boolean {
-    if (!caretInsidePlaceholder(doc, cell, "[^]")) return false;
+    if (!caretInsidePlaceholder(doc, cell, "[^]", cursorPosition)) return false;
     new Notice(
         "This footnote reference is empty. Type a name between the brackets.",
         8000,
@@ -657,11 +682,15 @@ export function createFootnoteReference(
         return true;
     }
 
+    // DOCUMENT-aware masking, exactly like the warnEmptyReferenceIfInside
+    // guard: line-local masking can't see a surrounding fence, so guard and
+    // hop disagreed there and the caret hopped inside protected text
+    // (2026-08-11 review bug #6)
     const inEmpty = emptyReferenceStart(lineText, cursorPosition.ch);
     if (
         inEmpty !== null &&
         emptyReferenceStart(
-            maskInlineRegions(lineText),
+            maskedLineAt(docLines(doc), cursorPosition.line),
             cursorPosition.ch,
         ) !== null
     ) {

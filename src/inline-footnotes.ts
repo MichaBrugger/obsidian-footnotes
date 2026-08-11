@@ -1,5 +1,7 @@
-import { Editor, Notice } from "obsidian";
+import { Editor, EditorPosition, Notice } from "obsidian";
 
+import { docLines } from "./doc-context";
+import { maskInlineRegions, maskedLineAt } from "./markdown-scan";
 import { TableCellEditor } from "./table-cursor";
 
 // Inline footnotes ("^[...]"): content sanitizing, the escape-aware span
@@ -110,19 +112,49 @@ export function inlineFootnoteExitCh(lineText: string, ch: number): number | nul
 export function warnEmptyInlineFootnoteIfInside(
     doc: Editor,
     cell: TableCellEditor | null,
+    // the table sub-editor fallback resolves the real caret before running
+    // the command; guards must honor that position instead of re-reading a
+    // possibly-stale getCursor() (2026-08-11 review bug #9)
+    cursorPosition?: EditorPosition,
 ): boolean {
-    const text = cell
-        ? cell.state.doc.toString()
-        : doc.getLine(doc.getCursor().line);
-    const ch = cell ? cell.state.selection.main.head : doc.getCursor().ch;
-    const span = inlineFootnoteSpanAt(text, ch);
+    const span = maskedInlineFootnoteSpan(doc, cell, cursorPosition);
     if (span === null) return false;
-    if (text.slice(span.open + 2, span.close).trim() !== "") return false;
+    if (span.text.slice(span.open + 2, span.close).trim() !== "") return false;
     new Notice(
         "This inline footnote is empty. Type its text between the brackets.",
         8000,
     );
     return true;
+}
+
+/**
+ * The inline-footnote span at the caret, resolved against MASKED text: a
+ * "^[…]"-shaped fragment inside a fence, inline code, or a comment is
+ * plain text, and treating it as an inline footnote made every command
+ * inert there with a wrong toast (2026-08-11 review bug #7). A cheap raw
+ * scan gates the whole-document masking off the every-press hot path —
+ * masked indices match raw indices, so the span positions stay valid.
+ */
+function maskedInlineFootnoteSpan(
+    doc: Editor,
+    cell: TableCellEditor | null,
+    cursorPosition?: EditorPosition,
+): { text: string; open: number; close: number } | null {
+    if (cell) {
+        const raw = cell.state.doc.toString();
+        const ch = cell.state.selection.main.head;
+        if (inlineFootnoteSpanAt(raw, ch) === null) return null;
+        // cell text is a single line, so line-local masking suffices
+        const masked = maskInlineRegions(raw);
+        const span = inlineFootnoteSpanAt(masked, ch);
+        return span === null ? null : { text: masked, ...span };
+    }
+    const pos = cursorPosition ?? doc.getCursor();
+    const raw = doc.getLine(pos.line);
+    if (inlineFootnoteSpanAt(raw, pos.ch) === null) return null;
+    const masked = maskedLineAt(docLines(doc), pos.line);
+    const span = inlineFootnoteSpanAt(masked, pos.ch);
+    return span === null ? null : { text: masked, ...span };
 }
 
 /**
@@ -135,22 +167,16 @@ export function warnEmptyInlineFootnoteIfInside(
 export function exitInlineFootnoteIfInside(
     doc: Editor,
     cell: TableCellEditor | null,
+    cursorPosition?: EditorPosition,
 ): boolean {
+    const span = maskedInlineFootnoteSpan(doc, cell, cursorPosition);
+    if (span === null) return false;
+    const exit = span.close + 1;
     if (cell) {
-        const exit = inlineFootnoteExitCh(
-            cell.state.doc.toString(),
-            cell.state.selection.main.head,
-        );
-        if (exit === null) return false;
         cell.dispatch({ selection: { anchor: exit } });
         return true;
     }
-    const cursorPosition = doc.getCursor();
-    const exit = inlineFootnoteExitCh(
-        doc.getLine(cursorPosition.line),
-        cursorPosition.ch,
-    );
-    if (exit === null) return false;
-    doc.setCursor({ line: cursorPosition.line, ch: exit });
+    const pos = cursorPosition ?? doc.getCursor();
+    doc.setCursor({ line: pos.line, ch: exit });
     return true;
 }

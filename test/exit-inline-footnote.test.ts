@@ -12,6 +12,7 @@ function fakeEditor(line: string, ch: number) {
     const moves: EditorPosition[] = [];
     const doc = {
         getLine: () => line,
+        lineCount: () => 1,
         getCursor: () => ({ line: 0, ch }),
         setCursor: (pos: EditorPosition) => moves.push(pos),
     } as unknown as Editor;
