@@ -97,6 +97,13 @@ const specialBlockArb = fc.constantFrom(
     "    indented code[^73]",
     "> quoted[^42]\n> [^42]: a quoted definition",
     "---",
+    // shapes from the 2026-08-10 Sol-bug batch: loose-list continuations,
+    // double-digit list fences, quoted unclosed math, heading + indent
+    "- item\n\n    continuation[^42]",
+    "10. ```\n    fenced[^74]\n    ```",
+    "> $$\n> quoted math[^75]",
+    "# Heading\n    code-shaped[^76]",
+    "[^note]: formula\n    $$\n    E = mc^2\n    $$",
 );
 
 const blockArb = fc.oneof(
@@ -150,6 +157,21 @@ const keepingOptionsArb: fc.Arbitrary<LintOptions> = optionsArb.map(
     (options) => ({
         ...options,
         removeOrphanedReferences: false,
+        removeOrphanedDefinitions: false,
+        reindexOptions: {
+            ...options.reindexOptions,
+            keepOrphanedDefinitions: true,
+        },
+    }),
+);
+
+// options with only DEFINITION deletion off — since definition blocks span
+// regions their continuations open (Sol bug #3 fix), deleting an orphaned
+// definition legitimately deletes its embedded protected math/comment
+// lines; reference deletion never touches protected lines, so it stays on
+const definitionKeepingOptionsArb: fc.Arbitrary<LintOptions> = optionsArb.map(
+    (options) => ({
+        ...options,
         removeOrphanedDefinitions: false,
         reindexOptions: {
             ...options.reindexOptions,
@@ -268,7 +290,7 @@ describe("lint invariants over random documents", () => {
 
     soakIt("protected line contents survive lint as a multiset", () => {
         fc.assert(
-            fc.property(docArb, optionsArb, (doc, options) => {
+            fc.property(docArb, definitionKeepingOptionsArb, (doc, options) => {
                 const out = lintFootnotes(doc, options);
                 const linesIn = normalizeEol(doc).text.split("\n");
                 const protectedIn = protectedLines(linesIn);

@@ -360,16 +360,35 @@ export function scanDocument(lines: string[]): DocumentScan {
         }
     }
 
-    let fence: { char: string; length: number; depth: number } | null = null;
+    // contentIndent: the column the fence's CONTAINER content starts at —
+    // 0 for a document-level fence, the list item's content column when
+    // the opener rode a list-marker line ("10. ```"). A closer may be
+    // indented up to contentIndent + 3 (Sol bug #1: the old absolute
+    // {0,3} test let "    ```" never close a "10. ```" fence, which then
+    // swallowed the rest of the note).
+    let fence: {
+        char: string;
+        length: number;
+        depth: number;
+        contentIndent: number;
+    } | null = null;
+    // comment/math regions live in the CONTAINER that opened them, like
+    // fences (Sol bug #4, verified against metadataCache): regionDepth is
+    // the blockquote depth at the opener — a line whose depth drops below
+    // it ends the quote and the region with it
     let inComment = false;
     let inMath = false;
-    // indented-code state (C21): `prevBlank` marks a block boundary (doc
-    // start included), `inDefinition` mirrors findDefinitionBlocks' reach —
-    // a "[^x]:" line plus its indented continuations and the blank runs
-    // between them — and `inIndentedCode` is an open indented chunk.
+    let regionDepth = 0;
+    // indented-code state (C21): `blockBoundary` marks a place indented
+    // code may OPEN — doc start, blank lines, and (Sol bug #5: lazy
+    // continuation is paragraph-only) right after an ATX heading, a
+    // closed fence, a bare region closer, or a thematic break.
+    // `inDefinition` mirrors findDefinitionBlocks' reach — a "[^x]:" line
+    // plus its indented continuations and the blank runs between them —
+    // and `inIndentedCode` is an open indented chunk.
     let inIndentedCode = false;
     let inDefinition = false;
-    let prevBlank = true;
+    let blockBoundary = true;
     // open list items' CONTENT indents, innermost last (Sol bug #2,
     // 2026-08-10, verified against metadataCache): a loose list's indented
     // continuation ("- a", blank, "    details") is LIVE list content —
@@ -378,13 +397,24 @@ export function scanDocument(lines: string[]): DocumentScan {
     // quoted lists ride their quote's existing rules.
     const listStack: number[] = [];
     for (; i < src.length; i++) {
+        // the blockquote nesting where this line's container constructs
+        // count — fences and comment/math regions live in the container
+        // that opened them
+        const { depth, rest } = blockquoteDepth(src[i]);
+        if ((inComment || inMath) && depth < regionDepth) {
+            // the region's blockquote ended, taking it along (a blank or
+            // shallower line ends the quote) — this line is normal text
+            // and gets the full treatment below
+            inComment = false;
+            inMath = false;
+        }
         if (inComment) {
             startsInComment[i] = true;
             inIndentedCode = false;
             // inDefinition survives: a region OPENED by an indented
             // continuation ("    <!--") is definition content, and the
             // definition resumes after its closer (Sol bug #3)
-            prevBlank = false;
+            blockBoundary = false;
             if (!src[i].includes("-->")) {
                 isProtected[i] = true; // interior: nothing live on it
                 continue;
@@ -395,13 +425,25 @@ export function scanDocument(lines: string[]): DocumentScan {
             const closed = maskLineRegions(src[i], true);
             inComment = closed.endsInComment;
             inMath = closed.endsInMath;
+            // the closer's live suffix can open a NEW region — at this
+            // line's own container depth
+            if (inComment || inMath) regionDepth = depth;
+            // a bare closer (no live suffix) ends a BLOCK — an indented
+            // chunk may open right below (Sol bug #5)
+            if (
+                !inComment &&
+                !inMath &&
+                closed.masked.replace(/\0/g, " ").trim() === ""
+            ) {
+                blockBoundary = true;
+            }
             continue;
         }
         if (inMath) {
             startsInMath[i] = true;
             inIndentedCode = false;
             // inDefinition survives — same rationale as the comment branch
-            prevBlank = false;
+            blockBoundary = false;
             if (!src[i].includes("$$")) {
                 isProtected[i] = true; // interior: nothing live on it
                 continue;
@@ -409,11 +451,20 @@ export function scanDocument(lines: string[]): DocumentScan {
             const closed = maskLineRegions(src[i], false, true);
             inMath = closed.endsInMath;
             inComment = closed.endsInComment;
+            // same as the comment branch: a reopened region lives at this
+            // line's own container depth
+            if (inComment || inMath) regionDepth = depth;
+            // a bare closer ends a block, same as the comment branch
+            if (
+                !inComment &&
+                !inMath &&
+                closed.masked.replace(/\0/g, " ").trim() === ""
+            ) {
+                blockBoundary = true;
+            }
             continue;
         }
-        // a fence lives in the CONTAINER that opened it (CommonMark):
-        // depth is the blockquote nesting where the delimiters count
-        const { depth, rest } = blockquoteDepth(src[i]);
+        // a fence lives in the CONTAINER that opened it (CommonMark)
         if (fence && depth < fence.depth) {
             // the fence's blockquote ended, taking the fence with it
             // (bug-blockquote-fence-outlives-quote) — this line is normal
@@ -424,20 +475,30 @@ export function scanDocument(lines: string[]): DocumentScan {
         if (fence) {
             inIndentedCode = false;
             inDefinition = false;
-            prevBlank = false;
+            blockBoundary = false;
             isProtected[i] = true;
             // a closer counts only at the fence's own depth: "> ```" can't
             // close a document-level fence (it is code content there —
             // bug-blockquote-closes-bare-fence), and a doc-level "```"
             // can't close a blockquoted one (handled above by ending it)
             if (depth === fence.depth) {
-                const close = rest.match(/^ {0,3}(`{3,}|~{3,})\s*$/);
+                // closer indent is measured against the fence's container:
+                // up to contentIndent + 3 leading spaces
+                let lead = 0;
+                while (lead < rest.length && rest[lead] === " ") lead++;
+                const close =
+                    lead <= fence.contentIndent + 3
+                        ? rest.slice(lead).match(/^(`{3,}|~{3,})\s*$/)
+                        : null;
                 if (
                     close &&
                     close[1][0] === fence.char &&
                     close[1].length >= fence.length
                 ) {
                     fence = null;
+                    // a closed fence ends its block — an indented chunk
+                    // may open on the very next line (Sol bug #5)
+                    blockBoundary = true;
                 }
             }
             continue;
@@ -448,14 +509,14 @@ export function scanDocument(lines: string[]): DocumentScan {
             // definition (blank runs can lead to more continuation —
             // findDefinitionBlocks) nor an indented chunk (code blocks
             // continue across blanks when more indented lines follow)
-            prevBlank = true;
+            blockBoundary = true;
             continue; // nothing on a blank line can open a fence or comment
         }
         const indentWidth = leadingIndentWidth(src[i]);
         // a non-blank line at a block boundary closes every list item it
         // is not indented into (lazy continuations, which have no blank
         // above them, keep their item open)
-        if (prevBlank) {
+        if (blockBoundary) {
             while (
                 listStack.length > 0 &&
                 indentWidth < listStack[listStack.length - 1]
@@ -468,22 +529,24 @@ export function scanDocument(lines: string[]): DocumentScan {
         const indented = indentWidth >= codeIndent;
         if (indented && inIndentedCode) {
             isProtected[i] = true;
-            prevBlank = false;
+            blockBoundary = false;
             continue;
         }
-        if (indented && !inDefinition && prevBlank) {
+        if (indented && !inDefinition && blockBoundary) {
             // a chunk indented past the code threshold, opening at a block
             // boundary outside any definition, is CommonMark indented code
             // — inert to Obsidian, so the transforms must not count or
             // rewrite it
             inIndentedCode = true;
             isProtected[i] = true;
-            prevBlank = false;
+            blockBoundary = false;
             continue;
         }
         // a code-indented line here is a definition continuation or a lazy
         // paragraph continuation — live markdown, and it keeps an open
         // definition open; a shallower line re-decides both states
+        const thematicBreak =
+            depth === 0 && /^ {0,3}([-*_])( *\1){2,} *$/.test(rest);
         if (!indented) {
             inIndentedCode = false;
             // lines indented ≥ 4 continue an open definition even inside a
@@ -493,8 +556,9 @@ export function scanDocument(lines: string[]): DocumentScan {
             }
             // a list-item marker OPENS a container: its content indent is
             // the marker column + marker width + the following gap (a gap
-            // of 5+, or none, counts as 1 per CommonMark)
-            if (depth === 0) {
+            // of 5+, or none, counts as 1 per CommonMark). A thematic
+            // break ("- - -") is not a list item.
+            if (depth === 0 && !thematicBreak) {
                 const item = src[i].match(/^( *)([-+*]|\d{1,9}[.)])( +|$)/);
                 if (item) {
                     while (
@@ -511,14 +575,19 @@ export function scanDocument(lines: string[]): DocumentScan {
                 }
             }
         }
-        prevBlank = false;
+        // lazy continuation is paragraph-only: an ATX heading or thematic
+        // break ends its block outright, so an indented chunk may open on
+        // the very next line (Sol bug #5)
+        blockBoundary =
+            thematicBreak ||
+            (depth === 0 && /^ {0,3}#{1,6}(?: |$)/.test(rest));
 
         // a fence can also open on a LIST ITEM line ("- ```", "1. ~~~") —
         // the list marker is a container prefix like the blockquote one;
         // its closer arrives indented into the item, which the {0,3}
         // closer pattern already accepts (bug-list-item-fence)
         let fenceLine = rest;
-        let open = fenceLine.match(/^ {0,3}(`{3,}|~{3,})/);
+        let open = fenceLine.match(/^( {0,3})(`{3,}|~{3,})/);
         if (!open) {
             const afterListMarker = rest.replace(
                 /^ {0,3}(?:[-+*]|\d{1,9}[.)]) +/,
@@ -526,11 +595,18 @@ export function scanDocument(lines: string[]): DocumentScan {
             );
             if (afterListMarker !== rest) {
                 fenceLine = afterListMarker;
-                open = fenceLine.match(/^ {0,3}(`{3,}|~{3,})/);
+                open = fenceLine.match(/^( {0,3})(`{3,}|~{3,})/);
             }
         }
-        if (open && isFenceOpener(fenceLine, open[1])) {
-            fence = { char: open[1][0], length: open[1].length, depth };
+        if (open && isFenceOpener(fenceLine, open[2])) {
+            fence = {
+                char: open[2][0],
+                length: open[2].length,
+                depth,
+                // the stripped list marker plus the opener's own indent IS
+                // the container content column the closer aligns to
+                contentIndent: rest.length - fenceLine.length + open[1].length,
+            };
             isProtected[i] = true;
             continue;
         }
@@ -543,14 +619,18 @@ export function scanDocument(lines: string[]): DocumentScan {
             const opened = maskLineRegions(src[i], false, false);
             inComment = opened.endsInComment;
             inMath = opened.endsInMath;
+            if (inComment || inMath) regionDepth = depth;
         }
     }
     return {
         isProtected,
         startsInComment,
         startsInMath,
+        // a quoted unclosed region can't reach an EOF append — the
+        // appended line ends its quote, same as a blockquoted fence
         endsProtected:
-            inComment || inMath || (fence !== null && fence.depth === 0),
+            ((inComment || inMath) && regionDepth === 0) ||
+            (fence !== null && fence.depth === 0),
     };
 }
 
