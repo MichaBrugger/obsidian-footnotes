@@ -56,7 +56,7 @@ describe("footnote hotkey on an orphaned definition", () => {
         const cursor = { line: 2, ch: lines[2].length };
         const doc = fakeEditor(lines, cursor);
         expect(
-            shouldJumpFromDefinitionToReference(lines[2], cursor, doc, fakePlugin()),
+            shouldJumpFromDefinitionToReference(lines[2], cursor, fakePlugin(), doc),
         ).toBe(true);
         expect(doc.appliedChanges).toEqual([]);
         expect(doc.cursor).toEqual(cursor);
@@ -67,7 +67,7 @@ describe("footnote hotkey on an orphaned definition", () => {
         const cursor = { line: 3, ch: 4 };
         const doc = fakeEditor(lines, cursor);
         expect(
-            shouldJumpFromDefinitionToReference(lines[3], cursor, doc, fakePlugin()),
+            shouldJumpFromDefinitionToReference(lines[3], cursor, fakePlugin(), doc),
         ).toBe(true);
         expect(doc.appliedChanges).toEqual([]);
         expect(doc.cursor).toEqual(cursor);
@@ -78,7 +78,7 @@ describe("footnote hotkey on an orphaned definition", () => {
         const cursor = { line: 2, ch: lines[2].length };
         const doc = fakeEditor(lines, cursor);
         expect(
-            shouldJumpFromDefinitionToReference(lines[2], cursor, doc, fakePlugin()),
+            shouldJumpFromDefinitionToReference(lines[2], cursor, fakePlugin(), doc),
         ).toBe(true);
         expect(doc.cursor).toEqual({ line: 0, ch: "ref[^1]".length });
     });
@@ -88,7 +88,7 @@ describe("footnote hotkey on an orphaned definition", () => {
         const cursor = { line: 1, ch: 5 };
         const doc = fakeEditor(lines, cursor);
         expect(
-            shouldJumpFromDefinitionToReference(lines[1], cursor, doc, fakePlugin()),
+            shouldJumpFromDefinitionToReference(lines[1], cursor, fakePlugin(), doc),
         ).toBe(false);
     });
 });

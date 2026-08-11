@@ -2,7 +2,7 @@ import { Editor, EditorChange, EditorPosition } from "obsidian";
 import { describe, expect, it } from "vitest";
 
 import FootnotePlugin from "../../src/main";
-import { shouldCreateMatchingFootnoteDefinition } from "../../src/insert-or-navigate-footnotes";
+import { createMatchingFootnoteDefinition } from "../../src/insert-or-navigate-footnotes";
 import { reindexFootnotes } from "../../src/linting/rules/re-index-footnotes";
 
 // BUG: Obsidian footnote labels are case-insensitive — "[^Note]" and "[^note]:"
@@ -83,7 +83,7 @@ describe("bug: footnote ids compared case-sensitively", () => {
         ]);
         // caret inside the [^Note] reference; a definition for this footnote exists
         // (case-insensitively), so this press should navigate, not create
-        shouldCreateMatchingFootnoteDefinition(
+        createMatchingFootnoteDefinition(
             "Alpha[^Note].",
             { line: 0, ch: 8 },
             fakePlugin(),

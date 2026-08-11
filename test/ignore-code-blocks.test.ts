@@ -86,8 +86,8 @@ describe("shouldJumpFromReferenceToDefinition ignores code", () => {
         const handled = shouldJumpFromReferenceToDefinition(
             "fake[^1]",
             { line: 1, ch: 6 },
-            doc,
             fakePlugin,
+            doc,
         );
         expect(handled).toBeFalsy();
     });
@@ -97,8 +97,8 @@ describe("shouldJumpFromReferenceToDefinition ignores code", () => {
         const handled = shouldJumpFromReferenceToDefinition(
             "see `x[^1]` here",
             { line: 0, ch: 8 },
-            doc,
             fakePlugin,
+            doc,
         );
         expect(handled).toBeFalsy();
     });
@@ -112,8 +112,8 @@ describe("shouldJumpFromReferenceToDefinition ignores code", () => {
         const handled = shouldJumpFromReferenceToDefinition(
             "`[^1]` real[^1]",
             { line: 0, ch: 13 },
-            doc,
             fakePlugin,
+            doc,
         );
         expect(handled).toBe(true);
         expect(cursorMoves).toEqual([{ line: 2, ch: "[^1]: definition".length }]);
@@ -126,8 +126,8 @@ describe("shouldJumpFromDefinitionToReference ignores code", () => {
         const handled = shouldJumpFromDefinitionToReference(
             "[^1]: fake",
             { line: 1, ch: 3 },
-            doc,
             fakePlugin,
+            doc,
         );
         expect(handled).toBeFalsy();
     });
@@ -143,8 +143,8 @@ describe("shouldJumpFromDefinitionToReference ignores code", () => {
         const handled = shouldJumpFromDefinitionToReference(
             "[^1]: definition",
             { line: 4, ch: 3 },
-            doc,
             fakePlugin,
+            doc,
         );
         expect(handled).toBe(true);
         // the first REAL occurrence is on line 3 — not the fenced line 1

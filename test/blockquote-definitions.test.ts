@@ -47,8 +47,8 @@ describe("definitions inside blockquotes/callouts (C22)", () => {
         const handled = shouldJumpFromReferenceToDefinition(
             CALLOUT[1],
             { line: 1, ch: 8 }, // inside [^1]
-            doc,
             fakePlugin,
+            doc,
         );
         expect(handled).toBe(true);
         expect(cursorMoves).toEqual([{ line: 2, ch: CALLOUT[2].length }]);
@@ -59,8 +59,8 @@ describe("definitions inside blockquotes/callouts (C22)", () => {
         const handled = shouldJumpFromDefinitionToReference(
             CALLOUT[2],
             { line: 2, ch: 5 },
-            doc,
             fakePlugin,
+            doc,
         );
         expect(handled).toBe(true);
         // "> body[^1]" — the reference ends at ch 10
@@ -73,8 +73,8 @@ describe("definitions inside blockquotes/callouts (C22)", () => {
         const handled = shouldJumpFromDefinitionToReference(
             lines[0],
             { line: 0, ch: 4 },
-            doc,
             fakePlugin,
+            doc,
         );
         expect(handled).toBe(true); // the Notice path — press consumed
         expect(cursorMoves).toEqual([]);

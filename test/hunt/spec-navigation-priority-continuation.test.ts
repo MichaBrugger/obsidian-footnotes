@@ -69,7 +69,7 @@ describe("decided: the definition-block jump owns presses inside a continuation 
             "[^b]: second",
         ];
         const doc = fakeEditor(lines, { line: 3, ch: 17 }); // inside [^b]
-        const handled = shouldJumpFromDefinitionToReference(lines[3], doc.cursor, doc, fakePlugin());
+        const handled = shouldJumpFromDefinitionToReference(lines[3], doc.cursor, fakePlugin(), doc);
         expect(handled).toBe(true);
         // [^a]'s first reference ends at ch 8 on line 0
         expect(doc.cursor).toEqual({ line: 0, ch: 8 });

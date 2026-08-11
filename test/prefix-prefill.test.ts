@@ -3,9 +3,9 @@ import { describe, expect, it } from "vitest";
 
 import FootnotePlugin from "../src/main";
 import {
-    shouldCreateAutonumFootnote,
-    shouldCreateFootnoteReference,
-    shouldCreateMatchingFootnoteDefinition,
+    createAutonumFootnote,
+    createFootnoteReference,
+    createMatchingFootnoteDefinition,
     warnPrefilledReferenceIfInside,
 } from "../src/insert-or-navigate-footnotes";
 // the stub Notice records into noticeCalls — vi.mock("obsidian") does not
@@ -71,11 +71,11 @@ describe("named command prefills the footnote-prefix into the new reference", ()
             line: 3,
             ch: 11,
         });
-        shouldCreateFootnoteReference(
+        createFootnoteReference(
             "Alpha bravo",
             { line: 3, ch: 11 },
-            doc,
             fakePlugin(true),
+            doc,
         );
         expect(doc.appliedChanges).toEqual([
             { from: { line: 3, ch: 11 }, text: "[^7-]" },
@@ -89,11 +89,11 @@ describe("named command prefills the footnote-prefix into the new reference", ()
             line: 3,
             ch: 11,
         });
-        shouldCreateFootnoteReference(
+        createFootnoteReference(
             "Alpha bravo",
             { line: 3, ch: 11 },
-            doc,
             fakePlugin(false),
+            doc,
         );
         expect(doc.appliedChanges).toEqual([
             { from: { line: 3, ch: 11 }, text: "[^]" },
@@ -109,11 +109,11 @@ describe("named command prefills the footnote-prefix into the new reference", ()
             ch: 5,
         });
         noticeCalls.length = 0;
-        shouldCreateFootnoteReference(
+        createFootnoteReference(
             "Alpha",
             { line: 3, ch: 5 },
-            doc,
             fakePlugin(true),
+            doc,
         );
         expect(doc.appliedChanges).toEqual([]);
         expect(doc.cursor).toEqual({ line: 3, ch: 5 });
@@ -130,7 +130,7 @@ describe("named command prefills the footnote-prefix into the new reference", ()
             ch: 5,
         });
         noticeCalls.length = 0;
-        shouldCreateAutonumFootnote(
+        createAutonumFootnote(
             "Alpha",
             { line: 3, ch: 5 },
             fakePlugin(true),
@@ -148,11 +148,11 @@ describe("named command prefills the footnote-prefix into the new reference", ()
             line: 3,
             ch: 5,
         });
-        shouldCreateFootnoteReference(
+        createFootnoteReference(
             "Alpha",
             { line: 3, ch: 5 },
-            doc,
             fakePlugin(false),
+            doc,
         );
         expect(doc.appliedChanges).toEqual([
             { from: { line: 3, ch: 5 }, text: "[^]" },
@@ -218,7 +218,7 @@ describe("definition creation no longer applies the prefix", () => {
             ch: 9,
         });
         expect(
-            shouldCreateMatchingFootnoteDefinition(
+            createMatchingFootnoteDefinition(
                 "Alpha [^tag] b",
                 { line: 3, ch: 9 },
                 fakePlugin(true),

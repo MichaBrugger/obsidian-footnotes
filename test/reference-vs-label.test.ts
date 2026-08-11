@@ -33,14 +33,14 @@ describe("navigation twin — blockquoted duplicate label as phantom jump target
         // to itself") — a definition label is not a reference.
         const lines = ["[^1]: first", "> [^1]: second"];
         const { doc, cursorMoves } = fakeEditor(lines);
-        shouldJumpFromDefinitionToReference(lines[0], { line: 0, ch: 2 }, doc, fakePlugin);
+        shouldJumpFromDefinitionToReference(lines[0], { line: 0, ch: 2 }, fakePlugin, doc);
         expect(cursorMoves).toEqual([]);
     });
 
     it("control: column-0 duplicates correctly report (labels excluded at column 0)", () => {
         const lines = ["[^1]: first", "[^1]: second"];
         const { doc, cursorMoves } = fakeEditor(lines);
-        shouldJumpFromDefinitionToReference(lines[0], { line: 0, ch: 2 }, doc, fakePlugin);
+        shouldJumpFromDefinitionToReference(lines[0], { line: 0, ch: 2 }, fakePlugin, doc);
         expect(cursorMoves).toEqual([]);
     });
 });

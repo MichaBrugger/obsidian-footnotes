@@ -540,7 +540,7 @@ export function lintAfterFootnoteCreation(
     if (relandCursor) {
         const target = uniqueEmptyDefinitionName(doc);
         if (target !== null) {
-            jumpToFootnoteDefinition(target, doc.getCursor(), doc, plugin);
+            jumpToFootnoteDefinition(target, doc.getCursor(), plugin, doc);
         }
     }
 }

@@ -56,8 +56,8 @@ describe("footnote names containing ':' (issue #50)", () => {
         const handled = shouldJumpFromReferenceToDefinition(
             line,
             { line: 3, ch },
-            doc,
             fakePlugin,
+            doc,
         );
         expect(handled).toBe(true);
         // lands at the end of "[^arXiv:1234.5678]: Content 2"
@@ -69,8 +69,8 @@ describe("footnote names containing ':' (issue #50)", () => {
         const handled = shouldJumpFromDefinitionToReference(
             REPORT[6],
             { line: 6, ch: 5 },
-            doc,
             fakePlugin,
+            doc,
         );
         expect(handled).toBe(true);
         const referenceStart = REPORT[3].indexOf("[^arXiv");

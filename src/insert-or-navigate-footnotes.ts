@@ -281,10 +281,10 @@ function moveCursorAndSetJumpPoint(
 export function shouldJumpFromDefinitionToReference(
     lineText: string,
     cursorPosition: EditorPosition,
-    doc: Editor,
     plugin: FootnotePlugin,
+    doc: Editor,
     ctx?: DocContext,
-) {
+): boolean {
     // check if we're in a footnote definition line ("[^1]: footnote") or one of
     // its continuation lines; if so, jump back to the footnote in the text
 
@@ -363,10 +363,10 @@ export function shouldJumpFromDefinitionToReference(
 export function jumpToFootnoteDefinition(
     footnoteName: string,
     cursorPosition: EditorPosition,
-    doc: Editor,
     plugin: FootnotePlugin,
+    doc: Editor,
     ctx: DocContext = docContext(doc),
-) {
+): boolean {
     // find the first line with this definition reference name in it — matching
     // the masked twin so definition-shaped lines inside code don't count
     // (#41); blockquote/callout labels count too (C22)
@@ -425,10 +425,10 @@ export function referenceAtCursor(
 export function shouldJumpFromReferenceToDefinition(
     lineText: string,
     cursorPosition: EditorPosition,
-    doc: Editor,
     plugin: FootnotePlugin,
+    doc: Editor,
     ctx?: DocContext,
-) {
+): boolean {
     // Jump cursor TO definition reference:
     // find the reference whose brackets contain the cursor on this line,
     // then place the cursor at that footnote's definition line. This runs on
@@ -475,12 +475,12 @@ export function shouldJumpFromReferenceToDefinition(
             if (popupEditingAvailable(plugin)) {
                 // the popup's close callback runs LATER, after its save may
                 // have edited the document — it must build a FRESH context
-                void openFootnotePopup(plugin, footnoteName, () =>
-                    jumpToFootnoteDefinition(footnoteName, cursorPosition, doc, plugin)
-                );
+                void openFootnotePopup(plugin, footnoteName, () => {
+                    jumpToFootnoteDefinition(footnoteName, cursorPosition, plugin, doc);
+                });
                 return true;
             }
-            return jumpToFootnoteDefinition(footnoteName, cursorPosition, doc, plugin, ctx);
+            return jumpToFootnoteDefinition(footnoteName, cursorPosition, plugin, doc, ctx);
         }
     }
     return false;
@@ -712,7 +712,7 @@ function adjustFootnotePosition(
 // (regression reported 2026-07-14; same family as issue #28). Hand focus
 // back to the main editor and only edit once the sync-back has settled.
 // The primary table-cell path dispatches through the cell's own editor
-// instead — see shouldCreateAutonumFootnote / shouldCreateFootnoteReference.
+// instead — see createAutonumFootnote / createFootnoteReference.
 export function runOutsideTableCell(
     doc: Editor,
     run: (cursorPosition: EditorPosition) => void,
@@ -1026,19 +1026,19 @@ export async function insertAutonumFootnote(plugin: FootnotePlugin) {
             // inside run() so the table-fallback path reads post-sync state
             const ctx = docContext(doc);
 
-            if (shouldJumpFromDefinitionToReference(lineText, cursorPosition, doc, plugin, ctx))
+            if (shouldJumpFromDefinitionToReference(lineText, cursorPosition, plugin, doc, ctx))
                 return;
-            if (shouldJumpFromReferenceToDefinition(lineText, cursorPosition, doc, plugin, ctx))
+            if (shouldJumpFromReferenceToDefinition(lineText, cursorPosition, plugin, doc, ctx))
                 return;
             // caret inside a reference with NO definition: continue the half-built
             // footnote (create its definition) instead of nesting "[^N]" into the
             // brackets — parity with the named and inline keys, so an
             // accidental numbered press mid-naming is just the next step
             // (reported from beta.9 phone testing, 2026-08-09)
-            if (shouldCreateMatchingFootnoteDefinition(lineText, cursorPosition, plugin, doc, ctx))
+            if (createMatchingFootnoteDefinition(lineText, cursorPosition, plugin, doc, ctx))
                 return;
 
-            shouldCreateAutonumFootnote(lineText, cursorPosition, plugin, doc, cell, ctx);
+            createAutonumFootnote(lineText, cursorPosition, plugin, doc, cell, ctx);
         };
         if (cell) run(resolveTableCellCursor(doc) ?? doc.getCursor());
         else runOutsideTableCell(doc, run);
@@ -1047,14 +1047,14 @@ export async function insertAutonumFootnote(plugin: FootnotePlugin) {
 
 
 /** Cascade step 4 (autonum): insert the next-numbered reference at the caret (through `cell` when in a table) and append its definition, then popup or jump per settings. */
-export function shouldCreateAutonumFootnote(
+export function createAutonumFootnote(
     lineText: string,
     cursorPosition: EditorPosition,
     plugin: FootnotePlugin,
     doc: Editor,
     cell: TableCellEditor | null = null,
     ctx: DocContext = docContext(doc),
-) {
+): boolean {
     // create new footnote with the next numerical index — namespaced by the
     // note's footnote-prefix property when set (#31) — reading the editor
     // document (the view's data buffer lags editor edits by a tick, so it
@@ -1062,8 +1062,9 @@ export function shouldCreateAutonumFootnote(
     const markdownText = ctx.lines.join("\n");
     const prefix = activeFootnotePrefix(plugin, footnotePrefix(markdownText));
     // an invalid prefix blocks the insert outright (the Notice already
-    // explained why) — no unprefixed fallback footnote to clean up
-    if (prefix === null) return;
+    // explained why) — no unprefixed fallback footnote to clean up; the
+    // press was still consumed
+    if (prefix === null) return true;
     const currentMax = computeNextFootnoteNumber(
         markdownText,
         prefix,
@@ -1096,7 +1097,7 @@ export function shouldCreateAutonumFootnote(
         } else {
             moveCursorAndSetJumpPoint(doc, cursorPosition, definition.cursor, plugin, definitionChanges, true);
         }
-        return;
+        return true;
     }
 
     cursorPosition = adjustFootnotePosition(cursorPosition, doc, lineText, plugin);
@@ -1120,6 +1121,7 @@ export function shouldCreateAutonumFootnote(
         moveCursorAndSetJumpPoint(doc, cursorPosition, definition.cursor, plugin, changes, true);
         lintAfterFootnoteCreation(plugin, true);
     }
+    return true;
 }
 
 
@@ -1279,9 +1281,9 @@ export function navigateReferenceIfInside(
     }));
     if (referenceAtCursor(referencesOnLine, cursorPosition.ch) === null) return false;
 
-    if (shouldJumpFromReferenceToDefinition(lineText, cursorPosition, doc, plugin, ctx))
+    if (shouldJumpFromReferenceToDefinition(lineText, cursorPosition, plugin, doc, ctx))
         return true;
-    if (shouldCreateMatchingFootnoteDefinition(lineText, cursorPosition, plugin, doc, ctx))
+    if (createMatchingFootnoteDefinition(lineText, cursorPosition, plugin, doc, ctx))
         return true;
     // however the cascade resolved (e.g. an invalid name's warning), the
     // press is handled — "^[…]" must never land inside the reference
@@ -1408,28 +1410,28 @@ export async function insertNamedFootnote(plugin: FootnotePlugin) {
             // ONE shared document view for the whole cascade (perf F1)
             const ctx = docContext(doc);
 
-            if (shouldJumpFromDefinitionToReference(lineText, cursorPosition, doc, plugin, ctx))
+            if (shouldJumpFromDefinitionToReference(lineText, cursorPosition, plugin, doc, ctx))
                 return;
-            if (shouldJumpFromReferenceToDefinition(lineText, cursorPosition, doc, plugin, ctx))
+            if (shouldJumpFromReferenceToDefinition(lineText, cursorPosition, plugin, doc, ctx))
                 return;
 
-            if (shouldCreateMatchingFootnoteDefinition(lineText, cursorPosition, plugin, doc, ctx))
+            if (createMatchingFootnoteDefinition(lineText, cursorPosition, plugin, doc, ctx))
                 return;
-            shouldCreateFootnoteReference(lineText, cursorPosition, doc, plugin, cell);
+            createFootnoteReference(lineText, cursorPosition, plugin, doc, cell);
         };
         if (cell) run(resolveTableCellCursor(doc) ?? doc.getCursor());
         else runOutsideTableCell(doc, run);
     });
 }
 
-/** Cascade step 3 (numbered, named, and the inline keys via navigateReferenceIfInside): caret on a reference with no definition → append the matching definition (or warn on an invalid name). Returns true when it handled the press. The note's footnote-prefix is NOT applied here — it goes in at bracket creation (shouldCreateFootnoteReference), where the user can see it. */
-export function shouldCreateMatchingFootnoteDefinition(
+/** Cascade step 3 (numbered, named, and the inline keys via navigateReferenceIfInside): caret on a reference with no definition → append the matching definition (or warn on an invalid name). Returns true when it handled the press. The note's footnote-prefix is NOT applied here — it goes in at bracket creation (createFootnoteReference), where the user can see it. */
+export function createMatchingFootnoteDefinition(
     lineText: string,
     cursorPosition: EditorPosition,
     plugin: FootnotePlugin,
     doc: Editor,
     ctx?: DocContext,
-) {
+): boolean {
     // Create matching footnote definition for footnote reference
 
     // is the cursor inside a footnote reference on this line?
@@ -1441,7 +1443,9 @@ export function shouldCreateMatchingFootnoteDefinition(
         footnote: match[0],
         startIndex: match.index ?? 0,
     }));
-    if (referenceAtCursor(rawReferences, cursorPosition.ch) === null) return;
+    if (referenceAtCursor(rawReferences, cursorPosition.ch) === null) {
+        return false;
+    }
 
     // built only past the raw gate (perf F1)
     ctx ??= docContext(doc);
@@ -1503,9 +1507,12 @@ export function shouldCreateMatchingFootnoteDefinition(
 
                 return true;
             }
-            return;
+            // the reference already has a definition — not this step's
+            // press to handle; the cascade continues
+            return false;
         }
     }
+    return false;
 }
 
 // The start index of a placeholder `reference` occurrence whose brackets
@@ -1609,13 +1616,13 @@ function warnEmptyReferenceIfInside(
 }
 
 /** Cascade step 4 (named): insert an empty reference (through `cell` when in a table) ready for name entry — "[^]" with the caret between the brackets, or "[^7-]" with the caret after the prefix when the note's footnote-prefix is active, so the namespace is visible while the name is typed (requested 2026-07-20). A press with the caret still inside an empty "[^]" never reaches this step — warnEmptyReferenceIfInside claims it at the command entry — but the hop-out branches below stay as a last line of defense against nesting "[^[^]]". */
-export function shouldCreateFootnoteReference(
+export function createFootnoteReference(
     lineText: string,
     cursorPosition: EditorPosition,
-    doc: Editor,
     plugin: FootnotePlugin,
-    cell: TableCellEditor | null = null
-) {
+    doc: Editor,
+    cell: TableCellEditor | null = null,
+): boolean {
     //create empty footnote reference for name input, cursor after [^ and any
     //prefix. The prefix gate runs AFTER the second-press hop checks: an
     //invalid prefix blocks reference CREATION (toast only, nothing to clean
@@ -1641,15 +1648,15 @@ export function shouldCreateFootnoteReference(
             ) !== null
         ) {
             cell.dispatch({ selection: { anchor: inEmpty + "[^]".length } });
-            return;
+            return true;
         }
         const prefix = resolvePrefix();
-        if (prefix === null) return;
+        if (prefix === null) return true;
         // through the cell's own editor (never the main editor — that races
         // the cell's sync-back and corrupts the table); the caret lands
         // inside the brackets and focus stays in the cell for name entry
         insertInTableCell(cell, plugin, `[^${prefix}]`, 2 + prefix.length);
-        return;
+        return true;
     }
 
     const inEmpty = emptyReferenceStart(lineText, cursorPosition.ch);
@@ -1661,11 +1668,11 @@ export function shouldCreateFootnoteReference(
         ) !== null
     ) {
         doc.setCursor({ line: cursorPosition.line, ch: inEmpty + "[^]".length });
-        return;
+        return true;
     }
 
     const prefix = resolvePrefix();
-    if (prefix === null) return;
+    if (prefix === null) return true;
     const emptyReference = `[^${prefix}]`;
     cursorPosition = adjustFootnotePosition(cursorPosition, doc, lineText, plugin);
     const newCursorPos = {
@@ -1675,4 +1682,5 @@ export function shouldCreateFootnoteReference(
     moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos, plugin, [
         { from: cursorPosition, text: emptyReference },
     ]);
+    return true;
 }

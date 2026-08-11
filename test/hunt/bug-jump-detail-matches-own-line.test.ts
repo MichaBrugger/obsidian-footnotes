@@ -43,8 +43,8 @@ describe("bug: definition->reference jump matches the definition's own line", ()
         shouldJumpFromDefinitionToReference(
             "[^1]: definition",
             { line: 0, ch: 3 },
-            doc,
             fakePlugin,
+            doc,
         );
         // the real reference use is on line 1 (ch 8, just past "[^1]"); the
         // definition line is not a reference and must not be the target
@@ -64,8 +64,8 @@ describe("bug: definition->reference jump matches the definition's own line", ()
         shouldJumpFromDefinitionToReference(
             "[^orphan]: text",
             { line: 0, ch: 3 },
-            doc,
             fakePlugin,
+            doc,
         );
         expect(cursorMoves).toEqual([]);
     });

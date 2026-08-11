@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import FootnotePlugin from "../../src/main";
 import {
-    shouldCreateMatchingFootnoteDefinition,
+    createMatchingFootnoteDefinition,
     shouldJumpFromDefinitionToReference,
     shouldJumpFromReferenceToDefinition,
 } from "../../src/insert-or-navigate-footnotes";
@@ -67,7 +67,7 @@ describe("press-jump (reference → definition) with a code-span-named footnote 
 
     it("jumps from such a reference to its existing definition", () => {
         const doc = fakeEditor([MARKER_LINE, "", DETAIL_LINE], { line: 0, ch: 8 });
-        expect(shouldJumpFromReferenceToDefinition(MARKER_LINE, doc.cursor, doc, fakePlugin())).toBe(true);
+        expect(shouldJumpFromReferenceToDefinition(MARKER_LINE, doc.cursor, fakePlugin(), doc)).toBe(true);
         expect(doc.cursor).toEqual({ line: 2, ch: DETAIL_LINE.length });
     });
 
@@ -75,7 +75,7 @@ describe("press-jump (reference → definition) with a code-span-named footnote 
         const lines = ["ref [^`1`] here", "", "[^`1`]: the definition"];
         const caret = { line: 0, ch: 7 }; // on the "1" inside "[^`1`]"
         const doc = fakeEditor(lines, caret);
-        expect(shouldJumpFromReferenceToDefinition(lines[0], caret, doc, fakePlugin())).toBe(true);
+        expect(shouldJumpFromReferenceToDefinition(lines[0], caret, fakePlugin(), doc)).toBe(true);
         expect(doc.cursor).toEqual({ line: 2, ch: "[^`1`]: the definition".length });
     });
 });
@@ -87,7 +87,7 @@ describe("press-create with a code-span-named footnote (fixed 2026-08-10)", () =
         // the same treatment as spaced names
         const MARKER_LINE = "ref [^x`c`y] end";
         const doc = fakeEditor([MARKER_LINE, ""], { line: 0, ch: 8 });
-        const handled = shouldCreateMatchingFootnoteDefinition(
+        const handled = createMatchingFootnoteDefinition(
             MARKER_LINE,
             doc.cursor,
             fakePlugin(),
@@ -100,7 +100,7 @@ describe("press-create with a code-span-named footnote (fixed 2026-08-10)", () =
     it("does NOT append a duplicate definition full of NUL bytes when the definition exists", () => {
         const lines = ["ref [^`1`] here", "", "[^`1`]: the definition"];
         const doc = fakeEditor(lines, { line: 0, ch: 7 });
-        shouldCreateMatchingFootnoteDefinition(lines[0], { line: 0, ch: 7 }, fakePlugin(), doc);
+        createMatchingFootnoteDefinition(lines[0], { line: 0, ch: 7 }, fakePlugin(), doc);
         expect(doc.appliedChanges).toEqual([]);
     });
 });
@@ -109,7 +109,7 @@ describe("press-jump (definition → reference) with a code-span-named footnote 
     it("finds the reference of a backticked footnote name", () => {
         const lines = ["ref [^`1`] here", "", "[^`1`]: the definition"];
         const doc = fakeEditor(lines, { line: 2, ch: 5 });
-        shouldJumpFromDefinitionToReference(lines[2], { line: 2, ch: 5 }, doc, fakePlugin());
+        shouldJumpFromDefinitionToReference(lines[2], { line: 2, ch: 5 }, fakePlugin(), doc);
         // "[^`1`]" starts at index 4 and is 6 code units long
         expect(doc.cursor).toEqual({ line: 0, ch: 10 });
     });

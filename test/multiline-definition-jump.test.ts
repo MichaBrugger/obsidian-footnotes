@@ -40,8 +40,8 @@ describe("jumping back from a multi-line definition", () => {
         const handled = shouldJumpFromDefinitionToReference(
             NOTE[2],
             { line: 2, ch: 5 },
-            doc,
             fakePlugin,
+            doc,
         );
         expect(handled).toBe(true);
         expect(cursorMoves).toEqual([{ line: 0, ch: 12 + "[^multiline]".length }]);
@@ -52,8 +52,8 @@ describe("jumping back from a multi-line definition", () => {
         const handled = shouldJumpFromDefinitionToReference(
             NOTE[4],
             { line: 4, ch: NOTE[4].length },
-            doc,
             fakePlugin,
+            doc,
         );
         expect(handled).toBe(true);
         expect(cursorMoves).toEqual([{ line: 0, ch: 12 + "[^multiline]".length }]);
@@ -71,8 +71,8 @@ describe("jumping back from a multi-line definition", () => {
         const handled = shouldJumpFromDefinitionToReference(
             lines[4],
             { line: 4, ch: 10 },
-            doc,
             fakePlugin,
+            doc,
         );
         expect(handled).toBe(true);
         expect(cursorMoves).toEqual([{ line: 0, ch: "reference[^m]".length }]);
@@ -84,8 +84,8 @@ describe("jumping back from a multi-line definition", () => {
         const handled = shouldJumpFromDefinitionToReference(
             lines[1],
             { line: 1, ch: 6 },
-            doc,
             fakePlugin,
+            doc,
         );
         expect(handled).toBeFalsy();
     });
@@ -96,8 +96,8 @@ describe("jumping back from a multi-line definition", () => {
         const handled = shouldJumpFromDefinitionToReference(
             lines[2],
             { line: 2, ch: 6 },
-            doc,
             fakePlugin,
+            doc,
         );
         expect(handled).toBeFalsy();
     });

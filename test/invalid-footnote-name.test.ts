@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
     isValidFootnoteName,
-    shouldCreateMatchingFootnoteDefinition,
+    createMatchingFootnoteDefinition,
 } from "../src/insert-or-navigate-footnotes";
 import type FootnotePlugin from "../src/main";
 
@@ -41,7 +41,7 @@ describe("isValidFootnoteName", () => {
     });
 });
 
-describe("shouldCreateMatchingFootnoteDefinition with an invalid name", () => {
+describe("createMatchingFootnoteDefinition with an invalid name", () => {
     it("warns and stops instead of creating a definition", () => {
         const line = "alpha[^my note] bravo";
         const doc = {
@@ -51,7 +51,7 @@ describe("shouldCreateMatchingFootnoteDefinition with an invalid name", () => {
 
         // returning true consumes the hotkey press; the fake editor has no
         // transaction method, so reaching the creation path would throw
-        const handled = shouldCreateMatchingFootnoteDefinition(
+        const handled = createMatchingFootnoteDefinition(
             line,
             { line: 0, ch: 7 }, // cursor inside [^my note]
             {} as FootnotePlugin,
@@ -67,7 +67,7 @@ describe("shouldCreateMatchingFootnoteDefinition with an invalid name", () => {
             lineCount: () => 1,
         } as unknown as Editor;
 
-        const handled = shouldCreateMatchingFootnoteDefinition(
+        const handled = createMatchingFootnoteDefinition(
             line,
             { line: 0, ch: 8 }, // cursor inside [^`c`]
             {} as FootnotePlugin,

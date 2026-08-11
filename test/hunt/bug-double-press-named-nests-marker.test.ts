@@ -2,12 +2,12 @@ import { Editor, EditorChange, EditorPosition } from "obsidian";
 import { describe, expect, it } from "vitest";
 
 import FootnotePlugin from "../../src/main";
-import { shouldCreateFootnoteReference } from "../../src/insert-or-navigate-footnotes";
+import { createFootnoteReference } from "../../src/insert-or-navigate-footnotes";
 
 // BUG: pressing the named-footnote hotkey twice in a row (before typing a name)
 // nests a second empty reference inside the first: "[^]" becomes "[^[^]]". The
 // first press leaves "[^]" with the caret between the brackets; the second press
-// falls all the way to shouldCreateFootnoteReference, which blindly inserts another
+// falls all the way to createFootnoteReference, which blindly inserts another
 // "[^]" at the caret. The empty "[^]" doesn't match AllReferences (which requires a
 // non-empty name), so every earlier cascade step misses it. The inline command
 // already handles the equivalent double-press by hopping the caret out; the
@@ -56,7 +56,7 @@ describe("bug: double-pressing the named hotkey nests [^] references", () => {
         const line = "[^]";
         const doc = fakeEditor([line]);
         // caret between the brackets, where the first press left it
-        shouldCreateFootnoteReference(line, { line: 0, ch: 2 }, doc, fakePlugin());
+        createFootnoteReference(line, { line: 0, ch: 2 }, fakePlugin(), doc);
         const inserted = doc.appliedChanges.some(
             (change) => change.text === "[^]" && change.from.ch === 2,
         );
