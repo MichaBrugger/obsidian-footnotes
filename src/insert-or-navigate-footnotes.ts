@@ -941,17 +941,28 @@ export function computeNextFootnoteNumber(
  * first press opened (and closes it) instead of racing past it — and
  * document edits must wait for a just-closed popup's pending definition
  * save, or that save clobbers them.
+ *
+ * Continuation-passing ON PURPOSE: `action` runs synchronously in the SAME
+ * microtask as the settle continuation and the toggle check. Returning the
+ * editor to an awaiting caller instead adds a microtask hop between the
+ * toggle check and the popup registration the action performs — wide
+ * enough for a same-tick second press's toggle check to run first, find no
+ * popup, and mint a second footnote (the 2026-07-16 regression class;
+ * exactly this happened when the preamble was first extracted as a
+ * value-returning helper — caught by the rapid-press smoke tests,
+ * 2026-08-11).
  */
-async function editableEditorForCommand(
+async function withEditableEditor(
     plugin: FootnotePlugin,
-): Promise<Editor | null> {
+    action: (doc: Editor) => void | Promise<void>,
+): Promise<void> {
     await settleFootnotePopupWithFeedback();
-    if (toggleCloseFootnotePopup()) return null;
+    if (toggleCloseFootnotePopup()) return;
     const mdView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
     const doc = mdView && viewEditor(mdView);
-    if (!mdView || !doc) return null;
-    if (readingViewActive(mdView)) return null;
-    return doc;
+    if (!mdView || !doc) return;
+    if (readingViewActive(mdView)) return;
+    return action(doc);
 }
 
 /**
@@ -1004,41 +1015,35 @@ function openPopupForNewDefinition(
 
 /** The auto-numbered command ("Insert / navigate auto-numbered footnote"): runs the decision cascade, creating "[^N]" + definition when nothing to navigate to. */
 export async function insertAutonumFootnote(plugin: FootnotePlugin) {
-    // ORDER MATTERS: settle first, then toggle. The settle wait must come
-    // before the popup toggle so a same-tick second press sees the popup
-    // the first press opened (and closes it) instead of racing past it —
-    // and document edits must wait for a just-closed popup's pending
-    // definition save, or that save clobbers them.
-    const doc = await editableEditorForCommand(plugin);
-    if (!doc) return;
+    await withEditableEditor(plugin, (doc) => {
+        // an actively edited table cell owns the real caret; getCursor() is
+        // stale there, and editing the row via the main editor corrupts the
+        // table — reads use the resolved position, writes go through the cell
+        const cell = activeTableCellEditor(doc);
+        if (caretGuardsHandled(plugin, doc, cell)) return;
+        const run = (cursorPosition: EditorPosition) => {
+            const lineText = doc.getLine(cursorPosition.line);
+            // ONE shared document view for the whole cascade (perf F1) — built
+            // inside run() so the table-fallback path reads post-sync state
+            const ctx = docContext(doc);
 
-    // an actively edited table cell owns the real caret; getCursor() is
-    // stale there, and editing the row via the main editor corrupts the
-    // table — reads use the resolved position, writes go through the cell
-    const cell = activeTableCellEditor(doc);
-    if (caretGuardsHandled(plugin, doc, cell)) return;
-    const run = (cursorPosition: EditorPosition) => {
-        const lineText = doc.getLine(cursorPosition.line);
-        // ONE shared document view for the whole cascade (perf F1) — built
-        // inside run() so the table-fallback path reads post-sync state
-        const ctx = docContext(doc);
+            if (shouldJumpFromDefinitionToReference(lineText, cursorPosition, doc, plugin, ctx))
+                return;
+            if (shouldJumpFromReferenceToDefinition(lineText, cursorPosition, doc, plugin, ctx))
+                return;
+            // caret inside a reference with NO definition: continue the half-built
+            // footnote (create its definition) instead of nesting "[^N]" into the
+            // brackets — parity with the named and inline keys, so an
+            // accidental numbered press mid-naming is just the next step
+            // (reported from beta.9 phone testing, 2026-08-09)
+            if (shouldCreateMatchingFootnoteDefinition(lineText, cursorPosition, plugin, doc, ctx))
+                return;
 
-        if (shouldJumpFromDefinitionToReference(lineText, cursorPosition, doc, plugin, ctx))
-            return;
-        if (shouldJumpFromReferenceToDefinition(lineText, cursorPosition, doc, plugin, ctx))
-            return;
-        // caret inside a reference with NO definition: continue the half-built
-        // footnote (create its definition) instead of nesting "[^N]" into the
-        // brackets — parity with the named and inline keys, so an
-        // accidental numbered press mid-naming is just the next step
-        // (reported from beta.9 phone testing, 2026-08-09)
-        if (shouldCreateMatchingFootnoteDefinition(lineText, cursorPosition, plugin, doc, ctx))
-            return;
-
-        shouldCreateAutonumFootnote(lineText, cursorPosition, plugin, doc, cell, ctx);
-    };
-    if (cell) run(resolveTableCellCursor(doc) ?? doc.getCursor());
-    else runOutsideTableCell(doc, run);
+            shouldCreateAutonumFootnote(lineText, cursorPosition, plugin, doc, cell, ctx);
+        };
+        if (cell) run(resolveTableCellCursor(doc) ?? doc.getCursor());
+        else runOutsideTableCell(doc, run);
+    });
 }
 
 
@@ -1293,15 +1298,14 @@ export function navigateReferenceIfInside(
  * commands instead of nesting.
  */
 export async function insertInlineFootnote(plugin: FootnotePlugin) {
-    const doc = await editableEditorForCommand(plugin);
-    if (!doc) return;
+    await withEditableEditor(plugin, (doc) => {
+        const cell = activeTableCellEditor(doc);
+        if (caretGuardsHandled(plugin, doc, cell)) return;
+        // inside a real reference, navigate instead of nesting "^[]"
+        if (navigateReferenceIfInside(plugin, doc, cell)) return;
 
-    const cell = activeTableCellEditor(doc);
-    if (caretGuardsHandled(plugin, doc, cell)) return;
-    // inside a real reference, navigate instead of nesting "^[]"
-    if (navigateReferenceIfInside(plugin, doc, cell)) return;
-
-    insertInlineText(plugin, "^[]", 2);
+        insertInlineText(plugin, "^[]", 2);
+    });
 }
 
 /**
@@ -1364,60 +1368,59 @@ export function exitInlineFootnoteIfInside(
 
 /** Inline-footnote paste command: inserts `^[<clipboard>]` with the caret after it. Inside a "[^x]" reference it navigates like the named command instead (the clipboard stays untouched). */
 export async function pasteInlineFootnote(plugin: FootnotePlugin) {
-    const doc = await editableEditorForCommand(plugin);
-    if (!doc) return;
-    const pasteCell = activeTableCellEditor(doc);
-    // the same guards every other insert command runs (missed here until
-    // the 2026-08-07 QOL sweep; pinned by test/paste-inline-in-inline.test.ts)
-    if (caretGuardsHandled(plugin, doc, pasteCell)) return;
-    if (navigateReferenceIfInside(plugin, doc, pasteCell)) return;
+    await withEditableEditor(plugin, async (doc) => {
+        const pasteCell = activeTableCellEditor(doc);
+        // the same guards every other insert command runs (missed here until
+        // the 2026-08-07 QOL sweep; pinned by test/paste-inline-in-inline.test.ts)
+        if (caretGuardsHandled(plugin, doc, pasteCell)) return;
+        if (navigateReferenceIfInside(plugin, doc, pasteCell)) return;
 
-    // read the clipboard BEFORE resolving positions — it's the only await,
-    // and everything position-dependent should happen after it
-    let raw: string;
-    try {
-        raw = await navigator.clipboard.readText();
-    } catch {
-        new Notice("Couldn't read the clipboard.");
-        return;
-    }
-    const content = sanitizeInlineFootnoteContent(raw);
-    if (!content) {
-        new Notice("The clipboard is empty, so there is nothing to put in an inline footnote.");
-        return;
-    }
-    const text = `^[${content}]`;
-    insertInlineText(plugin, text, text.length);
+        // read the clipboard BEFORE resolving positions — it's the only await,
+        // and everything position-dependent should happen after it
+        let raw: string;
+        try {
+            raw = await navigator.clipboard.readText();
+        } catch {
+            new Notice("Couldn't read the clipboard.");
+            return;
+        }
+        const content = sanitizeInlineFootnoteContent(raw);
+        if (!content) {
+            new Notice("The clipboard is empty, so there is nothing to put in an inline footnote.");
+            return;
+        }
+        const text = `^[${content}]`;
+        insertInlineText(plugin, text, text.length);
+    });
 }
 
 //FUNCTIONS FOR NAMED FOOTNOTES
 
 /** The named command ("Insert / navigate named footnote"): same cascade, but creation is two-step — first press inserts "[^]" for name entry, next press (caret on the named reference) creates its definition. */
 export async function insertNamedFootnote(plugin: FootnotePlugin) {
-    const doc = await editableEditorForCommand(plugin);
-    if (!doc) return;
+    await withEditableEditor(plugin, (doc) => {
+        // an actively edited table cell owns the real caret; getCursor() is
+        // stale there, and editing the row via the main editor corrupts the
+        // table — reads use the resolved position, writes go through the cell
+        const cell = activeTableCellEditor(doc);
+        if (caretGuardsHandled(plugin, doc, cell)) return;
+        const run = (cursorPosition: EditorPosition) => {
+            const lineText = doc.getLine(cursorPosition.line);
+            // ONE shared document view for the whole cascade (perf F1)
+            const ctx = docContext(doc);
 
-    // an actively edited table cell owns the real caret; getCursor() is
-    // stale there, and editing the row via the main editor corrupts the
-    // table — reads use the resolved position, writes go through the cell
-    const cell = activeTableCellEditor(doc);
-    if (caretGuardsHandled(plugin, doc, cell)) return;
-    const run = (cursorPosition: EditorPosition) => {
-        const lineText = doc.getLine(cursorPosition.line);
-        // ONE shared document view for the whole cascade (perf F1)
-        const ctx = docContext(doc);
+            if (shouldJumpFromDefinitionToReference(lineText, cursorPosition, doc, plugin, ctx))
+                return;
+            if (shouldJumpFromReferenceToDefinition(lineText, cursorPosition, doc, plugin, ctx))
+                return;
 
-        if (shouldJumpFromDefinitionToReference(lineText, cursorPosition, doc, plugin, ctx))
-            return;
-        if (shouldJumpFromReferenceToDefinition(lineText, cursorPosition, doc, plugin, ctx))
-            return;
-
-        if (shouldCreateMatchingFootnoteDefinition(lineText, cursorPosition, plugin, doc, ctx))
-            return;
-        shouldCreateFootnoteReference(lineText, cursorPosition, doc, plugin, cell);
-    };
-    if (cell) run(resolveTableCellCursor(doc) ?? doc.getCursor());
-    else runOutsideTableCell(doc, run);
+            if (shouldCreateMatchingFootnoteDefinition(lineText, cursorPosition, plugin, doc, ctx))
+                return;
+            shouldCreateFootnoteReference(lineText, cursorPosition, doc, plugin, cell);
+        };
+        if (cell) run(resolveTableCellCursor(doc) ?? doc.getCursor());
+        else runOutsideTableCell(doc, run);
+    });
 }
 
 /** Cascade step 3 (numbered, named, and the inline keys via navigateReferenceIfInside): caret on a reference with no definition → append the matching definition (or warn on an invalid name). Returns true when it handled the press. The note's footnote-prefix is NOT applied here — it goes in at bracket creation (shouldCreateFootnoteReference), where the user can see it. */
