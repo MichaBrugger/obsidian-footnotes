@@ -55,7 +55,6 @@ describe("phantom frontmatter from a leading thematic break", () => {
             removeOrphanedDefinitions: false,
             orphanSafePrefix: "",
             applyNotePrefix: false,
-            prefixAware: false,
             sectionHeading: HEADING,
         });
         // the orphaned definition takes [^2] — NOT the orphaned

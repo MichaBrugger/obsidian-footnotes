@@ -83,7 +83,7 @@ describe("reindexFootnotes with a prefix namespace", () => {
     });
 });
 
-describe("lintFootnotes prefix awareness (prefixAware)", () => {
+describe("lintFootnotes prefix awareness (applyNotePrefix — one flag drives both the apply step and namespace-aware reindexing since 2026-08-11)", () => {
     it("unifies plain and prefixed footnotes into one reading-order sequence", () => {
         // the L11 scenario: plain strays adopt the prefix, then the WHOLE
         // namespace renumbers by appearance — including the pre-existing
@@ -93,19 +93,21 @@ describe("lintFootnotes prefix awareness (prefixAware)", () => {
         const expected =
             "---\nfootnote-prefix: 2.\n---\nb[^2.1] a[^2.2] pre[^2.3] end\n\n[^2.1]: two\n[^2.2]: one\n[^2.3]: already prefixed";
         expect(
-            lintFootnotes(input, { applyNotePrefix: true, prefixAware: true }),
+            lintFootnotes(input, { applyNotePrefix: true }),
         ).toBe(expected);
     });
 
-    it("reorders prefixed footnotes even without the apply step", () => {
+    it("reorders prefixed footnotes when nothing needs the prefix applied", () => {
+        // every footnote already carries the prefix, so the apply step is a
+        // no-op and only the namespace-aware renumbering shows
         const input =
             "---\nfootnote-prefix: 2.\n---\nb[^2.5] a[^2.2] end\n\n[^2.2]: two\n[^2.5]: five";
         const expected =
             "---\nfootnote-prefix: 2.\n---\nb[^2.1] a[^2.2] end\n\n[^2.1]: five\n[^2.2]: two";
-        expect(lintFootnotes(input, { prefixAware: true })).toBe(expected);
+        expect(lintFootnotes(input, { applyNotePrefix: true })).toBe(expected);
     });
 
-    it("without prefixAware, prefixed footnotes keep their old named behavior", () => {
+    it("without applyNotePrefix, prefixed footnotes keep their old named behavior", () => {
         const input =
             "---\nfootnote-prefix: 2.\n---\nb[^2.5] a[^2.2] end\n\n[^2.2]: two\n[^2.5]: five";
         const expected =
@@ -116,7 +118,7 @@ describe("lintFootnotes prefix awareness (prefixAware)", () => {
     it("is idempotent with everything on", () => {
         const messy =
             "---\nfootnote-prefix: 2.\n---\nc[^9], b[^2.4] a[^1]\n\n[^1]: one\n[^9]: nine\n[^2.4]: pre";
-        const options = { applyNotePrefix: true, prefixAware: true };
+        const options = { applyNotePrefix: true };
         const once = lintFootnotes(messy, options);
         expect(lintFootnotes(once, options)).toBe(once);
     });
@@ -127,7 +129,7 @@ describe("lintFootnotes prefix awareness (prefixAware)", () => {
         const expected =
             "---\nfootnote-prefix: 2.\n---\nx[^2.note] y[^2.1] end\n\n[^2.note]: n\n[^2.1]: one";
         expect(
-            lintFootnotes(input, { applyNotePrefix: true, prefixAware: true }),
+            lintFootnotes(input, { applyNotePrefix: true }),
         ).toBe(expected);
     });
 
@@ -138,7 +140,6 @@ describe("lintFootnotes prefix awareness (prefixAware)", () => {
             "---\nfootnote-prefix: 2.\n---\na[^note] b[^1] c[^2.7]\n\n[^note]: n\n[^1]: one\n[^2.7]: pre";
         const options = {
             applyNotePrefix: true,
-            prefixAware: true,
             reindexOptions: { renumberNamedFootnotes: true },
         };
         const once = lintFootnotes(messy, options);

@@ -148,7 +148,6 @@ const optionsArb: fc.Arbitrary<LintOptions> = fc.record({
     removeOrphanedDefinitions: fc.boolean(),
     orphanSafePrefix: fc.constantFrom("", "2."),
     applyNotePrefix: fc.boolean(),
-    prefixAware: fc.boolean(),
     sectionHeading: fc.constantFrom("", "# Footnotes", "---\n## Footnotes"),
 });
 

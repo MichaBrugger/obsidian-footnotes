@@ -65,16 +65,8 @@ export function lintOptionsFromSettings(
         removeOrphanedReferences: plugin.settings.lintDeleteOrphanedReferences,
         removeOrphanedDefinitions:
             plugin.settings.lintDeleteOrphanedDefinitions,
-        orphanSafePrefix: alertPrefix(plugin, markdown),
-        // BOTH prefix behaviors ride the apply-prefix rule (and the whole
-        // feature toggle): with the rule off, footnotes carrying the
-        // note's prefix are treated as NAMED footnotes and keep their ids —
-        // renumbering them within the namespace while nothing else was
-        // being prefixed felt inconsistent (Jason, 2026-08-08)
+        orphanSafePrefix: orphanSafePrefixFor(plugin, markdown),
         applyNotePrefix:
-            plugin.settings.enableFootnotePrefix &&
-            plugin.settings.lintApplyPrefix,
-        prefixAware:
             plugin.settings.enableFootnotePrefix &&
             plugin.settings.lintApplyPrefix,
     };
@@ -97,10 +89,8 @@ export interface LintOptions {
     removeOrphanedDefinitions?: boolean;
     /** The note's own valid footnote-prefix while the prefix feature is on: its untouched "[^2.]" placeholder is an in-progress footnote, never an orphan to delete. */
     orphanSafePrefix?: string;
-    /** Rename plain numbered AND named footnotes to carry the note's own footnote-prefix property (default off; the caller gates on settings). */
+    /** Rename plain numbered AND named footnotes to carry the note's own footnote-prefix property, AND have reindex treat matching-prefixed footnotes as NUMBERED within that namespace (default off; the caller gates on settings). One flag on purpose: both behaviors ride the apply-prefix rule — renumbering within the namespace while nothing else was being prefixed felt inconsistent (Jason, 2026-08-08), so the separate `prefixAware` knob was folded in (2026-08-11). */
     applyNotePrefix?: boolean;
-    /** Treat footnotes matching the note's own footnote-prefix as NUMBERED — reindex renumbers them within the namespace like plain ones (default off; set when the per-note prefix feature is on). */
-    prefixAware?: boolean;
 }
 
 /** The enabled cleanups in dependency order: fix punctuation, gather definitions at the bottom, then renumber and reorder. */
@@ -167,13 +157,10 @@ export function lintFootnotes(
             );
         }
     }
-    // the note's own valid footnote-prefix, when any prefix behavior is on
+    // the note's own valid footnote-prefix, when the prefix behavior is on
     // (an invalid property changes nothing here — the lint guard cancels
     // those runs outright anyway)
-    const notePrefix =
-        options.applyNotePrefix || options.prefixAware
-            ? footnotePrefix(result)
-            : "";
+    const notePrefix = options.applyNotePrefix ? footnotePrefix(result) : "";
     const validPrefix =
         notePrefix && footnotePrefixProblem(notePrefix) === null
             ? notePrefix
@@ -189,8 +176,10 @@ export function lintFootnotes(
         result = reindexFootnotes(result, {
             ...options.reindexOptions,
             // matching-prefixed footnotes are numbered footnotes (QOL):
-            // reindex renumbers them within the namespace like plain ones
-            prefix: options.prefixAware ? validPrefix : "",
+            // reindex renumbers them within the namespace like plain ones.
+            // validPrefix is "" unless applyNotePrefix is on — both prefix
+            // behaviors ride the one flag
+            prefix: validPrefix,
         });
     }
     // byte-identical no-op: restoring EOL onto an unchanged result would
@@ -280,14 +269,14 @@ export function countEmptyFootnoteReferences(
 }
 
 /** The bare-prefix placeholder the alert should also count: the note's own valid prefix, only while the feature is on. */
-function alertPrefix(plugin: FootnotePlugin, markdown: string): string {
+function orphanSafePrefixFor(plugin: FootnotePlugin, markdown: string): string {
     if (!plugin.settings.enableFootnotePrefix) return "";
     const prefix = footnotePrefix(markdown);
     return prefix && footnotePrefixProblem(prefix) === null ? prefix : "";
 }
 
 function noticeEmptyReferences(plugin: FootnotePlugin, markdown: string) {
-    const prefix = alertPrefix(plugin, markdown);
+    const prefix = orphanSafePrefixFor(plugin, markdown);
     const count = countEmptyFootnoteReferences(markdown, prefix);
     if (count === 0) return;
     const hint = prefix ? `"[^]" or the bare prefix "[^${prefix}]"` : '"[^]"';
@@ -311,7 +300,7 @@ function noticeOrphanedReferences(plugin: FootnotePlugin, markdown: string) {
     if (plugin.settings.lintDeleteOrphanedReferences) return;
     const names = orphanedFootnoteReferenceNames(
         markdown,
-        alertPrefix(plugin, markdown),
+        orphanSafePrefixFor(plugin, markdown),
     );
     if (names.length === 0) return;
     new Notice(

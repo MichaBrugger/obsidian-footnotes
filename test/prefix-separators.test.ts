@@ -62,10 +62,7 @@ describe.each(PREFIXES)('prefix "%s"', (prefix) => {
             "[^1]: plain one",
             `[^${prefix}9]: nine`,
         ].join("\n");
-        const once = lintFootnotes(note, {
-            applyNotePrefix: true,
-            prefixAware: true,
-        });
+        const once = lintFootnotes(note, { applyNotePrefix: true });
         // apply-prefix slots the plain footnote after the existing maximum,
         // then the prefix-aware reindex renumbers the whole namespace by
         // appearance order: 1, 2, 3 left to right
@@ -73,9 +70,7 @@ describe.each(PREFIXES)('prefix "%s"', (prefix) => {
             `late[^${prefix}1] plain[^${prefix}2] early[^${prefix}3] end`,
         );
         // idempotent: a second lint changes nothing
-        expect(
-            lintFootnotes(once, { applyNotePrefix: true, prefixAware: true }),
-        ).toBe(once);
+        expect(lintFootnotes(once, { applyNotePrefix: true })).toBe(once);
     });
 
     it("the bare-prefix placeholder counts as an unnamed reference", () => {

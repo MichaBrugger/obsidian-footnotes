@@ -42,23 +42,23 @@ function definitionNamesFolded(lines: string[], masked: string[]): Set<string> {
 function isOrphan(
     name: string,
     definitions: Set<string>,
-    safePrefixFolded: string,
+    orphanSafeFolded: string,
 ): boolean {
     const folded = name.toLowerCase();
     if (definitions.has(folded)) return false;
     if (!isValidFootnoteName(name)) return false;
-    if (safePrefixFolded !== "" && folded === safePrefixFolded) return false;
+    if (orphanSafeFolded !== "" && folded === orphanSafeFolded) return false;
     return true;
 }
 
 /**
  * Distinct names of orphaned references in first-appearance order, each in its
- * first-seen casing — the alert's list. `safePrefix` is the note's own valid
+ * first-seen casing — the alert's list. `orphanSafePrefix` is the note's own valid
  * footnote-prefix while the prefix feature is on ("" otherwise).
  */
 export function orphanedFootnoteReferenceNames(
     markdown: string,
-    safePrefix = "",
+    orphanSafePrefix = "",
 ): string[] {
     // no "[^" anywhere means no references (and no orphans) — this alert
     // scan runs on every lint (perf F4)
@@ -66,13 +66,13 @@ export function orphanedFootnoteReferenceNames(
     const lines = normalizeEol(markdown).text.split("\n");
     const masked = maskProtectedLines(lines);
     const definitions = definitionNamesFolded(lines, masked);
-    const safeFolded = safePrefix.toLowerCase();
+    const orphanSafeFolded = orphanSafePrefix.toLowerCase();
 
     const names: string[] = [];
     const seen = new Set<string>();
     for (let i = 0; i < masked.length; i++) {
         for (const { name } of referenceOccurrences(lines[i], masked[i])) {
-            if (!isOrphan(name, definitions, safeFolded)) continue;
+            if (!isOrphan(name, definitions, orphanSafeFolded)) continue;
             const folded = name.toLowerCase();
             if (!seen.has(folded)) {
                 seen.add(folded);
@@ -92,14 +92,14 @@ export function orphanedFootnoteReferenceNames(
  */
 export function removeOrphanedFootnoteReferences(
     markdown: string,
-    safePrefix = "",
+    orphanSafePrefix = "",
 ): string {
     const { text, eol } = normalizeEol(markdown);
     const lines = text.split("\n");
     const scan = scanDocument(lines);
     const masked = maskProtectedLines(lines, scan);
     const definitions = definitionNamesFolded(lines, masked);
-    const safeFolded = safePrefix.toLowerCase();
+    const orphanSafeFolded = orphanSafePrefix.toLowerCase();
 
     const out = lines.map((line, i) => {
         if (scan.isProtected[i]) return line;
@@ -110,7 +110,7 @@ export function removeOrphanedFootnoteReferences(
             line,
             masked[i],
         )) {
-            if (!isOrphan(name, definitions, safeFolded)) continue;
+            if (!isOrphan(name, definitions, orphanSafeFolded)) continue;
             result += line.slice(copied, start);
             copied = end;
             // seam: a space directly after the cut collapses when the cut
@@ -147,7 +147,7 @@ export function removeOrphanedFootnoteReferences(
 }
 
 /** Linter-shaped registry entry; the option is the note's safe bare prefix. */
-export const removeOrphanedReferencesRule: FootnoteRule<{ safePrefix?: string }> =
+export const removeOrphanedReferencesRule: FootnoteRule<{ orphanSafePrefix?: string }> =
     {
         id: "remove-orphaned-references",
         name: "Remove orphaned references",
@@ -175,5 +175,5 @@ export const removeOrphanedReferencesRule: FootnoteRule<{ safePrefix?: string }>
             },
         ],
         apply: (text, options) =>
-            removeOrphanedFootnoteReferences(text, options.safePrefix ?? ""),
+            removeOrphanedFootnoteReferences(text, options.orphanSafePrefix ?? ""),
     };

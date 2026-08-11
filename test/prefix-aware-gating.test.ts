@@ -7,9 +7,11 @@ import { lintFootnotes, lintOptionsFromSettings } from "../src/linting/linter";
 // on but the "Apply the note's footnote prefix" rule OFF, linting still
 // renumbered prefixed footnotes within their namespace — weirdly
 // inconsistent, since nothing else was being prefixed. Prefix-aware
-// reindexing is now gated on the apply rule too: while it is off,
-// footnotes carrying the prefix are treated as NAMED footnotes and keep
-// their ids.
+// reindexing is gated on the apply rule too: while it is off, footnotes
+// carrying the prefix are treated as NAMED footnotes and keep their ids.
+// Since 2026-08-11 the gating is structural — ONE applyNotePrefix flag
+// drives both the apply step and the namespace-aware reindex, so the
+// inconsistent combination can no longer be expressed at all.
 
 function pluginWith(overrides: Record<string, boolean>): FootnotePlugin {
     return {
@@ -40,7 +42,7 @@ const NOTE = [
 describe("prefix-aware reindexing is gated on the apply-prefix rule", () => {
     it("apply ON: prefixed footnotes renumber within their namespace", () => {
         const options = lintOptionsFromSettings(pluginWith({}), "", NOTE);
-        expect(options.prefixAware).toBe(true);
+        expect(options.applyNotePrefix).toBe(true);
         const result = lintFootnotes(NOTE, options);
         expect(result).toContain("b[^2.1] a[^2.2] end");
     });
@@ -51,7 +53,7 @@ describe("prefix-aware reindexing is gated on the apply-prefix rule", () => {
             "",
             NOTE,
         );
-        expect(options.prefixAware).toBe(false);
+        expect(options.applyNotePrefix).toBe(false);
         const result = lintFootnotes(NOTE, options);
         // ids untouched; the definitions still reorder to appearance order,
         // exactly as named footnotes always have
@@ -61,13 +63,12 @@ describe("prefix-aware reindexing is gated on the apply-prefix rule", () => {
         );
     });
 
-    it("feature OFF entirely: prefixAware stays off regardless of the rule", () => {
+    it("feature OFF entirely: applyNotePrefix stays off regardless of the rule", () => {
         const options = lintOptionsFromSettings(
             pluginWith({ enableFootnotePrefix: false }),
             "",
             NOTE,
         );
-        expect(options.prefixAware).toBe(false);
         expect(options.applyNotePrefix).toBe(false);
     });
 });

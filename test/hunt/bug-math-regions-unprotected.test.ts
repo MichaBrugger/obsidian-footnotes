@@ -48,10 +48,7 @@ describe("fixed 2026-08-10: math regions are protected (Jason: linting never tou
     it("the composed lint preserves all math content", () => {
         const input =
             "---\nfootnote-prefix: 4.\n---\n$x[^9].$ real[^2].\n$$\n[^8]: mathematical label\ny[^7]\n$$\n\n[^2]: real";
-        const out = lintFootnotes(input, {
-            applyNotePrefix: true,
-            prefixAware: true,
-        });
+        const out = lintFootnotes(input, { applyNotePrefix: true });
         expect(out).toContain("$x[^9].$");
         expect(out).toContain("$$\n[^8]: mathematical label\ny[^7]\n$$");
     });
