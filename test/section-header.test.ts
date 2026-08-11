@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { addFootnoteSectionHeader } from "../src/insert-or-navigate-footnotes";
+import { addFootnoteSectionHeader } from "../src/definition-append";
 import type FootnotePlugin from "../src/main";
 
 // The optional heading inserted above the first footnote definition. A blank

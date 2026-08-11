@@ -19,9 +19,11 @@ import {
 import { footnotePopupBusy, openFootnotePopup, popupEditingAvailable, runAfterNextPopupSettle, settleFootnotePopupWithFeedback, toggleCloseFootnotePopup } from "./footnote-popup";
 import { activeFootnotePrefix, footnotePrefix, footnotePrefixFromEditor, footnotePrefixProblem } from "./footnote-prefix";
 import { adjustFootnotePosition, endOfWordOffset, moveCursorAndSetJumpPoint } from "./cursor-motion";
+import { buildDefinitionAppend } from "./definition-append";
 import { DocContext, docContext, docLines, readingViewActive } from "./doc-context";
+import { exitInlineFootnoteIfInside, sanitizeInlineFootnoteContent, warnEmptyInlineFootnoteIfInside } from "./inline-footnotes";
 import { lintAfterFootnoteCreation } from "./linting/linter";
-import { definitionLabelIn, findDefinitionBlocks, maskInlineRegions, maskProtectedLines, maskedLineAt, scanDocument } from "./markdown-scan";
+import { definitionLabelIn, findDefinitionBlocks, maskInlineRegions, maskProtectedLines, maskedLineAt } from "./markdown-scan";
 import { viewEditor } from "./obsidian-internals";
 import { activeTableCellEditor, resolveTableCellCursor, runOutsideTableCell, TableCellEditor } from "./table-cursor";
 
@@ -276,153 +278,6 @@ export function shouldJumpFromReferenceToDefinition(
     return false;
 }
 
-export function addFootnoteSectionHeader(
-    plugin: FootnotePlugin,
-): string {
-    //check if 'Enable Footnote Section Heading' is true
-    //if so, return the "Footnote Section Heading"
-    // else, return ""
-
-    // a cleared-out heading value counts as no heading — the lint path
-    // already treats "" that way, and "\n\n" + "" would otherwise strand
-    // stray blank lines above the first footnote
-    if (
-        plugin.settings.enableFootnoteSectionHeading &&
-        plugin.settings.footnoteSectionHeading
-    ) {
-        // the setting holds literal markdown (legacy plain-text values are
-        // migrated on load); a blank line ALWAYS separates the heading from
-        // the content above it — markdown block convention (requested
-        // 2026-07-20), and it keeps a heading starting with a divider from
-        // turning the line above into a setext heading
-        return `\n\n${plugin.settings.footnoteSectionHeading}`;
-    }
-    return "";
-}
-
-// Build (don't apply) the edit that appends `[^id]: ` to the note's
-// footnote definitions: right after the last existing definition block
-// when there is one (issue #55 — the definitions may live under a
-// mid-document heading with more content below), otherwise after the last
-// non-blank line — trimming trailing blank lines if enabled, and adding a
-// blank separator plus the optional section heading before the first
-// footnote. Returned as data so the caller can bundle it with the reference
-// insertion into a single transaction (see moveCursorAndSetJumpPoint).
-export function buildDefinitionAppend(
-    doc: Editor,
-    footnoteId: string,
-    isFirstFootnote: boolean,
-    plugin: FootnotePlugin,
-    ctx: DocContext = docContext(doc),
-): { change: EditorChange; cursor: EditorPosition; prepend?: EditorChange } {
-    const lines = ctx.lines;
-    const isProtected = ctx.scan.isProtected;
-    const blocks = findDefinitionBlocks(lines, isProtected, ctx.scan);
-    // a non-blank line directly below the new definition would be pulled INTO
-    // it — Obsidian lazily continues a definition into the next line — so
-    // insertions with content below them add a trailing blank separator
-    // (A4 bug, 2026-07-20). The cursor still lands on the definition line.
-    const needsSeparator = (insertLine: number) =>
-        insertLine + 1 < lines.length && lines[insertLine + 1].trim() !== "";
-    if (blocks.length > 0) {
-        const lastLine = blocks[blocks.length - 1].end;
-        let text = `\n[^${footnoteId}]: `;
-        const cursor = { line: lastLine + 1, ch: text.length - 1 };
-        if (needsSeparator(lastLine)) text += "\n";
-        return {
-            change: {
-                from: { line: lastLine, ch: doc.getLine(lastLine).length },
-                text,
-            },
-            cursor,
-        };
-    }
-
-    // no definitions yet — but an existing section heading in the note
-    // claims the first footnote (QOL follow-up to issue #55): slot the
-    // definition under it instead of appending a second heading at the end.
-    // The setting is markdown that can span multiple lines, so match runs.
-    if (
-        plugin.settings.enableFootnoteSectionHeading &&
-        plugin.settings.footnoteSectionHeading
-    ) {
-        const headingLines = plugin.settings.footnoteSectionHeading.split("\n");
-        for (let i = 0; i + headingLines.length <= lines.length; i++) {
-            const matches = headingLines.every(
-                (headingLine, k) =>
-                    !isProtected[i + k] && lines[i + k] === headingLine,
-            );
-            if (!matches) continue;
-            let fromLine = i + headingLines.length - 1;
-            let slotText = `\n\n[^${footnoteId}]: `;
-            // reuse a blank line already separating the heading from what
-            // follows, instead of doubling it
-            if (fromLine + 1 < lines.length && lines[fromLine + 1] === "") {
-                fromLine += 1;
-                slotText = `\n[^${footnoteId}]: `;
-            }
-            const slotLinesAdded = slotText.split("\n").length - 1;
-            const cursor = {
-                line: fromLine + slotLinesAdded,
-                ch: slotText.length - slotText.lastIndexOf("\n") - 1,
-            };
-            if (needsSeparator(fromLine)) slotText += "\n";
-            return {
-                change: {
-                    from: { line: fromLine, ch: doc.getLine(fromLine).length },
-                    text: slotText,
-                },
-                cursor,
-            };
-        }
-    }
-
-    let fromLine = doc.lastLine();
-    let to: EditorPosition | undefined;
-    if (plugin.settings.enableRemoveBlankLastLines) {
-        while (fromLine > 0 && doc.getLine(fromLine).length === 0) {
-            fromLine--;
-        }
-        to = { line: doc.lastLine(), ch: doc.getLine(doc.lastLine()).length };
-    }
-    const from = { line: fromLine, ch: doc.getLine(fromLine).length };
-
-    let text = `\n[^${footnoteId}]: `;
-    if (isFirstFootnote) {
-        let heading = addFootnoteSectionHeader(plugin);
-        // the heading carries its own blank line above; a blank insertion
-        // line (trimming off, note ends empty) already supplies it
-        if (heading && doc.getLine(fromLine).trim() === "") {
-            heading = heading.slice(1);
-        }
-        text = heading + "\n" + text;
-    }
-
-    // cursor lands at the end of the inserted definition line
-    const linesAdded = text.split("\n").length - 1;
-    const cursor = {
-        line: fromLine + linesAdded,
-        ch: text.length - text.lastIndexOf("\n") - 1,
-    };
-
-    // The first footnote's section heading can carry a column-0 "---"
-    // divider; if the note's first line is a bare unclosed "---" (a
-    // thematic break), inserting that divider makes Obsidian re-read the
-    // whole head as YAML frontmatter, swallowing the prose in it (same
-    // hazard as preserveLeadingThematicBreak in
-    // move-footnotes-to-the-bottom — verified against metadataCache,
-    // 2026-08-10). A blank line prepended in the same transaction pins
-    // line 0 as content; it renders identically.
-    let prepend: EditorChange | undefined;
-    if (isFirstFootnote && lines[0] === "---" && !isProtected[0]) {
-        const candidate = lines.slice(0, fromLine + 1).join("\n") + text;
-        if (scanDocument(candidate.split("\n")).isProtected[0]) {
-            prepend = { from: { line: 0, ch: 0 }, text: "\n" };
-            cursor.line += 1;
-        }
-    }
-    return { change: { from, to, text }, cursor, prepend };
-}
 
 // Insert `text` at the caret of an actively edited table cell, through the
 // cell's own editor so the widget handles the markdown write-back. Respects
@@ -665,46 +520,6 @@ export function createAutonumFootnote(
 
 //FUNCTIONS FOR INLINE FOOTNOTES (^[...])
 
-/**
- * Clipboard text made safe as the body of an inline footnote. Inline
- * footnotes are single-line, so whitespace runs (including newlines)
- * collapse to one space and the result is trimmed. Balanced brackets pass
- * through (pasted markdown links keep working); if any bracket is
- * unbalanced — which would end the ^[...] early and corrupt the note —
- * every bare bracket is escaped instead (pre-escaped \[ and \] keep their
- * meaning). A dangling trailing backslash would escape the wrapper's own
- * closing "]", so it is doubled into a literal one. Empty/whitespace
- * input becomes "".
- */
-export function sanitizeInlineFootnoteContent(raw: string): string {
-    let text = raw.replace(/\s+/g, " ").trim();
-    let depth = 0;
-    for (let i = 0; i < text.length; i++) {
-        const c = text[i];
-        if (c === "\\") {
-            i++; // an escaped character can't open or close anything
-        } else if (c === "[") {
-            depth++;
-        } else if (c === "]") {
-            depth--;
-            if (depth < 0) break;
-        }
-    }
-    if (depth !== 0) {
-        // keep \[ and \] pairs as the balance scan understood them; escape
-        // only the bare brackets
-        text = text.replace(/\\[\s\S]|[[\]]/g, (m) =>
-            m.length === 2 ? m : `\\${m}`,
-        );
-    }
-    // an odd trailing backslash run leaves one backslash escaping the
-    // wrapper's closing "]" — double it so it renders literally instead
-    const trailing = /\\*$/.exec(text);
-    if (trailing && trailing[0].length % 2 === 1) {
-        text += "\\";
-    }
-    return text;
-}
 
 // Shared tail of both inline commands: place `text` at the caret (through
 // the cell sub-editor inside tables — see the table notes above) with the
@@ -733,55 +548,7 @@ function insertInlineText(
     });
 }
 
-/**
- * The inline footnote whose brackets contain `ch` on `lineText`, as its
- * `open` ("^" index) and `close` ("]" index), or null. Bracket matching is
- * escape-aware and steps over nested balanced pairs (markdown links).
- * "Inside" spans from just after the `^` through the closing `]` itself.
- */
-export function inlineFootnoteSpanAt(
-    lineText: string,
-    ch: number,
-): { open: number; close: number } | null {
-    for (let i = 0; i < lineText.length - 1; i++) {
-        const c = lineText[i];
-        if (c === "\\") {
-            i++;
-            continue;
-        }
-        if (c !== "^" || lineText[i + 1] !== "[") continue;
 
-        let depth = 0;
-        let close = -1;
-        for (let j = i + 1; j < lineText.length; j++) {
-            const cj = lineText[j];
-            if (cj === "\\") {
-                j++;
-            } else if (cj === "[") {
-                depth++;
-            } else if (cj === "]") {
-                depth--;
-                if (depth === 0) {
-                    close = j;
-                    break;
-                }
-            }
-        }
-        // this candidate never closes, so it isn't an inline footnote — a
-        // LATER "^[" on the line may still close (its opening "[" was
-        // counted as nesting above), so keep scanning instead of bailing
-        if (close === -1) continue;
-        if (ch > i && ch <= close) return { open: i, close };
-        i = close; // cursor isn't in this one — keep scanning after it
-    }
-    return null;
-}
-
-/** The position just past an inline footnote's closing bracket when `ch` sits inside one, or null. */
-export function inlineFootnoteExitCh(lineText: string, ch: number): number | null {
-    const span = inlineFootnoteSpanAt(lineText, ch);
-    return span === null ? null : span.close + 1;
-}
 
 /**
  * When the caret sits strictly inside a "[^x]" reference, handle the press the
@@ -847,63 +614,7 @@ export async function insertInlineFootnote(plugin: FootnotePlugin) {
     });
 }
 
-/**
- * When the caret sits inside an EMPTY inline footnote ("^[]", or only
- * whitespace between the brackets), leave it where it is, ask for the text
- * via a Notice, and report true. Shared by every footnote command, exactly
- * like the empty "[^]" reference guard (manual combo-test feedback,
- * 2026-08-08): a second press used to silently hop the caret out,
- * stranding an inline footnote with nothing in it. A FILLED inline
- * footnote is not this guard's business — there the press falls through
- * to exitInlineFootnoteIfInside, the deliberate "done typing" hop.
- */
-function warnEmptyInlineFootnoteIfInside(
-    doc: Editor,
-    cell: TableCellEditor | null,
-): boolean {
-    const text = cell
-        ? cell.state.doc.toString()
-        : doc.getLine(doc.getCursor().line);
-    const ch = cell ? cell.state.selection.main.head : doc.getCursor().ch;
-    const span = inlineFootnoteSpanAt(text, ch);
-    if (span === null) return false;
-    if (text.slice(span.open + 2, span.close).trim() !== "") return false;
-    new Notice(
-        "This inline footnote is empty. Type its text between the brackets.",
-        8000,
-    );
-    return true;
-}
 
-/**
- * When the caret sits inside an inline footnote ("^[...]"), hop it just
- * past the closing bracket and report true. Shared by every insert
- * command: for the numbered/named ones this prevents nesting a "[^x]"
- * reference inside the inline footnote's brackets, which would end the inline
- * footnote early and corrupt it ("^[in [^named]line]").
- */
-export function exitInlineFootnoteIfInside(
-    doc: Editor,
-    cell: TableCellEditor | null,
-): boolean {
-    if (cell) {
-        const exit = inlineFootnoteExitCh(
-            cell.state.doc.toString(),
-            cell.state.selection.main.head,
-        );
-        if (exit === null) return false;
-        cell.dispatch({ selection: { anchor: exit } });
-        return true;
-    }
-    const cursorPosition = doc.getCursor();
-    const exit = inlineFootnoteExitCh(
-        doc.getLine(cursorPosition.line),
-        cursorPosition.ch,
-    );
-    if (exit === null) return false;
-    doc.setCursor({ line: cursorPosition.line, ch: exit });
-    return true;
-}
 
 /** Inline-footnote paste command: inserts `^[<clipboard>]` with the caret after it. Inside a "[^x]" reference it navigates like the named command instead (the clipboard stays untouched). */
 export async function pasteInlineFootnote(plugin: FootnotePlugin) {

@@ -1,7 +1,7 @@
 import { Editor, EditorPosition } from "obsidian";
 import { describe, expect, it } from "vitest";
 
-import { exitInlineFootnoteIfInside } from "../src/insert-or-navigate-footnotes";
+import { exitInlineFootnoteIfInside } from "../src/inline-footnotes";
 
 // QOL (2026-07-18): the numbered/named hotkeys pressed INSIDE an inline
 // footnote hop the caret past its closing bracket instead of nesting a

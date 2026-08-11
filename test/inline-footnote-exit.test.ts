@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { inlineFootnoteExitCh } from "../src/insert-or-navigate-footnotes";
+import { inlineFootnoteExitCh } from "../src/inline-footnotes";
 
 // Second-press navigation for the inline-footnote hotkey: when the cursor
 // is inside a ^[...] the command moves it just past the closing bracket

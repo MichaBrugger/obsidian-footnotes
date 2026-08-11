@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { inlineFootnoteExitCh } from "../../src/insert-or-navigate-footnotes";
+import { inlineFootnoteExitCh } from "../../src/inline-footnotes";
 
 // BUG: an earlier UNCLOSED inline footnote poisons a later well-formed one.
 // The bracket-depth scan counts every unescaped "[" as nesting, so the "[" that
