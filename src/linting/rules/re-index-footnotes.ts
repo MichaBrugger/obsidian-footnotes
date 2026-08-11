@@ -1,6 +1,6 @@
 import {
-    footnoteReferenceMatches,
     footnotePrefixProblem,
+    referenceOccurrences,
 } from "../../insert-or-navigate-footnotes";
 import {
     DefinitionStart,
@@ -52,15 +52,10 @@ function referenceAppearanceOrder(
     const order: string[] = [];
     const seen = new Set<string>();
     for (let i = 0; i < lines.length; i++) {
-        // protected lines are all-NUL in the masked twin — no matches
-        for (const match of footnoteReferenceMatches(maskedLines[i])) {
-            // re-slice the original: a code span inside the name masks to
-            // NULs, which would split the reference's identity from its raw
-            // definition label (bug-masked-name-identity)
-            const start = match.index ?? 0;
-            const id = lines[i]
-                .slice(start + 2, start + match[0].length - 1)
-                .toLowerCase();
+        // protected lines are all-NUL in the masked twin — no matches;
+        // referenceOccurrences re-slices raw names (bug-masked-name-identity)
+        for (const { name } of referenceOccurrences(lines[i], maskedLines[i])) {
+            const id = name.toLowerCase();
             if (!seen.has(id)) {
                 seen.add(id);
                 order.push(id);
@@ -78,17 +73,11 @@ function rewriteReferences(
 ): string {
     let out = "";
     let copied = 0;
-    for (const match of footnoteReferenceMatches(masked)) {
-        // re-slice the original for the id — same masked-name rationale as
-        // referenceAppearanceOrder above
-        const start = match.index ?? 0;
-        const id = line
-            .slice(start + 2, start + match[0].length - 1)
-            .toLowerCase();
-        const newName = renames.get(id);
+    for (const { name, start, end } of referenceOccurrences(line, masked)) {
+        const newName = renames.get(name.toLowerCase());
         if (newName === undefined) continue;
         out += line.slice(copied, start) + `[^${newName}]`;
-        copied = start + match[0].length;
+        copied = end;
     }
     return out + line.slice(copied);
 }

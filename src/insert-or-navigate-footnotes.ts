@@ -61,6 +61,37 @@ export function footnoteReferenceMatches(line: string): RegExpMatchArray[] {
     return matches;
 }
 
+/** One reference occurrence from referenceOccurrences: the raw name plus the span of the whole "[^name]". */
+export interface ReferenceOccurrence {
+    /** The name exactly as typed — casing preserved; fold to compare identities. */
+    name: string;
+    /** Index of the opening "[". */
+    start: number;
+    /** Index just past the closing "]". */
+    end: number;
+}
+
+/**
+ * Every reference on the line, matched against its MASKED twin but with
+ * each name re-sliced from the RAW line: a code span inside a name masks
+ * to NULs, and a NUL-bearing name can never equal the raw definition label
+ * it must pair with (bug-masked-name-identity). This is the ONE home of
+ * that invariant — every scan and rewrite iterates through here instead of
+ * hand-rolling the match-then-re-slice dance it used to clone.
+ */
+export function referenceOccurrences(
+    line: string,
+    masked: string,
+): ReferenceOccurrence[] {
+    const occurrences: ReferenceOccurrence[] = [];
+    for (const match of footnoteReferenceMatches(masked)) {
+        const start = match.index ?? 0;
+        const end = start + match[0].length;
+        occurrences.push({ name: line.slice(start + 2, end - 1), start, end });
+    }
+    return occurrences;
+}
+
 /** Whether the character at `index` is backslash-escaped: an ODD run of backslashes directly before it. */
 function escapedAt(line: string, index: number): boolean {
     let backslashes = 0;
@@ -305,20 +336,12 @@ export function shouldJumpFromDefinitionToReference(
         // (parallel-review probe, 2026-08-10)
         for (let i = 0; i < masked.length; i++) {
             const lineLabel = definitionLabelIn(masked[i]);
-            for (const use of footnoteReferenceMatches(masked[i])) {
-                const useStart = use.index ?? 0;
-                if (lineLabel && useStart === lineLabel.nameStart - 2) {
+            for (const use of referenceOccurrences(lines[i], masked[i])) {
+                if (lineLabel && use.start === lineLabel.nameStart - 2) {
                     continue;
                 }
-                // re-slice the ORIGINAL line for the name: a code span
-                // inside it masks to NULs, which can never equal the raw
-                // block name (bug pinned in bug-masked-name-identity)
-                const useName = lines[i].slice(
-                    useStart + 2,
-                    useStart + use[0].length - 1,
-                );
-                if (useName.toLowerCase() !== name) continue;
-                const newCursorPos = { line: i, ch: useStart + use[0].length };
+                if (use.name.toLowerCase() !== name) continue;
+                const newCursorPos = { line: i, ch: use.end };
                 moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos, plugin, undefined, true);
                 return true;
             }
@@ -818,7 +841,6 @@ export function footnotePrefixFromEditor(doc: Editor): string {
     return footnotePrefix(lines.join("\n"));
 }
 
-// The prefix the autonumbered command should actually use: nothing unless
 /**
  * Why `prefix` can't be used as a footnote prefix, or null when it can.
  * Shared by the Set-footnote-prefix modal, the insert path, and the lint
@@ -840,13 +862,15 @@ export function footnotePrefixProblem(prefix: string): string | null {
 
 // the feature is enabled in settings, and a prefix that can't work BLOCKS
 // the insert (null) with an explanation — falling back to an unprefixed
-// footnote just left the user something to delete (reported 2026-08-07)
+// footnote just left the user something to delete (reported 2026-08-07).
+// Takes the already-extracted prefix so callers pick the cheap read:
+// footnotePrefixFromEditor per press, footnotePrefix when the full text is
+// already in hand (F1 — no whole-document materialization per keypress)
 function activeFootnotePrefix(
     plugin: FootnotePlugin,
-    markdownText: string,
+    prefix: string,
 ): string | null {
     if (!plugin.settings.enableFootnotePrefix) return "";
-    const prefix = footnotePrefix(markdownText);
     if (!prefix) return "";
     const problem = footnotePrefixProblem(prefix);
     if (problem) {
@@ -903,6 +927,81 @@ export function computeNextFootnoteNumber(
     return currentMax;
 }
 
+/**
+ * The shared entry preamble of every footnote command: settle a pending
+ * popup save, toggle-close an open popup (that press is consumed), then
+ * resolve an editable editor. Null means the press must do nothing —
+ * popup consumed it, no markdown view, a deferred view without an editor
+ * (viewEditor), or Reading view, where the editor API happily edits the
+ * HIDDEN buffer: one press invisibly inserted "[^]" and the next press
+ * toasted about a reference the user could not see (reported 2026-08-08,
+ * probed live; main.ts also disables the commands in the palette, this
+ * guards programmatic invocation). ORDER MATTERS: the settle wait comes
+ * BEFORE the popup toggle so a same-tick second press sees the popup the
+ * first press opened (and closes it) instead of racing past it — and
+ * document edits must wait for a just-closed popup's pending definition
+ * save, or that save clobbers them.
+ */
+async function editableEditorForCommand(
+    plugin: FootnotePlugin,
+): Promise<Editor | null> {
+    await settleFootnotePopupWithFeedback();
+    if (toggleCloseFootnotePopup()) return null;
+    const mdView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
+    const doc = mdView && viewEditor(mdView);
+    if (!mdView || !doc) return null;
+    if (readingViewActive(mdView)) return null;
+    return doc;
+}
+
+/**
+ * The caret guards every footnote command runs before acting, IN THIS
+ * ORDER (load-bearing): an EMPTY inline footnote asks for its text before
+ * the filled-inline "done typing" hop can trigger; the hop beats the
+ * reference guards (an inline body can contain reference-shaped text); an
+ * abandoned "[^]" asks for a name instead of nesting; an untouched
+ * "[^7-]" prefix placeholder asks for a suffix. True = the press was
+ * consumed (toast or hop) and the command stops. The inline/paste
+ * commands additionally navigate from inside a real reference
+ * (navigateReferenceIfInside) at their call sites — the autonum/named
+ * commands run their own jump cascade instead.
+ */
+function caretGuardsHandled(
+    plugin: FootnotePlugin,
+    doc: Editor,
+    cell: TableCellEditor | null,
+): boolean {
+    if (warnEmptyInlineFootnoteIfInside(doc, cell)) return true;
+    if (exitInlineFootnoteIfInside(doc, cell)) return true;
+    if (warnEmptyReferenceIfInside(doc, cell)) return true;
+    if (warnPrefilledReferenceIfInside(plugin, doc, cell)) return true;
+    return false;
+}
+
+/**
+ * The shared creation tail of the autonum and named commands' popup path:
+ * open the popup editor bound to the new definition. Its fallback (embed
+ * registry unavailable, or a late failure) jumps to the definition
+ * instead — and there a popup that failed AFTER its DOM existed is still
+ * settling its teardown save, so an immediate lint would no-op behind the
+ * busy gate; the settle-deferred lint registered here fires instead (E32).
+ */
+function openPopupForNewDefinition(
+    plugin: FootnotePlugin,
+    doc: Editor,
+    cursorPosition: EditorPosition,
+    footnoteId: string,
+    definitionCursor: EditorPosition,
+) {
+    const cancelCreationLint = scheduleCreationLintAfterPopup(plugin);
+    void openFootnotePopup(plugin, footnoteId, () => {
+        moveCursorAndSetJumpPoint(doc, cursorPosition, definitionCursor, plugin, undefined, true);
+        if (footnotePopupBusy()) return;
+        cancelCreationLint();
+        lintAfterFootnoteCreation(plugin, true);
+    });
+}
+
 /** The auto-numbered command ("Insert / navigate auto-numbered footnote"): runs the decision cascade, creating "[^N]" + definition when nothing to navigate to. */
 export async function insertAutonumFootnote(plugin: FootnotePlugin) {
     // ORDER MATTERS: settle first, then toggle. The settle wait must come
@@ -910,33 +1009,14 @@ export async function insertAutonumFootnote(plugin: FootnotePlugin) {
     // the first press opened (and closes it) instead of racing past it —
     // and document edits must wait for a just-closed popup's pending
     // definition save, or that save clobbers them.
-    await settleFootnotePopupWithFeedback();
-    // pressing the hotkey while the popup editor is open closes it
-    if (toggleCloseFootnotePopup()) return;
-
-    const mdView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
-    // viewEditor: a deferred view has no editor despite the typings
-    const doc = mdView && viewEditor(mdView);
-    if (!mdView || !doc) return;
-    // Reading view: the editor API happily edits the HIDDEN buffer — one
-    // press invisibly inserted "[^]" and the next press toasted about a
-    // reference the user could not see (reported 2026-08-08, probed live).
-    // Text-editing commands are inert there; main.ts also disables them
-    // in the palette, this guards programmatic invocation.
-    if (readingViewActive(mdView)) return;
+    const doc = await editableEditorForCommand(plugin);
+    if (!doc) return;
 
     // an actively edited table cell owns the real caret; getCursor() is
     // stale there, and editing the row via the main editor corrupts the
     // table — reads use the resolved position, writes go through the cell
     const cell = activeTableCellEditor(doc);
-    // inside an inline footnote, hop out instead of nesting a reference in it
-    // inside an EMPTY inline footnote, ask for its text instead of hopping
-    if (warnEmptyInlineFootnoteIfInside(doc, cell)) return;
-    if (exitInlineFootnoteIfInside(doc, cell)) return;
-    // inside an abandoned "[^]", ask for a name instead of nesting "[^N]"
-    if (warnEmptyReferenceIfInside(doc, cell)) return;
-    // inside an untouched "[^7-]" placeholder, ask for a suffix
-    if (warnPrefilledReferenceIfInside(plugin, doc, cell)) return;
+    if (caretGuardsHandled(plugin, doc, cell)) return;
     const run = (cursorPosition: EditorPosition) => {
         const lineText = doc.getLine(cursorPosition.line);
         // ONE shared document view for the whole cascade (perf F1) — built
@@ -976,7 +1056,7 @@ export function shouldCreateAutonumFootnote(
     // document (the view's data buffer lags editor edits by a tick, so it
     // can't be trusted here)
     const markdownText = ctx.lines.join("\n");
-    const prefix = activeFootnotePrefix(plugin, markdownText);
+    const prefix = activeFootnotePrefix(plugin, footnotePrefix(markdownText));
     // an invalid prefix blocks the insert outright (the Notice already
     // explained why) — no unprefixed fallback footnote to clean up
     if (prefix === null) return;
@@ -1031,17 +1111,7 @@ export function shouldCreateAutonumFootnote(
         // the cursor only moves past the new reference
         const afterReference = { line: cursorPosition.line + lineShift, ch: cursorPosition.ch + footnoteReference.length };
         doc.transaction({ changes, selection: { from: afterReference } });
-        const cancelCreationLint = scheduleCreationLintAfterPopup(plugin);
-        void openFootnotePopup(plugin, footnoteId, () => {
-            moveCursorAndSetJumpPoint(doc, cursorPosition, definition.cursor, plugin, undefined, true);
-            // a popup that failed AFTER its DOM existed is still settling
-            // its teardown save here — an immediate lint would no-op behind
-            // the busy gate, so leave the settle-deferred one registered
-            // above to fire instead (E32)
-            if (footnotePopupBusy()) return;
-            cancelCreationLint();
-            lintAfterFootnoteCreation(plugin, true);
-        });
+        openPopupForNewDefinition(plugin, doc, cursorPosition, footnoteId, definition.cursor);
     } else {
         moveCursorAndSetJumpPoint(doc, cursorPosition, definition.cursor, plugin, changes, true);
         lintAfterFootnoteCreation(plugin, true);
@@ -1223,26 +1293,12 @@ export function navigateReferenceIfInside(
  * commands instead of nesting.
  */
 export async function insertInlineFootnote(plugin: FootnotePlugin) {
-    // settle before toggle — same ordering rationale as insertAutonumFootnote
-    await settleFootnotePopupWithFeedback();
-    // pressing any footnote hotkey while the popup editor is open closes it
-    if (toggleCloseFootnotePopup()) return;
-
-    const mdView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
-    const doc = mdView && viewEditor(mdView);
-    if (!mdView || !doc) return;
-    // inert in Reading view — see insertAutonumFootnote
-    if (readingViewActive(mdView)) return;
+    const doc = await editableEditorForCommand(plugin);
+    if (!doc) return;
 
     const cell = activeTableCellEditor(doc);
-    // inside an EMPTY inline footnote, ask for its text instead of hopping
-    if (warnEmptyInlineFootnoteIfInside(doc, cell)) return;
-    if (exitInlineFootnoteIfInside(doc, cell)) return;
-    // inside an abandoned "[^]", ask for a name instead of nesting "^[]"
-    if (warnEmptyReferenceIfInside(doc, cell)) return;
-    // the untouched "[^7-]" placeholder warns for a suffix (it is not a
-    // real footnote to navigate to) — checked before navigateReferenceIfInside
-    if (warnPrefilledReferenceIfInside(plugin, doc, cell)) return;
+    if (caretGuardsHandled(plugin, doc, cell)) return;
+    // inside a real reference, navigate instead of nesting "^[]"
     if (navigateReferenceIfInside(plugin, doc, cell)) return;
 
     insertInlineText(plugin, "^[]", 2);
@@ -1308,25 +1364,12 @@ export function exitInlineFootnoteIfInside(
 
 /** Inline-footnote paste command: inserts `^[<clipboard>]` with the caret after it. Inside a "[^x]" reference it navigates like the named command instead (the clipboard stays untouched). */
 export async function pasteInlineFootnote(plugin: FootnotePlugin) {
-    // settle before toggle — same ordering rationale as insertAutonumFootnote
-    await settleFootnotePopupWithFeedback();
-    if (toggleCloseFootnotePopup()) return;
-
-    const mdView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
-    const doc = mdView && viewEditor(mdView);
-    if (!mdView || !doc) return;
-    // inert in Reading view — see insertAutonumFootnote
-    if (readingViewActive(mdView)) return;
+    const doc = await editableEditorForCommand(plugin);
+    if (!doc) return;
     const pasteCell = activeTableCellEditor(doc);
-    // inside an inline footnote, hop out instead of nesting "^[...]" in it —
-    // the same guard every other insert command runs (missed here until the
-    // 2026-08-07 QOL sweep; pinned by test/paste-inline-in-inline.test.ts)
-    // inside an EMPTY inline footnote, ask for its text instead of hopping
-    if (warnEmptyInlineFootnoteIfInside(doc, pasteCell)) return;
-    if (exitInlineFootnoteIfInside(doc, pasteCell)) return;
-    // inside an abandoned "[^]", ask for a name instead of nesting the paste
-    if (warnEmptyReferenceIfInside(doc, pasteCell)) return;
-    if (warnPrefilledReferenceIfInside(plugin, doc, pasteCell)) return;
+    // the same guards every other insert command runs (missed here until
+    // the 2026-08-07 QOL sweep; pinned by test/paste-inline-in-inline.test.ts)
+    if (caretGuardsHandled(plugin, doc, pasteCell)) return;
     if (navigateReferenceIfInside(plugin, doc, pasteCell)) return;
 
     // read the clipboard BEFORE resolving positions — it's the only await,
@@ -1351,31 +1394,14 @@ export async function pasteInlineFootnote(plugin: FootnotePlugin) {
 
 /** The named command ("Insert / navigate named footnote"): same cascade, but creation is two-step — first press inserts "[^]" for name entry, next press (caret on the named reference) creates its definition. */
 export async function insertNamedFootnote(plugin: FootnotePlugin) {
-    // settle before toggle — same ordering rationale as insertAutonumFootnote
-    await settleFootnotePopupWithFeedback();
-    // pressing the hotkey while the popup editor is open closes it
-    if (toggleCloseFootnotePopup()) return;
-
-    const mdView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
-    const doc = mdView && viewEditor(mdView);
-    if (!mdView || !doc) return;
-    // inert in Reading view — see insertAutonumFootnote
-    if (readingViewActive(mdView)) return;
+    const doc = await editableEditorForCommand(plugin);
+    if (!doc) return;
 
     // an actively edited table cell owns the real caret; getCursor() is
     // stale there, and editing the row via the main editor corrupts the
     // table — reads use the resolved position, writes go through the cell
     const cell = activeTableCellEditor(doc);
-    // inside an inline footnote, hop out instead of nesting a reference in it
-    // inside an EMPTY inline footnote, ask for its text instead of hopping
-    if (warnEmptyInlineFootnoteIfInside(doc, cell)) return;
-    if (exitInlineFootnoteIfInside(doc, cell)) return;
-    // inside an abandoned "[^]", ask for a name — a second press used to
-    // silently hop the caret out, leaving the fragment unexplained
-    if (warnEmptyReferenceIfInside(doc, cell)) return;
-    // inside an untouched "[^7-]" placeholder, warn — a second press
-    // must not create a footnote named after the bare prefix
-    if (warnPrefilledReferenceIfInside(plugin, doc, cell)) return;
+    if (caretGuardsHandled(plugin, doc, cell)) return;
     const run = (cursorPosition: EditorPosition) => {
         const lineText = doc.getLine(cursorPosition.line);
         // ONE shared document view for the whole cascade (perf F1)
@@ -1467,15 +1493,7 @@ export function shouldCreateMatchingFootnoteDefinition(
                     // type the definition in a popup instead of jumping to the
                     // bottom; the cursor stays on the reference
                     doc.transaction({ changes: definitionChanges });
-                    const cancelCreationLint = scheduleCreationLintAfterPopup(plugin);
-                    void openFootnotePopup(plugin, footnoteId, () => {
-                        moveCursorAndSetJumpPoint(doc, cursorPosition, definition.cursor, plugin, undefined, true);
-                        // see the autonum twin: a late popup failure is
-                        // still settling — the deferred lint fires (E32)
-                        if (footnotePopupBusy()) return;
-                        cancelCreationLint();
-                        lintAfterFootnoteCreation(plugin, true);
-                    });
+                    openPopupForNewDefinition(plugin, doc, cursorPosition, footnoteId, definition.cursor);
                 } else {
                     moveCursorAndSetJumpPoint(doc, cursorPosition, definition.cursor, plugin, definitionChanges, true);
                     lintAfterFootnoteCreation(plugin, true);
@@ -1600,9 +1618,12 @@ export function shouldCreateFootnoteReference(
     //prefix. The prefix gate runs AFTER the second-press hop checks: an
     //invalid prefix blocks reference CREATION (toast only, nothing to clean
     //up — reported 2026-08-07), but never plain caret navigation.
+    // footnotePrefixFromEditor stops at the closing frontmatter fence —
+    // the old doc.getValue() materialized the whole document per press
+    // (the half of F1 this path had missed)
     const resolvePrefix = () =>
         plugin.settings.enableFootnotePrefix
-            ? activeFootnotePrefix(plugin, doc.getValue())
+            ? activeFootnotePrefix(plugin, footnotePrefixFromEditor(doc))
             : "";
 
     if (cell) {

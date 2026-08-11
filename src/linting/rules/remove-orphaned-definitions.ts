@@ -1,4 +1,4 @@
-import { footnoteReferenceMatches } from "../../insert-or-navigate-footnotes";
+import { referenceOccurrences } from "../../insert-or-navigate-footnotes";
 import {
     DefinitionBlock,
     definitionLabelIn,
@@ -19,8 +19,8 @@ import { FootnoteRule } from "../rule";
 // the "Delete orphaned definitions" toggle works with reindexing off, and the
 // two orphan settings mirror each other. Deletion is transitive over a
 // reference graph, so a chain of definitions each kept alive only by the
-// previous one's body dies in ONE call at any depth (the 20-iteration
-// fixpoint cap never applies here); definitions that reference each other in
+// previous one's body dies in ONE call at any depth (reindex's fixpoint
+// cap never applies here); definitions that reference each other in
 // a cycle count as referenced and survive, exactly like the reindex policy.
 
 interface ReferenceScan {
@@ -72,15 +72,14 @@ function scanReferences(
     const liveRefs = new Map<string, number>();
     const blockRefs: string[][] = blocks.map(() => []);
     for (let i = 0; i < lines.length; i++) {
-        for (const match of footnoteReferenceMatches(maskedLines[i])) {
-            const start = match.index ?? 0;
+        for (const { name: raw, start } of referenceOccurrences(
+            lines[i],
+            maskedLines[i],
+        )) {
             // column-0 labels are excluded by footnoteReferenceMatches;
             // blockquoted ones read as mid-line references — skip them here
             if (start === labelStartAt[i]) continue;
-            // re-slice the original for the name (a code span masks to NULs)
-            const name = lines[i]
-                .slice(start + 2, start + match[0].length - 1)
-                .toLowerCase();
+            const name = raw.toLowerCase();
             if (blockAtLine[i] === -1) {
                 liveRefs.set(name, (liveRefs.get(name) ?? 0) + 1);
             } else {

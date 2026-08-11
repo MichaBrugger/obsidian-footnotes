@@ -1,7 +1,7 @@
 import {
     computeNextFootnoteNumber,
-    footnoteReferenceMatches,
     footnotePrefixProblem,
+    referenceOccurrences,
 } from "../../insert-or-navigate-footnotes";
 import {
     DefinitionStart,
@@ -58,11 +58,10 @@ export function applyFootnotePrefix(markdown: string, prefix: string): string {
     };
     for (let i = 0; i < lines.length; i++) {
         if (isProtected[i]) continue;
-        for (const match of footnoteReferenceMatches(maskedLines[i])) {
-            // re-slice the original: a code span inside the name masks to
-            // NULs in match[1], and the rewrite below compares original ids
-            const start = match.index ?? 0;
-            record(lines[i].slice(start + 2, start + match[0].length - 1));
+        // referenceOccurrences re-slices raw names — the rewrite below
+        // compares original ids (bug-masked-name-identity)
+        for (const { name } of referenceOccurrences(lines[i], maskedLines[i])) {
+            record(name);
         }
     }
     for (const block of blocks) {
@@ -99,15 +98,11 @@ export function applyFootnotePrefix(markdown: string, prefix: string): string {
         const masked = maskedLines[i];
         let result = "";
         let copied = 0;
-        for (const match of footnoteReferenceMatches(masked)) {
-            const start = match.index ?? 0;
-            // re-slice the original for the id: a code span inside the
-            // name masks to NULs in match[1]
-            const id = line.slice(start + 2, start + match[0].length - 1);
-            const newName = renameFor(id);
+        for (const { name, start, end } of referenceOccurrences(line, masked)) {
+            const newName = renameFor(name);
             if (newName === null) continue;
             result += line.slice(copied, start) + `[^${newName}]`;
-            copied = start + match[0].length;
+            copied = end;
         }
         result += line.slice(copied);
         const definition = line.match(DefinitionStart);

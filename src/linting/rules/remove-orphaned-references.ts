@@ -1,6 +1,6 @@
 import {
-    footnoteReferenceMatches,
     isValidFootnoteName,
+    referenceOccurrences,
 } from "../../insert-or-navigate-footnotes";
 import {
     definitionLabelIn,
@@ -71,9 +71,7 @@ export function orphanedFootnoteReferenceNames(
     const names: string[] = [];
     const seen = new Set<string>();
     for (let i = 0; i < masked.length; i++) {
-        for (const match of footnoteReferenceMatches(masked[i])) {
-            const start = match.index ?? 0;
-            const name = lines[i].slice(start + 2, start + match[0].length - 1);
+        for (const { name } of referenceOccurrences(lines[i], masked[i])) {
             if (!isOrphan(name, definitions, safeFolded)) continue;
             const folded = name.toLowerCase();
             if (!seen.has(folded)) {
@@ -108,10 +106,10 @@ export function removeOrphanedFootnoteReferences(
         let result = "";
         let copied = 0;
         let changed = false;
-        for (const match of footnoteReferenceMatches(masked[i])) {
-            const start = match.index ?? 0;
-            const end = start + match[0].length;
-            const name = line.slice(start + 2, end - 1);
+        for (const { name, start, end } of referenceOccurrences(
+            line,
+            masked[i],
+        )) {
             if (!isOrphan(name, definitions, safeFolded)) continue;
             result += line.slice(copied, start);
             copied = end;
