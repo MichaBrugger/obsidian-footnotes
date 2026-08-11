@@ -1,5 +1,5 @@
-import { Editor, EditorChange, EditorPosition, Notice } from "obsidian";
-import { describe, expect, it, vi } from "vitest";
+import { Editor, EditorChange, EditorPosition } from "obsidian";
+import { describe, expect, it } from "vitest";
 
 import FootnotePlugin from "../src/main";
 import {
@@ -8,11 +8,9 @@ import {
     shouldCreateMatchingFootnoteDefinition,
     warnPrefilledReferenceIfInside,
 } from "../src/insert-or-navigate-footnotes";
-
-vi.mock("obsidian", async (importOriginal) => ({
-    ...(await importOriginal<typeof import("obsidian")>()),
-    Notice: vi.fn(),
-}));
+// the stub Notice records into noticeCalls — vi.mock("obsidian") does not
+// survive `isolate: false` (see the note in test/mocks/obsidian.ts)
+import { noticeCalls } from "./mocks/obsidian";
 
 // Prefix-at-bracket-creation (requested 2026-07-20, replacing the
 // definition-time rename): with an active footnote-prefix the named command
@@ -110,7 +108,7 @@ describe("named command prefills the footnote-prefix into the new reference", ()
             line: 3,
             ch: 5,
         });
-        vi.mocked(Notice).mockClear();
+        noticeCalls.length = 0;
         shouldCreateFootnoteReference(
             "Alpha",
             { line: 3, ch: 5 },
@@ -120,10 +118,10 @@ describe("named command prefills the footnote-prefix into the new reference", ()
         expect(doc.appliedChanges).toEqual([]);
         expect(doc.cursor).toEqual({ line: 3, ch: 5 });
         // warning toasts carry a longer display duration (QOL 2026-08-07)
-        expect(Notice).toHaveBeenCalledWith(
+        expect(noticeCalls).toContainEqual([
             expect.stringContaining("No footnote was created"),
             expect.any(Number),
-        );
+        ]);
     });
 
     it("the auto-numbered command aborts the same way on an invalid prefix", () => {
@@ -131,7 +129,7 @@ describe("named command prefills the footnote-prefix into the new reference", ()
             line: 3,
             ch: 5,
         });
-        vi.mocked(Notice).mockClear();
+        noticeCalls.length = 0;
         shouldCreateAutonumFootnote(
             "Alpha",
             { line: 3, ch: 5 },
@@ -139,10 +137,10 @@ describe("named command prefills the footnote-prefix into the new reference", ()
             doc,
         );
         expect(doc.appliedChanges).toEqual([]);
-        expect(Notice).toHaveBeenCalledWith(
+        expect(noticeCalls).toContainEqual([
             expect.stringContaining("No footnote was created"),
             expect.any(Number),
-        );
+        ]);
     });
 
     it("with the prefix feature OFF, a digit-ending property changes nothing", () => {
@@ -168,16 +166,16 @@ describe("warnPrefilledReferenceIfInside (the [^7-] placeholder toast)", () => {
             line: 3,
             ch: 9,
         });
-        vi.mocked(Notice).mockClear();
+        noticeCalls.length = 0;
         expect(warnPrefilledReferenceIfInside(fakePlugin(true), doc, null)).toBe(
             true,
         );
         // the caret does NOT move — the toast is the whole response
         expect(doc.cursor).toEqual({ line: 3, ch: 9 });
         expect(doc.appliedChanges).toEqual([]);
-        expect(Notice).toHaveBeenCalledWith(
+        expect(noticeCalls).toContainEqual([
             expect.stringContaining("suffix"),
-        );
+        ]);
     });
 
     it("reports false once a name has been typed after the prefix", () => {
