@@ -128,12 +128,20 @@ function orphanedBlocks(referenceScan: ReferenceScan): DefinitionBlock[] {
  * matching the message's wording; fixing the listed orphan surfaces it on
  * the next lint.
  */
-export function orphanedFootnoteDefinitionNames(markdown: string): string[] {
+export function orphanedFootnoteDefinitionNames(
+    markdown: string,
+    // the post-lint alerts share ONE normalize/scan pass across all three
+    // alert helpers (2026-08-11 review perf item); direct callers omit it
+    precomputed?: { lines: string[]; scan: DocumentScan },
+): string[] {
     // no "[^" anywhere means no definitions (and no orphans) — this alert
     // scan runs on every lint (perf F4)
     if (!markdown.includes("[^")) return [];
-    const lines = normalizeEol(markdown).text.split("\n");
-    const referenceScan = scanReferences(lines, scanDocument(lines));
+    const lines = precomputed?.lines ?? normalizeEol(markdown).text.split("\n");
+    const referenceScan = scanReferences(
+        lines,
+        precomputed?.scan ?? scanDocument(lines),
+    );
     const referenced = new Set(referenceScan.liveRefs.keys());
     for (const refs of referenceScan.blockRefs) {
         for (const name of refs) referenced.add(name);

@@ -9,55 +9,66 @@ import { isValidFootnoteName } from "./footnote-grammar";
 // on footnote-grammar (+ the FootnotePlugin TYPE, erased at runtime) —
 // split out of the all-in-one commands file 2026-08-11.
 
+// strip a trailing "\r" so CRLF notes match the exact "---" fence and the
+// "$"-anchored property regex (a "\r" defeats both otherwise) — the ONE
+// copy both readers share (2026-08-11 review cleanliness)
+const stripCrLine = (line: string): string =>
+    line.endsWith("\r") ? line.slice(0, -1) : line;
+
+/** The parsed value of one "footnote-prefix:" property line. */
+function parsePrefixValue(captured: string | undefined): string {
+    let value = (captured ?? "").trim();
+    // a value that IS a comment is an empty value
+    if (value.startsWith("#")) return "";
+    // quotes end the value — anything after the closing quote
+    // (typically a comment) is not part of it
+    const quoted = value.match(/^(["'])(.*?)\1/);
+    if (quoted) return quoted[2];
+    // an unquoted value ends at a whitespace-preceded "#" (YAML
+    // comments); a "#" glued to text is value content
+    const commentAt = value.search(/(?:^|\s)#/);
+    if (commentAt !== -1) value = value.slice(0, commentAt).trim();
+    return value;
+}
+
 /**
  * The note's `footnote-prefix` frontmatter value, or "" when absent. Chapter
  * notes of a combined document set this (e.g. "2.") so the autonumbered
  * command creates "[^2.1]", "[^2.2]", … — unique across the merged export
- * (issue #31).
+ * (issue #31). Walks the head line-by-line WITHOUT splitting the whole
+ * document — this runs several times per lint on the full note text
+ * (2026-08-11 review perf item).
  */
 export function footnotePrefix(markdownText: string): string {
-    // strip trailing "\r" so CRLF notes match the exact "---" fence and the
-    // "$"-anchored property regex below (a "\r" defeats both otherwise)
-    const lines = markdownText
-        .split("\n")
-        .map((line) => (line.endsWith("\r") ? line.slice(0, -1) : line));
-    if (lines[0] !== "---") return "";
-    // Obsidian surfaces NO properties from an UNCLOSED "---" block
-    // (2026-08-11 review bug #11, ground-truthed via metadataCache) — a
-    // prefix in one would namespace footnotes from a setting the user
-    // cannot see, so the block must close before anything is honored
-    let close = -1;
-    for (let i = 1; i < lines.length; i++) {
-        if (/^(---|\.\.\.)\s*$/.test(lines[i])) {
-            close = i;
-            break;
+    let lineStart = 0;
+    let first = true;
+    // the FIRST property line wins; its value only becomes real once the
+    // block CLOSES — Obsidian surfaces NO properties from an unclosed
+    // "---" block (2026-08-11 review bug #11, ground-truthed via
+    // metadataCache), and a prefix there would namespace footnotes from a
+    // setting the user cannot see
+    let value: string | null = null;
+    for (;;) {
+        let lineEnd = markdownText.indexOf("\n", lineStart);
+        if (lineEnd === -1) lineEnd = markdownText.length;
+        const line = stripCrLine(markdownText.slice(lineStart, lineEnd));
+        if (first) {
+            if (line !== "---") return "";
+            first = false;
+        } else if (/^(---|\.\.\.)\s*$/.test(line)) {
+            return value ?? "";
+        } else if (value === null) {
+            // YAML needs whitespace after the colon — "footnote-prefix:2."
+            // is a plain scalar Obsidian doesn't show as a property, not a
+            // mapping (bug-prefix-yaml-comment)
+            const match = line.match(/^footnote-prefix:(?:\s+(.*))?$/);
+            // the "(?:\s+(.*))?" group is genuinely optional — undefined
+            // when the property has no value at all
+            if (match) value = parsePrefixValue(match[1]);
         }
+        if (lineEnd === markdownText.length) return ""; // unclosed block
+        lineStart = lineEnd + 1;
     }
-    if (close === -1) return "";
-    for (let i = 1; i < close; i++) {
-        // YAML needs whitespace after the colon — "footnote-prefix:2." is a
-        // plain scalar Obsidian doesn't show as a property, not a mapping
-        // (bug-prefix-yaml-comment)
-        const match = lines[i].match(/^footnote-prefix:(?:\s+(.*))?$/);
-        if (match) {
-            // the "(?:\s+(.*))?" group is genuinely optional — the
-            // RegExpMatchArray index signature hides that from the checker
-            const captured = match[1] as string | undefined;
-            let value = (captured ?? "").trim();
-            // a value that IS a comment is an empty value
-            if (value.startsWith("#")) return "";
-            // quotes end the value — anything after the closing quote
-            // (typically a comment) is not part of it
-            const quoted = value.match(/^(["'])(.*?)\1/);
-            if (quoted) return quoted[2];
-            // an unquoted value ends at a whitespace-preceded "#" (YAML
-            // comments); a "#" glued to text is value content
-            const commentAt = value.search(/(?:^|\s)#/);
-            if (commentAt !== -1) value = value.slice(0, commentAt).trim();
-            return value;
-        }
-    }
-    return "";
 }
 
 /**
@@ -68,12 +79,10 @@ export function footnotePrefix(markdownText: string): string {
  * instead. Parsing is delegated to footnotePrefix so the two can't drift.
  */
 export function footnotePrefixFromEditor(doc: Editor): string {
-    const stripCr = (line: string) =>
-        line.endsWith("\r") ? line.slice(0, -1) : line;
-    if (stripCr(doc.getLine(0)) !== "---") return "";
+    if (stripCrLine(doc.getLine(0)) !== "---") return "";
     const lines = ["---"];
     for (let i = 1; i < doc.lineCount(); i++) {
-        const line = stripCr(doc.getLine(i));
+        const line = stripCrLine(doc.getLine(i));
         lines.push(line);
         if (/^(---|\.\.\.)\s*$/.test(line)) break;
     }

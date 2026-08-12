@@ -15,7 +15,7 @@ import { readingViewActive, VaultWithConfigEvents, viewEditor } from "./obsidian
 import { FootnotePluginSettingTab, FootnotePluginSettings, DEFAULT_SETTINGS } from "./settings";
 import { dismissFootnotePopup } from "./footnote-popup";
 import { insertAutonumFootnote, insertInlineFootnote, insertNamedFootnote, pasteInlineFootnote } from "./insert-or-navigate-footnotes";
-import { footnotePrefix } from "./footnote-prefix";
+import { footnotePrefixFromEditor } from "./footnote-prefix";
 import { SetFootnotePrefixModal } from "./set-footnote-prefix";
 import {
   installLintOnSave,
@@ -118,11 +118,14 @@ export default class FootnotePlugin extends Plugin {
         const mdView = this.app.workspace.getActiveViewOfType(MarkdownView);
         if (checking) return !!mdView?.file;
         if (!mdView?.file) return;
-        // prefill with the note's current prefix so editing is one step
+        // prefill with the note's current prefix so editing is one step —
+        // read only the frontmatter block, not getValue()'s whole document
+        // (2026-08-11 review perf item)
+        const editor = viewEditor(mdView);
         new SetFootnotePrefixModal(
           this,
           mdView.file,
-          footnotePrefix(viewEditor(mdView)?.getValue() ?? ""),
+          editor ? footnotePrefixFromEditor(editor) : "",
         ).open();
       },
     });

@@ -8,7 +8,13 @@ import {
 } from "../footnote-popup";
 import { jumpToFootnoteDefinition } from "../navigation";
 import { footnotePrefix, footnotePrefixProblem } from "../footnote-prefix";
-import { maskProtectedLines, normalizeEol, restoreEol } from "../markdown-scan";
+import {
+    DocumentScan,
+    maskProtectedLines,
+    normalizeEol,
+    restoreEol,
+    scanDocument,
+} from "../markdown-scan";
 import { AppWithCommands, AppWithPlugins, readingViewActive, viewEditor, WindowWithVim } from "../obsidian-internals";
 import { activeTableCellEditor, nestedSubEditorOwnsFocus, runOutsideTableCell } from "../table-cursor";
 import { applyFootnotePrefix } from "./rules/apply-footnote-prefix";
@@ -241,6 +247,9 @@ export function lintRulesAllDisabled(plugin: FootnotePlugin): boolean {
 export function countEmptyFootnoteReferences(
     markdown: string,
     prefix = "",
+    // the post-lint alerts share ONE normalize/mask pass across all three
+    // alert helpers (2026-08-11 review perf item); direct callers omit it
+    masked?: string[],
 ): number {
     const needles = prefix ? ["[^]", `[^${prefix}]`] : ["[^]"];
     // masking only ever REMOVES needle occurrences, so a raw miss is
@@ -248,7 +257,8 @@ export function countEmptyFootnoteReferences(
     // (perf F4: skip the whole-document masking pass)
     if (!needles.some((needle) => markdown.includes(needle))) return 0;
     let count = 0;
-    const lines = maskProtectedLines(normalizeEol(markdown).text.split("\n"));
+    const lines =
+        masked ?? maskProtectedLines(normalizeEol(markdown).text.split("\n"));
     for (const line of lines) {
         for (const needle of needles) {
             for (
@@ -270,9 +280,13 @@ function orphanSafePrefixFor(plugin: FootnotePlugin, markdown: string): string {
     return prefix && footnotePrefixProblem(prefix) === null ? prefix : "";
 }
 
-function noticeEmptyReferences(plugin: FootnotePlugin, markdown: string) {
-    const prefix = orphanSafePrefixFor(plugin, markdown);
-    const count = countEmptyFootnoteReferences(markdown, prefix);
+function noticeEmptyReferences(
+    plugin: FootnotePlugin,
+    markdown: string,
+    prefix: string,
+    masked: string[],
+) {
+    const count = countEmptyFootnoteReferences(markdown, prefix, masked);
     if (count === 0) return;
     const hint = prefix ? `"[^]" or the bare prefix "[^${prefix}]"` : '"[^]"';
     new Notice(
@@ -291,12 +305,14 @@ function referenceList(names: string[]): string {
 
 // the alert half of "Delete orphaned references": while the toggle is off,
 // linting reports them instead — orphans are never silent
-function noticeOrphanedReferences(plugin: FootnotePlugin, markdown: string) {
+function noticeOrphanedReferences(
+    plugin: FootnotePlugin,
+    markdown: string,
+    prefix: string,
+    precomputed: { lines: string[]; masked: string[] },
+) {
     if (plugin.settings.lintDeleteOrphanedReferences) return;
-    const names = orphanedFootnoteReferenceNames(
-        markdown,
-        orphanSafePrefixFor(plugin, markdown),
-    );
+    const names = orphanedFootnoteReferenceNames(markdown, prefix, precomputed);
     if (names.length === 0) return;
     new Notice(
         names.length === 1
@@ -308,9 +324,13 @@ function noticeOrphanedReferences(plugin: FootnotePlugin, markdown: string) {
 
 // kept orphaned definitions alert too (Jason, 2026-08-10) — every orphan
 // kind is either deleted or surfaced, never silently preserved
-function noticeOrphanedDefinitions(plugin: FootnotePlugin, markdown: string) {
+function noticeOrphanedDefinitions(
+    plugin: FootnotePlugin,
+    markdown: string,
+    precomputed: { lines: string[]; scan: DocumentScan },
+) {
     if (plugin.settings.lintDeleteOrphanedDefinitions) return;
-    const names = orphanedFootnoteDefinitionNames(markdown);
+    const names = orphanedFootnoteDefinitionNames(markdown, precomputed);
     if (names.length === 0) return;
     new Notice(
         names.length === 1
@@ -321,11 +341,22 @@ function noticeOrphanedDefinitions(plugin: FootnotePlugin, markdown: string) {
 }
 
 // every lint entry point calls this with the POST-lint text, so the alerts
-// fire whether or not the rules changed anything
+// fire whether or not the rules changed anything. ONE normalize/scan/mask
+// is shared by all three alerts (2026-08-11 review perf item: the alerts
+// each re-derived it — ~40% of a lint's wall time, felt on every creation
+// with lint-on-footnote-creation enabled). The alerts are reporting, not
+// lint RULES — the rules-stay-independent mandate (2026-08-07) is about
+// the transform pipeline, which is untouched.
 function noticeLintAlerts(plugin: FootnotePlugin, markdown: string) {
-    noticeEmptyReferences(plugin, markdown);
-    noticeOrphanedReferences(plugin, markdown);
-    noticeOrphanedDefinitions(plugin, markdown);
+    // every alert's own raw gate requires a "[^" (all its needles carry one)
+    if (!markdown.includes("[^")) return;
+    const prefix = orphanSafePrefixFor(plugin, markdown);
+    const lines = normalizeEol(markdown).text.split("\n");
+    const scan = scanDocument(lines);
+    const masked = maskProtectedLines(lines, scan);
+    noticeEmptyReferences(plugin, markdown, prefix, masked);
+    noticeOrphanedReferences(plugin, markdown, prefix, { lines, masked });
+    noticeOrphanedDefinitions(plugin, markdown, { lines, scan });
 }
 
 // ---------- automatic linting (Linter-style triggers) ----------

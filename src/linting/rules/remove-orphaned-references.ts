@@ -56,12 +56,15 @@ function isOrphan(
 export function orphanedFootnoteReferenceNames(
     markdown: string,
     orphanSafePrefix = "",
+    // the post-lint alerts share ONE normalize/scan/mask across all three
+    // alert helpers (2026-08-11 review perf item); direct callers omit it
+    precomputed?: { lines: string[]; masked: string[] },
 ): string[] {
     // no "[^" anywhere means no references (and no orphans) — this alert
     // scan runs on every lint (perf F4)
     if (!markdown.includes("[^")) return [];
-    const lines = normalizeEol(markdown).text.split("\n");
-    const masked = maskProtectedLines(lines);
+    const lines = precomputed?.lines ?? normalizeEol(markdown).text.split("\n");
+    const masked = precomputed?.masked ?? maskProtectedLines(lines);
     const definitions = definitionNamesFolded(lines, masked);
     const orphanSafeFolded = orphanSafePrefix.toLowerCase();
 

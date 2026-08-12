@@ -18,7 +18,7 @@ import {
     referenceOccurrences,
 } from "./footnote-grammar";
 import { footnotePopupBusy, openFootnotePopup, popupEditingAvailable, runAfterNextPopupSettle, settleFootnotePopupWithFeedback, toggleCloseFootnotePopup } from "./footnote-popup";
-import { activeFootnotePrefix, footnotePrefix, footnotePrefixFromEditor, footnotePrefixProblem } from "./footnote-prefix";
+import { activeFootnotePrefix, footnotePrefixFromEditor, footnotePrefixProblem } from "./footnote-prefix";
 import { adjustFootnotePosition, endOfWordOffset, moveCursorAndSetJumpPoint } from "./cursor-motion";
 import { buildDefinitionAppend } from "./definition-append";
 import { DocContext, docContext, docLines, listExistingFootnoteDefinitions } from "./doc-context";
@@ -290,18 +290,19 @@ export function createAutonumFootnote(
     // create new footnote with the next numerical index — namespaced by the
     // note's footnote-prefix property when set (#31) — reading the editor
     // document (the view's data buffer lags editor edits by a tick, so it
-    // can't be trusted here)
-    const markdownText = ctx.lines.join("\n");
-    const prefix = activeFootnotePrefix(plugin, footnotePrefix(markdownText));
+    // can't be trusted here). The prefix comes from the frontmatter-only
+    // read: joining ctx.lines materialized the whole document per creation
+    // press just to parse its head (2026-08-11 review perf item)
+    const prefix = activeFootnotePrefix(plugin, footnotePrefixFromEditor(doc));
     // an invalid prefix blocks the insert outright (the Notice already
     // explained why) — no unprefixed fallback footnote to clean up; the
     // press was still consumed
     if (prefix === null) return true;
-    const currentMax = computeNextFootnoteNumber(
-        markdownText,
-        prefix,
-        ctx.maskedLines().join("\n"),
-    );
+    // the numbering scan only ever reads the MASKED text (the first
+    // argument exists to derive a default mask), so the masked twin is
+    // passed as both
+    const masked = ctx.maskedLines().join("\n");
+    const currentMax = computeNextFootnoteNumber(masked, prefix, masked);
 
     const footnoteId = `${prefix}${currentMax}`;
     const footnoteReference = `[^${footnoteId}]`;
