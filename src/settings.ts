@@ -21,6 +21,8 @@ export interface FootnotePluginSettings {
     lintDeleteOrphanedReferences: boolean;
     /** Linting deletes definitions that have no references (independent of reindexing); while off, they are kept and alerted about. Mirrors lintDeleteOrphanedReferences. */
     lintDeleteOrphanedDefinitions: boolean;
+    /** Linting merges later duplicate definitions of a footnote into the first one as continuation lines (Obsidian renders only the last definition otherwise); while off, duplicates are kept and alerted about. Same never-silent contract as the orphan toggles (Jason, 2026-08-12). */
+    lintMergeDuplicateDefinitions: boolean;
     lintFixPunctuation: boolean;
     lintMoveToBottom: boolean;
     lintReindex: boolean;
@@ -46,6 +48,7 @@ export const DEFAULT_SETTINGS: FootnotePluginSettings = {
     renumberNamedFootnotes: false,
     lintDeleteOrphanedReferences: false,
     lintDeleteOrphanedDefinitions: false,
+    lintMergeDuplicateDefinitions: false,
     lintFixPunctuation: true,
     lintMoveToBottom: true,
     lintReindex: true,
@@ -161,12 +164,13 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                         ],
                     },
                     {
-                        // orphans get their own section (Jason, 2026-08-10):
-                        // the two toggles mirror each other, and while one is
-                        // off linting ALERTS about that orphan kind instead —
-                        // orphans are never silent
+                        // orphans and duplicates get their own section
+                        // (Jason, 2026-08-10 + 2026-08-12): the toggles
+                        // mirror each other, and while one is off linting
+                        // ALERTS about that problem kind instead — they are
+                        // never silent
                         type: "group",
-                        heading: "Orphans",
+                        heading: "Orphans and duplicates",
                         items: [
                             {
                                 name: "Delete orphaned references",
@@ -182,6 +186,14 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                                 control: {
                                     type: "toggle",
                                     key: "lintDeleteOrphanedDefinitions",
+                                },
+                            },
+                            {
+                                name: "Merge duplicate definitions",
+                                desc: "Linting merges later duplicate definitions of the same footnote into the first one, keeping every body (Obsidian only renders the last definition otherwise). While off, linting alerts you about duplicates instead.",
+                                control: {
+                                    type: "toggle",
+                                    key: "lintMergeDuplicateDefinitions",
                                 },
                             },
                         ],

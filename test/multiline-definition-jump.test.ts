@@ -133,6 +133,31 @@ describe("jumping TO a definition lands at the block's real end", () => {
         ]);
     });
 
+    it("lands on the LAST definition when duplicates exist (the one Obsidian renders)", () => {
+        // ground-truthed 2026-08-12: with duplicate definitions Obsidian
+        // renders only the LAST one — jumping to the first would land the
+        // caret on dead text
+        const lines = [
+            "r[^d] here",
+            "",
+            "[^d]: first",
+            "",
+            "[^d]: second",
+            "    second continuation",
+        ];
+        const { doc, cursorMoves } = fakeEditor(lines);
+        const handled = jumpToFootnoteDefinition(
+            "d",
+            { line: 0, ch: 3 },
+            fakePlugin,
+            doc,
+        );
+        expect(handled).toBe(true);
+        expect(cursorMoves).toEqual([
+            { line: 5, ch: "    second continuation".length },
+        ]);
+    });
+
     it("crosses an indented math region belonging to the definition", () => {
         const lines = [
             "ref[^m] here",

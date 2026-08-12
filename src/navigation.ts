@@ -108,11 +108,14 @@ export function jumpToFootnoteDefinition(
     doc: Editor,
     ctx: DocContext = docContext(doc),
 ): boolean {
-    // find the first line with this definition reference name in it — matching
-    // the masked twin so definition-shaped lines inside code don't count
-    // (#41); blockquote/callout labels count too (C22)
+    // find the LAST line with this definition label — with duplicate
+    // definitions Obsidian renders only the last one (ground-truthed
+    // 2026-08-12), so jumping to an earlier one would land on dead text.
+    // Matching runs on the masked twin so definition-shaped lines inside
+    // code don't count (#41); blockquote/callout labels count too (C22)
     const lines = ctx.lines;
     const masked = ctx.maskedLines();
+    let labelLine = -1;
     for (let i = 0; i < masked.length; i++) {
         const label = definitionLabelIn(masked[i]);
         // ids are case-insensitive: the definition label may differ in casing
@@ -124,24 +127,27 @@ export function jumpToFootnoteDefinition(
             lines[i].slice(label.nameStart, label.nameEnd).toLowerCase() ===
                 footnoteName.toLowerCase()
         ) {
-            // land at the END of the definition (indented lines belong to
-            // it) so the user can backspace/type without arrow keys. The
-            // block's reach comes from findDefinitionBlocks itself — a
-            // hand-rolled walk here stopped at blank runs and at region
-            // interiors the block walk absorbs, landing the caret
-            // mid-definition (2026-08-11 review bug #12). A blockquoted
-            // label is never part of a column-0 block; its own line is the
-            // landing spot.
-            const block = findDefinitionBlocks(
-                lines,
-                ctx.scan.isProtected,
-                ctx.scan,
-            ).find((candidate) => candidate.start === i);
-            const endLine = block ? block.end : i;
-            const newCursorPos = { line: endLine, ch: doc.getLine(endLine).length };
-            moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos, plugin, undefined, true);
-            return true;
+            labelLine = i;
         }
+    }
+    if (labelLine !== -1) {
+        // land at the END of the definition (indented lines belong to
+        // it) so the user can backspace/type without arrow keys. The
+        // block's reach comes from findDefinitionBlocks itself — a
+        // hand-rolled walk here stopped at blank runs and at region
+        // interiors the block walk absorbs, landing the caret
+        // mid-definition (2026-08-11 review bug #12). A blockquoted
+        // label is never part of a column-0 block; its own line is the
+        // landing spot.
+        const block = findDefinitionBlocks(
+            lines,
+            ctx.scan.isProtected,
+            ctx.scan,
+        ).find((candidate) => candidate.start === labelLine);
+        const endLine = block ? block.end : labelLine;
+        const newCursorPos = { line: endLine, ch: doc.getLine(endLine).length };
+        moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos, plugin, undefined, true);
+        return true;
     }
     return false;
 }

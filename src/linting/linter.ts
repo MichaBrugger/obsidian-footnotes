@@ -29,6 +29,10 @@ import {
     orphanedFootnoteReferenceNames,
     removeOrphanedFootnoteReferences,
 } from "./rules/remove-orphaned-references";
+import {
+    duplicateFootnoteDefinitionNames,
+    mergeDuplicateFootnoteDefinitions,
+} from "./rules/merge-duplicate-definitions";
 
 // The whole-document footnote linter: each pure rule (see src/linting/rules/)
 // gets a command, plus one "lint" command composing all three. This module
@@ -66,6 +70,8 @@ export function lintOptionsFromSettings(
         removeOrphanedReferences: plugin.settings.lintDeleteOrphanedReferences,
         removeOrphanedDefinitions:
             plugin.settings.lintDeleteOrphanedDefinitions,
+        mergeDuplicateDefinitions:
+            plugin.settings.lintMergeDuplicateDefinitions,
         orphanSafePrefix: orphanSafePrefixFor(plugin, markdown),
         applyNotePrefix:
             plugin.settings.enableFootnotePrefix &&
@@ -88,6 +94,8 @@ export interface LintOptions {
     removeOrphanedReferences?: boolean;
     /** Delete definitions nothing references, transitively (default off; the caller gates on the "Delete orphaned definitions" setting). Independent of `reindex`. */
     removeOrphanedDefinitions?: boolean;
+    /** Merge later duplicate definitions into the first as continuation lines (default off; the caller gates on the "Merge duplicate definitions" setting). While off, the alerts report duplicates instead — Obsidian renders only the LAST definition (ground truth 2026-08-12). */
+    mergeDuplicateDefinitions?: boolean;
     /** The note's own valid footnote-prefix while the prefix feature is on: its untouched "[^2.]" placeholder is an in-progress footnote, never an orphan to delete. */
     orphanSafePrefix?: string;
     /** Rename plain numbered AND named footnotes to carry the note's own footnote-prefix property, AND have reindex treat matching-prefixed footnotes as NUMBERED within that namespace (default off; the caller gates on settings). One flag on purpose: both behaviors ride the apply-prefix rule — renumbering within the namespace while nothing else was being prefixed felt inconsistent (Jason, 2026-08-08), so the separate `prefixAware` knob was folded in (2026-08-11). */
@@ -103,7 +111,14 @@ export function lintFootnotes(
     // original endings are restored a single time on the way out
     const { text, eol } = normalizeEol(markdown);
     let result = text;
-    // FIRST: definitions slated for deletion shouldn't be moved, prefixed,
+    // duplicates merge FIRST of all: every rule below then sees one
+    // definition block per name — orphan deletion judges one block, move
+    // gathers one, reindex permutes one — and a second pass has no
+    // duplicates left, so the pipeline stays idempotent
+    if (options.mergeDuplicateDefinitions) {
+        result = mergeDuplicateFootnoteDefinitions(result);
+    }
+    // definitions slated for deletion shouldn't be moved, prefixed,
     // or handed numbers by the rules below — and deleting orphaned
     // definitions can't orphan a live reference (a reference's presence is
     // exactly what keeps a definition alive). Reindex's own
@@ -228,10 +243,12 @@ export function lintRulesAllDisabled(plugin: FootnotePlugin): boolean {
         !s.lintMoveToBottom &&
         !s.lintReindex &&
         !(s.enableFootnotePrefix && s.lintApplyPrefix) &&
-        // orphan DELETION is a transform; the alerts that replace it while
-        // the toggles are off deliberately stay silent when every rule is off
+        // orphan DELETION and duplicate MERGING are transforms; the alerts
+        // that replace them while the toggles are off deliberately stay
+        // silent when every rule is off
         !s.lintDeleteOrphanedReferences &&
-        !s.lintDeleteOrphanedDefinitions
+        !s.lintDeleteOrphanedDefinitions &&
+        !s.lintMergeDuplicateDefinitions
     );
 }
 
@@ -340,6 +357,25 @@ function noticeOrphanedDefinitions(
     );
 }
 
+// the alert half of "Merge duplicate definitions": while the toggle is off,
+// linting reports duplicates instead — like orphans, they are never silent
+// (Jason's policy 2026-08-12; Obsidian renders only the LAST definition)
+function noticeDuplicateDefinitions(
+    plugin: FootnotePlugin,
+    markdown: string,
+    precomputed: { lines: string[]; scan: DocumentScan },
+) {
+    if (plugin.settings.lintMergeDuplicateDefinitions) return;
+    const names = duplicateFootnoteDefinitionNames(markdown, precomputed);
+    if (names.length === 0) return;
+    new Notice(
+        names.length === 1
+            ? `This note defines ${referenceList(names)} more than once. Obsidian renders only the last definition. Merge them, or turn on "Merge duplicate definitions".`
+            : `This note defines ${names.length} footnotes more than once (${referenceList(names)}). Obsidian renders only each one's last definition. Merge them, or turn on "Merge duplicate definitions".`,
+        8000,
+    );
+}
+
 // every lint entry point calls this with the POST-lint text, so the alerts
 // fire whether or not the rules changed anything. ONE normalize/scan/mask
 // is shared by all three alerts (2026-08-11 review perf item: the alerts
@@ -357,6 +393,7 @@ function noticeLintAlerts(plugin: FootnotePlugin, markdown: string) {
     noticeEmptyReferences(plugin, markdown, prefix, masked);
     noticeOrphanedReferences(plugin, markdown, prefix, { lines, masked });
     noticeOrphanedDefinitions(plugin, markdown, { lines, scan });
+    noticeDuplicateDefinitions(plugin, markdown, { lines, scan });
 }
 
 // ---------- automatic linting (Linter-style triggers) ----------

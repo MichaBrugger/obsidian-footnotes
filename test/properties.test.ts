@@ -49,6 +49,7 @@ const optionsArb: fc.Arbitrary<LintOptions> = fc.record({
     }),
     removeOrphanedReferences: fc.boolean(),
     removeOrphanedDefinitions: fc.boolean(),
+    mergeDuplicateDefinitions: fc.boolean(),
     orphanSafePrefix: fc.constantFrom("", "2."),
     applyNotePrefix: fc.boolean(),
     sectionHeading: fc.constantFrom("", "# Footnotes", "---\n## Footnotes"),
@@ -60,6 +61,9 @@ const keepingOptionsArb: fc.Arbitrary<LintOptions> = optionsArb.map(
         ...options,
         removeOrphanedReferences: false,
         removeOrphanedDefinitions: false,
+        // merging collapses duplicate definitions into one — a deliberate
+        // structure change the conservation/oracle properties must not see
+        mergeDuplicateDefinitions: false,
         reindexOptions: {
             ...options.reindexOptions,
             keepOrphanedDefinitions: true,
@@ -75,6 +79,10 @@ const definitionKeepingOptionsArb: fc.Arbitrary<LintOptions> = optionsArb.map(
     (options) => ({
         ...options,
         removeOrphanedDefinitions: false,
+        // mergeDuplicateDefinitions stays ON here on purpose: it deletes
+        // only unprotected duplicate label lines and carries continuation
+        // content along verbatim, so the protected-line conservation this
+        // arb feeds must hold with merging active too
         reindexOptions: {
             ...options.reindexOptions,
             keepOrphanedDefinitions: true,

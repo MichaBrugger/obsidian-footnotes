@@ -10,6 +10,7 @@
 import { FootnoteRule } from "../rule";
 import { applyFootnotePrefixRule } from "./apply-footnote-prefix";
 import { footnoteAfterPunctuationRule } from "./footnote-after-punctuation";
+import { mergeDuplicateDefinitionsRule } from "./merge-duplicate-definitions";
 import { moveFootnotesToTheBottomRule } from "./move-footnotes-to-the-bottom";
 import { reIndexFootnotesRule } from "./re-index-footnotes";
 import { removeOrphanedDefinitionsRule } from "./remove-orphaned-definitions";
@@ -18,6 +19,7 @@ import { removeOrphanedReferencesRule } from "./remove-orphaned-references";
 // `unknown` erases each rule's own options type so they share one list; the
 // examples carry their own options, so consumers never need the erased type
 export const footnoteRules: FootnoteRule<unknown>[] = [
+    mergeDuplicateDefinitionsRule,
     removeOrphanedDefinitionsRule,
     footnoteAfterPunctuationRule,
     moveFootnotesToTheBottomRule,

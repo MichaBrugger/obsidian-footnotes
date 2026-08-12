@@ -63,6 +63,15 @@ Prose AFTER the definitions, so "move to the bottom" has real work: after lintin
 - [ ] Type a bare `[^]` into the mess above and run **Lint footnotes**: an extra alert says the note has an empty footnote reference that won't render (it fires alongside the normal lint notice, and also when the lint otherwise had nothing to do; undo afterwards)
 - [ ] Turn OFF all three rules AND Reindex AND both Orphans toggles on the Linting page, then run **Lint footnotes**: it says all lint rules are turned off, instead of the misleading "No linting needed." (Ctrl+S with lint-on-save says the same, 2026-08-10)
 - [ ] Add a reference with no definition (like `stray[^99]`) and lint: an alert names it and says to write its definition or delete the reference; with `Delete orphaned references` ON (Orphans section) the lint removes it from the text instead, healing the spacing (2026-08-10)
-- [ ] On the Linting page, `Renumber named footnotes` is greyed out while `Reindex` is off, `Apply the note's footnote prefix` is greyed out while the prefix feature is off (main tab), and the two `Orphans` toggles are never greyed
-- [ ] The Linting page shows the new **Orphans** section between Rules and Reindexing, holding `Delete orphaned references` and `Delete orphaned definitions` (both OFF by default; off means the lint ALERTS about that orphan kind instead)
+- [ ] On the Linting page, `Renumber named footnotes` is greyed out while `Reindex` is off, `Apply the note's footnote prefix` is greyed out while the prefix feature is off (main tab), and the `Orphans and duplicates` toggles are never greyed
+- [ ] The Linting page shows the **Orphans and duplicates** section between Rules and Reindexing, holding `Delete orphaned references`, `Delete orphaned definitions`, and `Merge duplicate definitions` (all OFF by default; off means the lint ALERTS about that kind instead)
+
+## Duplicate definitions (rule added 2026-08-12)
+
+Obsidian renders only the LAST definition when a footnote is defined twice; earlier ones are dead text (verified live).
+
+- [ ] Add a second `[^dup]: another body` below an existing `[^dup]: body` and lint with `Merge duplicate definitions` OFF: an alert says the note defines `[^dup]` more than once and that only the last definition renders; both definitions stay in the note
+- [ ] Turn `Merge duplicate definitions` ON and lint again: the two bodies merge into ONE definition, the second body indented as a continuation line below the first, and Reading view shows both lines in the footnote
+- [ ] Lint a second time: nothing changes (idempotent)
+- [ ] With duplicates present, the footnote hotkey on the reference jumps to the LAST definition (the one Obsidian renders), not the first
 - [ ] With the Linter plugin ENABLED, the Linting page opens with a "Using the Linter plugin?" note telling you to turn off Linter's own footnote rules (both plugins rewriting the same footnotes conflicts, verified 2026-08-08); with Linter disabled or uninstalled, the note is hidden
