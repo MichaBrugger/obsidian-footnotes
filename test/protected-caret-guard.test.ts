@@ -181,6 +181,24 @@ describe("footnote creation is blocked inside protected text", () => {
         });
     });
 
+    it("a named placeholder that would COMPLETE an inline-math pair and be swallowed", async () => {
+        // "$5 or [^]$6" satisfies the non-space-edge rule the moment the
+        // placeholder lands — the name-entry flow would be stranded in math
+        await expectBlocked(insertNamedFootnote, ["$5 or $6 tail"], {
+            line: 0,
+            ch: 6,
+        });
+    });
+
+    it("an inline placeholder that would COMPLETE an inline-math pair and be swallowed", async () => {
+        // the command-press flow property's shrunk counterexample:
+        // "$5 or ^[]$6" masks the just-planted brackets into math
+        await expectBlocked(insertInlineFootnote, ["$5 or $6"], {
+            line: 0,
+            ch: 6,
+        });
+    });
+
     it("a reference that would COMPLETE an inline-math pair and be swallowed by it", async () => {
         // found by the command-press property suite (2026-08-12): "$5 or "
         // ends with a space, so the dollars are prose — until "[^2]"

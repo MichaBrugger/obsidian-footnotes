@@ -4,6 +4,11 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { docArb } from "./arbitraries";
 import FootnotePlugin from "../src/main";
+import { isValidFootnoteName } from "../src/footnote-grammar";
+import {
+    inlineFootnoteSpanAt,
+    sanitizeInlineFootnoteContent,
+} from "../src/inline-footnotes";
 import {
     insertAutonumFootnote,
     insertInlineFootnote,
@@ -12,7 +17,11 @@ import {
 } from "../src/insert-or-navigate-footnotes";
 import { orphanedFootnoteDefinitionNames } from "../src/linting/rules/remove-orphaned-definitions";
 import { orphanedFootnoteReferenceNames } from "../src/linting/rules/remove-orphaned-references";
-import { normalizeEol, scanDocument } from "../src/markdown-scan";
+import {
+    findDefinitionBlocks,
+    normalizeEol,
+    scanDocument,
+} from "../src/markdown-scan";
 
 // Property tests for the CREATION COMMANDS (2026-08-12, Jason's ask):
 // the same document generator that fuzzes the lint transforms drives the
@@ -207,14 +216,77 @@ const ALLOWED_SHAPE_DELTAS: Record<CommandName, number[]> = {
     paste: [0, 1],
 };
 
+// the paste command reads THIS on every press — the invariant properties
+// keep the benign default so their contracts stay tight, and the dedicated
+// hostile-clipboard property swaps in generated strings per run
+let clipboardText = "generated clipboard text";
 beforeAll(() => {
     vi.stubGlobal("navigator", {
-        clipboard: { readText: async () => "generated clipboard text" },
+        clipboard: { readText: async () => clipboardText },
     });
 });
 afterAll(() => {
     vi.unstubAllGlobals();
 });
+
+// ---------- typed content (Jason's ask 2026-08-12: fuzz the INSIDES) ----------
+
+/** Splice `text` at the caret, exactly like typing — the caret rides to the end of it. */
+function typeText(doc: PressDoc, text: string) {
+    const { line, ch } = doc.cursor;
+    const current = doc.lines[line];
+    doc.lines[line] = current.slice(0, ch) + text + current.slice(ch);
+    doc.cursor = { line, ch: ch + text.length };
+}
+
+/** Whether the press just planted `placeholder` with the caret sitting one short of its closing bracket ("[^]" for named, "^[]" for inline). */
+function plantedPlaceholder(doc: PressDoc, placeholder: string): boolean {
+    const line = doc.lines[doc.cursor.line] ?? "";
+    return (
+        line.slice(doc.cursor.ch - 2, doc.cursor.ch + 1) === placeholder
+    );
+}
+
+function definitionNamesFolded(lines: string[]): Set<string> {
+    const scan = scanDocument(lines);
+    return new Set(
+        findDefinitionBlocks(lines, scan.isProtected, scan).map((block) =>
+            block.name.toLowerCase(),
+        ),
+    );
+}
+
+// names a user might type into the "[^]" placeholder: pool names that
+// collide with the generator's own definitions (case variants included),
+// fresh names the document has never seen, deliberately INVALID names
+// (spaces, backticks — warned about, never created), and random word-ish
+// strings
+const typedNameArb = fc.oneof(
+    fc.constantFrom("note", "Note", "9", "a$1", "ch-2", "x"),
+    fc.constantFrom("fresh", "Fresh-Name", "注釈", "x.y", "$start"),
+    fc.constantFrom("bad name", "tick`name"),
+    fc
+        .string({ minLength: 1, maxLength: 12 })
+        .map((s) => s.replace(/[[\]\s`\\^$\n\r]/g, ""))
+        .filter((s) => s.length > 0),
+);
+
+// bodies a user might type after the label / between inline brackets —
+// bracketless random text plus a few deliberate balanced-bracket shapes
+// (dollars and backslashes excluded here: a stray "$" pairing with later
+// line text or a trailing "\" changes the SURROUNDING structure, which is
+// the swallow-guards' territory, not the typing flow's)
+const typedBodyArb = fc.oneof(
+    fc.constantFrom(
+        "a quick aside",
+        "see [link](https://example.org) for more",
+        "中文注释内容",
+        "",
+    ),
+    fc
+        .string({ maxLength: 24 })
+        .map((s) => s.replace(/[[\]`\\^$\n\r]/g, " ").trim()),
+);
 
 describe("creation-command invariants over random documents", () => {
     soakIt("a press never throws and never loses a protected line", async () => {
@@ -308,6 +380,150 @@ describe("creation-command invariants over random documents", () => {
                     ).toBe(true);
                 }
             }),
+        );
+    });
+
+    soakIt("the FULL NAMED FLOW: plant, type a name, re-press, type the definition", async () => {
+        await fc.assert(
+            fc.asyncProperty(
+                pressArb,
+                typedNameArb,
+                typedBodyArb,
+                async ({ lines, cursor, settings }, name, body) => {
+                    const doc = pressEditor(lines, cursor);
+                    const plugin = fakePlugin(doc, settings);
+                    await insertNamedFootnote(plugin);
+                    // the press may have warned/hopped/navigated instead —
+                    // only a planted "[^]" starts the typing flow
+                    if (!plantedPlaceholder(doc, "[^]")) return;
+
+                    typeText(doc, name);
+                    const definitionsBefore = definitionNamesFolded(doc.lines);
+                    await insertNamedFootnote(plugin);
+                    const folded = name.toLowerCase();
+                    const definitionsAfter = definitionNamesFolded(doc.lines);
+
+                    if (!isValidFootnoteName(name)) {
+                        // spaces/backticks: warned about, nothing created
+                        expect([...definitionsAfter].sort()).toEqual(
+                            [...definitionsBefore].sort(),
+                        );
+                        return;
+                    }
+                    if (definitionsBefore.has(folded)) {
+                        // an existing definition (any casing) means the
+                        // second press NAVIGATES — no duplicate is created
+                        expect([...definitionsAfter].sort()).toEqual(
+                            [...definitionsBefore].sort(),
+                        );
+                        return;
+                    }
+                    // fresh valid name: its definition now exists, and the
+                    // caret sits at the label's end — type the body there
+                    expect(definitionsAfter.has(folded)).toBe(true);
+                    typeText(doc, body);
+                    const after = doc.lines.join("\n");
+                    expect(after).toContain(`[^${name}]: ${body}`);
+                    // the flow ends with a WHOLE footnote: reference and
+                    // definition alive, neither orphaned
+                    const fold = (n: string) => n.toLowerCase();
+                    expect(
+                        orphanedFootnoteReferenceNames(after).map(fold),
+                    ).not.toContain(folded);
+                    expect(
+                        orphanedFootnoteDefinitionNames(after).map(fold),
+                    ).not.toContain(folded);
+                },
+            ),
+        );
+    });
+
+    soakIt("the FULL INLINE FLOW: plant, type the body, re-press hops out (or warns while empty)", async () => {
+        await fc.assert(
+            fc.asyncProperty(
+                pressArb,
+                typedBodyArb,
+                async ({ lines, cursor, settings }, body) => {
+                    const doc = pressEditor(lines, cursor);
+                    const plugin = fakePlugin(doc, settings);
+                    await insertInlineFootnote(plugin);
+                    if (!plantedPlaceholder(doc, "^[]")) return;
+
+                    typeText(doc, body);
+                    const afterTyping = doc.lines.join("\n");
+                    const caretAfterTyping = { ...doc.cursor };
+                    await insertInlineFootnote(plugin);
+                    // the second press never edits — it hops (filled) or
+                    // warns and stays (empty)
+                    expect(doc.lines.join("\n")).toBe(afterTyping);
+                    if (body === "") {
+                        expect(doc.cursor).toEqual(caretAfterTyping);
+                    } else {
+                        // hop lands just past the closing bracket:
+                        // "^[" + body + "]" ends one past the typed text
+                        expect(doc.cursor).toEqual({
+                            line: caretAfterTyping.line,
+                            ch: caretAfterTyping.ch + 1,
+                        });
+                        expect(
+                            doc.lines[caretAfterTyping.line],
+                        ).toContain(`^[${body}]`);
+                    }
+                },
+            ),
+        );
+    });
+
+    soakIt("paste survives ARBITRARY clipboard content end to end", async () => {
+        await fc.assert(
+            fc.asyncProperty(
+                pressArb,
+                fc.string({ maxLength: 40 }),
+                async ({ lines, cursor, settings }, clip) => {
+                    clipboardText = clip;
+                    try {
+                        const doc = await press(lines, cursor, "paste", settings);
+                        const before = lines.join("\n");
+                        const after = doc.lines.join("\n");
+                        if (after === before) return; // guard/warn/empty path
+                        const content = sanitizeInlineFootnoteContent(clip);
+                        const inserted = `^[${content}]`;
+                        const count = (text: string) =>
+                            text.split(inserted).length - 1;
+                        if (content !== "" && count(after) === count(before) + 1) {
+                            // the pasted inline footnote must CLOSE where the
+                            // sanitizer promised — an unbalanced clipboard
+                            // that escaped sanitizing would run away here
+                            const line = doc.lines.find(
+                                (l, i) => l !== lines[i] && l.includes(inserted),
+                            );
+                            expect(line).toBeDefined();
+                            const start = (line as string).indexOf(inserted);
+                            const span = inlineFootnoteSpanAt(
+                                line as string,
+                                start + 2,
+                            );
+                            expect(span).not.toBeNull();
+                            if (span?.open === start) {
+                                expect(span.close).toBe(
+                                    start + inserted.length - 1,
+                                );
+                            }
+                        } else {
+                            // the only other edit paste makes: creating the
+                            // definition for a definition-less reference
+                            // under the caret (navigate step)
+                            expect(
+                                definitionNamesFolded(doc.lines).size,
+                            ).toBeGreaterThan(
+                                definitionNamesFolded(lines).size,
+                            );
+                        }
+                    } finally {
+                        clipboardText = "generated clipboard text";
+                    }
+                },
+            ),
         );
     });
 

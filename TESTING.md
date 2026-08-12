@@ -40,8 +40,13 @@ The suite has three kinds of files:
   caret positions and settings: a press never throws, never edits
   protected text, never loses a protected line, adds only the raw
   reference shapes its contract allows, and never mints a dead reference
-  or orphaned definition of its own making. Popup, table cells, and
-  Reading view stay smoke-suite territory.
+  or orphaned definition of its own making. The TYPED flows are fuzzed
+  too: the full named cycle (plant `[^]`, type a generated name —
+  colliding, fresh, or invalid — re-press for the definition, type its
+  body), the inline cycle (plant `^[]`, type a body, re-press hops out or
+  warns while empty), and paste with arbitrary `fc.string` clipboard
+  content through the whole command. Popup, table cells, and Reading view
+  stay smoke-suite territory.
 
 Properties run 200 cases each by default. Before a release, soak them:
 

@@ -23,7 +23,7 @@ import { adjustFootnotePosition, endOfWordOffset, moveCursorAndSetJumpPoint, saf
 import { buildDefinitionAppend } from "./definition-append";
 import { DocContext, docContext, docLines, listExistingFootnoteDefinitions } from "./doc-context";
 import { shouldJumpFromDefinitionToReference, shouldJumpFromReferenceToDefinition } from "./navigation";
-import { exitInlineFootnoteIfInside, sanitizeInlineFootnoteContent, warnEmptyInlineFootnoteIfInside } from "./inline-footnotes";
+import { exitInlineFootnoteIfInside, inlineFootnoteSpanAt, sanitizeInlineFootnoteContent, warnEmptyInlineFootnoteIfInside } from "./inline-footnotes";
 import { lintAfterFootnoteCreation } from "./linting/linter";
 import { definitionLabelIn, findDefinitionBlocks, maskInlineRegions, maskedLineAt, scanDocument } from "./markdown-scan";
 import { readingViewActive, viewEditor } from "./obsidian-internals";
@@ -44,13 +44,16 @@ import { activeTableCellEditor, resolveTableCellCursor, runOutsideTableCell, Tab
 // Insert `text` at the caret of an actively edited table cell, through the
 // cell's own editor so the widget handles the markdown write-back. Respects
 // the end-of-word setting and leaves the cell caret `caretOffsetInText`
-// characters into the inserted text (focus stays in the cell).
+// characters into the inserted text (focus stays in the cell). False =
+// the insertion was refused (it would be born dead — see the liveness
+// check) and NOTHING was dispatched: a caller pairing it with a definition
+// append must skip that too.
 export function insertInTableCell(
     cell: TableCellEditor,
     plugin: FootnotePlugin,
     text: string,
     caretOffsetInText: number,
-) {
+): boolean {
     const cellText = cell.state.doc.toString();
     const head = cell.state.selection.main.head;
     // safeInsertionCh, same as adjustFootnotePosition: an insertion after
@@ -62,10 +65,26 @@ export function insertInTableCell(
             ? endOfWordOffset(cellText, head)
             : head,
     );
+    // the insertion can COMPLETE a construct around it and be masked into
+    // it at birth — "$…$" pairing is the found case (command-press
+    // property suite, 2026-08-12); cell text is a single line, so
+    // line-local masking decides
+    const simulatedCell = cellText.slice(0, at) + text + cellText.slice(at);
+    const maskedCell = maskInlineRegions(simulatedCell);
+    const live = text.startsWith("^[")
+        ? // pasted content may carry its own inline code (masked inside the
+          // brackets) — the inline SPAN surviving is what matters
+          inlineFootnoteSpanAt(maskedCell, at + 2)?.open === at
+        : maskedCell.slice(at, at + text.length) === text;
+    if (!live) {
+        new Notice(ProtectedCreationNotice, 8000);
+        return false;
+    }
     cell.dispatch({
         changes: { from: at, insert: text },
         selection: { anchor: at + caretOffsetInText },
     });
+    return true;
 }
 
 // "Lint on footnote creation", popup flavor: the lint must wait for the
@@ -210,6 +229,26 @@ function warnProtectedCaretIfInside(
 const ProtectedCreationNotice =
     "No footnote was created: footnotes can't go inside code, math, or other protected text.";
 
+/**
+ * The caret line's masked twin AFTER inserting `insert` at `position` —
+ * the liveness oracle for single-change insertions: an insertion can
+ * COMPLETE a construct around it and be masked into it at birth ("$…$"
+ * whose content previously had a space edge is the found case —
+ * command-press property suite, 2026-08-12). Simulated against the whole
+ * document so multi-line region state is honored.
+ */
+function simulatedMaskedLine(
+    doc: Editor,
+    position: EditorPosition,
+    insert: string,
+): string {
+    const lines = docLines(doc);
+    const lineText = lines[position.line];
+    lines[position.line] =
+        lineText.slice(0, position.ch) + insert + lineText.slice(position.ch);
+    return maskedLineAt(lines, position.line);
+}
+
 /** The document `changes` would produce — every change addresses the ORIGINAL text (CodeMirror transaction semantics), so they apply back-to-front. */
 function simulateChanges(lines: string[], changes: EditorChange[]): string[] {
     const text = lines.join("\n");
@@ -351,8 +390,14 @@ export function createAutonumFootnote(
     if (cell) {
         // the reference goes through the cell's own editor (never the main
         // editor — that races the cell's sync-back and corrupts the table);
-        // the definition append is outside the table, so the main editor is safe
-        insertInTableCell(cell, plugin, footnoteReference, footnoteReference.length);
+        // the definition append is outside the table, so the main editor is
+        // safe. A refused cell insertion (born-dead check) must not leave
+        // an orphaned definition behind.
+        if (
+            !insertInTableCell(cell, plugin, footnoteReference, footnoteReference.length)
+        ) {
+            return true;
+        }
         const definition = buildDefinitionAppend(doc, footnoteId, isFirstFootnote, plugin, ctx);
         // the phantom-frontmatter prepend (see buildDefinitionAppend) rides
         // the same transaction; it edits above the table, which is outside
@@ -446,6 +491,14 @@ function insertInlineText(
     runOutsideTableCell(doc, (cursorPosition) => {
         const lineText = doc.getLine(cursorPosition.line);
         const at = adjustFootnotePosition(cursorPosition, doc, lineText, plugin);
+        // born-dead check (see simulatedMaskedLine): the "^[…]" must still
+        // parse as an inline-footnote span on the masked result — content
+        // it carries (pasted inline code) may mask INSIDE the brackets
+        const masked = simulatedMaskedLine(doc, at, text);
+        if (inlineFootnoteSpanAt(masked, at.ch + 2)?.open !== at.ch) {
+            new Notice(ProtectedCreationNotice, 8000);
+            return;
+        }
         const newCursorPos = { line: at.line, ch: at.ch + caretOffsetInText };
         moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos, plugin, [
             { from: at, text },
@@ -872,6 +925,18 @@ export function createFootnoteReference(
     if (prefix === null) return true;
     const emptyReference = `[^${prefix}]`;
     cursorPosition = adjustFootnotePosition(cursorPosition, doc, lineText, plugin);
+    // born-dead check (see simulatedMaskedLine): a placeholder that lands
+    // masked would silently strand the name-entry flow
+    const masked = simulatedMaskedLine(doc, cursorPosition, emptyReference);
+    if (
+        masked.slice(
+            cursorPosition.ch,
+            cursorPosition.ch + emptyReference.length,
+        ) !== emptyReference
+    ) {
+        new Notice(ProtectedCreationNotice, 8000);
+        return true;
+    }
     const newCursorPos = {
         line: cursorPosition.line,
         ch: cursorPosition.ch + 2 + prefix.length,
