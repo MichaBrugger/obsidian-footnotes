@@ -30,6 +30,7 @@ Run **Set footnote prefix** from the command palette:
 - [ ] Running the command again and clearing the field removes the property entirely
 - [ ] Escape still cancels without changes
 - [ ] With `Per-note footnote prefix` turned OFF, saving a prefix warns that the feature toggle is off, so the prefix won't be used yet (QOL 2026-08-07)
+- [ ] The `footnote-prefix` property shows as TEXT in the Properties panel, even after saving a numeric-looking prefix like `4.` (fix 2026-08-12: Obsidian's type inference registered it as a number; the modal and plugin load now pin the type to text)
 
 ## Digit-ending prefix guards (QOL)
 

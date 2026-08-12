@@ -40,6 +40,36 @@ export function viewEditor(view: MarkdownView): Editor | null {
     return (view as { editor?: Editor }).editor ?? null;
 }
 
+/** The undocumented vault-wide property-type registry behind the Properties panel (Obsidian 1.4+). Optional throughout: a future release renaming any of it must degrade to a no-op, never a crash. */
+interface MetadataTypeManager {
+    getPropertyInfo?(name: string): { widget?: string } | null | undefined;
+    setType?(name: string, type: string): void;
+}
+
+interface AppWithMetadataTypeManager extends App {
+    metadataTypeManager?: MetadataTypeManager;
+}
+
+/**
+ * Pin `name`'s vault-wide property type to "text". Obsidian INFERS an
+ * unassigned property's type from its occurrences — numeric-looking
+ * footnote-prefix values like "2." registered the property as a NUMBER,
+ * after which the Properties panel coerces edits numerically (reported
+ * 2026-08-12). An explicit assignment persists in types.json and wins over
+ * inference. No-op when the type is already text or the registry is
+ * unavailable.
+ */
+export function ensureTextPropertyType(app: App, name: string): void {
+    const manager = (app as AppWithMetadataTypeManager).metadataTypeManager;
+    if (!manager?.setType) return;
+    if (manager.getPropertyInfo?.(name)?.widget === "text") return;
+    try {
+        manager.setType(name, "text");
+    } catch {
+        // private API — a shape change must never break the caller
+    }
+}
+
 /** Whether `mdView` is in Reading view — where every text-editing command must be inert (the editor API would edit the HIDDEN buffer). The structural parameter type keeps getMode honestly optional: bare test fakes without it count as editable. Lives beside viewEditor — both guard against what the view actually is (moved out of doc-context, 2026-08-11 review cleanliness). */
 export function readingViewActive(mdView: {
     getMode?: MarkdownView["getMode"];

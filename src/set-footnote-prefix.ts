@@ -2,6 +2,7 @@ import { MarkdownView, Modal, Notice, Setting, TFile } from "obsidian";
 
 import type FootnotePlugin from "./main";
 import { footnotePrefixProblem } from "./footnote-prefix";
+import { ensureTextPropertyType } from "./obsidian-internals";
 
 // The "Set footnote prefix" command's modal: one text input that writes the
 // footnote-prefix frontmatter property on Enter (or the Save button). An
@@ -85,6 +86,12 @@ export class SetFootnotePrefixModal extends Modal {
                 else delete frontmatter["footnote-prefix"];
             },
         );
+        // a prefix is TEXT even when it looks numeric ("2.") — without an
+        // explicit type, Obsidian infers one from occurrences and can
+        // register the property as a number (reported 2026-08-12)
+        if (prefix) {
+            ensureTextPropertyType(this.plugin.app, "footnote-prefix");
+        }
         this.close();
         if (prefix && !this.plugin.settings.enableFootnotePrefix) {
             // the property was written but nothing reads it while the
