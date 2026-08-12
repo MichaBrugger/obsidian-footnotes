@@ -1,0 +1,425 @@
+import {
+    Editor,
+    EditorChange,
+    EditorPosition,
+    MarkdownView,
+    Notice,
+} from "obsidian";
+
+import type FootnotePlugin from "./main";
+import {
+    computeNextFootnoteNumber,
+    emptyReferenceStart,
+    footnoteReferenceMatches,
+    idListIncludes,
+    isValidFootnoteName,
+    occurrenceAtCursor,
+    referenceAtCursor,
+    referenceOccurrences,
+} from "./footnote-grammar";
+import { footnotePopupBusy, openFootnotePopup, popupEditingAvailable, runAfterNextPopupSettle } from "./footnote-popup";
+import { activeFootnotePrefix, footnotePrefixFromEditor } from "./footnote-prefix";
+import { adjustFootnotePosition, endOfWordOffset, moveCursorAndSetJumpPoint } from "./cursor-motion";
+import { buildDefinitionAppend } from "./definition-append";
+import { DocContext, docContext, listExistingFootnoteDefinitions } from "./doc-context";
+import { inlineFootnoteSpanAt } from "./inline-footnotes";
+import {
+    ProtectedCreationNotice,
+    safeInsertionCh,
+    simulateChanges,
+    simulatedMaskedLine,
+} from "./insertion-liveness";
+import { lintAfterFootnoteCreation } from "./linting/linter";
+import { findDefinitionBlocks, maskInlineRegions, maskedLineAt, scanDocument } from "./markdown-scan";
+import { warnProtectedCaretIfInside } from "./press-guards";
+import { TableCellEditor } from "./table-cursor";
+
+// The creation steps of the command cascade: mint a reference, append its
+// definition, and hand off to the popup (or jump) — each step verified
+// against the insertion-liveness kit before any edit is dispatched. This
+// module is the linter's SOLE importer besides main.ts wiring: creation is
+// where lint-on-footnote-creation triggers. Split out of the all-in-one
+// commands file 2026-08-12.
+
+// Insert `text` at the caret of an actively edited table cell, through the
+// cell's own editor so the widget handles the markdown write-back. Respects
+// the end-of-word setting and leaves the cell caret `caretOffsetInText`
+// characters into the inserted text (focus stays in the cell). False =
+// the insertion was refused (it would be born dead — see the liveness
+// check) and NOTHING was dispatched: a caller pairing it with a definition
+// append must skip that too.
+export function insertInTableCell(
+    cell: TableCellEditor,
+    plugin: FootnotePlugin,
+    text: string,
+    caretOffsetInText: number,
+): boolean {
+    const cellText = cell.state.doc.toString();
+    const head = cell.state.selection.main.head;
+    // safeInsertionCh, same as adjustFootnotePosition: an insertion after
+    // an escaping backslash or an unescaped "^" would be swallowed
+    // (bug-insert-after-backslash)
+    const at = safeInsertionCh(
+        cellText,
+        plugin.settings.insertAtEndOfWord
+            ? endOfWordOffset(cellText, head)
+            : head,
+    );
+    // the insertion can COMPLETE a construct around it and be masked into
+    // it at birth — "$…$" pairing is the found case (command-press
+    // property suite, 2026-08-12); cell text is a single line, so
+    // line-local masking decides
+    const simulatedCell = cellText.slice(0, at) + text + cellText.slice(at);
+    const maskedCell = maskInlineRegions(simulatedCell);
+    const live = text.startsWith("^[")
+        ? // pasted content may carry its own inline code (masked inside the
+          // brackets) — the inline SPAN surviving is what matters
+          inlineFootnoteSpanAt(maskedCell, at + 2)?.open === at
+        : maskedCell.slice(at, at + text.length) === text;
+    if (!live) {
+        new Notice(ProtectedCreationNotice, 8000);
+        return false;
+    }
+    cell.dispatch({
+        changes: { from: at, insert: text },
+        selection: { anchor: at + caretOffsetInText },
+    });
+    return true;
+}
+
+// "Lint on footnote creation", popup flavor: the lint must wait for the
+// popup that is about to open to close and settle — linting under it could
+// renumber the id it is bound to. Registered BEFORE openFootnotePopup; the
+// returned canceller is for its fallback path, where the press degrades to
+// the jump flow and the immediate trigger takes over.
+// Stryker disable all: popup-settle scheduling against the live workspace —
+// smoke-test territory, unreachable from units (coverage-verified 2026-08-11)
+function scheduleCreationLintAfterPopup(plugin: FootnotePlugin): () => void {
+    if (!plugin.settings.lintOnFootnoteCreation) return () => {};
+    const path =
+        plugin.app.workspace.getActiveViewOfType(MarkdownView)?.file?.path;
+    return runAfterNextPopupSettle(() => {
+        lintAfterFootnoteCreation(plugin, false, path);
+    });
+}
+// Stryker restore all
+
+/**
+ * The shared creation tail of the autonum and named commands' popup path:
+ * open the popup editor bound to the new definition. Its fallback (embed
+ * registry unavailable, or a late failure) jumps to the definition
+ * instead — and there a popup that failed AFTER its DOM existed is still
+ * settling its teardown save, so an immediate lint would no-op behind the
+ * busy gate; the settle-deferred lint registered here fires instead (E32).
+ */
+function openPopupForNewDefinition(
+    plugin: FootnotePlugin,
+    doc: Editor,
+    cursorPosition: EditorPosition,
+    footnoteId: string,
+    definitionCursor: EditorPosition,
+) {
+    const cancelCreationLint = scheduleCreationLintAfterPopup(plugin);
+    void openFootnotePopup(plugin, footnoteId, () => {
+        moveCursorAndSetJumpPoint(doc, cursorPosition, definitionCursor, plugin, undefined, true);
+        if (footnotePopupBusy()) return;
+        cancelCreationLint();
+        lintAfterFootnoteCreation(plugin, true);
+    });
+}
+
+/** Cascade step 4 (autonum): insert the next-numbered reference at the caret (through `cell` when in a table) and append its definition, then popup or jump per settings. */
+export function createAutonumFootnote(
+    lineText: string,
+    cursorPosition: EditorPosition,
+    plugin: FootnotePlugin,
+    doc: Editor,
+    cell: TableCellEditor | null = null,
+    ctx: DocContext = docContext(doc),
+): boolean {
+    // creation in code/math/comment/frontmatter is blocked outright
+    if (warnProtectedCaretIfInside(doc, cell, cursorPosition, ctx)) return true;
+
+    // create new footnote with the next numerical index — namespaced by the
+    // note's footnote-prefix property when set (#31) — reading the editor
+    // document (the view's data buffer lags editor edits by a tick, so it
+    // can't be trusted here). The prefix comes from the frontmatter-only
+    // read: joining ctx.lines materialized the whole document per creation
+    // press just to parse its head (2026-08-11 review perf item)
+    const prefix = activeFootnotePrefix(plugin, footnotePrefixFromEditor(doc));
+    // an invalid prefix blocks the insert outright (the Notice already
+    // explained why) — no unprefixed fallback footnote to clean up; the
+    // press was still consumed
+    if (prefix === null) return true;
+    // the numbering scan only ever reads the MASKED text (the first
+    // argument exists to derive a default mask), so the masked twin is
+    // passed as both
+    const masked = ctx.maskedLines().join("\n");
+    const currentMax = computeNextFootnoteNumber(masked, prefix, masked);
+
+    const footnoteId = `${prefix}${currentMax}`;
+    const footnoteReference = `[^${footnoteId}]`;
+
+    // "first footnote" = first DEFINITION, matching the named command and
+    // move-to-bottom's fixed point — the old "&& currentMax === 1" skipped
+    // the section heading when the note's only artifact was an orphan
+    // reference (2026-08-11 review bug #8)
+    const isFirstFootnote = listExistingFootnoteDefinitions(doc, ctx).length === 0;
+
+    if (cell) {
+        // the reference goes through the cell's own editor (never the main
+        // editor — that races the cell's sync-back and corrupts the table);
+        // the definition append is outside the table, so the main editor is
+        // safe. A refused cell insertion (born-dead check) must not leave
+        // an orphaned definition behind.
+        if (
+            !insertInTableCell(cell, plugin, footnoteReference, footnoteReference.length)
+        ) {
+            return true;
+        }
+        const definition = buildDefinitionAppend(doc, footnoteId, isFirstFootnote, plugin, ctx);
+        // the phantom-frontmatter prepend (see buildDefinitionAppend) rides
+        // the same transaction; it edits above the table, which is outside
+        // the cell sub-editor's region and therefore safe (issue #28 policy)
+        const definitionChanges = definition.prepend
+            ? [definition.prepend, definition.change]
+            : [definition.change];
+        if (popupEditingAvailable(plugin)) {
+            doc.transaction({ changes: definitionChanges });
+            void openFootnotePopup(plugin, footnoteId, () => {
+                moveCursorAndSetJumpPoint(doc, cursorPosition, definition.cursor, plugin, undefined, true);
+            });
+        } else {
+            moveCursorAndSetJumpPoint(doc, cursorPosition, definition.cursor, plugin, definitionChanges, true);
+        }
+        return true;
+    }
+
+    cursorPosition = adjustFootnotePosition(cursorPosition, doc, lineText, plugin);
+    const definition = buildDefinitionAppend(doc, footnoteId, isFirstFootnote, plugin, ctx);
+    const changes: EditorChange[] = [
+        { from: cursorPosition, text: footnoteReference },
+        definition.change,
+    ];
+    // the phantom-frontmatter prepend (see buildDefinitionAppend) rides the
+    // same transaction; it shifts every post-transaction line down by one
+    if (definition.prepend) changes.push(definition.prepend);
+    const lineShift = definition.prepend ? 1 : 0;
+
+    // the insertion itself can RECLASSIFY the document — "[^N]" at a
+    // quote's column 0 demotes the quote and a region opener riding that
+    // line swallows everything below, including the definition this very
+    // transaction appends; between two loose dollars it can COMPLETE an
+    // inline-math pair that swallows the reference (both found by the
+    // command-press property suite, 2026-08-12). Verify on the SIMULATED
+    // result that the new reference is live and its definition parses as a
+    // live block; refuse like the protected-caret guard otherwise.
+    const simulated = simulateChanges(ctx.lines, changes);
+    const simulatedScan = scanDocument(simulated);
+    const definitionLive = findDefinitionBlocks(
+        simulated,
+        simulatedScan.isProtected,
+        simulatedScan,
+    ).some((block) => block.start === definition.cursor.line);
+    const referenceLine = cursorPosition.line + lineShift;
+    const referenceLive = referenceOccurrences(
+        simulated[referenceLine],
+        maskedLineAt(simulated, referenceLine),
+    ).some(
+        (occurrence) =>
+            occurrence.start === cursorPosition.ch &&
+            occurrence.name === footnoteId,
+    );
+    if (!definitionLive || !referenceLive) {
+        new Notice(ProtectedCreationNotice, 8000);
+        return true;
+    }
+
+    if (popupEditingAvailable(plugin)) {
+        // type the definition in a popup instead of jumping to the bottom;
+        // the cursor only moves past the new reference
+        const afterReference = { line: cursorPosition.line + lineShift, ch: cursorPosition.ch + footnoteReference.length };
+        doc.transaction({ changes, selection: { from: afterReference } });
+        openPopupForNewDefinition(plugin, doc, cursorPosition, footnoteId, definition.cursor);
+    } else {
+        moveCursorAndSetJumpPoint(doc, cursorPosition, definition.cursor, plugin, changes, true);
+        lintAfterFootnoteCreation(plugin, true);
+    }
+    return true;
+}
+
+/** Cascade step 3 (numbered, named, and the inline keys via navigateReferenceIfInside): caret on a reference with no definition → append the matching definition (or warn on an invalid name). Returns true when it handled the press. The note's footnote-prefix is NOT applied here — it goes in at bracket creation (createFootnoteReference), where the user can see it. */
+export function createMatchingFootnoteDefinition(
+    lineText: string,
+    cursorPosition: EditorPosition,
+    plugin: FootnotePlugin,
+    doc: Editor,
+    ctx?: DocContext,
+): boolean {
+    // Create matching footnote definition for footnote reference
+
+    // is the cursor inside a footnote reference on this line?
+    // does that reference have a definition line?
+    // if not, create it and place cursor there
+    // (raw-line gate first, masked re-check after — same rationale and #41
+    // semantics as navigation's shouldJumpFromReferenceToDefinition)
+    const rawReferences = footnoteReferenceMatches(lineText).map((match) => ({
+        footnote: match[0],
+        startIndex: match.index ?? 0,
+    }));
+    if (referenceAtCursor(rawReferences, cursorPosition.ch) === null) {
+        return false;
+    }
+
+    // built only past the raw gate (perf F1). referenceOccurrences
+    // re-slices each raw name — a code span inside the name masks to NULs,
+    // and creating a definition from the masked name wrote literal NUL
+    // bytes into the note (bug-masked-name-identity)
+    ctx ??= docContext(doc);
+    const target = occurrenceAtCursor(
+        referenceOccurrences(lineText, ctx.maskedLine(cursorPosition.line)),
+        cursorPosition.ch,
+    );
+
+    if (target !== null) {
+        const footnoteId = target.name;
+
+        // a spaced or backticked name is an authoring mistake Obsidian
+        // won't render; warn instead of creating a definition that can't work
+        if (!isValidFootnoteName(footnoteId)) {
+            const offender = footnoteId.includes("`")
+                ? "backticks"
+                : "spaces";
+            new Notice(
+                `Footnote name "${footnoteId}" contains ${offender}, so Obsidian won't render it as a footnote. Remove the ${offender}.`,
+                8000,
+            );
+            return true;
+        }
+
+        const list = listExistingFootnoteDefinitions(doc, ctx);
+
+        // ids are case-insensitive — a "[^note]:" definition already covers
+        // a "[^Note]" reference, so this must navigate, not create a duplicate
+        if (!idListIncludes(list, footnoteId)) {
+            const definition = buildDefinitionAppend(doc, footnoteId, list.length === 0, plugin, ctx);
+            // the phantom-frontmatter prepend rides the same
+            // transaction (see buildDefinitionAppend)
+            const definitionChanges = definition.prepend
+                ? [definition.prepend, definition.change]
+                : [definition.change];
+
+            if (popupEditingAvailable(plugin)) {
+                // type the definition in a popup instead of jumping to the
+                // bottom; the cursor stays on the reference
+                doc.transaction({ changes: definitionChanges });
+                openPopupForNewDefinition(plugin, doc, cursorPosition, footnoteId, definition.cursor);
+            } else {
+                moveCursorAndSetJumpPoint(doc, cursorPosition, definition.cursor, plugin, definitionChanges, true);
+                lintAfterFootnoteCreation(plugin, true);
+            }
+
+            return true;
+        }
+        // the reference already has a definition — not this step's
+        // press to handle; the cascade continues
+        return false;
+    }
+    return false;
+}
+
+/** Cascade step 4 (named): insert an empty reference (through `cell` when in a table) ready for name entry — "[^]" with the caret between the brackets, or "[^7-]" with the caret after the prefix when the note's footnote-prefix is active, so the namespace is visible while the name is typed (requested 2026-07-20). A press with the caret still inside an empty "[^]" never reaches this step — warnEmptyReferenceIfInside claims it at the command entry — but the hop-out branches below stay as a last line of defense against nesting "[^[^]]". */
+export function createFootnoteReference(
+    lineText: string,
+    cursorPosition: EditorPosition,
+    plugin: FootnotePlugin,
+    doc: Editor,
+    cell: TableCellEditor | null = null,
+    ctx: DocContext = docContext(doc),
+): boolean {
+    //create empty footnote reference for name input, cursor after [^ and any
+    //prefix. The prefix gate runs AFTER the second-press hop checks: an
+    //invalid prefix blocks reference CREATION (toast only, nothing to clean
+    //up — reported 2026-08-07), but never plain caret navigation.
+    // footnotePrefixFromEditor stops at the closing frontmatter fence —
+    // the old doc.getValue() materialized the whole document per press
+    // (the half of F1 this path had missed)
+    const resolvePrefix = () =>
+        plugin.settings.enableFootnotePrefix
+            ? activeFootnotePrefix(plugin, footnotePrefixFromEditor(doc))
+            : "";
+
+    if (cell) {
+        const cellText = cell.state.doc.toString();
+        // masked confirm like caretInsidePlaceholder: a "[^]"-shaped
+        // fragment inside inline code is plain text (#41 semantics)
+        const inEmpty = emptyReferenceStart(cellText, cell.state.selection.main.head);
+        if (
+            inEmpty !== null &&
+            emptyReferenceStart(
+                maskInlineRegions(cellText),
+                cell.state.selection.main.head,
+            ) !== null
+        ) {
+            cell.dispatch({ selection: { anchor: inEmpty + "[^]".length } });
+            return true;
+        }
+        // creation inside a cell's inline code/math span is blocked
+        if (warnProtectedCaretIfInside(doc, cell, cursorPosition, ctx)) {
+            return true;
+        }
+        const prefix = resolvePrefix();
+        if (prefix === null) return true;
+        // through the cell's own editor (never the main editor — that races
+        // the cell's sync-back and corrupts the table); the caret lands
+        // inside the brackets and focus stays in the cell for name entry
+        insertInTableCell(cell, plugin, `[^${prefix}]`, 2 + prefix.length);
+        return true;
+    }
+
+    // DOCUMENT-aware masking, exactly like the warnEmptyReferenceIfInside
+    // guard: line-local masking can't see a surrounding fence, so guard and
+    // hop disagreed there and the caret hopped inside protected text
+    // (2026-08-11 review bug #6)
+    const inEmpty = emptyReferenceStart(lineText, cursorPosition.ch);
+    if (
+        inEmpty !== null &&
+        emptyReferenceStart(
+            maskedLineAt(ctx.lines, cursorPosition.line),
+            cursorPosition.ch,
+        ) !== null
+    ) {
+        doc.setCursor({ line: cursorPosition.line, ch: inEmpty + "[^]".length });
+        return true;
+    }
+
+    // creation in code/math/comment/frontmatter is blocked outright — but
+    // AFTER the hop check above, so plain caret navigation out of a live
+    // "[^]" never gets a bogus toast
+    if (warnProtectedCaretIfInside(doc, null, cursorPosition, ctx)) return true;
+
+    const prefix = resolvePrefix();
+    if (prefix === null) return true;
+    const emptyReference = `[^${prefix}]`;
+    cursorPosition = adjustFootnotePosition(cursorPosition, doc, lineText, plugin);
+    // born-dead check (see simulatedMaskedLine): a placeholder that lands
+    // masked would silently strand the name-entry flow
+    const masked = simulatedMaskedLine(doc, cursorPosition, emptyReference);
+    if (
+        masked.slice(
+            cursorPosition.ch,
+            cursorPosition.ch + emptyReference.length,
+        ) !== emptyReference
+    ) {
+        new Notice(ProtectedCreationNotice, 8000);
+        return true;
+    }
+    const newCursorPos = {
+        line: cursorPosition.line,
+        ch: cursorPosition.ch + 2 + prefix.length,
+    };
+    moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos, plugin, [
+        { from: cursorPosition, text: emptyReference },
+    ]);
+    return true;
+}

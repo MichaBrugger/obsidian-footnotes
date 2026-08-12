@@ -15,7 +15,10 @@
         "src/cursor-motion.ts",
         "src/definition-append.ts",
         "src/inline-footnotes.ts",
+        "src/insertion-liveness.ts",
         "src/navigation.ts",
+        "src/press-guards.ts",
+        "src/create-footnote.ts",
         "src/linting/**/*.ts",
         "src/insert-or-navigate-footnotes.ts",
         "src/table-cursor.ts"

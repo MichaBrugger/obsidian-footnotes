@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import FootnotePlugin from "../src/main";
 import {
     countEmptyFootnoteReferences,
-    lintRulesAllDisabled,
-} from "../src/linting/linter";
+} from "../src/linting/lint-alerts";
+import { lintRulesAllDisabled } from "../src/linting/linter";
 
 // QOL sweep (2026-08-07): the lint paths alert on abandoned empty "[^]"
 // references — every rule is blind to them (the reference regexes require a

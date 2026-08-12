@@ -1,7 +1,7 @@
 import { Editor } from "obsidian";
 import { describe, expect, it } from "vitest";
 
-import { createMatchingFootnoteDefinition } from "../src/insert-or-navigate-footnotes";
+import { createMatchingFootnoteDefinition } from "../src/create-footnote";
 import { isValidFootnoteName } from "../src/footnote-grammar";
 import type FootnotePlugin from "../src/main";
 

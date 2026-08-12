@@ -2,7 +2,7 @@ import { Editor, EditorChange, EditorPosition } from "obsidian";
 import { describe, expect, it } from "vitest";
 
 import FootnotePlugin from "../../src/main";
-import { createFootnoteReference } from "../../src/insert-or-navigate-footnotes";
+import { createFootnoteReference } from "../../src/create-footnote";
 
 // BUG: pressing the named-footnote hotkey twice in a row (before typing a name)
 // nests a second empty reference inside the first: "[^]" becomes "[^[^]]". The

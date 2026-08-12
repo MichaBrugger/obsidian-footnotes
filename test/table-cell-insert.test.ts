@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { insertInTableCell } from "../src/insert-or-navigate-footnotes";
+import { insertInTableCell } from "../src/create-footnote";
 import type FootnotePlugin from "../src/main";
 import type { TableCellEditor } from "../src/table-cursor";
 

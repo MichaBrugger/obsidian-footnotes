@@ -6,8 +6,8 @@ import {
     createAutonumFootnote,
     createFootnoteReference,
     createMatchingFootnoteDefinition,
-    warnPrefilledReferenceIfInside,
-} from "../src/insert-or-navigate-footnotes";
+} from "../src/create-footnote";
+import { warnPrefilledReferenceIfInside } from "../src/press-guards";
 // the stub Notice records into noticeCalls — vi.mock("obsidian") does not
 // survive `isolate: false` (see the note in test/mocks/obsidian.ts)
 import { noticeCalls } from "./mocks/obsidian";
