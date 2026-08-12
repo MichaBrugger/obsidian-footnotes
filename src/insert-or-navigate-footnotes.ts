@@ -156,6 +156,71 @@ function caretGuardsHandled(
 }
 
 /**
+ * Footnote CREATION is blocked when the caret sits inside code, math, a
+ * comment, or frontmatter (Jason's rule 2026-08-12 — always on, inline
+ * spans included): a reference minted there is dead text Obsidian never
+ * renders, which the next lint's orphan handling then deletes. Runs at
+ * the CREATION steps only — navigation never reaches protected text (its
+ * masked gates fall through). True = warned, press consumed.
+ */
+function warnProtectedCaretIfInside(
+    doc: Editor,
+    cell: TableCellEditor | null,
+    cursorPosition: EditorPosition,
+    ctx: DocContext,
+): boolean {
+    let inside: boolean;
+    if (cell) {
+        // cell text is a single line, so line-local masking suffices
+        inside = caretInsideMaskedSpan(
+            maskInlineRegions(cell.state.doc.toString()),
+            cell.state.selection.main.head,
+            false,
+            false,
+        );
+    } else {
+        const { scan } = ctx;
+        const line = cursorPosition.line;
+        // at the line's edges, "inside" is decided by whether an open
+        // region crosses that edge: a caret at ch 0 of a comment CLOSER
+        // line, or at the end of a line whose tail opened a region, is
+        // inside it even though the neighboring character is off-line
+        const openAtStart =
+            scan.startsInComment[line] || scan.startsInMath[line];
+        const openAtEnd =
+            line + 1 < ctx.lines.length
+                ? scan.startsInComment[line + 1] || scan.startsInMath[line + 1]
+                : scan.endsProtected;
+        inside =
+            scan.isProtected[line] ||
+            caretInsideMaskedSpan(
+                ctx.maskedLine(line),
+                cursorPosition.ch,
+                openAtStart,
+                openAtEnd,
+            );
+    }
+    if (!inside) return false;
+    new Notice(
+        "No footnote was created: footnotes can't go inside code, math, or other protected text.",
+        8000,
+    );
+    return true;
+}
+
+/** Whether `ch` sits STRICTLY inside a masked (NUL) span — the text on both sides is claimed. Boundaries are fine: just before an opener or just after a closer inserts outside the span. `openAtStart`/`openAtEnd` stand in for the off-line neighbor at ch 0 / end of line. */
+function caretInsideMaskedSpan(
+    masked: string,
+    ch: number,
+    openAtStart: boolean,
+    openAtEnd: boolean,
+): boolean {
+    const before = ch > 0 ? masked[ch - 1] === "\0" : openAtStart;
+    const after = ch < masked.length ? masked[ch] === "\0" : openAtEnd;
+    return before && after;
+}
+
+/**
  * The shared creation tail of the autonum and named commands' popup path:
  * open the popup editor bound to the new definition. Its fallback (embed
  * registry unavailable, or a late failure) jumps to the definition
@@ -224,6 +289,9 @@ export function createAutonumFootnote(
     cell: TableCellEditor | null = null,
     ctx: DocContext = docContext(doc),
 ): boolean {
+    // creation in code/math/comment/frontmatter is blocked outright
+    if (warnProtectedCaretIfInside(doc, cell, cursorPosition, ctx)) return true;
+
     // create new footnote with the next numerical index — namespaced by the
     // note's footnote-prefix property when set (#31) — reading the editor
     // document (the view's data buffer lags editor edits by a tick, so it
@@ -388,6 +456,11 @@ export async function insertInlineFootnote(plugin: FootnotePlugin) {
         if (caretGuardsHandled(plugin, doc, cell)) return;
         // inside a real reference, navigate instead of nesting "^[]"
         if (navigateReferenceIfInside(plugin, doc, cell)) return;
+        // creation in code/math/comment/frontmatter is blocked outright
+        const cursorPosition =
+            (cell ? resolveTableCellCursor(doc) : null) ?? doc.getCursor();
+        if (warnProtectedCaretIfInside(doc, cell, cursorPosition, docContext(doc)))
+            return;
 
         insertInlineText(plugin, "^[]", 2);
     });
@@ -403,6 +476,15 @@ export async function pasteInlineFootnote(plugin: FootnotePlugin) {
         // the 2026-08-07 QOL sweep; pinned by test/paste-inline-in-inline.test.ts)
         if (caretGuardsHandled(plugin, doc, pasteCell)) return;
         if (navigateReferenceIfInside(plugin, doc, pasteCell)) return;
+        // creation in code/math/comment/frontmatter is blocked outright —
+        // before the clipboard await, so a blocked press never reads it
+        const pastePosition =
+            (pasteCell ? resolveTableCellCursor(doc) : null) ?? doc.getCursor();
+        if (
+            warnProtectedCaretIfInside(doc, pasteCell, pastePosition, docContext(doc))
+        ) {
+            return;
+        }
 
         // read the clipboard BEFORE resolving positions — it's the only await,
         // and everything position-dependent should happen after it
@@ -453,7 +535,7 @@ export async function insertNamedFootnote(plugin: FootnotePlugin) {
 
             if (createMatchingFootnoteDefinition(lineText, cursorPosition, plugin, doc, ctx))
                 return;
-            createFootnoteReference(lineText, cursorPosition, plugin, doc, cell);
+            createFootnoteReference(lineText, cursorPosition, plugin, doc, cell, ctx);
         };
         if (cell) run(resolveTableCellCursor(doc) ?? doc.getCursor());
         else runOutsideTableCell(doc, run);
@@ -645,6 +727,7 @@ export function createFootnoteReference(
     plugin: FootnotePlugin,
     doc: Editor,
     cell: TableCellEditor | null = null,
+    ctx: DocContext = docContext(doc),
 ): boolean {
     //create empty footnote reference for name input, cursor after [^ and any
     //prefix. The prefix gate runs AFTER the second-press hop checks: an
@@ -673,6 +756,10 @@ export function createFootnoteReference(
             cell.dispatch({ selection: { anchor: inEmpty + "[^]".length } });
             return true;
         }
+        // creation inside a cell's inline code/math span is blocked
+        if (warnProtectedCaretIfInside(doc, cell, cursorPosition, ctx)) {
+            return true;
+        }
         const prefix = resolvePrefix();
         if (prefix === null) return true;
         // through the cell's own editor (never the main editor — that races
@@ -697,6 +784,11 @@ export function createFootnoteReference(
         doc.setCursor({ line: cursorPosition.line, ch: inEmpty + "[^]".length });
         return true;
     }
+
+    // creation in code/math/comment/frontmatter is blocked outright — but
+    // AFTER the hop check above, so plain caret navigation out of a live
+    // "[^]" never gets a bogus toast
+    if (warnProtectedCaretIfInside(doc, null, cursorPosition, ctx)) return true;
 
     const prefix = resolvePrefix();
     if (prefix === null) return true;

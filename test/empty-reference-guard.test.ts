@@ -1,6 +1,8 @@
 import { Editor, EditorChange, EditorPosition } from "obsidian";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { noticeCalls } from "./mocks/obsidian";
+
 import FootnotePlugin from "../src/main";
 import {
     insertAutonumFootnote,
@@ -109,17 +111,41 @@ describe("footnote commands inside an empty [^] reference", () => {
         expect(doc.appliedChanges.length).toBeGreaterThan(0);
     });
 
-    it("a [^] inside inline code is plain text and does not block (#41 parity)", async () => {
+    // Originally these pinned that a code-masked "[^]" doesn't block the
+    // INSERT (#41 parity). Since the protected-caret guard (Jason's rule
+    // 2026-08-12) creation inside code is blocked outright — what survives
+    // is that the EMPTY-REFERENCE toast never fires there; the block comes
+    // from the protected-text guard instead.
+    it("a [^] inside inline code never fires the empty-reference warning (#41 parity)", async () => {
         // "use `x [^] y` here" with the caret between the code span's brackets
+        noticeCalls.length = 0;
         const line = "use `x [^] y` here";
         const doc = fakeEditor([line], { line: 0, ch: 9 });
         await insertAutonumFootnote(fakePlugin(doc));
-        expect(doc.appliedChanges.length).toBeGreaterThan(0);
+        expect(doc.appliedChanges).toEqual([]);
+        expect(emptyReferenceToastFired()).toBe(false);
+        expect(protectedToastFired()).toBe(true);
     });
 
-    it("a [^] inside a code fence does not block either", async () => {
+    it("a [^] inside a code fence never fires the empty-reference warning either", async () => {
+        noticeCalls.length = 0;
         const doc = fakeEditor(["```", "a [^] b", "```"], { line: 1, ch: 4 });
         await insertAutonumFootnote(fakePlugin(doc));
-        expect(doc.appliedChanges.length).toBeGreaterThan(0);
+        expect(doc.appliedChanges).toEqual([]);
+        expect(emptyReferenceToastFired()).toBe(false);
+        expect(protectedToastFired()).toBe(true);
     });
 });
+
+const emptyReferenceToastFired = () =>
+    noticeCalls.some(
+        (args) =>
+            typeof args[0] === "string" &&
+            args[0].includes("footnote reference is empty"),
+    );
+const protectedToastFired = () =>
+    noticeCalls.some(
+        (args) =>
+            typeof args[0] === "string" &&
+            args[0].includes("inside code, math"),
+    );

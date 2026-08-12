@@ -1,6 +1,8 @@
 import { Editor, EditorChange, EditorPosition } from "obsidian";
 import { describe, expect, it, vi } from "vitest";
 
+import { noticeCalls } from "../mocks/obsidian";
+
 import FootnotePlugin from "../../src/main";
 import { openFootnotePopup } from "../../src/footnote-popup";
 import { warnEmptyInlineFootnoteIfInside } from "../../src/inline-footnotes";
@@ -75,13 +77,15 @@ function fakePlugin(
 }
 
 describe("bug #6: the empty-[^] hop must be document-aware", () => {
-    it("a '[^]' inside a fence is plain text — the named command inserts instead of hopping", async () => {
+    it("a '[^]' inside a fence is plain text — the named command neither hops nor warns about it", async () => {
+        // originally pinned as "inserts instead of hopping"; since the
+        // protected-caret guard (Jason's rule 2026-08-12) creation in a
+        // fence is blocked outright — the point that survives is that the
+        // caret never hops and the empty-reference toast never fires
         const doc = fakeEditor(["```", "x [^] y", "```", "prose"], { line: 1, ch: 4 });
         await insertNamedFootnote(fakePlugin(doc));
-        expect(doc.appliedChanges).toEqual([
-            { from: { line: 1, ch: 4 }, text: "[^]" },
-        ]);
-        expect(doc.cursor).toEqual({ line: 1, ch: 6 });
+        expect(doc.appliedChanges).toEqual([]);
+        expect(doc.cursor).toEqual({ line: 1, ch: 4 });
     });
 
     it("a live '[^]' still gets the hop (control)", async () => {
@@ -94,25 +98,34 @@ describe("bug #6: the empty-[^] hop must be document-aware", () => {
 });
 
 describe("bug #7: inline-footnote guards must mask", () => {
-    it("a literal empty '^[]' inside a fence doesn't make the inline command inert", async () => {
+    // both cases originally pinned the insertion; since the protected-caret
+    // guard (Jason's rule 2026-08-12) creation there is blocked — what
+    // survives of bug #7 is that the WRONG toasts (empty-inline warning,
+    // hop-out) never fire on fence/code-span text
+    it("a literal empty '^[]' inside a fence never fires the empty-inline warning", async () => {
+        noticeCalls.length = 0;
         const doc = fakeEditor(["```", "see ^[] here", "```", "after"], {
             line: 1,
             ch: 6,
         });
         await insertInlineFootnote(fakePlugin(doc));
-        expect(doc.appliedChanges).toEqual([
-            { from: { line: 1, ch: 6 }, text: "^[]" },
-        ]);
-        expect(doc.cursor).toEqual({ line: 1, ch: 8 });
+        expect(doc.appliedChanges).toEqual([]);
+        expect(doc.cursor).toEqual({ line: 1, ch: 6 });
+        expect(
+            noticeCalls.some(
+                (args) =>
+                    typeof args[0] === "string" &&
+                    args[0].includes("inline footnote is empty"),
+            ),
+        ).toBe(false);
     });
 
-    it("a filled '^[…]' inside inline code doesn't trigger the hop-out", async () => {
+    it("a filled '^[…]' inside inline code never triggers the hop-out", async () => {
         const line = "a `^[filled]` b";
         const doc = fakeEditor([line], { line: 0, ch: 7 });
         await insertInlineFootnote(fakePlugin(doc));
-        expect(doc.appliedChanges).toEqual([
-            { from: { line: 0, ch: 7 }, text: "^[]" },
-        ]);
+        expect(doc.appliedChanges).toEqual([]);
+        expect(doc.cursor).toEqual({ line: 0, ch: 7 });
     });
 
     it("a live empty '^[]' still warns and stays (control)", async () => {
