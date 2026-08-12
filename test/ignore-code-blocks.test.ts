@@ -2,9 +2,10 @@ import { Editor, EditorPosition } from "obsidian";
 import { describe, expect, it } from "vitest";
 
 import FootnotePlugin from "../src/main";
-import { listExistingFootnoteDefinitions, listExistingFootnoteReferencesAndLocations } from "../src/doc-context";
+import { listExistingFootnoteDefinitions } from "../src/doc-context";
 import { shouldJumpFromDefinitionToReference, shouldJumpFromReferenceToDefinition } from "../src/navigation";
-import { computeNextFootnoteNumber } from "../src/footnote-grammar";
+import { computeNextFootnoteNumber, referenceOccurrences } from "../src/footnote-grammar";
+import { maskProtectedLines } from "../src/markdown-scan";
 
 // Issue #41: [^x]-shaped text inside code — fenced blocks, inline code, or
 // frontmatter — must be invisible to every scan the insert/navigate
@@ -58,17 +59,32 @@ describe("listExistingFootnoteDefinitions ignores code", () => {
     });
 });
 
-describe("listExistingFootnoteReferencesAndLocations ignores code", () => {
+// reference listing composed from the primitives the cascade uses (the old
+// dedicated lister died production-dead — 2026-08-11 review cleanliness)
+function referenceLocations(lines: string[]) {
+    const masked = maskProtectedLines(lines);
+    const references: { footnote: string; lineNum: number; startIndex: number }[] = [];
+    for (let i = 0; i < lines.length; i++) {
+        for (const occurrence of referenceOccurrences(lines[i], masked[i])) {
+            references.push({
+                footnote: lines[i].slice(occurrence.start, occurrence.end),
+                lineNum: i,
+                startIndex: occurrence.start,
+            });
+        }
+    }
+    return references;
+}
+
+describe("reference occurrences ignore code", () => {
     it("skips references inside inline code but keeps real ones placed after", () => {
-        const { doc } = fakeEditor(["use `[^1]` then real[^2]"]);
-        expect(listExistingFootnoteReferencesAndLocations(doc)).toEqual([
+        expect(referenceLocations(["use `[^1]` then real[^2]"])).toEqual([
             { footnote: "[^2]", lineNum: 0, startIndex: 20 },
         ]);
     });
 
     it("skips references inside fenced code blocks", () => {
-        const { doc } = fakeEditor(["```", "x[^1]", "```", "y[^2]"]);
-        expect(listExistingFootnoteReferencesAndLocations(doc)).toEqual([
+        expect(referenceLocations(["```", "x[^1]", "```", "y[^2]"])).toEqual([
             { footnote: "[^2]", lineNum: 3, startIndex: 1 },
         ]);
     });

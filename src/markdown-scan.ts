@@ -9,9 +9,10 @@ export const DefinitionStart = /^\[\^([^[\]]+)\]:/;
  * The trailing punctuation the insert commands hop over — the same class
  * the footnote-after-punctuation lint reorders, so the two features can't
  * disagree about where a reference belongs. ASCII plus the CJK fullwidth
- * forms 。，、；：！？ (Jason, 2026-08-10). Lives here, in the dependency
- * root, because both consumers read it at MODULE scope — anywhere else it
- * rides an import cycle and evaluates as undefined.
+ * forms 。，、；：！？ (Jason, 2026-08-10). Lives here because this leaf
+ * is the one module BOTH consumers (cursor-motion and the lint rule)
+ * already sit above — the pre-split cycle that once forced this home is
+ * gone, but no better shared home exists.
  */
 export const TrailingPunctuationChars = ".,;:!?。，、；：！？";
 // a continuation line belongs to the definition above it
@@ -113,6 +114,29 @@ export function definitionLabelIn(
 }
 
 /**
+ * The first exact, fully unprotected occurrence of `runLines` in `lines`,
+ * as the index of the run's LAST line — or -1. The section-heading setting
+ * is markdown that can span multiple lines ("---\n## Footnotes"), so both
+ * the insert flow (buildDefinitionAppend's heading slot) and the
+ * move-to-bottom rule anchor on the whole run through THIS function — two
+ * hand-rolled copies would let the fixed-point guarantee drift
+ * (2026-08-11 review cleanliness).
+ */
+export function findLineRunEnd(
+    lines: string[],
+    isProtected: boolean[],
+    runLines: string[],
+): number {
+    for (let i = 0; i + runLines.length <= lines.length; i++) {
+        const matches = runLines.every(
+            (runLine, k) => !isProtected[i + k] && lines[i + k] === runLine,
+        );
+        if (matches) return i + runLines.length - 1;
+    }
+    return -1;
+}
+
+/**
  * Whether a line already known to start with a fence delimiter actually opens
  * a fence. Per CommonMark a backtick fence's info string may not contain a
  * backtick — "```[^1]``` x" is an inline code span in a paragraph, not a
@@ -125,22 +149,6 @@ function isFenceOpener(bareLine: string, delim: string): boolean {
     return !rest.includes("`");
 }
 
-/**
- * One left-to-right scan of a line for inline code spans, HTML comments,
- * and math ($…$ / $$…$$), NULing all three, CommonMark-style: whichever
- * construct opens first claims its content — backticks inside a comment
- * are literal, "<!--" inside a code span is code (bug-comment-mask-order /
- * bug-backticked-comment-opener), "$" inside either is just a dollar.
- * Backslash-escaped openers of every kind are literal text
- * (bug-escaped-comment-opener), and the abbreviated comments "<!-->" and
- * "<!--->" are complete per CommonMark §6.6 (bug-short-form-comment).
- * Inline math needs a non-empty content that neither starts nor ends with
- * a space (Obsidian's rule — "$5 and $10" stays prose). `startInComment` /
- * `startInMath` continue a multi-line region from the previous line;
- * `endsInComment` / `endsInMath` report one left open at EOL (its opener
- * masked through the end of the line). Math protection is Jason's 2026-08-10
- * ruling: linting never touches math.
- */
 /**
  * Whether the "$" at `i` sits inside a footnote-reference shape ("[^…]").
  * Jason verified live (2026-08-10): Obsidian tokenizes the bracket construct
@@ -161,6 +169,22 @@ function dollarInsideReference(chars: readonly string[], i: number): boolean {
     return false;
 }
 
+/**
+ * One left-to-right scan of a line for inline code spans, HTML comments,
+ * and math ($…$ / $$…$$), NULing all three, CommonMark-style: whichever
+ * construct opens first claims its content — backticks inside a comment
+ * are literal, "<!--" inside a code span is code (bug-comment-mask-order /
+ * bug-backticked-comment-opener), "$" inside either is just a dollar.
+ * Backslash-escaped openers of every kind are literal text
+ * (bug-escaped-comment-opener), and the abbreviated comments "<!-->" and
+ * "<!--->" are complete per CommonMark §6.6 (bug-short-form-comment).
+ * Inline math needs a non-empty content that neither starts nor ends with
+ * a space (Obsidian's rule — "$5 and $10" stays prose). `startInComment` /
+ * `startInMath` continue a multi-line region from the previous line;
+ * `endsInComment` / `endsInMath` report one left open at EOL (its opener
+ * masked through the end of the line). Math protection is Jason's 2026-08-10
+ * ruling: linting never touches math.
+ */
 export function maskLineRegions(
     line: string,
     // named state instead of two positional booleans — call sites like
@@ -333,17 +357,6 @@ export interface DocumentScan {
     endsProtected: boolean;
 }
 
-/**
- * The whole-document protection walk: YAML frontmatter, fenced code blocks
- * (both delimiter lines included, including fences nested in
- * blockquotes/callouts), multi-line HTML comments — whose state is tracked
- * by the same escape- and code-span-aware scanner that does the masking, so
- * the two can't disagree — and STANDALONE indented code blocks (Jason's
- * ruling 2026-08-10: linting never touches code). "Standalone" is the
- * definition-aware part: an indented line continuing a footnote definition
- * (or lazily continuing a paragraph) is live markdown; only a 4-space/tab
- * chunk opening at a block boundary outside any definition is code.
- */
 /** Width of the line's leading whitespace, tabs expanding to 4-column tab stops (CommonMark). */
 function leadingIndentWidth(line: string): number {
     let width = 0;
@@ -355,6 +368,17 @@ function leadingIndentWidth(line: string): number {
     return width;
 }
 
+/**
+ * The whole-document protection walk: YAML frontmatter, fenced code blocks
+ * (both delimiter lines included, including fences nested in
+ * blockquotes/callouts), multi-line HTML comments — whose state is tracked
+ * by the same escape- and code-span-aware scanner that does the masking, so
+ * the two can't disagree — and STANDALONE indented code blocks (Jason's
+ * ruling 2026-08-10: linting never touches code). "Standalone" is the
+ * definition-aware part: an indented line continuing a footnote definition
+ * (or lazily continuing a paragraph) is live markdown; only a 4-space/tab
+ * chunk opening at a block boundary outside any definition is code.
+ */
 export function scanDocument(lines: string[]): DocumentScan {
     const src = stripCr(lines);
     const isProtected = new Array<boolean>(lines.length).fill(false);

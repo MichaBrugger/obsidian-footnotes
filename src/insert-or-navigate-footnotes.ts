@@ -1,9 +1,9 @@
 import {
-	Editor,
-	EditorChange,
-	EditorPosition,
-	MarkdownView,
-	Notice
+    Editor,
+    EditorChange,
+    EditorPosition,
+    MarkdownView,
+    Notice,
 } from "obsidian";
 
 import type FootnotePlugin from "./main";
@@ -13,18 +13,20 @@ import {
     footnoteReferenceMatches,
     idListIncludes,
     isValidFootnoteName,
+    occurrenceAtCursor,
     referenceAtCursor,
+    referenceOccurrences,
 } from "./footnote-grammar";
 import { footnotePopupBusy, openFootnotePopup, popupEditingAvailable, runAfterNextPopupSettle, settleFootnotePopupWithFeedback, toggleCloseFootnotePopup } from "./footnote-popup";
 import { activeFootnotePrefix, footnotePrefix, footnotePrefixFromEditor, footnotePrefixProblem } from "./footnote-prefix";
 import { adjustFootnotePosition, endOfWordOffset, moveCursorAndSetJumpPoint } from "./cursor-motion";
 import { buildDefinitionAppend } from "./definition-append";
-import { DocContext, docContext, docLines, listExistingFootnoteDefinitions, readingViewActive } from "./doc-context";
+import { DocContext, docContext, docLines, listExistingFootnoteDefinitions } from "./doc-context";
 import { shouldJumpFromDefinitionToReference, shouldJumpFromReferenceToDefinition } from "./navigation";
 import { exitInlineFootnoteIfInside, sanitizeInlineFootnoteContent, warnEmptyInlineFootnoteIfInside } from "./inline-footnotes";
 import { lintAfterFootnoteCreation } from "./linting/linter";
 import { maskInlineRegions, maskedLineAt } from "./markdown-scan";
-import { viewEditor } from "./obsidian-internals";
+import { readingViewActive, viewEditor } from "./obsidian-internals";
 import { activeTableCellEditor, resolveTableCellCursor, runOutsideTableCell, TableCellEditor } from "./table-cursor";
 
 // Core logic for both hotkey commands. Each press walks the same decision
@@ -38,12 +40,6 @@ import { activeTableCellEditor, resolveTableCellCursor, runOutsideTableCell, Tab
 // Table caveat (see table-cursor.ts): when the caret is in an actively
 // edited table cell, reads use the position resolved from the cell's
 // sub-editor and reference writes are dispatched INTO that sub-editor.
-
-
-
-
-
-
 
 // Insert `text` at the caret of an actively edited table cell, through the
 // cell's own editor so the widget handles the markdown write-back. Respects
@@ -279,7 +275,6 @@ export async function insertAutonumFootnote(plugin: FootnotePlugin) {
     });
 }
 
-
 /** Cascade step 4 (autonum): insert the next-numbered reference at the caret (through `cell` when in a table) and append its definition, then popup or jump per settings. */
 export function createAutonumFootnote(
     lineText: string,
@@ -364,9 +359,7 @@ export function createAutonumFootnote(
     return true;
 }
 
-
 //FUNCTIONS FOR INLINE FOOTNOTES (^[...])
-
 
 // Shared tail of both inline commands: place `text` at the caret (through
 // the cell sub-editor inside tables — see the table notes above) with the
@@ -394,8 +387,6 @@ function insertInlineText(
         ]);
     });
 }
-
-
 
 /**
  * When the caret sits strictly inside a "[^x]" reference, handle the press the
@@ -426,12 +417,11 @@ export function navigateReferenceIfInside(
     // and inserting an inline footnote there is fine (#41 semantics).
     // One shared context past the gate serves the rest of the press (F1)
     const ctx = docContext(doc);
-    const maskedLine = ctx.maskedLine(cursorPosition.line);
-    const referencesOnLine = footnoteReferenceMatches(maskedLine).map((match) => ({
-        footnote: match[0],
-        startIndex: match.index ?? 0,
-    }));
-    if (referenceAtCursor(referencesOnLine, cursorPosition.ch) === null) return false;
+    const occurrences = referenceOccurrences(
+        lineText,
+        ctx.maskedLine(cursorPosition.line),
+    );
+    if (occurrenceAtCursor(occurrences, cursorPosition.ch) === null) return false;
 
     if (shouldJumpFromReferenceToDefinition(lineText, cursorPosition, plugin, doc, ctx))
         return true;
@@ -465,8 +455,6 @@ export async function insertInlineFootnote(plugin: FootnotePlugin) {
         insertInlineText(plugin, "^[]", 2);
     });
 }
-
-
 
 /** Inline-footnote paste command: inserts `^[<clipboard>]` with the caret after it. Inside a "[^x]" reference it navigates like the named command instead (the clipboard stays untouched). */
 export async function pasteInlineFootnote(plugin: FootnotePlugin) {
@@ -555,8 +543,8 @@ export function createMatchingFootnoteDefinition(
     // is the cursor inside a footnote reference on this line?
     // does that reference have a definition line?
     // if not, create it and place cursor there
-    // (raw-line gate first, masked re-check after — same rationale and
-    // #41 semantics as shouldJumpFromReferenceToDefinition above)
+    // (raw-line gate first, masked re-check after — same rationale and #41
+    // semantics as navigation's shouldJumpFromReferenceToDefinition)
     const rawReferences = footnoteReferenceMatches(lineText).map((match) => ({
         footnote: match[0],
         startIndex: match.index ?? 0,
@@ -565,70 +553,59 @@ export function createMatchingFootnoteDefinition(
         return false;
     }
 
-    // built only past the raw gate (perf F1)
+    // built only past the raw gate (perf F1). referenceOccurrences
+    // re-slices each raw name — a code span inside the name masks to NULs,
+    // and creating a definition from the masked name wrote literal NUL
+    // bytes into the note (bug-masked-name-identity)
     ctx ??= docContext(doc);
-    const maskedLine = ctx.maskedLine(cursorPosition.line);
-    // re-slice the raw line for the reference text — a code span inside the
-    // name masks to NULs, and creating a definition from the masked name wrote
-    // literal NUL bytes into the note (bug-masked-name-identity)
-    const referencesOnLine = footnoteReferenceMatches(maskedLine).map((match) => {
-        const start = match.index ?? 0;
-        return {
-            footnote: lineText.slice(start, start + match[0].length),
-            startIndex: start,
-        };
-    });
-    const referenceTarget = referenceAtCursor(referencesOnLine, cursorPosition.ch);
+    const target = occurrenceAtCursor(
+        referenceOccurrences(lineText, ctx.maskedLine(cursorPosition.line)),
+        cursorPosition.ch,
+    );
 
-    if (referenceTarget !== null) {
-        //find if this footnote exists by listing existing footnote definitions
-        {
-            // positional slice of "[^name]" — see shouldJumpFromReferenceToDefinition
-            const footnoteId = referenceTarget.slice(2, -1);
+    if (target !== null) {
+        const footnoteId = target.name;
 
-            // a spaced or backticked name is an authoring mistake Obsidian
-            // won't render; warn instead of creating a definition that can't work
-            if (!isValidFootnoteName(footnoteId)) {
-                const offender = footnoteId.includes("`")
-                    ? "backticks"
-                    : "spaces";
-                new Notice(
-                    `Footnote name "${footnoteId}" contains ${offender}, so Obsidian won't render it as a footnote. Remove the ${offender}.`,
-                    8000,
-                );
-                return true;
-            }
-
-            const list = listExistingFootnoteDefinitions(doc, ctx);
-
-            // Check if the list doesn't include current footnote (ids are
-            // case-insensitive — a "[^note]:" definition already covers a
-            // "[^Note]" reference, so this must navigate, not create a duplicate)
-            // if so, add definition for the current footnote
-            if (!idListIncludes(list, footnoteId)) {
-                const definition = buildDefinitionAppend(doc, footnoteId, list.length === 0, plugin, ctx);
-                // the phantom-frontmatter prepend rides the same
-                // transaction (see buildDefinitionAppend)
-                const definitionChanges = definition.prepend
-                    ? [definition.prepend, definition.change]
-                    : [definition.change];
-
-                if (popupEditingAvailable(plugin)) {
-                    // type the definition in a popup instead of jumping to the
-                    // bottom; the cursor stays on the reference
-                    doc.transaction({ changes: definitionChanges });
-                    openPopupForNewDefinition(plugin, doc, cursorPosition, footnoteId, definition.cursor);
-                } else {
-                    moveCursorAndSetJumpPoint(doc, cursorPosition, definition.cursor, plugin, definitionChanges, true);
-                    lintAfterFootnoteCreation(plugin, true);
-                }
-
-                return true;
-            }
-            // the reference already has a definition — not this step's
-            // press to handle; the cascade continues
-            return false;
+        // a spaced or backticked name is an authoring mistake Obsidian
+        // won't render; warn instead of creating a definition that can't work
+        if (!isValidFootnoteName(footnoteId)) {
+            const offender = footnoteId.includes("`")
+                ? "backticks"
+                : "spaces";
+            new Notice(
+                `Footnote name "${footnoteId}" contains ${offender}, so Obsidian won't render it as a footnote. Remove the ${offender}.`,
+                8000,
+            );
+            return true;
         }
+
+        const list = listExistingFootnoteDefinitions(doc, ctx);
+
+        // ids are case-insensitive — a "[^note]:" definition already covers
+        // a "[^Note]" reference, so this must navigate, not create a duplicate
+        if (!idListIncludes(list, footnoteId)) {
+            const definition = buildDefinitionAppend(doc, footnoteId, list.length === 0, plugin, ctx);
+            // the phantom-frontmatter prepend rides the same
+            // transaction (see buildDefinitionAppend)
+            const definitionChanges = definition.prepend
+                ? [definition.prepend, definition.change]
+                : [definition.change];
+
+            if (popupEditingAvailable(plugin)) {
+                // type the definition in a popup instead of jumping to the
+                // bottom; the cursor stays on the reference
+                doc.transaction({ changes: definitionChanges });
+                openPopupForNewDefinition(plugin, doc, cursorPosition, footnoteId, definition.cursor);
+            } else {
+                moveCursorAndSetJumpPoint(doc, cursorPosition, definition.cursor, plugin, definitionChanges, true);
+                lintAfterFootnoteCreation(plugin, true);
+            }
+
+            return true;
+        }
+        // the reference already has a definition — not this step's
+        // press to handle; the cascade continues
+        return false;
     }
     return false;
 }

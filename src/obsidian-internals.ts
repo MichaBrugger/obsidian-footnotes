@@ -40,6 +40,13 @@ export function viewEditor(view: MarkdownView): Editor | null {
     return (view as { editor?: Editor }).editor ?? null;
 }
 
+/** Whether `mdView` is in Reading view — where every text-editing command must be inert (the editor API would edit the HIDDEN buffer). The structural parameter type keeps getMode honestly optional: bare test fakes without it count as editable. Lives beside viewEditor — both guard against what the view actually is (moved out of doc-context, 2026-08-11 review cleanliness). */
+export function readingViewActive(mdView: {
+    getMode?: MarkdownView["getMode"];
+}): boolean {
+    return mdView.getMode?.() === "preview";
+}
+
 /** The editable markdown embed produced by the embed registry. */
 interface MarkdownEmbed {
     editable: boolean;

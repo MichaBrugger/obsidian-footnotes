@@ -2,15 +2,13 @@ import { Editor, EditorChange, EditorPosition } from "obsidian";
 
 import type FootnotePlugin from "./main";
 import { DocContext, docContext } from "./doc-context";
-import { findDefinitionBlocks, scanDocument } from "./markdown-scan";
+import { findDefinitionBlocks, findLineRunEnd, scanDocument } from "./markdown-scan";
 
 // Where a new footnote definition lands: the section-heading setting and
 // the append edit both creation paths share. Split out of the all-in-one
 // commands file 2026-08-11.
 
-export function addFootnoteSectionHeader(
-    plugin: FootnotePlugin,
-): string {
+function addFootnoteSectionHeader(plugin: FootnotePlugin): string {
     //check if 'Enable Footnote Section Heading' is true
     //if so, return the "Footnote Section Heading"
     // else, return ""
@@ -78,14 +76,16 @@ export function buildDefinitionAppend(
         plugin.settings.enableFootnoteSectionHeading &&
         plugin.settings.footnoteSectionHeading
     ) {
-        const headingLines = plugin.settings.footnoteSectionHeading.split("\n");
-        for (let i = 0; i + headingLines.length <= lines.length; i++) {
-            const matches = headingLines.every(
-                (headingLine, k) =>
-                    !isProtected[i + k] && lines[i + k] === headingLine,
-            );
-            if (!matches) continue;
-            let fromLine = i + headingLines.length - 1;
+        // findLineRunEnd is the ONE anchor matcher shared with the
+        // move-to-bottom rule — the fixed-point guarantee needs both to
+        // agree on what counts as the existing heading
+        const anchorEnd = findLineRunEnd(
+            lines,
+            isProtected,
+            plugin.settings.footnoteSectionHeading.split("\n"),
+        );
+        if (anchorEnd !== -1) {
+            let fromLine = anchorEnd;
             let slotText = `\n\n[^${footnoteId}]: `;
             // reuse a blank line already separating the heading from what
             // follows, instead of doubling it

@@ -1,6 +1,5 @@
-import { Editor, MarkdownView } from "obsidian";
+import { Editor } from "obsidian";
 
-import { footnoteReferenceMatches } from "./footnote-grammar";
 import {
     definitionLabelIn,
     DocumentScan,
@@ -9,16 +8,9 @@ import {
     scanDocument,
 } from "./markdown-scan";
 
-// One press's shared read-only view of the document, plus the editor-mode
-// guard every command runs. Depends only on markdown-scan + Obsidian types
-// — split out of the all-in-one commands file 2026-08-11.
-
-/** Whether `mdView` is in Reading view — where every text-editing command must be inert. The structural parameter type keeps getMode honestly optional: bare test fakes without it count as editable. */
-export function readingViewActive(mdView: {
-    getMode?: MarkdownView["getMode"];
-}): boolean {
-    return mdView.getMode?.() === "preview";
-}
+// One press's shared read-only view of the document. Depends only on
+// markdown-scan + Obsidian types — split out of the all-in-one commands
+// file 2026-08-11.
 
 // Scans run against the document's masked twin (code and frontmatter
 // blotted out, indices preserved): a "[^x]" inside a code sample is plain
@@ -71,31 +63,6 @@ export function listExistingFootnoteDefinitions(
         }
     }
     return definitionNames;
-}
-
-/** Every reference occurrence with its position — repeated references appear once per use. Code blocks don't count. */
-export function listExistingFootnoteReferencesAndLocations(
-    doc: Editor
-) {
-    const references: { footnote: string; lineNum: number; startIndex: number }[] = [];
-
-    //search each line for footnote references
-    //for each, add their name, line number, and start index to the list
-    const lines = docLines(doc);
-    const masked = maskProtectedLines(lines);
-    for (let i = 0; i < lines.length; i++) {
-        for (const match of footnoteReferenceMatches(masked[i])) {
-            const start = match.index ?? 0;
-            references.push({
-                // slice the original: the masked match text could carry
-                // mask characters when code sits inside the brackets
-                footnote: lines[i].slice(start, start + match[0].length),
-                lineNum: i,
-                startIndex: start,
-            });
-        }
-    }
-    return references;
 }
 
 export function docContext(doc: Editor): DocContext {

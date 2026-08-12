@@ -74,6 +74,23 @@ export function referenceOccurrences(
     return occurrences;
 }
 
+/**
+ * The occurrence whose brackets strictly contain `ch`, or null — the same
+ * "inside" rule as referenceAtCursor, for callers already holding
+ * referenceOccurrences (the masked-match→raw-name pairing). The cascade's
+ * masked re-checks used to clone the match-then-re-slice dance instead
+ * (2026-08-11 review cleanliness).
+ */
+export function occurrenceAtCursor(
+    occurrences: ReferenceOccurrence[],
+    ch: number,
+): ReferenceOccurrence | null {
+    for (const occurrence of occurrences) {
+        if (ch > occurrence.start && ch < occurrence.end) return occurrence;
+    }
+    return null;
+}
+
 /** Whether the character at `index` is backslash-escaped: an ODD run of backslashes directly before it. */
 function escapedAt(line: string, index: number): boolean {
     let backslashes = 0;

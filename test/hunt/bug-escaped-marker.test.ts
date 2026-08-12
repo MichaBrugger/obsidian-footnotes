@@ -1,23 +1,14 @@
-import { Editor } from "obsidian";
 import { describe, expect, it } from "vitest";
 
-import { listExistingFootnoteReferencesAndLocations } from "../../src/doc-context";
-import { computeNextFootnoteNumber } from "../../src/footnote-grammar";
+import { computeNextFootnoteNumber, referenceOccurrences } from "../../src/footnote-grammar";
 import { reindexFootnotes } from "../../src/linting/rules/re-index-footnotes";
 
 // Scenario: a backslash-escaped reference "\[^9]" is literal text per CommonMark
-// §2.4, yet it gets renumbered by reindex, listed by
-// listExistingFootnoteReferencesAndLocations, and reserves autonumbers.
+// §2.4, yet it gets renumbered by reindex, listed as a reference occurrence,
+// and reserves autonumbers.
 // Hunt: 2026-08-09. Lens: grammar.
 // Root cause: the AllReferences regex has no escape-awareness — it matches "[^…]"
 // even when preceded by a backslash.
-
-function fakeEditor(lines: string[]): Editor {
-    return {
-        getLine: (n: number) => lines[n],
-        lineCount: () => lines.length,
-    } as unknown as Editor;
-}
 
 describe("fixed 2026-08-10: backslash-escaped references are treated as real footnotes", () => {
     it("does not treat a backslash-escaped reference as a footnote during reindex", () => {
@@ -26,9 +17,9 @@ describe("fixed 2026-08-10: backslash-escaped references are treated as real foo
     });
 
     it("does not list a backslash-escaped reference as a footnote", () => {
-        const doc = fakeEditor(["literal \\[^fake] real[^ok]"]);
-        expect(listExistingFootnoteReferencesAndLocations(doc)).toEqual([
-            { footnote: "[^ok]", lineNum: 0, startIndex: 21 },
+        const line = "literal \\[^fake] real[^ok]";
+        expect(referenceOccurrences(line, line)).toEqual([
+            { name: "ok", start: 21, end: 26 },
         ]);
     });
 

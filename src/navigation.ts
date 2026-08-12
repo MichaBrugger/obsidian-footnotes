@@ -6,6 +6,7 @@ import { DocContext, docContext, listExistingFootnoteDefinitions } from "./doc-c
 import {
     footnoteReferenceMatches,
     idListIncludes,
+    occurrenceAtCursor,
     referenceAtCursor,
     referenceOccurrences,
 } from "./footnote-grammar";
@@ -168,44 +169,34 @@ export function shouldJumpFromReferenceToDefinition(
 
     // #41: re-check against the masked twin — a reference inside a fence or
     // inline code is plain text, so the press falls through to insertion.
-    // The reference TEXT is re-sliced from the raw line: a code span inside
-    // the name masks to NULs, and the masked name would break the definition
+    // referenceOccurrences re-slices each raw name: a code span inside the
+    // name masks to NULs, and the masked name would break the definition
     // lookup and jump below (bug-masked-name-identity).
     // The context is built only past the raw gate — this step runs on
     // every press, most of which sit on plain text (perf F1)
     ctx ??= docContext(doc);
-    const maskedLine = ctx.maskedLine(cursorPosition.line);
-    const referencesOnLine = footnoteReferenceMatches(maskedLine).map((match) => {
-        const start = match.index ?? 0;
-        return {
-            footnote: lineText.slice(start, start + match[0].length),
-            startIndex: start,
-        };
-    });
-    const referenceTarget = referenceAtCursor(referencesOnLine, cursorPosition.ch);
+    const target = occurrenceAtCursor(
+        referenceOccurrences(lineText, ctx.maskedLine(cursorPosition.line)),
+        cursorPosition.ch,
+    );
+    if (target !== null) {
+        const footnoteName = target.name;
 
-    if (referenceTarget !== null) {
-        // the reference is exactly "[^name]", so the name is a positional
-        // slice — regex re-extraction would stop at brackets the mask hid
-        {
-            const footnoteName = referenceTarget.slice(2, -1);
-
-            // references without a definition line fall through to the
-            // definition-creation paths (ids compared case-insensitively)
-            if (!idListIncludes(listExistingFootnoteDefinitions(doc, ctx), footnoteName)) {
-                return false;
-            }
-
-            if (popupEditingAvailable(plugin)) {
-                // the popup's close callback runs LATER, after its save may
-                // have edited the document — it must build a FRESH context
-                void openFootnotePopup(plugin, footnoteName, () => {
-                    jumpToFootnoteDefinition(footnoteName, cursorPosition, plugin, doc);
-                });
-                return true;
-            }
-            return jumpToFootnoteDefinition(footnoteName, cursorPosition, plugin, doc, ctx);
+        // references without a definition line fall through to the
+        // definition-creation paths (ids compared case-insensitively)
+        if (!idListIncludes(listExistingFootnoteDefinitions(doc, ctx), footnoteName)) {
+            return false;
         }
+
+        if (popupEditingAvailable(plugin)) {
+            // the popup's close callback runs LATER, after its save may
+            // have edited the document — it must build a FRESH context
+            void openFootnotePopup(plugin, footnoteName, () => {
+                jumpToFootnoteDefinition(footnoteName, cursorPosition, plugin, doc);
+            });
+            return true;
+        }
+        return jumpToFootnoteDefinition(footnoteName, cursorPosition, plugin, doc, ctx);
     }
     return false;
 }

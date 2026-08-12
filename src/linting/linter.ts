@@ -7,10 +7,9 @@ import {
     toggleCloseFootnotePopup,
 } from "../footnote-popup";
 import { jumpToFootnoteDefinition } from "../navigation";
-import { readingViewActive } from "../doc-context";
 import { footnotePrefix, footnotePrefixProblem } from "../footnote-prefix";
 import { maskProtectedLines, normalizeEol, restoreEol } from "../markdown-scan";
-import { AppWithCommands, AppWithPlugins, viewEditor, WindowWithVim } from "../obsidian-internals";
+import { AppWithCommands, AppWithPlugins, readingViewActive, viewEditor, WindowWithVim } from "../obsidian-internals";
 import { activeTableCellEditor, nestedSubEditorOwnsFocus, runOutsideTableCell } from "../table-cursor";
 import { applyFootnotePrefix } from "./rules/apply-footnote-prefix";
 import { footnoteAfterPunctuation } from "./rules/footnote-after-punctuation";

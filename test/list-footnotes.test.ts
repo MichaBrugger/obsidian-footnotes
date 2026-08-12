@@ -1,10 +1,12 @@
 import { Editor } from "obsidian";
 import { describe, expect, it } from "vitest";
 
-import { listExistingFootnoteDefinitions, listExistingFootnoteReferencesAndLocations } from "../src/doc-context";
+import { listExistingFootnoteDefinitions } from "../src/doc-context";
+import { referenceOccurrences } from "../src/footnote-grammar";
+import { maskProtectedLines } from "../src/markdown-scan";
 
-// The two document-scanning functions the navigation cascade is built on:
-// definitions (definitions) and reference occurrences with positions. Includes the
+// The document-scanning behavior the navigation cascade is built on:
+// definition names, and reference occurrences with positions. Includes the
 // 2026-07-14 regression pin: definitions only count at the start of a line.
 
 // Both functions only read lines, so the fake needs exactly two methods.
@@ -13,6 +15,24 @@ function fakeEditor(lines: string[]): Editor {
         getLine: (n: number) => lines[n],
         lineCount: () => lines.length,
     } as unknown as Editor;
+}
+
+// The old listExistingFootnoteReferencesAndLocations died production-dead
+// (2026-08-11 review cleanliness); its pins now exercise the primitives the
+// cascade actually composes: referenceOccurrences over the masked twin.
+function referenceLocations(lines: string[]) {
+    const masked = maskProtectedLines(lines);
+    const references: { footnote: string; lineNum: number; startIndex: number }[] = [];
+    for (let i = 0; i < lines.length; i++) {
+        for (const occurrence of referenceOccurrences(lines[i], masked[i])) {
+            references.push({
+                footnote: lines[i].slice(occurrence.start, occurrence.end),
+                lineNum: i,
+                startIndex: occurrence.start,
+            });
+        }
+    }
+    return references;
 }
 
 describe("listExistingFootnoteDefinitions", () => {
@@ -51,32 +71,27 @@ describe("listExistingFootnoteDefinitions", () => {
     });
 });
 
-describe("listExistingFootnoteReferencesAndLocations", () => {
+describe("reference occurrences with positions (via referenceOccurrences)", () => {
     it("records each reference with its line number and start index", () => {
-        const doc = fakeEditor(["alpha[^1] bravo[^note]"]);
-        expect(listExistingFootnoteReferencesAndLocations(doc)).toEqual([
+        expect(referenceLocations(["alpha[^1] bravo[^note]"])).toEqual([
             { footnote: "[^1]", lineNum: 0, startIndex: 5 },
             { footnote: "[^note]", lineNum: 0, startIndex: 15 },
         ]);
     });
 
     it("excludes definition lines", () => {
-        expect(
-            listExistingFootnoteReferencesAndLocations(fakeEditor(["[^1]: one"])),
-        ).toEqual([]);
+        expect(referenceLocations(["[^1]: one"])).toEqual([]);
     });
 
     it("tracks references across multiple lines", () => {
-        const doc = fakeEditor(["alpha[^1]", "bravo", "charlie[^2]"]);
-        expect(listExistingFootnoteReferencesAndLocations(doc)).toEqual([
+        expect(referenceLocations(["alpha[^1]", "bravo", "charlie[^2]"])).toEqual([
             { footnote: "[^1]", lineNum: 0, startIndex: 5 },
             { footnote: "[^2]", lineNum: 2, startIndex: 7 },
         ]);
     });
 
     it("records the same reference each time it is used", () => {
-        const doc = fakeEditor(["alpha[^1] bravo[^1]"]);
-        expect(listExistingFootnoteReferencesAndLocations(doc)).toEqual([
+        expect(referenceLocations(["alpha[^1] bravo[^1]"])).toEqual([
             { footnote: "[^1]", lineNum: 0, startIndex: 5 },
             { footnote: "[^1]", lineNum: 0, startIndex: 15 },
         ]);
@@ -86,9 +101,8 @@ describe("listExistingFootnoteReferencesAndLocations", () => {
         // hunt 2026-07-17: only a column-0 "[^id]:" is a definition; a
         // mid-paragraph "noted[^3]: prose" is a live reference the old
         // (?!:) lookahead used to drop (grammar spec: reference-regexes tests)
-        const doc = fakeEditor(["as noted[^3]: more prose", "[^3]: the definition"]);
-        expect(listExistingFootnoteReferencesAndLocations(doc)).toEqual([
-            { footnote: "[^3]", lineNum: 0, startIndex: 8 },
-        ]);
+        expect(
+            referenceLocations(["as noted[^3]: more prose", "[^3]: the definition"]),
+        ).toEqual([{ footnote: "[^3]", lineNum: 0, startIndex: 8 }]);
     });
 });

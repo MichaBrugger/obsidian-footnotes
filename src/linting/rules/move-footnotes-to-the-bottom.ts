@@ -1,5 +1,6 @@
 import {
     findDefinitionBlocks,
+    findLineRunEnd,
     normalizeEol,
     protectedLines,
     scanDocument,
@@ -87,23 +88,18 @@ export function moveFootnoteDefinitionsToBottom(
     // the setting is markdown that can span MULTIPLE lines
     // ("---\n## Footnotes"), so matching compares line runs — single-line
     // comparison kept re-adding multi-line headings on every lint (bug
-    // reported 2026-07-17). The scan runs on the post-cut body: cutting
-    // whole definition blocks can't change fence pairing, so protection is
+    // reported 2026-07-17). findLineRunEnd is the ONE anchor matcher
+    // shared with buildDefinitionAppend's heading slot (fixed-point
+    // guarantee). The scan runs on the post-cut body: cutting whole
+    // definition blocks can't change fence pairing, so protection is
     // re-derived safely.
     let anchorEnd = -1;
     if (sectionHeading) {
-        const headingLines = sectionHeading.split("\n");
-        const bodyProtected = protectedLines(body);
-        for (let i = 0; i + headingLines.length <= body.length; i++) {
-            const matches = headingLines.every(
-                (headingLine, k) =>
-                    !bodyProtected[i + k] && body[i + k] === headingLine,
-            );
-            if (matches) {
-                anchorEnd = i + headingLines.length - 1;
-                break;
-            }
-        }
+        anchorEnd = findLineRunEnd(
+            body,
+            protectedLines(body),
+            sectionHeading.split("\n"),
+        );
     }
 
     if (anchorEnd !== -1) {
