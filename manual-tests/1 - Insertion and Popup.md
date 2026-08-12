@@ -73,6 +73,25 @@ Switch this note to Reading view, then:
 - [ ] The footnote commands are missing from the command palette while in Reading view
 - [ ] **Set footnote prefix** is still available there (a frontmatter edit is fine in Reading view)
 
+## Protected text (rule added 2026-08-12)
+
+Footnote creation is blocked inside code, math, comments, and frontmatter. It is always on, and inline spans count too. With the cursor in each spot below, every insert hotkey (numbered, named, inline, paste inline) shows "No footnote was created: footnotes can't go inside code, math, or other protected text." and changes nothing:
+
+- [ ] Inside the fenced code block below
+- [ ] Inside the `inline code span` on this line
+- [ ] Inside the math block below, and inside $x + y$ inline math
+- [ ] On a frontmatter line (add `---` frontmatter to a scratch note)
+- [ ] Just BEFORE the opening backtick or just AFTER the closing backtick of the span above, inserting still works normally
+- [ ] Navigation is unaffected: the hotkey on a live reference/definition elsewhere in the note still jumps
+
+```
+block me [^here]
+```
+
+$$
+E = mc^2
+$$
+
 ## Popup editor
 
 Turn on `Edit footnotes in a popup`, then:
