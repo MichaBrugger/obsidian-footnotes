@@ -46,6 +46,39 @@ const proseLineArb = fc
     .array(linePieceArb, { minLength: 1, maxLength: 5 })
     .map((pieces) => pieces.join(" "));
 
+// filler paragraphs between the footnote-bearing blocks (Jason's corpus
+// review, 2026-08-12: real notes are mostly prose) — Latin lorem ipsum and
+// the Thousand Character Classic as its CJK counterpart. A paragraph may
+// carry one reference, before OR after its final punctuation mark (the
+// punctuation rule's whole job).
+const LATIN_FILLER = [
+    "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+    "Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
+    "Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.",
+    "Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.",
+];
+const CJK_FILLER = [
+    "天地玄黄，宇宙洪荒。日月盈昃，辰宿列张。寒来暑往，秋收冬藏。",
+    "闰余成岁，律吕调阳。云腾致雨，露结为霜。金生丽水，玉出昆冈。",
+    "剑号巨阙，珠称夜光。果珍李柰，菜重芥姜。海咸河淡，鳞潜羽翔。",
+];
+const fillerParagraphArb = fc
+    .tuple(
+        fc.array(fc.constantFrom(...LATIN_FILLER, ...CJK_FILLER), {
+            minLength: 1,
+            maxLength: 3,
+        }),
+        fc.option(fc.tuple(nameArb, fc.boolean()), { nil: undefined }),
+    )
+    .map(([sentences, referenceSpot]) => {
+        const paragraph = sentences.join(" ");
+        if (referenceSpot === undefined) return paragraph;
+        const [name, afterPunctuation] = referenceSpot;
+        return afterPunctuation
+            ? `${paragraph}[^${name}]`
+            : `${paragraph.slice(0, -1)}[^${name}]${paragraph.slice(-1)}`;
+    });
+
 const definitionBlockArb = fc
     .tuple(nameArb, fc.constantFrom(...WORDS), fc.boolean())
     .map(([n, w, continued]) =>
@@ -86,6 +119,7 @@ const specialBlockArb = fc.constantFrom(
 );
 
 const blockArb = fc.oneof(
+    { weight: 4, arbitrary: fillerParagraphArb },
     { weight: 4, arbitrary: proseLineArb },
     { weight: 3, arbitrary: definitionBlockArb },
     { weight: 1, arbitrary: fenceBlockArb },
