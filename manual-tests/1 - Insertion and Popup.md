@@ -83,6 +83,7 @@ Footnote creation is blocked inside code, math, comments, and frontmatter. It is
 - [ ] On a frontmatter line (add `---` frontmatter to a scratch note)
 - [ ] Just BEFORE the opening backtick or just AFTER the closing backtick of the span above, inserting still works normally
 - [ ] Navigation is unaffected: the hotkey on a live reference/definition elsewhere in the note still jumps
+- [ ] Swallow guards (found by the press fuzzer 2026-08-12): with the caret between `$5 or ` and `$6` on a line like `pay $5 or $6 now`, the numbered hotkey shows the same protected-text toast instead of inserting a reference that would complete a math pair and vanish; the caret right after a lone `\` inserts the footnote BEFORE the backslash (both stay live)
 
 ```
 block me [^here]

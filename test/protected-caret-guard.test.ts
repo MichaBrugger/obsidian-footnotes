@@ -180,6 +180,30 @@ describe("footnote creation is blocked inside protected text", () => {
             ch: line.length,
         });
     });
+
+    it("a reference that would COMPLETE an inline-math pair and be swallowed by it", async () => {
+        // found by the command-press property suite (2026-08-12): "$5 or "
+        // ends with a space, so the dollars are prose — until "[^2]"
+        // lands before the second one and "$5 or [^2]$" satisfies the
+        // non-space-edge rule, masking the fresh reference into math
+        await expectBlocked(insertAutonumFootnote, ["$5 or $6 [^1]"], {
+            line: 0,
+            ch: 6,
+        });
+    });
+
+    it("a reference that would DEMOTE a quote and strand its own definition", async () => {
+        // found by the command-press property suite (2026-08-12): "[^1]"
+        // at column 0 of "> $$" breaks the blockquote, the now doc-level
+        // "$$" swallows everything below — including the definition the
+        // same transaction appends. The simulate-and-verify refusal
+        // catches it before any edit.
+        await expectBlocked(
+            insertAutonumFootnote,
+            ["> $$", "> quoted math[^75]"],
+            { line: 0, ch: 0 },
+        );
+    });
 });
 
 describe("creation still works at protected-text boundaries", () => {

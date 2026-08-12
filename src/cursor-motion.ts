@@ -1,6 +1,7 @@
 import { Editor, EditorChange, EditorPosition } from "obsidian";
 
 import type FootnotePlugin from "./main";
+import { escapedAt } from "./footnote-grammar";
 import { TrailingPunctuationChars } from "./markdown-scan";
 import {
     EditorWithCm,
@@ -112,20 +113,54 @@ export function endOfWordOffset(text: string, offset: number): number {
     return end;
 }
 
-/** adjust cursor position to insert a footnote only at the end of word */
+/**
+ * The rightmost column at or left of `ch` where an insertion keeps its
+ * meaning: text inserted directly after an ESCAPING backslash would itself
+ * be escaped ("\" + "[^N]" is literal prose, its appended definition
+ * instantly orphaned — while the character the backslash used to protect
+ * goes LIVE), and a reference inserted directly after an unescaped "^"
+ * would be swallowed as inline-footnote content ("^" + "[^N]" reads as
+ * "^[^N]"). Both found by the command-press property suite (2026-08-12).
+ * Each hazard steps one column left; runs of hazards walk left until the
+ * insertion is safe.
+ */
+export function safeInsertionCh(lineText: string, ch: number): number {
+    for (;;) {
+        if (escapedAt(lineText, ch)) {
+            ch--;
+            continue;
+        }
+        if (
+            ch > 0 &&
+            lineText[ch - 1] === "^" &&
+            !escapedAt(lineText, ch - 1)
+        ) {
+            ch--;
+            continue;
+        }
+        return ch;
+    }
+}
+
+/** adjust cursor position to insert a footnote only at the end of word, and never where an escape or inline-footnote opener would swallow the insertion */
 export function adjustFootnotePosition(
     cursorPosition: EditorPosition,
     doc: Editor,
     lineText: string,
     plugin: FootnotePlugin,
 ) {
-    if (!plugin.settings.insertAtEndOfWord) return cursorPosition;
-    const endOfWordUnderCursor = doc.wordAt(cursorPosition)?.to;
-    if (!endOfWordUnderCursor) return cursorPosition; // no word under cursor
-
-    // adjust cursor position to insert a footnote only at the end of word
-    const nextChar = lineText.charAt(endOfWordUnderCursor.ch);
-    if (isTrailingPunctuation(nextChar)) endOfWordUnderCursor.ch++;
-    cursorPosition = endOfWordUnderCursor;
+    if (plugin.settings.insertAtEndOfWord) {
+        const endOfWordUnderCursor = doc.wordAt(cursorPosition)?.to;
+        if (endOfWordUnderCursor) {
+            // adjust cursor position to insert a footnote only at the end of word
+            const nextChar = lineText.charAt(endOfWordUnderCursor.ch);
+            if (isTrailingPunctuation(nextChar)) endOfWordUnderCursor.ch++;
+            cursorPosition = endOfWordUnderCursor;
+        }
+    }
+    const ch = safeInsertionCh(lineText, cursorPosition.ch);
+    if (ch !== cursorPosition.ch) {
+        cursorPosition = { line: cursorPosition.line, ch };
+    }
     return cursorPosition;
 }

@@ -91,8 +91,8 @@ export function occurrenceAtCursor(
     return null;
 }
 
-/** Whether the character at `index` is backslash-escaped: an ODD run of backslashes directly before it. */
-function escapedAt(line: string, index: number): boolean {
+/** Whether the character at `index` is backslash-escaped: an ODD run of backslashes directly before it. Exported for the insertion-position adjuster — text INSERTED at an escaped position would itself be escaped (bug-insert-after-backslash). */
+export function escapedAt(line: string, index: number): boolean {
     let backslashes = 0;
     for (let j = index - 1; j >= 0 && line[j] === "\\"; j--) backslashes++;
     return backslashes % 2 === 1;

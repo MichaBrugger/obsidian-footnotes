@@ -19,13 +19,13 @@ import {
 } from "./footnote-grammar";
 import { footnotePopupBusy, openFootnotePopup, popupEditingAvailable, runAfterNextPopupSettle, settleFootnotePopupWithFeedback, toggleCloseFootnotePopup } from "./footnote-popup";
 import { activeFootnotePrefix, footnotePrefixFromEditor, footnotePrefixProblem } from "./footnote-prefix";
-import { adjustFootnotePosition, endOfWordOffset, moveCursorAndSetJumpPoint } from "./cursor-motion";
+import { adjustFootnotePosition, endOfWordOffset, moveCursorAndSetJumpPoint, safeInsertionCh } from "./cursor-motion";
 import { buildDefinitionAppend } from "./definition-append";
 import { DocContext, docContext, docLines, listExistingFootnoteDefinitions } from "./doc-context";
 import { shouldJumpFromDefinitionToReference, shouldJumpFromReferenceToDefinition } from "./navigation";
 import { exitInlineFootnoteIfInside, sanitizeInlineFootnoteContent, warnEmptyInlineFootnoteIfInside } from "./inline-footnotes";
 import { lintAfterFootnoteCreation } from "./linting/linter";
-import { maskInlineRegions, maskedLineAt } from "./markdown-scan";
+import { definitionLabelIn, findDefinitionBlocks, maskInlineRegions, maskedLineAt, scanDocument } from "./markdown-scan";
 import { readingViewActive, viewEditor } from "./obsidian-internals";
 import { activeTableCellEditor, resolveTableCellCursor, runOutsideTableCell, TableCellEditor } from "./table-cursor";
 
@@ -53,9 +53,15 @@ export function insertInTableCell(
 ) {
     const cellText = cell.state.doc.toString();
     const head = cell.state.selection.main.head;
-    const at = plugin.settings.insertAtEndOfWord
-        ? endOfWordOffset(cellText, head)
-        : head;
+    // safeInsertionCh, same as adjustFootnotePosition: an insertion after
+    // an escaping backslash or an unescaped "^" would be swallowed
+    // (bug-insert-after-backslash)
+    const at = safeInsertionCh(
+        cellText,
+        plugin.settings.insertAtEndOfWord
+            ? endOfWordOffset(cellText, head)
+            : head,
+    );
     cell.dispatch({
         changes: { from: at, insert: text },
         selection: { anchor: at + caretOffsetInText },
@@ -197,11 +203,40 @@ function warnProtectedCaretIfInside(
             );
     }
     if (!inside) return false;
-    new Notice(
-        "No footnote was created: footnotes can't go inside code, math, or other protected text.",
-        8000,
-    );
+    new Notice(ProtectedCreationNotice, 8000);
     return true;
+}
+
+const ProtectedCreationNotice =
+    "No footnote was created: footnotes can't go inside code, math, or other protected text.";
+
+/** The document `changes` would produce — every change addresses the ORIGINAL text (CodeMirror transaction semantics), so they apply back-to-front. */
+function simulateChanges(lines: string[], changes: EditorChange[]): string[] {
+    const text = lines.join("\n");
+    const offsetOf = (pos: EditorPosition): number => {
+        let offset = 0;
+        for (let i = 0; i < pos.line && i < lines.length; i++) {
+            offset += lines[i].length + 1;
+        }
+        return offset + pos.ch;
+    };
+    const resolved = changes
+        .map((change, index) => ({
+            from: offsetOf(change.from),
+            to: change.to ? offsetOf(change.to) : offsetOf(change.from),
+            text: change.text,
+            index,
+        }))
+        // back-to-front; SAME-POSITION insertions concatenate in change
+        // order (CodeMirror semantics — the reference and the EOF-append
+        // definition share an offset when the caret sits at line end), so
+        // ties apply the later change first
+        .sort((a, b) => b.from - a.from || b.index - a.index);
+    let out = text;
+    for (const change of resolved) {
+        out = out.slice(0, change.from) + change.text + out.slice(change.to);
+    }
+    return out.split("\n");
 }
 
 /** Whether `ch` sits STRICTLY inside a masked (NUL) span — the text on both sides is claimed. Boundaries are fine: just before an opener or just after a closer inserts outside the span. `openAtStart`/`openAtEnd` stand in for the off-line neighbor at ch 0 / end of line. */
@@ -347,6 +382,35 @@ export function createAutonumFootnote(
     if (definition.prepend) changes.push(definition.prepend);
     const lineShift = definition.prepend ? 1 : 0;
 
+    // the insertion itself can RECLASSIFY the document — "[^N]" at a
+    // quote's column 0 demotes the quote and a region opener riding that
+    // line swallows everything below, including the definition this very
+    // transaction appends; between two loose dollars it can COMPLETE an
+    // inline-math pair that swallows the reference (both found by the
+    // command-press property suite, 2026-08-12). Verify on the SIMULATED
+    // result that the new reference is live and its definition parses as a
+    // live block; refuse like the protected-caret guard otherwise.
+    const simulated = simulateChanges(ctx.lines, changes);
+    const simulatedScan = scanDocument(simulated);
+    const definitionLive = findDefinitionBlocks(
+        simulated,
+        simulatedScan.isProtected,
+        simulatedScan,
+    ).some((block) => block.start === definition.cursor.line);
+    const referenceLine = cursorPosition.line + lineShift;
+    const referenceLive = referenceOccurrences(
+        simulated[referenceLine],
+        maskedLineAt(simulated, referenceLine),
+    ).some(
+        (occurrence) =>
+            occurrence.start === cursorPosition.ch &&
+            occurrence.name === footnoteId,
+    );
+    if (!definitionLive || !referenceLive) {
+        new Notice(ProtectedCreationNotice, 8000);
+        return true;
+    }
+
     if (popupEditingAvailable(plugin)) {
         // type the definition in a popup instead of jumping to the bottom;
         // the cursor only moves past the new reference
@@ -434,6 +498,39 @@ export function navigateReferenceIfInside(
 }
 
 /**
+ * When the caret sits INSIDE a definition label ("[^x]:" — before the end
+ * of its colon), handle the press like the numbered/named cascade's step 1:
+ * jump back to the first reference (or explain an orphan). Inserting inline
+ * text there would shove the label off column 0, DESTROYING the definition
+ * and orphaning its references (found by the command-press property suite,
+ * 2026-08-12 — the inline pair never had the jump-from-definition step the
+ * other keys start with). Definition CONTENT, at or past the label end, is
+ * ordinary prose and stays insertable. Table cells never hold real
+ * definitions, so a cell press skips this.
+ */
+function navigateDefinitionLabelIfInside(
+    plugin: FootnotePlugin,
+    doc: Editor,
+    cell: TableCellEditor | null,
+): boolean {
+    if (cell) return false;
+    const cursorPosition = doc.getCursor();
+    const lineText = doc.getLine(cursorPosition.line);
+    // raw-line gate first — this runs on every inline/paste press
+    const label = definitionLabelIn(lineText);
+    if (!label || cursorPosition.ch >= label.labelEnd) return false;
+    // a label-shaped line inside code is plain text (#41): no jump — the
+    // protected-caret guard downstream owns that caret
+    const ctx = docContext(doc);
+    const maskedLabel = definitionLabelIn(ctx.maskedLine(cursorPosition.line));
+    if (!maskedLabel || cursorPosition.ch >= maskedLabel.labelEnd) return false;
+    // however the jump resolves (first reference, or the orphan toast),
+    // the press is handled — "^[…]" must never land inside the label
+    shouldJumpFromDefinitionToReference(lineText, cursorPosition, plugin, doc, ctx);
+    return true;
+}
+
+/**
  * Inline-footnote command: inserts `^[]` with the caret between the
  * brackets for quick writing. A second press while the cursor is still
  * inside an inline footnote instead hops it just past the closing bracket,
@@ -445,6 +542,8 @@ export async function insertInlineFootnote(plugin: FootnotePlugin) {
     await withEditableEditor(plugin, (doc) => {
         const cell = activeTableCellEditor(doc);
         if (caretGuardsHandled(plugin, doc, cell)) return;
+        // inside a definition label, jump back like the other footnote keys
+        if (navigateDefinitionLabelIfInside(plugin, doc, cell)) return;
         // inside a real reference, navigate instead of nesting "^[]"
         if (navigateReferenceIfInside(plugin, doc, cell)) return;
         // creation in code/math/comment/frontmatter is blocked outright
@@ -464,6 +563,7 @@ export async function pasteInlineFootnote(plugin: FootnotePlugin) {
         // the same guards every other insert command runs (missed here until
         // the 2026-08-07 QOL sweep; pinned by test/paste-inline-in-inline.test.ts)
         if (caretGuardsHandled(plugin, doc, pasteCell)) return;
+        if (navigateDefinitionLabelIfInside(plugin, doc, pasteCell)) return;
         if (navigateReferenceIfInside(plugin, doc, pasteCell)) return;
         // creation in code/math/comment/frontmatter is blocked outright —
         // before the clipboard await, so a blocked press never reads it

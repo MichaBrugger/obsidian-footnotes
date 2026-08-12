@@ -32,12 +32,21 @@ The suite has three kinds of files:
   conservation, scanner self-agreement, plus a **differential oracle**
   that parses each document with micromark (GFM footnotes + math) before
   and after linting and requires identical footnote structure. Failures
-  shrink to a minimal counterexample automatically.
+  shrink to a minimal counterexample automatically. The document generator
+  lives in `test/arbitraries.ts`, shared with the sample-corpus script.
+- **Command-press properties** (`test/command-properties.test.ts`) — the
+  same generator drives the four real creation commands (autonum, named,
+  inline, paste) against a transaction-applying fake editor at random
+  caret positions and settings: a press never throws, never edits
+  protected text, never loses a protected line, adds only the raw
+  reference shapes its contract allows, and never mints a dead reference
+  or orphaned definition of its own making. Popup, table cells, and
+  Reading view stay smoke-suite territory.
 
 Properties run 200 cases each by default. Before a release, soak them:
 
 ```powershell
-$env:FC_NUM_RUNS = "5000"; npx vitest run test/properties.test.ts
+$env:FC_NUM_RUNS = "5000"; npx vitest run test/properties.test.ts test/command-properties.test.ts
 ```
 
 Standing rules:
