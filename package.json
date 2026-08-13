@@ -16,11 +16,6 @@
   "keywords": [],
   "author": "",
   "license": "MIT",
-  "knip": {
-    "ignore": [
-      "vitest.stryker.config.ts"
-    ]
-  },
   "devDependencies": {
     "@stryker-mutator/core": "^9.6.1",
     "@stryker-mutator/vitest-runner": "^9.6.1",
@@ -41,5 +36,14 @@
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.64.0",
     "vitest": "^4.1.10"
+  },
+  "knip": {
+    "entry": [
+      "scripts/generate-corpora.ts",
+      "scripts/strip-inkscape-icons.mjs"
+    ],
+    "ignore": [
+      "vitest.stryker.config.ts"
+    ]
   }
 }
