@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { protectedLines, scanDocument } from "../../src/markdown-scan";
+import { protectedLines, scanDocument } from "../../src/parsing/markdown-scan";
 
 // Sol re-review bug #1 (2026-08-10): a fence opened on a list-item line
 // ("10. ```", "  - ```") closes with a fence indented to the ITEM'S

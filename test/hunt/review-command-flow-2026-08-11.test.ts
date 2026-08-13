@@ -4,13 +4,13 @@ import { describe, expect, it, vi } from "vitest";
 import { noticeCalls } from "../mocks/obsidian";
 
 import FootnotePlugin from "../../src/main";
-import { openFootnotePopup } from "../../src/footnote-popup";
-import { warnEmptyInlineFootnoteIfInside } from "../../src/inline-footnotes";
+import { openFootnotePopup } from "../../src/commands/footnote-popup";
+import { warnEmptyInlineFootnoteIfInside } from "../../src/commands/inline-footnotes";
 import {
     insertAutonumFootnote,
     insertInlineFootnote,
     insertNamedFootnote,
-} from "../../src/insert-or-navigate-footnotes";
+} from "../../src/commands/insert-or-navigate-footnotes";
 
 // Pins for the 2026-08-11 review's command-flow bugs:
 //   #6 the empty-"[^]" hop used LINE-LOCAL masking while its guard used

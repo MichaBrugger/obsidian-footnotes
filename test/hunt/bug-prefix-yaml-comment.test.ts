@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { footnotePrefix } from "../../src/footnote-prefix";
+import { footnotePrefix } from "../../src/parsing/footnote-prefix";
 import { lintBlockedByPrefix } from "../../src/linting/linter";
 
 // Scenario: "footnote-prefix: 2. # later chapters" makes footnotePrefix return

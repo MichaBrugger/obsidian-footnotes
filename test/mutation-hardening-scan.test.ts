@@ -10,7 +10,7 @@ import {
     removeLineRanges,
     restoreEol,
     scanDocument,
-} from "../src/markdown-scan";
+} from "../src/parsing/markdown-scan";
 
 // These tests exist to kill Stryker survivors from the 2026-08-10 baseline
 // listed in survivors-markdown-scan.json (144 mutants against

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { computeNextFootnoteNumber } from "../src/footnote-grammar";
+import { computeNextFootnoteNumber } from "../src/parsing/footnote-grammar";
 
 // The pure core of the auto-numbered command: next number = highest
 // existing numbered reference/definition + 1. Deliberate policy pinned here:

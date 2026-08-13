@@ -1,8 +1,8 @@
 import { Editor, EditorPosition, Notice } from "obsidian";
 
-import type FootnotePlugin from "./main";
-import { emptyReferenceStart } from "./footnote-grammar";
-import { footnotePrefixFromEditor, footnotePrefixProblem } from "./footnote-prefix";
+import type FootnotePlugin from "../main";
+import { emptyReferenceStart } from "../parsing/footnote-grammar";
+import { footnotePrefixFromEditor, footnotePrefixProblem } from "../parsing/footnote-prefix";
 import {
     exitInlineFootnoteIfInside,
     warnEmptyInlineFootnoteIfInside,
@@ -10,11 +10,11 @@ import {
 import {
     caretInsideMaskedSpan,
     ProtectedCreationNotice,
-} from "./insertion-liveness";
-import { DocContext, docContext, docLines } from "./doc-context";
-import { definitionLabelIn, maskInlineRegions, maskedLineAt } from "./markdown-scan";
+} from "../editor/insertion-liveness";
+import { DocContext, docContext, docLines } from "../editor/doc-context";
+import { definitionLabelIn, maskInlineRegions, maskedLineAt } from "../parsing/markdown-scan";
 import { shouldJumpFromDefinitionToReference } from "./navigation";
-import { TableCellEditor } from "./table-cursor";
+import { TableCellEditor } from "../editor/table-cursor";
 
 // The press guards: a footnote key was pressed — does something OTHER than
 // creation own it? Empty placeholders warn, filled inline footnotes hop,

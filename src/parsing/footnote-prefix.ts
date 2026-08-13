@@ -1,6 +1,6 @@
 import { Editor, Notice } from "obsidian";
 
-import type FootnotePlugin from "./main";
+import type FootnotePlugin from "../main";
 import { isValidFootnoteName } from "./footnote-grammar";
 
 // The note's `footnote-prefix` frontmatter property: parsing (a hand-rolled

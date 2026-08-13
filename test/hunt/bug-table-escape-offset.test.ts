@@ -1,9 +1,9 @@
 import type { Editor, EditorChange, EditorPosition } from "obsidian";
 import { describe, expect, it } from "vitest";
 
-import { insertAutonumFootnote } from "../../src/insert-or-navigate-footnotes";
+import { insertAutonumFootnote } from "../../src/commands/insert-or-navigate-footnotes";
 import type FootnotePlugin from "../../src/main";
-import { resolveTableCellCursor, type TableCellEditor } from "../../src/table-cursor";
+import { resolveTableCellCursor, type TableCellEditor } from "../../src/editor/table-cursor";
 
 // A caret just inside a reference after an escaped pipe (\|) resolves one source column short, reads as OUTSIDE the reference, and insertAutonumFootnote nests a new reference inside the existing one.
 // Hunt: 2026-08-09. Lens: offsets.

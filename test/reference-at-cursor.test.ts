@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { referenceAtCursor } from "../src/footnote-grammar";
+import { referenceAtCursor } from "../src/parsing/footnote-grammar";
 
 // The "inside a reference" rule shared by both navigation checks, aligned
 // with the inline-footnote definition (issue #49): the caret counts as on

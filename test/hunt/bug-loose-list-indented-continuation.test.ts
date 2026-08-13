@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { protectedLines } from "../../src/markdown-scan";
+import { protectedLines } from "../../src/parsing/markdown-scan";
 import { removeOrphanedFootnoteDefinitions } from "../../src/linting/rules/remove-orphaned-definitions";
 
 // Sol re-review bug #2 (2026-08-10), ground truth verified against

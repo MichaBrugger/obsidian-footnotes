@@ -2,8 +2,8 @@ import { Editor, EditorChange, EditorPosition } from "obsidian";
 import { describe, expect, it } from "vitest";
 
 import FootnotePlugin from "../../src/main";
-import { createMatchingFootnoteDefinition } from "../../src/create-footnote";
-import { shouldJumpFromDefinitionToReference, shouldJumpFromReferenceToDefinition } from "../../src/navigation";
+import { createMatchingFootnoteDefinition } from "../../src/commands/create-footnote";
+import { shouldJumpFromDefinitionToReference, shouldJumpFromReferenceToDefinition } from "../../src/commands/navigation";
 import { reindexFootnotes } from "../../src/linting/rules/re-index-footnotes";
 
 // Scenario: a footnote whose name contains an inline-code span ("[^x`c`y]")

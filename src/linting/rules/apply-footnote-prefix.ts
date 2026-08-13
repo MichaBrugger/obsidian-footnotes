@@ -1,5 +1,5 @@
-import { footnotePrefixProblem } from "../../footnote-prefix";
-import { computeNextFootnoteNumber, referenceOccurrences } from "../../footnote-grammar";
+import { footnotePrefixProblem } from "../../parsing/footnote-prefix";
+import { computeNextFootnoteNumber, referenceOccurrences } from "../../parsing/footnote-grammar";
 import {
     DefinitionStart,
     findDefinitionBlocks,
@@ -7,7 +7,7 @@ import {
     normalizeEol,
     scanDocument,
     restoreEol,
-} from "../../markdown-scan";
+} from "../../parsing/markdown-scan";
 import { IgnoreType } from "../ignore-types";
 import { FootnoteRule } from "../rule";
 

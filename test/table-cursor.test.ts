@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { tableRowCellSpans } from "../src/table-cursor";
+import { tableRowCellSpans } from "../src/editor/table-cursor";
 
 // The escape-aware cell geometry that resolveTableCellCursor uses to map a
 // cell-local caret back to a document position. Only this slicing is

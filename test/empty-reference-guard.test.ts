@@ -9,7 +9,7 @@ import {
     insertInlineFootnote,
     insertNamedFootnote,
     pasteInlineFootnote,
-} from "../src/insert-or-navigate-footnotes";
+} from "../src/commands/insert-or-navigate-footnotes";
 
 // QOL sweep (2026-08-07): any footnote command pressed with the caret inside
 // an abandoned empty reference "[^]" warns ("give it a name") and leaves the

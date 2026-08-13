@@ -1,7 +1,7 @@
 import { App } from "obsidian";
 import { describe, expect, it } from "vitest";
 
-import { ensureTextPropertyType } from "../src/obsidian-internals";
+import { ensureTextPropertyType } from "../src/editor/obsidian-internals";
 
 // Reported 2026-08-12: the vault registered footnote-prefix as a NUMBER
 // property — Obsidian infers an unassigned property's type from its

@@ -2,7 +2,7 @@
 // the tab renders from getSettingDefinitions() (declarative, auto-saving).
 import { App, PluginSettingTab, SettingDefinitionItem } from "obsidian";
 import type FootnotePlugin from "./main";
-import { AppWithPlugins } from "./obsidian-internals";
+import { AppWithPlugins } from "./editor/obsidian-internals";
 
 export interface FootnotePluginSettings {
     /** Marks saved data whose one-time migrations have run (see loadSettings). Not shown in the settings tab. */

@@ -7,9 +7,9 @@ import { math } from "micromark-extension-math";
 import { describe, expect, it } from "vitest";
 
 import { docArb } from "./arbitraries";
-import { inlineFootnoteSpanAt, sanitizeInlineFootnoteContent } from "../src/inline-footnotes";
-import { endOfWordOffset } from "../src/cursor-motion";
-import { footnoteReferenceMatches } from "../src/footnote-grammar";
+import { inlineFootnoteSpanAt, sanitizeInlineFootnoteContent } from "../src/commands/inline-footnotes";
+import { endOfWordOffset } from "../src/editor/cursor-motion";
+import { footnoteReferenceMatches } from "../src/parsing/footnote-grammar";
 import { lintFootnotes, LintOptions } from "../src/linting/linter";
 import {
     findDefinitionBlocks,
@@ -17,7 +17,7 @@ import {
     maskedLineAt,
     normalizeEol,
     protectedLines,
-} from "../src/markdown-scan";
+} from "../src/parsing/markdown-scan";
 
 // Property-based tests (fast-check, adopted 2026-08-10): instead of
 // hand-picked cases, every property is asserted over RANDOMLY GENERATED

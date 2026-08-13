@@ -6,7 +6,7 @@ import {
     scanDocument,
     removeLineRanges,
     restoreEol,
-} from "../../markdown-scan";
+} from "../../parsing/markdown-scan";
 import { IgnoreType } from "../ignore-types";
 import { FootnoteRule } from "../rule";
 

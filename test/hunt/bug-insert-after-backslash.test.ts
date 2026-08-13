@@ -5,7 +5,7 @@ import FootnotePlugin from "../../src/main";
 import {
     insertAutonumFootnote,
     insertInlineFootnote,
-} from "../../src/insert-or-navigate-footnotes";
+} from "../../src/commands/insert-or-navigate-footnotes";
 
 // Found by the command-press property suite (2026-08-12, shrunk from
 // "\[^81]. alpha[^1].", caret between "\" and "["): inserting a footnote

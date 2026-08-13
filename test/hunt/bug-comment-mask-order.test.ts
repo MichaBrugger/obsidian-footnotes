@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { computeNextFootnoteNumber } from "../../src/footnote-grammar";
+import { computeNextFootnoteNumber } from "../../src/parsing/footnote-grammar";
 
 // BUG: a line like `<!-- [^9] `--> `` is a one-line HTML block (fully inert),
 // but the comment's reference stays visible to autonumbering.

@@ -1,7 +1,7 @@
 import { Editor } from "obsidian";
 import { describe, expect, it } from "vitest";
 
-import { listExistingFootnoteDefinitions } from "../../src/doc-context";
+import { listExistingFootnoteDefinitions } from "../../src/editor/doc-context";
 
 // BUG: listExistingFootnoteDefinitions leaks NUL bytes when a footnote name
 // contains a backtick span. It reads the maskProtectedLines/maskInlineCode

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { protectedLines } from "../../src/markdown-scan";
+import { protectedLines } from "../../src/parsing/markdown-scan";
 
 // Sol re-review bug #5 (2026-08-10), ground truth verified against
 // Obsidian's metadataCache ("heading:0-0, code:1-1"): lazy continuation

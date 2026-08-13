@@ -2,7 +2,7 @@ import { Editor } from "obsidian";
 import { describe, expect, it } from "vitest";
 
 import FootnotePlugin from "../../src/main";
-import { buildDefinitionAppend } from "../../src/definition-append";
+import { buildDefinitionAppend } from "../../src/commands/definition-append";
 import { lintFootnotes } from "../../src/linting/linter";
 import { moveFootnoteDefinitionsToBottom } from "../../src/linting/rules/move-footnotes-to-the-bottom";
 

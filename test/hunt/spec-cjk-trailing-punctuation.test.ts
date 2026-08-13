@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { endOfWordOffset } from "../../src/cursor-motion";
+import { endOfWordOffset } from "../../src/editor/cursor-motion";
 
 // spec question: should the TrailingPunctuation class grow CJK members
 // (。！？；：，) so the end-of-word hop treats CJK punctuation like ASCII?

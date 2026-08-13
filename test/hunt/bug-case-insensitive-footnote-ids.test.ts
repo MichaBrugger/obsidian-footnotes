@@ -2,7 +2,7 @@ import { Editor, EditorChange, EditorPosition } from "obsidian";
 import { describe, expect, it } from "vitest";
 
 import FootnotePlugin from "../../src/main";
-import { createMatchingFootnoteDefinition } from "../../src/create-footnote";
+import { createMatchingFootnoteDefinition } from "../../src/commands/create-footnote";
 import { reindexFootnotes } from "../../src/linting/rules/re-index-footnotes";
 
 // BUG: Obsidian footnote labels are case-insensitive — "[^Note]" and "[^note]:"

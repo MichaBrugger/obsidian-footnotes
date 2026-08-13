@@ -5,7 +5,7 @@ import FootnotePlugin from "../src/main";
 import {
     jumpToFootnoteDefinition,
     shouldJumpFromDefinitionToReference,
-} from "../src/navigation";
+} from "../src/commands/navigation";
 
 // Bug (reported 2026-07-17, manual testing): jumping TO a multi-line definition
 // lands the caret on the LAST continuation line by design, but jumping BACK

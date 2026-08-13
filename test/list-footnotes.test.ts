@@ -1,9 +1,9 @@
 import { Editor } from "obsidian";
 import { describe, expect, it } from "vitest";
 
-import { listExistingFootnoteDefinitions } from "../src/doc-context";
-import { referenceOccurrences } from "../src/footnote-grammar";
-import { maskProtectedLines } from "../src/markdown-scan";
+import { listExistingFootnoteDefinitions } from "../src/editor/doc-context";
+import { referenceOccurrences } from "../src/parsing/footnote-grammar";
+import { maskProtectedLines } from "../src/parsing/markdown-scan";
 
 // The document-scanning behavior the navigation cascade is built on:
 // definition names, and reference occurrences with positions. Includes the

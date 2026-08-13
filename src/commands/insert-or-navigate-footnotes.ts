@@ -1,31 +1,31 @@
 import { Editor, EditorPosition, MarkdownView, Notice } from "obsidian";
 
-import type FootnotePlugin from "./main";
+import type FootnotePlugin from "../main";
 import {
     footnoteReferenceMatches,
     occurrenceAtCursor,
     referenceAtCursor,
     referenceOccurrences,
-} from "./footnote-grammar";
+} from "../parsing/footnote-grammar";
 import { settleFootnotePopupWithFeedback, toggleCloseFootnotePopup } from "./footnote-popup";
-import { adjustFootnotePosition, moveCursorAndSetJumpPoint } from "./cursor-motion";
+import { adjustFootnotePosition, moveCursorAndSetJumpPoint } from "../editor/cursor-motion";
 import {
     createAutonumFootnote,
     createFootnoteReference,
     createMatchingFootnoteDefinition,
     insertInTableCell,
 } from "./create-footnote";
-import { docContext } from "./doc-context";
+import { docContext } from "../editor/doc-context";
 import { inlineFootnoteSpanAt, sanitizeInlineFootnoteContent } from "./inline-footnotes";
-import { ProtectedCreationNotice, simulatedMaskedLine } from "./insertion-liveness";
+import { ProtectedCreationNotice, simulatedMaskedLine } from "../editor/insertion-liveness";
 import { shouldJumpFromDefinitionToReference, shouldJumpFromReferenceToDefinition } from "./navigation";
-import { readingViewActive, viewEditor } from "./obsidian-internals";
+import { readingViewActive, viewEditor } from "../editor/obsidian-internals";
 import {
     caretGuardsHandled,
     navigateDefinitionLabelIfInside,
     warnProtectedCaretIfInside,
 } from "./press-guards";
-import { activeTableCellEditor, resolveTableCellCursor, runOutsideTableCell, TableCellEditor } from "./table-cursor";
+import { activeTableCellEditor, resolveTableCellCursor, runOutsideTableCell, TableCellEditor } from "../editor/table-cursor";
 
 // The command entry points: each press walks the same decision cascade
 // against the caret position:

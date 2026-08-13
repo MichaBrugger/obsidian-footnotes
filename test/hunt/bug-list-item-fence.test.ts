@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { computeNextFootnoteNumber } from "../../src/footnote-grammar";
+import { computeNextFootnoteNumber } from "../../src/parsing/footnote-grammar";
 
 // BUG: a fence opening on a list-item line ("- ```" / "1. ~~~") is missed:
 // the code body stays live and the indented closer OPENS a phantom fence

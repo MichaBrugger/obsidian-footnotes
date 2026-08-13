@@ -6,7 +6,7 @@ import {
     Notice,
 } from "obsidian";
 
-import type FootnotePlugin from "./main";
+import type FootnotePlugin from "../main";
 import {
     computeNextFootnoteNumber,
     emptyReferenceStart,
@@ -16,23 +16,23 @@ import {
     occurrenceAtCursor,
     referenceAtCursor,
     referenceOccurrences,
-} from "./footnote-grammar";
+} from "../parsing/footnote-grammar";
 import { footnotePopupBusy, openFootnotePopup, popupEditingAvailable, runAfterNextPopupSettle } from "./footnote-popup";
-import { activeFootnotePrefix, footnotePrefixFromEditor } from "./footnote-prefix";
-import { adjustFootnotePosition, endOfWordOffset, moveCursorAndSetJumpPoint } from "./cursor-motion";
+import { activeFootnotePrefix, footnotePrefixFromEditor } from "../parsing/footnote-prefix";
+import { adjustFootnotePosition, endOfWordOffset, moveCursorAndSetJumpPoint } from "../editor/cursor-motion";
 import { buildDefinitionAppend } from "./definition-append";
-import { DocContext, docContext, listExistingFootnoteDefinitions } from "./doc-context";
+import { DocContext, docContext, listExistingFootnoteDefinitions } from "../editor/doc-context";
 import { inlineFootnoteSpanAt } from "./inline-footnotes";
 import {
     ProtectedCreationNotice,
     safeInsertionCh,
     simulateChanges,
     simulatedMaskedLine,
-} from "./insertion-liveness";
-import { lintAfterFootnoteCreation } from "./linting/linter";
-import { findDefinitionBlocks, maskInlineRegions, maskedLineAt, scanDocument } from "./markdown-scan";
+} from "../editor/insertion-liveness";
+import { lintAfterFootnoteCreation } from "../linting/linter";
+import { findDefinitionBlocks, maskInlineRegions, maskedLineAt, scanDocument } from "../parsing/markdown-scan";
 import { warnProtectedCaretIfInside } from "./press-guards";
-import { TableCellEditor } from "./table-cursor";
+import { TableCellEditor } from "../editor/table-cursor";
 
 // The creation steps of the command cascade: mint a reference, append its
 // definition, and hand off to the popup (or jump) — each step verified

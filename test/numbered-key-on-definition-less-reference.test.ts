@@ -2,7 +2,7 @@ import { Editor, EditorChange, EditorPosition } from "obsidian";
 import { describe, expect, it } from "vitest";
 
 import FootnotePlugin from "../src/main";
-import { insertAutonumFootnote } from "../src/insert-or-navigate-footnotes";
+import { insertAutonumFootnote } from "../src/commands/insert-or-navigate-footnotes";
 
 // Bug (Jason, from beta.9 phone testing 2026-08-09): mid-way through
 // creating a named footnote (name typed, definition not yet created), an

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { scanDocument } from "../../src/markdown-scan";
+import { scanDocument } from "../../src/parsing/markdown-scan";
 
 // Bug #4 (2026-08-11 review, Opus): indented code INSIDE a blockquote was
 // never protected — indent was measured on the raw line, where the "> "

@@ -5,12 +5,12 @@ import {
     footnotePopupBusy,
     settleFootnotePopupWithFeedback,
     toggleCloseFootnotePopup,
-} from "../footnote-popup";
-import { jumpToFootnoteDefinition } from "../navigation";
-import { footnotePrefix, footnotePrefixProblem } from "../footnote-prefix";
-import { maskProtectedLines, normalizeEol, restoreEol } from "../markdown-scan";
-import { AppWithCommands, AppWithPlugins, readingViewActive, viewEditor, WindowWithVim } from "../obsidian-internals";
-import { activeTableCellEditor, nestedSubEditorOwnsFocus, runOutsideTableCell } from "../table-cursor";
+} from "../commands/footnote-popup";
+import { jumpToFootnoteDefinition } from "../commands/navigation";
+import { footnotePrefix, footnotePrefixProblem } from "../parsing/footnote-prefix";
+import { maskProtectedLines, normalizeEol, restoreEol } from "../parsing/markdown-scan";
+import { AppWithCommands, AppWithPlugins, readingViewActive, viewEditor, WindowWithVim } from "../editor/obsidian-internals";
+import { activeTableCellEditor, nestedSubEditorOwnsFocus, runOutsideTableCell } from "../editor/table-cursor";
 import { applyFootnotePrefix } from "./rules/apply-footnote-prefix";
 import { footnoteAfterPunctuation } from "./rules/footnote-after-punctuation";
 import { moveFootnoteDefinitionsToBottom } from "./rules/move-footnotes-to-the-bottom";

@@ -2,7 +2,7 @@ import { Editor, EditorPosition } from "obsidian";
 import { describe, expect, it } from "vitest";
 
 import FootnotePlugin from "../../src/main";
-import { shouldJumpFromDefinitionToReference } from "../../src/navigation";
+import { shouldJumpFromDefinitionToReference } from "../../src/commands/navigation";
 
 // BUG: jump-from-definition-to-reference matches the definition's own line. It scans
 // `masked[i].indexOf("[^name]")` over ALL lines including the definition line

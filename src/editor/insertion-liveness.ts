@@ -1,8 +1,8 @@
 import { Editor, EditorChange, EditorPosition } from "obsidian";
 
 import { docLines } from "./doc-context";
-import { escapedAt } from "./footnote-grammar";
-import { maskedLineAt } from "./markdown-scan";
+import { escapedAt } from "../parsing/footnote-grammar";
+import { maskedLineAt } from "../parsing/markdown-scan";
 
 // The born-dead safety kit: will inserted text still MEAN what it says
 // once it lands? An insertion can be swallowed by an escape or an

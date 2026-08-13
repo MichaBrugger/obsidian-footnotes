@@ -2,7 +2,7 @@ import { Editor } from "obsidian";
 import { describe, expect, it } from "vitest";
 
 import FootnotePlugin from "../src/main";
-import { buildDefinitionAppend } from "../src/definition-append";
+import { buildDefinitionAppend } from "../src/commands/definition-append";
 
 // Where a new footnote definition lands. Issue #55: when definitions already
 // exist, the new definition belongs right after the LAST existing definition

@@ -1,8 +1,8 @@
 import { Editor, EditorChange, EditorPosition } from "obsidian";
 
-import type FootnotePlugin from "./main";
+import type FootnotePlugin from "../main";
 import { safeInsertionCh } from "./insertion-liveness";
-import { TrailingPunctuationChars } from "./markdown-scan";
+import { TrailingPunctuationChars } from "../parsing/markdown-scan";
 import {
     EditorWithCm,
     VaultWithConfig,

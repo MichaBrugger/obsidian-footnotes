@@ -2,10 +2,10 @@ import { Editor, EditorPosition } from "obsidian";
 import { describe, expect, it } from "vitest";
 
 import FootnotePlugin from "../src/main";
-import { listExistingFootnoteDefinitions } from "../src/doc-context";
-import { shouldJumpFromDefinitionToReference, shouldJumpFromReferenceToDefinition } from "../src/navigation";
-import { computeNextFootnoteNumber, referenceOccurrences } from "../src/footnote-grammar";
-import { maskProtectedLines } from "../src/markdown-scan";
+import { listExistingFootnoteDefinitions } from "../src/editor/doc-context";
+import { shouldJumpFromDefinitionToReference, shouldJumpFromReferenceToDefinition } from "../src/commands/navigation";
+import { computeNextFootnoteNumber, referenceOccurrences } from "../src/parsing/footnote-grammar";
+import { maskProtectedLines } from "../src/parsing/markdown-scan";
 
 // Issue #41: [^x]-shaped text inside code — fenced blocks, inline code, or
 // frontmatter — must be invisible to every scan the insert/navigate

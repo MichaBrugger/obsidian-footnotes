@@ -2,7 +2,7 @@ import { Editor, EditorChange, EditorPosition } from "obsidian";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import FootnotePlugin from "../src/main";
-import { pasteInlineFootnote } from "../src/insert-or-navigate-footnotes";
+import { pasteInlineFootnote } from "../src/commands/insert-or-navigate-footnotes";
 
 // Bug (QOL sweep, 2026-08-07): the paste-inline-footnote command skipped the
 // inside-an-inline-footnote guard the other insert commands share, so pasting

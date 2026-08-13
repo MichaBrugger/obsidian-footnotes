@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { protectedLines } from "../../src/markdown-scan";
-import { footnotePrefix } from "../../src/footnote-prefix";
-import { computeNextFootnoteNumber } from "../../src/footnote-grammar";
+import { protectedLines } from "../../src/parsing/markdown-scan";
+import { footnotePrefix } from "../../src/parsing/footnote-prefix";
+import { computeNextFootnoteNumber } from "../../src/parsing/footnote-grammar";
 
 // BUG: CRLF line endings defeat frontmatter protection AND the footnote-prefix
 // feature. `protectedLines` and `footnotePrefix` both gate on the exact string

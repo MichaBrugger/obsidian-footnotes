@@ -1,8 +1,8 @@
 import { Editor, EditorChange, EditorPosition } from "obsidian";
 
-import type FootnotePlugin from "./main";
-import { DocContext, docContext } from "./doc-context";
-import { findDefinitionBlocks, findLineRunEnd, scanDocument } from "./markdown-scan";
+import type FootnotePlugin from "../main";
+import { DocContext, docContext } from "../editor/doc-context";
+import { findDefinitionBlocks, findLineRunEnd, scanDocument } from "../parsing/markdown-scan";
 
 // Where a new footnote definition lands: the section-heading setting and
 // the append edit both creation paths share. Split out of the all-in-one

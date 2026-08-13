@@ -1,31 +1,39 @@
 {
     "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
-    "_comment": "Mutation testing — LOCAL pre-release audit, not CI (GitHub Actions are too slow for this; run `npm run mutation`). perTest coverage analysis means each mutant only runs the tests that cover it; incremental mode caches results so re-runs after small changes take seconds-to-minutes. The mutate list is the pure logic the unit suite exercises — plugin bootstrap, settings UI, and the DOM-bound popup are smoke-test territory where mutants would just be no-coverage noise.",
+    "_comment": "Mutation testing \u2014 LOCAL pre-release audit, not CI (GitHub Actions are too slow for this; run `npm run mutation`). perTest coverage analysis means each mutant only runs the tests that cover it; incremental mode caches results so re-runs after small changes take seconds-to-minutes. The mutate list is the pure logic the unit suite exercises \u2014 plugin bootstrap, settings UI, and the DOM-bound popup are smoke-test territory where mutants would just be no-coverage noise.",
     "testRunner": "vitest",
-    "vitest": { "configFile": "vitest.stryker.config.ts" },
+    "vitest": {
+        "configFile": "vitest.stryker.config.ts"
+    },
     "coverageAnalysis": "perTest",
-    "_timeout_comment": "hard 15s cap per mutant run: the default derives from the (slow, isolation-forced) dry run, and the suite's loop-killing tests make infinite-loop mutants hang until timeout — uncapped, ~100 such mutants stretched a scoped run from 16 minutes to hours (2026-08-11)",
+    "_timeout_comment": "hard 15s cap per mutant run: the default derives from the (slow, isolation-forced) dry run, and the suite's loop-killing tests make infinite-loop mutants hang until timeout \u2014 uncapped, ~100 such mutants stretched a scoped run from 16 minutes to hours (2026-08-11)",
     "timeoutMS": 15000,
     "timeoutFactor": 1.25,
     "mutate": [
-        "src/markdown-scan.ts",
-        "src/footnote-grammar.ts",
-        "src/footnote-prefix.ts",
-        "src/doc-context.ts",
-        "src/cursor-motion.ts",
-        "src/definition-append.ts",
-        "src/inline-footnotes.ts",
-        "src/insertion-liveness.ts",
-        "src/navigation.ts",
-        "src/press-guards.ts",
-        "src/create-footnote.ts",
-        "src/linting/**/*.ts",
-        "src/insert-or-navigate-footnotes.ts",
-        "src/table-cursor.ts"
+        "src/parsing/markdown-scan.ts",
+        "src/parsing/footnote-grammar.ts",
+        "src/parsing/footnote-prefix.ts",
+        "src/editor/doc-context.ts",
+        "src/editor/cursor-motion.ts",
+        "src/editor/insertion-liveness.ts",
+        "src/editor/table-cursor.ts",
+        "src/commands/definition-append.ts",
+        "src/commands/inline-footnotes.ts",
+        "src/commands/navigation.ts",
+        "src/commands/press-guards.ts",
+        "src/commands/create-footnote.ts",
+        "src/commands/insert-or-navigate-footnotes.ts",
+        "src/linting/**/*.ts"
     ],
     "incremental": true,
     "incrementalFile": "reports/stryker-incremental.json",
-    "reporters": ["html", "clear-text", "progress"],
-    "htmlReporter": { "fileName": "reports/mutation.html" },
+    "reporters": [
+        "html",
+        "clear-text",
+        "progress"
+    ],
+    "htmlReporter": {
+        "fileName": "reports/mutation.html"
+    },
     "tempDirName": ".stryker-tmp"
 }

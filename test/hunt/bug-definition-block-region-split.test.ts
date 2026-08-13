@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
     findDefinitionBlocks,
     scanDocument,
-} from "../../src/markdown-scan";
+} from "../../src/parsing/markdown-scan";
 import { moveFootnoteDefinitionsToBottom } from "../../src/linting/rules/move-footnotes-to-the-bottom";
 
 // Sol re-review bug #3 (2026-08-10): a definition's indented continuation

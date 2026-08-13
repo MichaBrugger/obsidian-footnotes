@@ -7,7 +7,7 @@ import {
     resolveTableCellCursor,
     tableRowCellSpans,
     type TableCellEditor,
-} from "../src/table-cursor";
+} from "../src/editor/table-cursor";
 
 // Kills Stryker survivors from the 2026-08-10 baseline (survivors-table-cursor.json,
 // 50 mutants on src/table-cursor.ts). Each test is built to diverge between the

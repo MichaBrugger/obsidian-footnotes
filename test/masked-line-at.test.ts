@@ -4,7 +4,7 @@ import {
     maskLineRegions,
     maskProtectedLines,
     maskedLineAt,
-} from "../src/markdown-scan";
+} from "../src/parsing/markdown-scan";
 
 // Perf helper (2026-08-07): the per-keypress paths need exactly ONE line of
 // the document's masked twin; maskedLineAt must agree with the full

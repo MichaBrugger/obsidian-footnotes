@@ -11,12 +11,12 @@ import {
   Plugin
 } from "obsidian";
 
-import { ensureTextPropertyType, readingViewActive, VaultWithConfigEvents, viewEditor } from "./obsidian-internals";
+import { ensureTextPropertyType, readingViewActive, VaultWithConfigEvents, viewEditor } from "./editor/obsidian-internals";
 import { FootnotePluginSettingTab, FootnotePluginSettings, DEFAULT_SETTINGS } from "./settings";
-import { dismissFootnotePopup } from "./footnote-popup";
-import { insertAutonumFootnote, insertInlineFootnote, insertNamedFootnote, pasteInlineFootnote } from "./insert-or-navigate-footnotes";
-import { footnotePrefixFromEditor } from "./footnote-prefix";
-import { SetFootnotePrefixModal } from "./set-footnote-prefix";
+import { dismissFootnotePopup } from "./commands/footnote-popup";
+import { insertAutonumFootnote, insertInlineFootnote, insertNamedFootnote, pasteInlineFootnote } from "./commands/insert-or-navigate-footnotes";
+import { footnotePrefixFromEditor } from "./parsing/footnote-prefix";
+import { SetFootnotePrefixModal } from "./commands/set-footnote-prefix";
 import {
   installLintOnSave,
   installVimWriteHook,

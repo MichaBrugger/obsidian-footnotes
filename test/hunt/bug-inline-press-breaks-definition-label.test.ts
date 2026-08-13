@@ -5,7 +5,7 @@ import FootnotePlugin from "../../src/main";
 import {
     insertInlineFootnote,
     pasteInlineFootnote,
-} from "../../src/insert-or-navigate-footnotes";
+} from "../../src/commands/insert-or-navigate-footnotes";
 
 // Found by the command-press property suite on its FIRST run (2026-08-12,
 // shrunk counterexample ["[^1]: alpha"], caret 0:0, paste): the inline and

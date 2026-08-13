@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { computeNextFootnoteNumber } from "../../src/footnote-grammar";
+import { computeNextFootnoteNumber } from "../../src/parsing/footnote-grammar";
 
 // BUG: a backslash-escaped "\<!--" is literal text per CommonMark §2.4, but
 // it hides the rest of the note as if a comment opened.

@@ -1,8 +1,8 @@
 import { Editor } from "obsidian";
 import { describe, expect, it } from "vitest";
 
-import { listExistingFootnoteDefinitions } from "../../src/doc-context";
-import { computeNextFootnoteNumber } from "../../src/footnote-grammar";
+import { listExistingFootnoteDefinitions } from "../../src/editor/doc-context";
+import { computeNextFootnoteNumber } from "../../src/parsing/footnote-grammar";
 import { footnoteAfterPunctuation } from "../../src/linting/rules/footnote-after-punctuation";
 import { reindexFootnotes } from "../../src/linting/rules/re-index-footnotes";
 

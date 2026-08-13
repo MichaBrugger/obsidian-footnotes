@@ -2,8 +2,8 @@ import { Editor, EditorPosition } from "obsidian";
 import { describe, expect, it } from "vitest";
 
 import FootnotePlugin from "../src/main";
-import { shouldJumpFromDefinitionToReference } from "../src/navigation";
-import { tableRowCellSpans } from "../src/table-cursor";
+import { shouldJumpFromDefinitionToReference } from "../src/commands/navigation";
+import { tableRowCellSpans } from "../src/editor/table-cursor";
 import { removeOrphanedFootnoteReferences } from "../src/linting/rules/remove-orphaned-references";
 
 // Promoted from a parallel review's scratch probes (2026-08-10).

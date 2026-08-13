@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { footnoteAfterPunctuation } from "../../src/linting/rules/footnote-after-punctuation";
-import { maskLineRegions } from "../../src/markdown-scan";
+import { maskLineRegions } from "../../src/parsing/markdown-scan";
 
 // Bug (2026-08-11 review, Kimi): dollarInsideReference walked the RAW line
 // backwards, so a "[^" fragment already masked away as code (or comment)

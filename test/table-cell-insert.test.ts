@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { insertInTableCell } from "../src/create-footnote";
+import { insertInTableCell } from "../src/commands/create-footnote";
 import type FootnotePlugin from "../src/main";
-import type { TableCellEditor } from "../src/table-cursor";
+import type { TableCellEditor } from "../src/editor/table-cursor";
 
 // Regression companion to the table-corruption smoke test (2026-07-15).
 // The contract with Obsidian itself — that a cell sub-editor can be FOUND

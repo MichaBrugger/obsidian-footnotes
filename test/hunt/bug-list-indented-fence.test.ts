@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { scanDocument } from "../../src/markdown-scan";
+import { scanDocument } from "../../src/parsing/markdown-scan";
 
 // Bug #3 (2026-08-11 review, Kimi): a fence indented 4+ under a list item
 // was invisible to the scanner — fence indent is measured from the ITEM'S

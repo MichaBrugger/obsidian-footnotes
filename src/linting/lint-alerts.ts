@@ -1,13 +1,13 @@
 import { Notice } from "obsidian";
 
 import type FootnotePlugin from "../main";
-import { footnotePrefix, footnotePrefixProblem } from "../footnote-prefix";
+import { footnotePrefix, footnotePrefixProblem } from "../parsing/footnote-prefix";
 import {
     DocumentScan,
     maskProtectedLines,
     normalizeEol,
     scanDocument,
-} from "../markdown-scan";
+} from "../parsing/markdown-scan";
 import { duplicateFootnoteDefinitionNames } from "./rules/merge-duplicate-definitions";
 import { orphanedFootnoteDefinitionNames } from "./rules/remove-orphaned-definitions";
 import { orphanedFootnoteReferenceNames } from "./rules/remove-orphaned-references";

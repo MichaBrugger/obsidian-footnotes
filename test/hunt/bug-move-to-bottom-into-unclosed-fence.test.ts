@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { moveFootnoteDefinitionsToBottom } from "../../src/linting/rules/move-footnotes-to-the-bottom";
-import { findDefinitionBlocks, protectedLines } from "../../src/markdown-scan";
+import { findDefinitionBlocks, protectedLines } from "../../src/parsing/markdown-scan";
 
 // BUG: moveFootnoteDefinitionsToBottom relocates a valid definition INTO an
 // unclosed code fence. In the input, "[^1]: def" is a fully valid definition

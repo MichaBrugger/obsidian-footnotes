@@ -7,7 +7,7 @@ import {
     insertInlineFootnote,
     insertNamedFootnote,
     pasteInlineFootnote,
-} from "../src/insert-or-navigate-footnotes";
+} from "../src/commands/insert-or-navigate-footnotes";
 
 // BUG (reported by Jason 2026-08-08, probed live the same day): in Reading
 // view the commands passed their checks and ran the whole cascade against

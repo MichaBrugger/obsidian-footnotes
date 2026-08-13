@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { computeNextFootnoteNumber } from "../../src/footnote-grammar";
+import { computeNextFootnoteNumber } from "../../src/parsing/footnote-grammar";
 
 // BUG: backtick handling in the protected-region scanner ignores CommonMark
 // fine print, and the mistakes swallow real references.

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { computeNextFootnoteNumber } from "../../src/footnote-grammar";
+import { computeNextFootnoteNumber } from "../../src/parsing/footnote-grammar";
 
 // BUG: a fenced code block nested inside a blockquote or callout is not
 // protected. `protectedLines`' fence-open regex is anchored at column 0

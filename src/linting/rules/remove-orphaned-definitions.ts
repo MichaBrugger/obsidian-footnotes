@@ -1,4 +1,4 @@
-import { referenceOccurrences } from "../../footnote-grammar";
+import { referenceOccurrences } from "../../parsing/footnote-grammar";
 import {
     DefinitionBlock,
     definitionLabelIn,
@@ -9,7 +9,7 @@ import {
     removeLineRanges,
     restoreEol,
     scanDocument,
-} from "../../markdown-scan";
+} from "../../parsing/markdown-scan";
 import { IgnoreType } from "../ignore-types";
 import { FootnoteRule } from "../rule";
 

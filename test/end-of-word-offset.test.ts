@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { endOfWordOffset } from "../src/cursor-motion";
+import { endOfWordOffset } from "../src/editor/cursor-motion";
 
 // Cell-local twin of the main editor's end-of-word adjustment: used when
 // inserting a reference inside an actively edited table cell, where the main

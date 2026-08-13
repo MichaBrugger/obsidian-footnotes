@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { computeNextFootnoteNumber, referenceOccurrences } from "../../src/footnote-grammar";
+import { computeNextFootnoteNumber, referenceOccurrences } from "../../src/parsing/footnote-grammar";
 import { reindexFootnotes } from "../../src/linting/rules/re-index-footnotes";
 
 // Scenario: a backslash-escaped reference "\[^9]" is literal text per CommonMark

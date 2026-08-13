@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { sanitizeInlineFootnoteContent } from "../src/inline-footnotes";
+import { sanitizeInlineFootnoteContent } from "../src/commands/inline-footnotes";
 
 // Spec for what clipboard text may become the body of an inline footnote
 // (^[...]). Inline footnotes are single-line by nature, and an unbalanced

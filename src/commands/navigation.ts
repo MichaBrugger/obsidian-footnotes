@@ -1,17 +1,17 @@
 import { Editor, EditorPosition, Notice } from "obsidian";
 
-import type FootnotePlugin from "./main";
-import { moveCursorAndSetJumpPoint } from "./cursor-motion";
-import { DocContext, docContext, listExistingFootnoteDefinitions } from "./doc-context";
+import type FootnotePlugin from "../main";
+import { moveCursorAndSetJumpPoint } from "../editor/cursor-motion";
+import { DocContext, docContext, listExistingFootnoteDefinitions } from "../editor/doc-context";
 import {
     footnoteReferenceMatches,
     idListIncludes,
     occurrenceAtCursor,
     referenceAtCursor,
     referenceOccurrences,
-} from "./footnote-grammar";
+} from "../parsing/footnote-grammar";
 import { openFootnotePopup, popupEditingAvailable } from "./footnote-popup";
-import { definitionLabelIn, findDefinitionBlocks } from "./markdown-scan";
+import { definitionLabelIn, findDefinitionBlocks } from "../parsing/markdown-scan";
 
 // The jump half of the decision cascade: definition → first reference,
 // reference → its definition (popup-edit when enabled). Imports the popup

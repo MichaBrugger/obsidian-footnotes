@@ -2,7 +2,7 @@ import { Editor, EditorChange, EditorPosition } from "obsidian";
 import { describe, expect, it } from "vitest";
 
 import FootnotePlugin from "../src/main";
-import { shouldJumpFromDefinitionToReference } from "../src/navigation";
+import { shouldJumpFromDefinitionToReference } from "../src/commands/navigation";
 
 // QOL sweep (2026-08-07): pressing a footnote hotkey with the caret on an
 // ORPHANED definition ("[^x]: …" with no reference anywhere) used to fall

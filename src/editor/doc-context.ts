@@ -6,7 +6,7 @@ import {
     maskLineRegions,
     maskProtectedLines,
     scanDocument,
-} from "./markdown-scan";
+} from "../parsing/markdown-scan";
 
 // One press's shared read-only view of the document. Depends only on
 // markdown-scan + Obsidian types — split out of the all-in-one commands

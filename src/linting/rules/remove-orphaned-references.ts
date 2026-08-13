@@ -1,11 +1,11 @@
-import { isValidFootnoteName, referenceOccurrences } from "../../footnote-grammar";
+import { isValidFootnoteName, referenceOccurrences } from "../../parsing/footnote-grammar";
 import {
     definitionLabelIn,
     maskProtectedLines,
     normalizeEol,
     scanDocument,
     restoreEol,
-} from "../../markdown-scan";
+} from "../../parsing/markdown-scan";
 import { IgnoreType } from "../ignore-types";
 import { FootnoteRule } from "../rule";
 

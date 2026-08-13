@@ -1,4 +1,4 @@
-import { referenceOccurrences } from "../../footnote-grammar";
+import { referenceOccurrences } from "../../parsing/footnote-grammar";
 import {
     definitionLabelIn,
     maskProtectedLines,
@@ -6,7 +6,7 @@ import {
     scanDocument,
     restoreEol,
     TrailingPunctuationChars,
-} from "../../markdown-scan";
+} from "../../parsing/markdown-scan";
 import { IgnoreType } from "../ignore-types";
 import { FootnoteRule } from "../rule";
 

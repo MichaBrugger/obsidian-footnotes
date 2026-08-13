@@ -6,7 +6,7 @@ import {
     insertAutonumFootnote,
     insertInlineFootnote,
     pasteInlineFootnote,
-} from "../src/insert-or-navigate-footnotes";
+} from "../src/commands/insert-or-navigate-footnotes";
 
 // Manual combo-test feedback (Jason, 2026-08-08): a second press of the
 // inline hotkey while the just-inserted "^[]" was still EMPTY silently

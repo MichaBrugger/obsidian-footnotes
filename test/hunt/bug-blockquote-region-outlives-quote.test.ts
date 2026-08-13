@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { protectedLines, scanDocument } from "../../src/markdown-scan";
+import { protectedLines, scanDocument } from "../../src/parsing/markdown-scan";
 
 // Sol re-review bug #4 (2026-08-10), ground truth verified against
 // Obsidian's metadataCache ("blockquote:0-1, paragraph:3-3"): an unclosed

@@ -1,8 +1,8 @@
 import { Editor, EditorPosition, Notice } from "obsidian";
 
-import { docLines } from "./doc-context";
-import { maskInlineRegions, maskedLineAt } from "./markdown-scan";
-import { TableCellEditor } from "./table-cursor";
+import { docLines } from "../editor/doc-context";
+import { maskInlineRegions, maskedLineAt } from "../parsing/markdown-scan";
+import { TableCellEditor } from "../editor/table-cursor";
 
 // Inline footnotes ("^[...]"): content sanitizing, the escape-aware span
 // scanner, and the two caret guards every command shares. Split out of the

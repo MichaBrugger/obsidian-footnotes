@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { reindexFootnotes } from "../../src/linting/rules/re-index-footnotes";
 import { moveFootnoteDefinitionsToBottom } from "../../src/linting/rules/move-footnotes-to-the-bottom";
 import { lintFootnotes } from "../../src/linting/linter";
-import { protectedLines } from "../../src/markdown-scan";
+import { protectedLines } from "../../src/parsing/markdown-scan";
 
 // Cutting a definition at line 0 strands a "---" at DOCUMENT START, and a leading --- plus a later --- line manufactures a YAML frontmatter block that swallows live prose; reindex drop-orphans then DELETES the still-referenced definition.
 // Hunt: 2026-08-09. Lens: properties.

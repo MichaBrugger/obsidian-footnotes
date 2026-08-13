@@ -2,7 +2,7 @@ import { Editor, EditorChange, EditorPosition } from "obsidian";
 import { describe, expect, it } from "vitest";
 
 import FootnotePlugin from "../src/main";
-import { navigateReferenceIfInside } from "../src/insert-or-navigate-footnotes";
+import { navigateReferenceIfInside } from "../src/commands/insert-or-navigate-footnotes";
 
 // QOL (2026-07-20), the reverse of the inline-footnote hop: pressing the
 // INLINE footnote hotkey while the caret sits inside a numbered or named

@@ -4,24 +4,24 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { docArb } from "./arbitraries";
 import FootnotePlugin from "../src/main";
-import { isValidFootnoteName } from "../src/footnote-grammar";
+import { isValidFootnoteName } from "../src/parsing/footnote-grammar";
 import {
     inlineFootnoteSpanAt,
     sanitizeInlineFootnoteContent,
-} from "../src/inline-footnotes";
+} from "../src/commands/inline-footnotes";
 import {
     insertAutonumFootnote,
     insertInlineFootnote,
     insertNamedFootnote,
     pasteInlineFootnote,
-} from "../src/insert-or-navigate-footnotes";
+} from "../src/commands/insert-or-navigate-footnotes";
 import { orphanedFootnoteDefinitionNames } from "../src/linting/rules/remove-orphaned-definitions";
 import { orphanedFootnoteReferenceNames } from "../src/linting/rules/remove-orphaned-references";
 import {
     findDefinitionBlocks,
     normalizeEol,
     scanDocument,
-} from "../src/markdown-scan";
+} from "../src/parsing/markdown-scan";
 
 // Property tests for the CREATION COMMANDS (2026-08-12, Jason's ask):
 // the same document generator that fuzzes the lint transforms drives the

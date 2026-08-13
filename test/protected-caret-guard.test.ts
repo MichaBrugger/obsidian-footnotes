@@ -9,7 +9,7 @@ import {
     insertInlineFootnote,
     insertNamedFootnote,
     pasteInlineFootnote,
-} from "../src/insert-or-navigate-footnotes";
+} from "../src/commands/insert-or-navigate-footnotes";
 
 // Jason's rule (2026-08-12, always on — no toggle, inline spans included):
 // footnote CREATION is blocked when the caret sits inside code, math, a

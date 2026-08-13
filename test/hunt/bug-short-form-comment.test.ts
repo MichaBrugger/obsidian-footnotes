@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { computeNextFootnoteNumber } from "../../src/footnote-grammar";
+import { computeNextFootnoteNumber } from "../../src/parsing/footnote-grammar";
 
 // BUG: "<!-->" and "<!--->" mid-line are COMPLETE comments per CommonMark
 // 0.31.2 §6.6, but protectedLines enters multi-line comment state and hides

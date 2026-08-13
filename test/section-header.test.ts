@@ -1,7 +1,7 @@
 import { Editor } from "obsidian";
 import { describe, expect, it } from "vitest";
 
-import { buildDefinitionAppend } from "../src/definition-append";
+import { buildDefinitionAppend } from "../src/commands/definition-append";
 import type FootnotePlugin from "../src/main";
 
 // The optional heading inserted above the first footnote definition. A blank

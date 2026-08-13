@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { footnotePrefix, footnotePrefixProblem } from "../src/footnote-prefix";
-import { computeNextFootnoteNumber } from "../src/footnote-grammar";
+import { footnotePrefix, footnotePrefixProblem } from "../src/parsing/footnote-prefix";
+import { computeNextFootnoteNumber } from "../src/parsing/footnote-grammar";
 import { countEmptyFootnoteReferences } from "../src/linting/lint-alerts";
 import { lintFootnotes } from "../src/linting/linter";
 import { applyFootnotePrefix } from "../src/linting/rules/apply-footnote-prefix";

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { computeNextFootnoteNumber } from "../../src/footnote-grammar";
+import { computeNextFootnoteNumber } from "../../src/parsing/footnote-grammar";
 import { applyFootnotePrefix } from "../../src/linting/rules/apply-footnote-prefix";
 import { footnoteAfterPunctuation } from "../../src/linting/rules/footnote-after-punctuation";
 import { reindexFootnotes } from "../../src/linting/rules/re-index-footnotes";
