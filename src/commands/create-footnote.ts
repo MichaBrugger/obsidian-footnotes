@@ -216,10 +216,14 @@ export function createAutonumFootnote(
             ? [definition.prepend, definition.change]
             : [definition.change];
         if (popupEditingAvailable(plugin)) {
+            // Stryker disable all: popup arm — units run popup-off, so
+            // mutants here are no-coverage noise; smoke territory
+            // (verified 2026-08-12)
             doc.transaction({ changes: definitionChanges });
             void openFootnotePopup(plugin, footnoteId, () => {
                 moveCursorAndSetJumpPoint(doc, cursorPosition, definition.cursor, plugin, undefined, true);
             });
+            // Stryker restore all
         } else {
             moveCursorAndSetJumpPoint(doc, cursorPosition, definition.cursor, plugin, definitionChanges, true);
         }
@@ -269,9 +273,12 @@ export function createAutonumFootnote(
     if (popupEditingAvailable(plugin)) {
         // type the definition in a popup instead of jumping to the bottom;
         // the cursor only moves past the new reference
+        // Stryker disable all: popup arm — units run popup-off, so mutants
+        // here are no-coverage noise; smoke territory (verified 2026-08-12)
         const afterReference = { line: cursorPosition.line + lineShift, ch: cursorPosition.ch + footnoteReference.length };
         doc.transaction({ changes, selection: { from: afterReference } });
         openPopupForNewDefinition(plugin, doc, cursorPosition, footnoteId, definition.cursor);
+        // Stryker restore all
     } else {
         moveCursorAndSetJumpPoint(doc, cursorPosition, definition.cursor, plugin, changes, true);
         lintAfterFootnoteCreation(plugin, true);
@@ -343,8 +350,12 @@ export function createMatchingFootnoteDefinition(
             if (popupEditingAvailable(plugin)) {
                 // type the definition in a popup instead of jumping to the
                 // bottom; the cursor stays on the reference
+                // Stryker disable all: popup arm — units run popup-off, so
+                // mutants here are no-coverage noise; smoke territory
+                // (verified 2026-08-12)
                 doc.transaction({ changes: definitionChanges });
                 openPopupForNewDefinition(plugin, doc, cursorPosition, footnoteId, definition.cursor);
+                // Stryker restore all
             } else {
                 moveCursorAndSetJumpPoint(doc, cursorPosition, definition.cursor, plugin, definitionChanges, true);
                 lintAfterFootnoteCreation(plugin, true);

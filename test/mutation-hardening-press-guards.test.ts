@@ -1,0 +1,355 @@
+import { Editor, EditorPosition } from "obsidian";
+import { beforeEach, describe, expect, it } from "vitest";
+
+import { noticeCalls } from "./mocks/obsidian";
+
+import FootnotePlugin from "../src/main";
+import {
+    caretGuardsHandled,
+    navigateDefinitionLabelIfInside,
+    warnPrefilledReferenceIfInside,
+    warnProtectedCaretIfInside,
+} from "../src/commands/press-guards";
+import { docContext } from "../src/editor/doc-context";
+import { ProtectedCreationNotice } from "../src/editor/insertion-liveness";
+import { TableCellEditor } from "../src/editor/table-cursor";
+
+// Mutation hardening for the press guards (Stryker re-baseline 2026-08-12:
+// press-guards scored 60%). The guards are driven DIRECTLY here, not through
+// the command entry points: the commands wrap them in simulate-and-verify
+// defense in depth that reaches the same refusal by another route, so a
+// command-level test passes even with a guard's condition broken — which is
+// why the edge conditions below survived. Each test pins one decision the
+// guard alone owns.
+
+interface FakeDoc extends Editor {
+    cursor: EditorPosition;
+}
+
+function fakeEditor(lines: string[], cursor: EditorPosition = { line: 0, ch: 0 }): FakeDoc {
+    const doc = {
+        cursor,
+        getCursor: () => doc.cursor,
+        getLine: (n: number) => lines[n],
+        getValue: () => lines.join("\n"),
+        lineCount: () => lines.length,
+        lastLine: () => lines.length - 1,
+        setCursor(pos: EditorPosition) {
+            doc.cursor = pos;
+        },
+        scrollIntoView() {},
+    };
+    return doc as unknown as FakeDoc;
+}
+
+function fakePlugin(settings: Partial<FootnotePlugin["settings"]> = {}): FootnotePlugin {
+    return {
+        // moveCursorAndSetJumpPoint reads the vault config for vim mode
+        app: { vault: {} },
+        settings: {
+            enableFootnotePrefix: false,
+            enablePopupEditor: false,
+            ...settings,
+        },
+    } as unknown as FootnotePlugin;
+}
+
+function fakeCell(text: string, head: number): TableCellEditor {
+    return {
+        state: {
+            doc: { toString: () => text },
+            selection: { main: { head, anchor: head } },
+        },
+        dispatch() {},
+    };
+}
+
+beforeEach(() => {
+    noticeCalls.length = 0;
+});
+
+const messages = () => noticeCalls.map((args) => args[0] as string);
+
+describe("the protected-caret guard inside a table cell", () => {
+    // the main-editor line is deliberately plain in these: only the cell
+    // branch can produce a refusal, so a mutant that falls through to the
+    // document branch answers differently
+    const plainDoc = () => fakeEditor(["plain row here"]);
+
+    it("refuses a caret inside the cell's own inline code", () => {
+        const doc = plainDoc();
+        expect(
+            warnProtectedCaretIfInside(
+                doc,
+                fakeCell("has `co de` x", 7),
+                { line: 0, ch: 3 },
+                docContext(doc),
+            ),
+        ).toBe(true);
+        expect(messages()).toEqual([ProtectedCreationNotice]);
+    });
+
+    it("allows a caret at the cell's start, just before an opening code span", () => {
+        // ch 0 has no left neighbor IN THE CELL, and a cell's text is one
+        // line: nothing can be open across its start
+        const doc = plainDoc();
+        expect(
+            warnProtectedCaretIfInside(
+                doc,
+                fakeCell("`code` x", 0),
+                { line: 0, ch: 3 },
+                docContext(doc),
+            ),
+        ).toBe(false);
+        expect(noticeCalls).toEqual([]);
+    });
+
+    it("allows a caret at the cell's end, just after a closing code span", () => {
+        const doc = plainDoc();
+        expect(
+            warnProtectedCaretIfInside(
+                doc,
+                fakeCell("x `code`", "x `code`".length),
+                { line: 0, ch: 3 },
+                docContext(doc),
+            ),
+        ).toBe(false);
+        expect(noticeCalls).toEqual([]);
+    });
+});
+
+describe("the protected-caret guard at a line's edges", () => {
+    const guard = (lines: string[], cursor: EditorPosition) => {
+        const doc = fakeEditor(lines, cursor);
+        return warnProtectedCaretIfInside(doc, null, cursor, docContext(doc));
+    };
+
+    it("refuses ch 0 of a line a comment region is open across", () => {
+        // "still --> tail" closes the region mid-line, so the line itself is
+        // not wholly protected — ch 0 is inside only because the region
+        // crosses the line START
+        expect(
+            guard(
+                ["prose <!-- open", "hidden comment", "still --> tail", "plain"],
+                { line: 2, ch: 0 },
+            ),
+        ).toBe(true);
+    });
+
+    it("allows ch 0 of a line whose own code span starts there", () => {
+        // masked text says "protected" to the right of the caret, but no
+        // region crosses the line start, so the insertion point is outside
+        expect(guard(["`code` here", "plain"], { line: 0, ch: 0 })).toBe(false);
+        expect(noticeCalls).toEqual([]);
+    });
+
+    it("refuses end of a line whose tail opens a comment the next line continues", () => {
+        expect(
+            guard(["text <!-- open", "hidden"], { line: 0, ch: "text <!-- open".length }),
+        ).toBe(true);
+    });
+
+    it("refuses end of a line whose tail opens MATH the next line continues", () => {
+        // the comment twin above passes even when the guard reads only
+        // startsInComment — this one needs startsInMath of the SAME next line
+        expect(
+            guard(["text $$", "E = mc^2", "$$", "after"], {
+                line: 0,
+                ch: "text $$".length,
+            }),
+        ).toBe(true);
+    });
+
+    it("allows end of a line whose code span closes there", () => {
+        expect(guard(["text `code`", "next"], { line: 0, ch: "text `code`".length })).toBe(
+            false,
+        );
+        expect(noticeCalls).toEqual([]);
+    });
+
+    it("refuses end of the LAST line while a region reaches EOF", () => {
+        // there is no next line to ask, so the document-wide endsProtected
+        // fact stands in for the off-line neighbor
+        expect(guard(["text <!-- open"], { line: 0, ch: "text <!-- open".length })).toBe(
+            true,
+        );
+    });
+
+    it("allows end of an earlier line when the region only opens BELOW it", () => {
+        // endsProtected is true for this document, but it speaks for the
+        // end of the DOCUMENT, not for the end of line 0
+        expect(
+            guard(["text `code`", "hidden <!-- open"], {
+                line: 0,
+                ch: "text `code`".length,
+            }),
+        ).toBe(false);
+        expect(noticeCalls).toEqual([]);
+    });
+});
+
+describe("the definition-label navigation guard", () => {
+    it("claims the press from inside the label and jumps to the reference", () => {
+        const doc = fakeEditor(["[^x]: text", "", "see [^x] here"], { line: 0, ch: 4 });
+        expect(navigateDefinitionLabelIfInside(fakePlugin(), doc, null)).toBe(true);
+        expect(doc.cursor.line).toBe(2);
+    });
+
+    it("leaves the press alone with the caret exactly AT the label end", () => {
+        // "[^x]:" ends at ch 5; the colon is the label's last character, and
+        // everything from there on is ordinary definition content
+        const doc = fakeEditor(["[^x]: text", "", "see [^x] here"], { line: 0, ch: 5 });
+        expect(navigateDefinitionLabelIfInside(fakePlugin(), doc, null)).toBe(false);
+        expect(doc.cursor).toEqual({ line: 0, ch: 5 });
+    });
+
+    it("leaves a label-shaped line inside a code fence alone (#41)", () => {
+        const doc = fakeEditor(["```", "[^x]: t", "```"], { line: 1, ch: 3 });
+        expect(navigateDefinitionLabelIfInside(fakePlugin(), doc, null)).toBe(false);
+        expect(doc.cursor).toEqual({ line: 1, ch: 3 });
+    });
+
+    it("never navigates from a table cell, even on a definition line", () => {
+        const doc = fakeEditor(["[^x]: text", "", "see [^x] here"], { line: 0, ch: 3 });
+        expect(
+            navigateDefinitionLabelIfInside(fakePlugin(), doc, fakeCell("word", 2)),
+        ).toBe(false);
+        expect(doc.cursor).toEqual({ line: 0, ch: 3 });
+    });
+
+    it("bounds the claim by the RAW label end, which masking can only extend", () => {
+        // the raw label is "[^a`]:" (ends at ch 6); masking the code span
+        // "`]:`" lets the name run on to the later "]:", so the masked label
+        // ends at ch 11. The raw gate decides — a caret at 6 is content
+        const doc = fakeEditor(["[^a`]:` b]: c"], { line: 0, ch: 6 });
+        expect(navigateDefinitionLabelIfInside(fakePlugin(), doc, null)).toBe(false);
+        expect(doc.cursor).toEqual({ line: 0, ch: 6 });
+    });
+
+    it("ignores a label that exists only AFTER code masking", () => {
+        // raw "[^a`[`b]: c" has a "[" in the name, so it is no label at all;
+        // its masked twin "[^a\0\0\0b]: c" would parse as one
+        const doc = fakeEditor(["[^a`[`b]: c"], { line: 0, ch: 3 });
+        expect(navigateDefinitionLabelIfInside(fakePlugin(), doc, null)).toBe(false);
+        expect(doc.cursor).toEqual({ line: 0, ch: 3 });
+    });
+});
+
+describe("the prefilled-reference guard", () => {
+    const prefixNotice = "Please add a footnote suffix after the prefix.";
+    const noteWith = (prefix: string, body: string) => [
+        "---",
+        `footnote-prefix: "${prefix}"`,
+        "---",
+        body,
+    ];
+
+    it("warns inside the untouched prefix placeholder", () => {
+        const doc = fakeEditor(noteWith("7-", "see [^7-] here"));
+        expect(
+            warnPrefilledReferenceIfInside(
+                fakePlugin({ enableFootnotePrefix: true }),
+                doc,
+                null,
+                { line: 3, ch: 6 },
+            ),
+        ).toBe(true);
+        expect(messages()).toEqual([prefixNotice]);
+    });
+
+    it("stays silent while the note's prefix is invalid", () => {
+        // a trailing digit is invalid ("7" + autonumber "1" reads as 71), so
+        // "[^7]" is a real footnote name here, not a bare-prefix placeholder
+        const doc = fakeEditor(noteWith("7", "see [^7] here"));
+        expect(
+            warnPrefilledReferenceIfInside(
+                fakePlugin({ enableFootnotePrefix: true }),
+                doc,
+                null,
+                { line: 3, ch: 6 },
+            ),
+        ).toBe(false);
+        expect(noticeCalls).toEqual([]);
+    });
+
+    it("stays silent when the note has no prefix property (the empty guard owns [^])", () => {
+        const doc = fakeEditor(["see [^] here"]);
+        expect(
+            warnPrefilledReferenceIfInside(
+                fakePlugin({ enableFootnotePrefix: true }),
+                doc,
+                null,
+                { line: 0, ch: 5 },
+            ),
+        ).toBe(false);
+        expect(noticeCalls).toEqual([]);
+    });
+
+    it("stays silent on a line with no reference bracket at all", () => {
+        const doc = fakeEditor(noteWith("7-", "plain prose"));
+        expect(
+            warnPrefilledReferenceIfInside(
+                fakePlugin({ enableFootnotePrefix: true }),
+                doc,
+                null,
+                { line: 3, ch: 4 },
+            ),
+        ).toBe(false);
+        expect(noticeCalls).toEqual([]);
+    });
+
+    it("stays silent while the prefix feature is off", () => {
+        const doc = fakeEditor(noteWith("3~", "see [^3~] here"));
+        expect(
+            warnPrefilledReferenceIfInside(fakePlugin(), doc, null, { line: 3, ch: 6 }),
+        ).toBe(false);
+        expect(noticeCalls).toEqual([]);
+    });
+});
+
+describe("the caret guard cascade", () => {
+    it("hands an unclaimed press on to the prefilled-reference guard", () => {
+        const doc = fakeEditor(["---", 'footnote-prefix: "7-"', "---", "see [^7-] here"]);
+        expect(
+            caretGuardsHandled(
+                fakePlugin({ enableFootnotePrefix: true }),
+                doc,
+                null,
+                { line: 3, ch: 6 },
+            ),
+        ).toBe(true);
+        expect(messages()).toEqual(["Please add a footnote suffix after the prefix."]);
+    });
+
+    it("claims nothing on plain prose", () => {
+        const doc = fakeEditor(["plain prose here"]);
+        expect(caretGuardsHandled(fakePlugin(), doc, null, { line: 0, ch: 5 })).toBe(false);
+        expect(noticeCalls).toEqual([]);
+    });
+
+    it("warns about a live [^] in a table cell, reading the CELL's text", () => {
+        // the document caret is elsewhere in the row: only the cell's own
+        // text and head can produce this warning
+        const doc = fakeEditor(["| a [^] b |"]);
+        expect(
+            caretGuardsHandled(fakePlugin(), doc, fakeCell("a [^] b", 4), {
+                line: 0,
+                ch: 0,
+            }),
+        ).toBe(true);
+        expect(messages()).toEqual([
+            "This footnote reference is empty. Type a name between the brackets.",
+        ]);
+    });
+
+    it("leaves a [^] inside the cell's inline code alone (#41)", () => {
+        const doc = fakeEditor(["| a `[^]` b |"]);
+        expect(
+            caretGuardsHandled(fakePlugin(), doc, fakeCell("a `[^]` b", 5), {
+                line: 0,
+                ch: 0,
+            }),
+        ).toBe(false);
+        expect(noticeCalls).toEqual([]);
+    });
+});

@@ -257,12 +257,15 @@ function convertMainSelectionToAutonum(
     if (popupEditingAvailable(plugin)) {
         // edit the pre-filled definition in a popup; the cursor only moves
         // past the new reference
+        // Stryker disable all: popup arm — units run popup-off, so mutants
+        // here are no-coverage noise; smoke territory (verified 2026-08-12)
         const afterReference = {
             line: referenceLine,
             ch: selection.from.ch + footnoteReference.length,
         };
         doc.transaction({ changes, selection: { from: afterReference } });
         openPopupForNewDefinition(plugin, doc, selection.from, footnoteId, definition.cursor);
+        // Stryker restore all
     } else {
         moveCursorAndSetJumpPoint(doc, selection.from, definition.cursor, plugin, changes, true);
     }
@@ -303,10 +306,13 @@ function convertCellSelectionToAutonum(
         : [definition.change];
     const origin = cursorPosition ?? doc.getCursor();
     if (popupEditingAvailable(plugin)) {
+        // Stryker disable all: popup arm — units run popup-off, so mutants
+        // here are no-coverage noise; smoke territory (verified 2026-08-12)
         doc.transaction({ changes: definitionChanges });
         void openFootnotePopup(plugin, footnoteId, () => {
             moveCursorAndSetJumpPoint(doc, origin, definition.cursor, plugin, undefined, true);
         });
+        // Stryker restore all
     } else {
         moveCursorAndSetJumpPoint(doc, origin, definition.cursor, plugin, definitionChanges, true);
     }

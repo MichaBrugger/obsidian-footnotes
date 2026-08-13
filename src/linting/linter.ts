@@ -426,6 +426,9 @@ export function lintAfterFootnoteCreation(
     // a deferred (popup-path) lint must not fire on some OTHER note the
     // user has since switched to
     if (expectedFilePath && mdView.file?.path !== expectedFilePath) return;
+    // Stryker disable next-line all: popup liveness is footnote-popup module
+    // state only a live embedRegistry can set — smoke territory, like the
+    // identical guard inside the disable region above (verified 2026-08-12)
     if (footnotePopupBusy()) return;
     if (activeTableCellEditor(doc) || nestedSubEditorOwnsFocus(doc)) return;
     const before = doc.getValue();
