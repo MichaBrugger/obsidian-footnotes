@@ -22,10 +22,6 @@
 }
 
 /* closed but not yet torn down (waiting for the embed's save debounce) */
-.footnote-shortcut-popup.footnote-shortcut-popup-closed {
-    display: none;
-}
-
 /* which footnote is being edited; metrics match the embedded editor's
    text so the label lines up with the first line of the detail */
 .footnote-shortcut-popup .footnote-shortcut-popup-label {

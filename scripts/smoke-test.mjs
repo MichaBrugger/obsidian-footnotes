@@ -668,6 +668,53 @@ async function main() {
         );
     });
 
+    await test("rapid typed popups keep their texts apart and never crash the save chain", async () => {
+        // regression (reported 2026-08-13, root-caused live): the teardown's
+        // save flush called embed.save() with NO ARGUMENTS — current
+        // Obsidian's save(t, n) feeds t straight into set(), so
+        // set(undefined) threw deep in the save chain AND poisoned
+        // embed.text, making the embed's own debounced saves crash uncaught
+        // ("Cannot read properties of undefined (reading 'split')"). The
+        // stalled dirty flag also dragged every teardown out for seconds,
+        // and the closed popup's still-mounted editor could swallow
+        // keystrokes meant for the NEXT footnote's popup.
+        resetSettings({ enablePopupEditor: true });
+        await setupNote("Alpha bravo charlie");
+        action(
+            `window.__popupErrs = []; if (!window.__popupErrHook) { ` +
+            `window.__popupErrHook = true; ` +
+            `window.addEventListener('unhandledrejection', ` +
+            `(e) => window.__popupErrs && window.__popupErrs.push(String(e.reason))); }`,
+        );
+        setCursorAndRun(0, 8, CMD_AUTONUM); // [^1] + popup
+        for (let round = 0; round < 3; round++) {
+            await pollUntil(
+                `popup ${round + 1} focused for typing`,
+                `(() => { const p = document.querySelector('.footnote-shortcut-popup');
+                    return !!(p && p.contains(document.activeElement)); })()`,
+                (v) => v === true,
+            );
+            action(`document.execCommand('insertText', false, 'note ${round}');`);
+            await sleep(150);
+            action(`app.commands.executeCommandById('${CMD_AUTONUM}');`); // close
+            await sleep(120);
+            if (round < 2) {
+                action(`app.commands.executeCommandById('${CMD_AUTONUM}');`); // next
+            }
+        }
+        await pollUntil(
+            "every typed definition in its own footnote",
+            `(${EDITOR}).editor.getValue()`,
+            (v) => v === "Alpha bravo[^1][^2][^3] charlie\n\n[^1]: note 0\n[^2]: note 1\n[^3]: note 2",
+            12000,
+        );
+        await sleep(2500); // outlive the embeds' own save debounce
+        const errs = readJson("window.__popupErrs");
+        if (errs && errs.length) {
+            throw new Error(`popup save chain crashed: ${JSON.stringify(errs)}`);
+        }
+    });
+
     await test("popup edits propagate live into the main editor (stock parity)", async () => {
         // DELIBERATE behavior (Jason, 2026-08-08): while the popup is open
         // it saves on the embed's own debounce, exactly like Obsidian's

@@ -312,7 +312,15 @@ export async function openFootnotePopup(
     domTeardown = (focusEditor: boolean) => {
         resizeObserver.disconnect();
         doc.removeEventListener("mousedown", onDocMouseDown, true);
-        containerEl.addClass("footnote-shortcut-popup-closed");
+        // OUT of the document immediately, not just hidden: the embed's
+        // inline editor stays live while its save settles (up to ~5s), and
+        // keystrokes from someone already typing the NEXT footnote landed
+        // in it — appending to the WRONG definition and re-arming the
+        // embed's debounced save, which then fired against the unloaded
+        // embed's cleared state ("Cannot read properties of undefined
+        // (reading 'split')" — reported and repro'd 2026-08-13). The
+        // detached embed still saves fine; only input reachability changes.
+        containerEl.remove();
         if (focusEditor) {
             focusMainEditor();
             placeCursorAfterReference();
@@ -329,9 +337,17 @@ export async function openFootnotePopup(
             // the embed saves edits on its own DEBOUNCE (1-2s); flush the
             // save NOW and await its exact completion — this wait gates the
             // next footnote command, so every millisecond here is felt when
-            // creating consecutive footnotes rapidly
+            // creating consecutive footnotes rapidly. The flush passes the
+            // inline editor's CURRENT text and write=true (see the save
+            // signature note in obsidian-internals): the old argless call
+            // made set(undefined) throw and poisoned embed.text, so the
+            // embed's own later saves crashed uncaught (reported and
+            // root-caused live, 2026-08-13)
             try {
-                if (embed.dirty && !embed.saving) await embed.save?.();
+                if (embed.dirty && !embed.saving) {
+                    const text = embed.editMode?.editor?.getValue?.() ?? embed.text;
+                    if (typeof text === "string") await embed.save?.(text, true);
+                }
             } catch {
                 // fall through — the polling below is the safety net
             }
@@ -345,13 +361,19 @@ export async function openFootnotePopup(
                     return;
                 }
                 try {
+                    // a debounce timer armed by the final keystrokes would
+                    // fire AFTER the unload below and read the cleared
+                    // embed state (the rapid-succession crash) — everything
+                    // dirty has been flushed above, so the timers carry
+                    // nothing
+                    embed.requestSave?.cancel?.();
+                    embed.requestSaveFolds?.cancel?.();
                     embed.unload();
                 } catch {
                     // private API — a throw here must not skip the settle
                     // below, or every later footnote command would wait on
                     // pendingTeardown forever (E29)
                 }
-                containerEl.remove();
                 // one beat for Obsidian to reconcile the written file into
                 // the main view before anyone edits it (a timeout on
                 // purpose: rAF stalls entirely while the window is hidden)
@@ -377,6 +399,13 @@ export async function openFootnotePopup(
 
     const tryShow = async (): Promise<boolean> => {
         await embed.loadFile();
+        // a rapid second press toggle-closes the popup while loadFile is
+        // still in flight — teardown has already UNLOADED the embed, and
+        // showing the editor on an unloaded embed leaves a live inline
+        // editor whose save chain later fires against the cleared embed
+        // state ("Cannot read properties of undefined (reading 'split')",
+        // reported and repro'd 2026-08-13). Closed = handled, show nothing.
+        if (popupClosed()) return true;
         if (embed.subpathNotFound) return false;
         containerEl.removeClass("footnote-shortcut-popup-loading");
         embed.showEditor();

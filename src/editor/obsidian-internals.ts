@@ -84,6 +84,8 @@ interface MarkdownEmbed {
     saving?: boolean;
     saveAgain?: boolean;
     subpathNotFound?: boolean;
+    /** The section text as of the last set() — NOT live editor content. save()'s retry path reads this. */
+    text?: string;
     editMode?: {
         editor?: {
             focus(): void;
@@ -97,8 +99,19 @@ interface MarkdownEmbed {
     unload(): void;
     loadFile(): Promise<void>;
     showEditor(): void;
-    /** Immediate save — `requestSave` is its debounced wrapper. */
-    save?(): Promise<void> | void;
+    /**
+     * Immediate save — `requestSave` is its debounced wrapper. The section
+     * text and the write flag are REQUIRED: current Obsidian's save(t, n)
+     * passes t straight into set(), and set(undefined) both throws deep in
+     * the save chain AND poisons `this.text` so the embed's own later
+     * saves crash uncaught (the rapid-succession console error, root-caused
+     * live 2026-08-13); n defaults to FALSE, which skips the disk write
+     * entirely.
+     */
+    save?(text: string, write: boolean): Promise<void> | void;
+    /** The debounced save/fold-save wrappers (Obsidian debounce objects). A timer left armed at unload fires against the CLEARED embed state and throws deep in the save chain (reported 2026-08-13) — teardown cancels both. */
+    requestSave?: { cancel?(): void };
+    requestSaveFolds?: { cancel?(): void };
 }
 
 type EmbedCreator = (
