@@ -16,10 +16,16 @@ The plugin adds its commands **without hotkeys**, so assign your own right after
 
 `Settings → Hotkeys → search for "Footnote" → click the ⊕ next to a command → press your preferred keys`
 
-Recommended (what the maintainer uses):
+Of the plugin's seven commands, the four you'll press constantly deserve hotkeys. Here's what the maintainer uses — conveniently, they all sit next to each other at the end of the number row:
 
-- <kbd>Alt</kbd>+<kbd>0</kbd> for Insert / navigate auto-numbered footnote
-- <kbd>Alt</kbd>+<kbd>-</kbd> for Insert / navigate named footnote
+| Command | Recommended hotkey |
+| --- | --- |
+| Insert / navigate auto-numbered footnote | <kbd>Alt</kbd>+<kbd>0</kbd> |
+| Insert / navigate named footnote | <kbd>Alt</kbd>+<kbd>-</kbd> |
+| Insert inline footnote | <kbd>Alt</kbd>+<kbd>=</kbd> |
+| Insert inline footnote from clipboard | <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>=</kbd> |
+
+The other three — **Rename footnote**, **Set footnote prefix**, and **Lint footnotes** — come up less often, so running them from the command palette works fine; give them hotkeys too if they become part of your routine.
 
 <!-- GIF or screenshot: assigning a hotkey in the Hotkeys settings tab -->
 
