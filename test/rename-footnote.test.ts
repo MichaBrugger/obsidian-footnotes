@@ -211,6 +211,69 @@ describe("rename property", () => {
     );
 
     it(
+        "renameTargetAtCursor is total and truthful at ANY caret (the menu gate)",
+        async () => {
+            // the right-click menu shows "Rename footnote" exactly when this
+            // resolver returns a name — so at any caret in any document it
+            // must never throw, never fire inside protected text, only name
+            // footnotes the document really has, and always hand
+            // planFootnoteRename something it can answer
+            await fc.assert(
+                fc.property(
+                    docArb,
+                    fc.nat(1000),
+                    fc.nat(1000),
+                    newNameArb,
+                    (raw, linePick, chPick, newName) => {
+                        const lines = normalizeEol(raw).text.split("\n");
+                        const line = linePick % lines.length;
+                        const ch = chPick % (lines[line].length + 1);
+                        const doc = fakeEditor(lines);
+                        const target = renameTargetAtCursor(doc, { line, ch });
+                        if (target === null) return;
+                        const scan = scanDocument(lines);
+                        expect(
+                            scan.isProtected[line],
+                            `offered a rename inside protected text at ${line}:${ch}`,
+                        ).toBe(false);
+                        const folded = target.toLowerCase();
+                        const names = new Set<string>();
+                        for (let i = 0; i < lines.length; i++) {
+                            if (!lines[i].includes("[^")) continue;
+                            for (const occurrence of referenceOccurrences(
+                                lines[i],
+                                maskedLineAt(lines, i),
+                            )) {
+                                names.add(occurrence.name.toLowerCase());
+                            }
+                        }
+                        for (const block of findDefinitionBlocks(
+                            lines,
+                            scan.isProtected,
+                            scan,
+                        )) {
+                            names.add(block.name.toLowerCase());
+                        }
+                        expect(
+                            names.has(folded),
+                            `offered "${target}", which no live occurrence or label carries`,
+                        ).toBe(true);
+                        const plan = planFootnoteRename(doc, target, newName);
+                        expect([
+                            "renamed",
+                            "noop",
+                            "invalid",
+                            "collision",
+                            "dead",
+                        ]).toContain(plan.kind);
+                    },
+                ),
+            );
+        },
+        Math.max(30_000, Number(process.env.FC_NUM_RUNS ?? 200) * 60),
+    );
+
+    it(
         "a successful rename maps the name everywhere and touches nothing else",
         async () => {
             await fc.assert(
