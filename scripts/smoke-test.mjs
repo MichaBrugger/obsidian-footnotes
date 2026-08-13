@@ -715,6 +715,33 @@ async function main() {
         }
     });
 
+    await test("right-click on a footnote offers Rename footnote, prose does not", async () => {
+        // the editor-menu hook (Jason's ask 2026-08-13): parity with the
+        // native "Rename this heading" on heading lines. Triggered
+        // programmatically with a recording menu stub — the caret stands in
+        // for the click point, which Obsidian resolves before the event.
+        resetSettings({});
+        await setupNote("Alpha bravo[^x] charlie\n\n[^x]: def");
+        const menuProbe = (line, ch) =>
+            `(() => { const v=${EDITOR}; v.editor.setCursor({line:${line},ch:${ch}}); ` +
+            `const items=[]; const item={ setTitle(t){ items.push(t); return item; }, ` +
+            `setIcon(){ return item; }, setSection(){ return item; }, onClick(){ return item; } }; ` +
+            `const menu={ addItem(cb){ cb(item); return menu; } }; ` +
+            `app.workspace.trigger('editor-menu', menu, v.editor, v); return items; })()`;
+        const onReference = readJson(menuProbe(0, 13));
+        if (!onReference || !onReference.includes("Rename footnote")) {
+            throw new Error(`no menu item on the reference: ${JSON.stringify(onReference)}`);
+        }
+        const onLabel = readJson(menuProbe(2, 2));
+        if (!onLabel || !onLabel.includes("Rename footnote")) {
+            throw new Error(`no menu item on the definition label: ${JSON.stringify(onLabel)}`);
+        }
+        const onProse = readJson(menuProbe(0, 2));
+        if (!onProse || onProse.includes("Rename footnote")) {
+            throw new Error(`menu item leaked onto plain prose: ${JSON.stringify(onProse)}`);
+        }
+    });
+
     await test("popup edits propagate live into the main editor (stock parity)", async () => {
         // DELIBERATE behavior (Jason, 2026-08-08): while the popup is open
         // it saves on the embed's own debounce, exactly like Obsidian's
@@ -1096,6 +1123,14 @@ async function main() {
     });
 
     await test("vim :w routes through the save command and lints (Linter parity)", async () => {
+        // vim does not exist on mobile — under Obsidian's mobile emulation
+        // (app.emulateMobile) the CM5 shim never attaches and this test
+        // can only fail confusingly (burned 2026-08-13: an evening chasing
+        // "broken vim" that was just the emulator being on)
+        if (readJson("app.isMobile") === true) {
+            console.log("        (skipped: mobile emulation active, no vim)");
+            return;
+        }
         resetSettings({ lintOnSave: true });
         // enabling vim loads the CM5 adapter; the plugin's leaf-change hook
         // then redefines :w — reopening the note fires that hook

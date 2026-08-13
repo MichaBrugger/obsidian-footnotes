@@ -16,7 +16,7 @@ import { FootnotePluginSettingTab, FootnotePluginSettings, DEFAULT_SETTINGS } fr
 import { dismissFootnotePopup } from "./commands/footnote-popup";
 import { insertAutonumFootnote, insertInlineFootnote, insertNamedFootnote, pasteInlineFootnote } from "./commands/insert-or-navigate-footnotes";
 import { footnotePrefixFromEditor } from "./parsing/footnote-prefix";
-import { renameFootnote } from "./commands/rename-footnote";
+import { registerRenameFootnoteMenu, renameFootnote } from "./commands/rename-footnote";
 import { SetFootnotePrefixModal } from "./commands/set-footnote-prefix";
 import {
   installLintOnSave,
@@ -124,6 +124,9 @@ export default class FootnotePlugin extends Plugin {
         void renameFootnote(this);
       },
     });
+    // right-click / long-press on a footnote also offers the rename, like
+    // the native "Rename this heading" on heading lines
+    registerRenameFootnoteMenu(this);
     this.addCommand({
       id: "set-footnote-prefix",
       name: "Set footnote prefix",

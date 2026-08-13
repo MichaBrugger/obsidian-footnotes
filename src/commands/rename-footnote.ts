@@ -1,4 +1,4 @@
-import { Editor, EditorChange, EditorPosition, Modal, Notice, Setting } from "obsidian";
+import { Editor, EditorChange, EditorPosition, MarkdownView, Modal, Notice, Setting } from "obsidian";
 
 import type FootnotePlugin from "../main";
 import {
@@ -207,6 +207,37 @@ function renameSurvives(
         }
     }
     return true;
+}
+
+/**
+ * Add "Rename footnote" to the editor's right-click (and mobile
+ * long-press) menu when the click landed on a reference or a definition
+ * label — the same pattern as Obsidian's own "Rename this heading" on
+ * heading lines (Jason's ask, 2026-08-13). Obsidian moves the caret to
+ * the click point before firing editor-menu, so the caret resolution is
+ * the command's own.
+ */
+export function registerRenameFootnoteMenu(plugin: FootnotePlugin) {
+    plugin.registerEvent(
+        plugin.app.workspace.on("editor-menu", (menu, editor, info) => {
+            // markdown views only: a canvas card's editor would pass the
+            // target check here while the command later resolves the
+            // ACTIVE markdown view's editor instead
+            if (!(info instanceof MarkdownView)) return;
+            if (renameTargetAtCursor(editor, editor.getCursor()) === null) {
+                return;
+            }
+            menu.addItem((item) =>
+                item
+                    .setTitle("Rename footnote")
+                    .setIcon("footnote-rename")
+                    .setSection("selection")
+                    .onClick(() => {
+                        void renameFootnote(plugin);
+                    }),
+            );
+        }),
+    );
 }
 
 /** The "Rename footnote" command: resolve the name under the caret, then hand off to the modal. */

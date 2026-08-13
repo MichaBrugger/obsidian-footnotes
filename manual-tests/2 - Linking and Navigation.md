@@ -34,6 +34,8 @@ Run **Rename footnote** from the command palette (bind a hotkey if you like) wit
 - [ ] Caret on plain prose → toast asks for a reference or definition, no modal
 - [ ] In Reading view the command is absent from the palette
 - [ ] With the popup open on a footnote, running the rename first settles/closes the popup (no stranded popup bound to the old name)
+- [ ] Right-clicking ON a reference or a definition label shows **Rename footnote** in the menu (like the native heading rename); right-clicking plain prose does not (added 2026-08-13)
+- [ ] In mobile emulation, the long-press menu on a footnote shows it too
 
 Filler so the jumps actually travel, scroll matters here.
 
