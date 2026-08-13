@@ -619,37 +619,44 @@ describe("creation-command invariants over random documents", () => {
                     }
                     // converted: the selection line keeps its prefix and
                     // suffix, and ONLY the trimmed span became the footnote.
-                    // The rare frontmatter-pinning prepend shifts every line
-                    // down by one — accept either position.
+                    // Lines inserted ABOVE the selection (a definition
+                    // appended after a mid-document block, the phantom-
+                    // frontmatter prepend) shift the converted line down —
+                    // search the whole possible shift window, and require
+                    // the middle to PARSE as the conversion (an empty
+                    // prefix+suffix would otherwise let any line match).
                     const prefix = lineBefore.slice(0, from);
                     const suffix = lineBefore.slice(to);
                     const selText = lineBefore.slice(from, to);
-                    const candidates = [doc.lines[span.line], doc.lines[span.line + 1]];
-                    const changedLine = candidates.find(
-                        (l) =>
-                            l !== undefined &&
-                            l.startsWith(prefix) &&
-                            l.endsWith(suffix) &&
-                            l.length >= prefix.length + suffix.length,
-                    );
+                    const shiftWindow = doc.lines.length - lines.length;
+                    const converted = (l: string | undefined) => {
+                        if (
+                            l === undefined ||
+                            !l.startsWith(prefix) ||
+                            !l.endsWith(suffix) ||
+                            l.length < prefix.length + suffix.length
+                        ) {
+                            return null;
+                        }
+                        const middle = l.slice(prefix.length, l.length - suffix.length);
+                        if (command === "inline") {
+                            return middle ===
+                                `^[${sanitizeInlineFootnoteContent(selText)}]`
+                                ? middle
+                                : null;
+                        }
+                        return /^\[\^([^\]]+)\]$/.test(middle) ? middle : null;
+                    };
+                    let middle: string | null = null;
+                    for (let shift = 0; shift <= shiftWindow && middle === null; shift++) {
+                        middle = converted(doc.lines[span.line + shift]);
+                    }
                     expect(
-                        changedLine,
-                        `no converted line kept prefix+suffix of ${JSON.stringify(lineBefore)}`,
-                    ).toBeDefined();
-                    const middle = (changedLine as string).slice(
-                        prefix.length,
-                        (changedLine as string).length - suffix.length,
-                    );
-                    if (command === "inline") {
-                        expect(middle).toBe(
-                            `^[${sanitizeInlineFootnoteContent(selText)}]`,
-                        );
-                    } else {
-                        const reference = /^\[\^([^\]]+)\]$/.exec(middle);
-                        expect(
-                            reference,
-                            `autonum conversion left ${JSON.stringify(middle)} in place`,
-                        ).not.toBeNull();
+                        middle,
+                        `no line in the shift window converted ${JSON.stringify(lineBefore)}`,
+                    ).not.toBeNull();
+                    if (command === "autonum") {
+                        const reference = /^\[\^([^\]]+)\]$/.exec(middle as string);
                         expect(doc.lines.join("\n")).toContain(
                             `[^${(reference as RegExpExecArray)[1]}]: ${selText}`,
                         );

@@ -14,6 +14,7 @@ import { inlineFootnoteSpanAt, sanitizeInlineFootnoteContent } from "./inline-fo
 import {
     ProtectedCreationNotice,
     simulateChanges,
+    simulatedAnchor,
     simulatedMaskedLine,
 } from "../editor/insertion-liveness";
 import {
@@ -228,11 +229,13 @@ function convertMainSelectionToAutonum(
         definition.change,
     ];
     if (definition.prepend) changes.push(definition.prepend);
-    const lineShift = definition.prepend ? 1 : 0;
 
     // same verification as createAutonumFootnote: the new reference must be
     // live and its definition must parse as a live block on the SIMULATED
-    // result; refuse like the protected-caret guard otherwise
+    // result; refuse like the protected-caret guard otherwise. The
+    // reference is re-found through simulatedAnchor — a definition appended
+    // ABOVE the selection shifts every later line (entry-corpus find,
+    // 2026-08-12)
     const simulated = simulateChanges(ctx.lines, changes);
     const simulatedScan = scanDocument(simulated);
     const definitionLive = findDefinitionBlocks(
@@ -240,13 +243,13 @@ function convertMainSelectionToAutonum(
         simulatedScan.isProtected,
         simulatedScan,
     ).some((block) => block.start === definition.cursor.line);
-    const referenceLine = selection.from.line + lineShift;
+    const referenceAnchor = simulatedAnchor(ctx.lines, changes, 0, simulated);
     const referenceLive = referenceOccurrences(
-        simulated[referenceLine],
-        maskedLineAt(simulated, referenceLine),
+        simulated[referenceAnchor.line],
+        maskedLineAt(simulated, referenceAnchor.line),
     ).some(
         (occurrence) =>
-            occurrence.start === selection.from.ch &&
+            occurrence.start === referenceAnchor.ch &&
             occurrence.name === footnoteId,
     );
     if (!definitionLive || !referenceLive) {
@@ -260,8 +263,8 @@ function convertMainSelectionToAutonum(
         // Stryker disable all: popup arm — units run popup-off, so mutants
         // here are no-coverage noise; smoke territory (verified 2026-08-12)
         const afterReference = {
-            line: referenceLine,
-            ch: selection.from.ch + footnoteReference.length,
+            line: referenceAnchor.line,
+            ch: referenceAnchor.ch + footnoteReference.length,
         };
         doc.transaction({ changes, selection: { from: afterReference } });
         openPopupForNewDefinition(plugin, doc, selection.from, footnoteId, definition.cursor);

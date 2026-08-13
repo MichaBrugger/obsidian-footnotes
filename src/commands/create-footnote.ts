@@ -27,6 +27,7 @@ import {
     ProtectedCreationNotice,
     safeInsertionCh,
     simulateChanges,
+    simulatedAnchor,
     simulatedMaskedLine,
 } from "../editor/insertion-liveness";
 import { lintAfterFootnoteCreation } from "../linting/linter";
@@ -239,7 +240,6 @@ export function createAutonumFootnote(
     // the phantom-frontmatter prepend (see buildDefinitionAppend) rides the
     // same transaction; it shifts every post-transaction line down by one
     if (definition.prepend) changes.push(definition.prepend);
-    const lineShift = definition.prepend ? 1 : 0;
 
     // the insertion itself can RECLASSIFY the document — "[^N]" at a
     // quote's column 0 demotes the quote and a region opener riding that
@@ -248,7 +248,11 @@ export function createAutonumFootnote(
     // inline-math pair that swallows the reference (both found by the
     // command-press property suite, 2026-08-12). Verify on the SIMULATED
     // result that the new reference is live and its definition parses as a
-    // live block; refuse like the protected-caret guard otherwise.
+    // live block; refuse like the protected-caret guard otherwise. The
+    // reference is re-found through simulatedAnchor: a definition appended
+    // ABOVE the caret shifts every later line, and reading the caret's
+    // original line index falsely refused mid-document-definition notes
+    // (found by the entry corpus, 2026-08-12).
     const simulated = simulateChanges(ctx.lines, changes);
     const simulatedScan = scanDocument(simulated);
     const definitionLive = findDefinitionBlocks(
@@ -256,13 +260,13 @@ export function createAutonumFootnote(
         simulatedScan.isProtected,
         simulatedScan,
     ).some((block) => block.start === definition.cursor.line);
-    const referenceLine = cursorPosition.line + lineShift;
+    const referenceAnchor = simulatedAnchor(ctx.lines, changes, 0, simulated);
     const referenceLive = referenceOccurrences(
-        simulated[referenceLine],
-        maskedLineAt(simulated, referenceLine),
+        simulated[referenceAnchor.line],
+        maskedLineAt(simulated, referenceAnchor.line),
     ).some(
         (occurrence) =>
-            occurrence.start === cursorPosition.ch &&
+            occurrence.start === referenceAnchor.ch &&
             occurrence.name === footnoteId,
     );
     if (!definitionLive || !referenceLive) {
@@ -275,7 +279,7 @@ export function createAutonumFootnote(
         // the cursor only moves past the new reference
         // Stryker disable all: popup arm — units run popup-off, so mutants
         // here are no-coverage noise; smoke territory (verified 2026-08-12)
-        const afterReference = { line: cursorPosition.line + lineShift, ch: cursorPosition.ch + footnoteReference.length };
+        const afterReference = { line: referenceAnchor.line, ch: referenceAnchor.ch + footnoteReference.length };
         doc.transaction({ changes, selection: { from: afterReference } });
         openPopupForNewDefinition(plugin, doc, cursorPosition, footnoteId, definition.cursor);
         // Stryker restore all
