@@ -50,15 +50,19 @@ export default class FootnotePlugin extends Plugin {
     // Jason's hand-drawn "action style" icon family (icons/action style/):
     // the action is the main glyph — hash (numbered), I-beam text cursor
     // (named / inline write), clipboard (paste), alert triangle (lint),
-    // left arrow into a dashed divider (prefix) — and the small mark gives
-    // the footnote type: down ARROW (jump to the note bottom) for regular
-    // footnotes, up chevron (the ^ of ^[...]) for inline ones. Source SVGs
-    // exported from Inkscape with strokes as currentColor for theming
-    // (fresh exports come out stroke="#000" and must be swapped by hand).
-    addIcon("footnote-numbered", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g transform="translate(0,1)" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><g transform="translate(-2,-1)"><path d="m4 9h14"/><path d="m4 15h11"/><line x1="10" x2="8" y1="3" y2="21"/><path d="m16 3-2 18"/></g><path d="m22 16-3 3-3-3"/><path d="m19 18v-7"/></g></svg>`);
-    addIcon("footnote-named", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g transform="translate(24,-62)" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><g transform="translate(-24,27)"><path d="m12 53v-12c0-2.2091 1.7909-4 4-4h1"/><path d="m7 57h1a4 4 0 0 0 4-4"/><path d="m7 37h1a4 4 0 0 1 4 4"/></g><path d="m-2 79-3 3-3-3"/><path d="m-5 81v-7"/></g></svg>`);
-    addIcon("footnote-lint", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m22 17-3 3-3-3"/><path d="m19 19v-7"/><g transform="translate(.006 -.019)"><path d="m16.027 8.0195-2.2969-4.0195c-0.76614-1.3519-2.7139-1.3519-3.48 0l-8 14c-0.77389 1.3403 0.20241 3.0139 1.75 3l9.994 0.01867"/><path d="m12 9v4"/><path d="m12 17h0.01"/></g></g></svg>`);
-    addIcon("footnote-prefix", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m19 19v-7"/><path d="m22 17-3 3-3-3"/><path d="m8 7-5 5 5 5v-10"/><path d="m12 20v2"/><path d="m12 14v2"/><path d="m12 8v2"/><path d="m12 2v2"/></g></svg>`);
+    // left arrow into a dashed divider (prefix), pencil (rename) — and the
+    // small mark gives the footnote type: down ARROW (jump to the note
+    // bottom) for regular footnotes, up chevron (the ^ of ^[...]) for
+    // inline ones. The arrows sit one step lower since 2026-08-13 (Jason's
+    // rebalance). Sources in icons/action style/ are raw Inkscape saves;
+    // scripts/strip-inkscape-icons.mjs strips the editor metadata and
+    // swaps Inkscape's stroke="#000" to currentColor for theming — paste
+    // its icons/optimized/ output here.
+    addIcon("footnote-numbered", `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><g transform="translate(0,1)" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><g transform="translate(-3,-1)"><path d="M 5,9 H 19" /><path d="M 5,15 H 16" /><line x1="10" x2="8" y1="3" y2="21" /><path d="M 16,3 14,21" /></g><path d="m 22,17 -3,3 -3,-3" /><path d="M 19,19 V 12" /></g></svg>`);
+    addIcon("footnote-named", `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><g transform="translate(24,-62)" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><g transform="translate(-24,27)"><path d="m12 53v-12c0-2.209 1.791-4 4-4h1" /><path d="m7 57h1a4 4 0 0 0 4-4" /><path d="m7 37h1a4 4 0 0 1 4 4" /></g><path d="m -2,80 -3,3 -3,-3" /><path d="M -5,82 V 75" /></g></svg>`);
+    addIcon("footnote-lint", `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><g fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m 22,18 -3,3 -3,-3" stroke="currentColor" /><path d="M 19,20 V 13" stroke="currentColor" /><g transform="translate(.006 -.019)" stroke="currentColor"><path d="M 16.588,9.019 13.73,4 c -0.766,-1.352 -2.714,-1.352 -3.48,0 l -8,14 c -0.774,1.34 0.202,3.014 1.75,3 h 8.994" fill="none" /><path d="m 11.994,9.019 v 4" /><path d="m 12,17 -0.006,0.019" /></g></g></svg>`);
+    addIcon("footnote-prefix", `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><g fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M 19,20 V 13" stroke="currentColor" /><path d="m 22,18 -3,3 -3,-3" stroke="currentColor" /><g stroke="currentColor"><path d="m8 7-5 5 5 5v-10" /><path d="m12 20v2" /><path d="m12 14v2" /><path d="m12 8v2" /><path d="m12 2v2" /></g></g></svg>`);
+    addIcon("footnote-rename", `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M 19,21 V 13" /><path d="m 22,18 -3,3 -3,-3" /><path d="M 19.005,8.96 21.174,6.812 v 0 C 23.832,4.155 19.846,0.168 17.188,2.825 L 3.842,16.174 c -0.232,0.232 -0.404,0.517 -0.5,0.83 l -1.321,4.352 c -0.114,0.381 0.242,0.737 0.623,0.622 l 4.353,-1.32 c 0.313,-0.095 0.598,-0.266 0.83,-0.497 l 7.177,-7.197" /></g></svg>`);
     addIcon("footnote-inline-cursor", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g transform="translate(0,-62)" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><g transform="translate(0,62)"><path d="m12 18v-12c0-2.2091 1.7909-4 4-4h1"/><path d="m7 22h1a4 4 0 0 0 4-4"/><path d="m7 2h1a4 4 0 0 1 4 4"/></g><path d="m22 81-3-3-3 3"/></g></svg>`);
     addIcon("footnote-inline-paste", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><g transform="translate(0,-27)"><rect x="8" y="29" width="8" height="4" rx="1" ry="1"/><path d="m16 31h2c1.1046 0 2 0.89543 2 2v6m-7 10h-7c-1.1046 0-2-0.89543-2-2v-14c0-1.1046 0.89543-2 2-2h2"/></g><path d="m22 19-3-3-3 3"/></g></svg>`);
 
@@ -114,7 +118,7 @@ export default class FootnotePlugin extends Plugin {
     this.addCommand({
       id: "rename-footnote",
       name: "Rename footnote",
-      icon: "pencil-line",
+      icon: "footnote-rename",
       checkCallback: (checking: boolean) => {
         if (checking) return !!this.editableMarkdownView();
         void renameFootnote(this);
