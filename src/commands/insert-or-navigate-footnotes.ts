@@ -66,9 +66,11 @@ import { activeTableCellEditor, resolveTableCellCursor, runOutsideTableCell, Tab
  * popup, and mint a second footnote (the 2026-07-16 regression class;
  * exactly this happened when the preamble was first extracted as a
  * value-returning helper — caught by the rapid-press smoke tests,
- * 2026-08-11).
+ * 2026-08-11). Exported for the Rename-footnote command (issue #36),
+ * which needs the same popup settling: renaming under an open popup would
+ * strand its save against the old name.
  */
-async function withEditableEditor(
+export async function withEditableEditor(
     plugin: FootnotePlugin,
     action: (doc: Editor) => void | Promise<void>,
 ): Promise<void> {

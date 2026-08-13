@@ -20,6 +20,21 @@ The definition at the very bottom of this note has NO reference anywhere. Put th
 - [ ] A "Nothing references this footnote" toast appears, the caret stays put, and NOTHING is inserted (it used to insert a brand-new footnote right into the definitions)
 - [ ] The same happens with the caret on its indented continuation line
 
+## Rename footnote (issue #36, 2026-08-12)
+
+Run **Rename footnote** from the command palette (bind a hotkey if you like) with the caret in each spot:
+
+- [ ] Caret inside `[^plain]` anywhere in this note → modal opens prefilled with `plain`; rename it to `renamed` → every `[^plain]` reference AND the `[^plain]:` definition update in one step, and the toast counts the places
+- [ ] One Ctrl+Z undoes the whole rename at once
+- [ ] Caret on the DEFINITION label line (`[^renamed]: …`) also opens the modal for that name
+- [ ] Renaming to a name already in use (try `Chapter`) keeps the modal open and explains the collision
+- [ ] Renaming `[^Chapter]` to `chapter` (case only) works — it's the same footnote to Obsidian
+- [ ] A name with a space keeps the modal open with the reason
+- [ ] A reference-shaped `[^…]` inside a code block is NOT renamed along with the live ones (add one to a fence and check)
+- [ ] Caret on plain prose → toast asks for a reference or definition, no modal
+- [ ] In Reading view the command is absent from the palette
+- [ ] With the popup open on a footnote, running the rename first settles/closes the popup (no stranded popup bound to the old name)
+
 Filler so the jumps actually travel, scroll matters here.
 
 Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.

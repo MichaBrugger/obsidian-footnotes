@@ -52,7 +52,10 @@ The suite has three kinds of files:
   editing, multi-line selections warn and edit nothing, and protected
   lines survive conversion presses untouched. Popup, table cells, and
   Reading view stay smoke-suite territory (the cell conversion writer has
-  deterministic pins in `test/selection-to-footnote.test.ts`).
+  deterministic pins in `test/selection-to-footnote.test.ts`). RENAME
+  (issue #36, `test/rename-footnote.test.ts`) pins its planner and adds a
+  property: a successful rename maps the name everywhere, leaves every
+  unedited line byte-identical, and is always reversible.
 
 Properties run 200 cases each by default. Before a release, soak them:
 

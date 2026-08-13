@@ -74,6 +74,12 @@ So one hotkey bounces you back and forth: reference to note, note to reference.
 
 <!-- GIF: cursor on reference, hotkey, popup edit; then cursor on definition, hotkey, jump back -->
 
+### Renaming a footnote
+
+Put your cursor on any reference or definition and run **Rename footnote** — like renaming a variable in a code editor. Every reference and the definition get the new name in one step, undoable in one step too. Names are matched case-insensitively (Obsidian treats `[^Note]` and `[^note]` as the same footnote), copies inside code blocks are left alone, and the command refuses a name that's already taken by another footnote.
+
+<!-- GIF: caret on reference, rename modal, every occurrence updates -->
+
 ### The popup editor
 
 Creating or visiting a footnote opens its text in a small editor right at your cursor, so you never lose your place in the note. Close it with the same hotkey, <kbd>Escape</kbd>, or by clicking anywhere outside. Prefer the classic jump-to-the-bottom behavior? Turn off **Edit footnotes in a popup** in the settings.

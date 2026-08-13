@@ -24,6 +24,7 @@
         "src/commands/create-footnote.ts",
         "src/commands/insert-or-navigate-footnotes.ts",
         "src/commands/selection-footnote.ts",
+        "src/commands/rename-footnote.ts",
         "src/linting/**/*.ts"
     ],
     "incremental": true,
