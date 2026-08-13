@@ -240,4 +240,11 @@ describe("the shared gate", () => {
         noticeLintAlerts(fakePlugin({}), "plain prose, nothing here");
         expect(noticeCalls).toEqual([]);
     });
+
+    it("a note whose footnotes are all healthy raises no alert either", () => {
+        // kills the empty-names early-return mutants: without them the
+        // plural branches would toast "This note has 0 …"
+        noticeLintAlerts(fakePlugin({}), "fine [^x] here\n\n[^x]: d");
+        expect(noticeCalls).toEqual([]);
+    });
 });

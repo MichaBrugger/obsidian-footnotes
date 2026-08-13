@@ -227,6 +227,11 @@ export async function renameFootnote(plugin: FootnotePlugin) {
 // button) applies. Invalid names, collisions, and names the simulation
 // refuses show their reason inline and keep the modal open — same shape
 // as the Set-footnote-prefix modal.
+// Stryker disable all: modal DOM against the live app — smoke-test
+// territory, unreachable from units (the whole prefix modal's FILE is
+// excluded for the same reason; this one shares a file with the pure
+// planners, so the exemption is scoped here). Coverage-verified by the
+// 2026-08-12 incremental run: every mutant below was no-coverage.
 class RenameFootnoteModal extends Modal {
     private plugin: FootnotePlugin;
     private doc: Editor;
