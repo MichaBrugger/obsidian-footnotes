@@ -139,6 +139,9 @@ function scheduleCreationLintAfterPopup(plugin: FootnotePlugin): () => void {
  * Exported for the selection-to-footnote conversion (issue #35), whose
  * autonum flavor hands off to the popup the same way.
  */
+// Stryker disable all: popup handoff against the live workspace — smoke-test
+// territory, unreachable from units (coverage-verified by the 2026-08-12
+// re-baseline: every mutant in this function was no-coverage)
 export function openPopupForNewDefinition(
     plugin: FootnotePlugin,
     doc: Editor,
@@ -154,6 +157,7 @@ export function openPopupForNewDefinition(
         lintAfterFootnoteCreation(plugin, true);
     });
 }
+// Stryker restore all
 
 /** Cascade step 4 (autonum): insert the next-numbered reference at the caret (through `cell` when in a table) and append its definition, then popup or jump per settings. */
 export function createAutonumFootnote(
