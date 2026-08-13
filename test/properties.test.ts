@@ -164,9 +164,61 @@ function footnoteShape(markdown: string): FootnoteShape {
 // reasons that are micromark's opinion, not a lint bug. The oracle recuses
 // itself from documents with a "$" inside a footnote name; every other
 // property still covers them.
-const oracleDocArb = docArb.filter((doc) => !/\[\^[^\]\n]*\$/.test(doc));
+// The SECOND known disagreement (found by a 500k overnight soak at run
+// 277k, 2026-08-13): a "---" head block reads as YAML frontmatter to
+// Obsidian even when its body is prose (metadataCache: section type
+// "yaml", frontmatter null — verified live), so reference-shaped text
+// inside it is DEAD, and reindex may legitimately renumber an orphaned
+// definition into that dead name. micromark can't referee those documents
+// from EITHER side: frontmatter-blind, it reads the fences as thematic
+// breaks and the dead reference as live prose (GFM tokenizes a reference
+// only once its definition exists, so the rename "mints" a resolving
+// pair); with micromark-extension-frontmatter loaded, a FAILED frontmatter
+// open at line 0 poisons GFM footnote-definition tokenization for the
+// whole document ("[^1]: alpha" parses as a plain link definition —
+// upstream interop bug, probed 2026-08-13). So the oracle recuses itself
+// from documents carrying reference-shaped text inside a closed head
+// block; the lint behavior there is pinned deterministically below.
+const headBlockWithReference = (doc: string): boolean => {
+    const head = /^---\r?\n([\s\S]*?)\r?\n(?:---|\.\.\.)(?:\r?\n|$)/.exec(doc);
+    return head !== null && head[1].includes("[^");
+};
+const oracleDocArb = docArb.filter(
+    (doc) => !/\[\^[^\]\n]*\$/.test(doc) && !headBlockWithReference(doc),
+);
 
 describe("differential oracle over random documents", () => {
+    it("recuses itself when a frontmatter head block carries reference-shaped text", () => {
+        // the 500k-soak counterexample of 2026-08-13, pinned: "alpha[^2]."
+        // sits inside the yaml head block (dead text to Obsidian), and
+        // reindex legitimately renumbers the orphaned [^42] definition to
+        // [^2] — correct by the live ground truth, unjudgeable by
+        // micromark (see headBlockWithReference above)
+        const doc =
+            "---\n\nalpha[^2].\n\n---\n\nLorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua[^1].\n\n[^42]: alpha";
+        const options: LintOptions = {
+            fixPunctuation: false,
+            moveDefinitionsToBottom: false,
+            reindex: true,
+            reindexOptions: {
+                renumberNamedFootnotes: false,
+                keepOrphanedDefinitions: true,
+            },
+            removeOrphanedReferences: false,
+            removeOrphanedDefinitions: false,
+            mergeDuplicateDefinitions: false,
+            orphanSafePrefix: "",
+            applyNotePrefix: false,
+            sectionHeading: "",
+        };
+        expect(lintFootnotes(doc, options)).toContain("[^2]: alpha");
+        expect(headBlockWithReference(doc)).toBe(true);
+        // a doc whose head block is reference-free stays IN the oracle's
+        // jurisdiction, closed or not
+        expect(headBlockWithReference("---\ntitle: t\n---\nbody[^1].")).toBe(false);
+        expect(headBlockWithReference("---\n\nalpha[^2].\n\nno closer")).toBe(false);
+    });
+
     soakIt("remark sees the same footnote structure before and after lint (deletions off)", () => {
         fc.assert(
             fc.property(oracleDocArb, keepingOptionsArb, (doc, options) => {

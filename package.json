@@ -17,7 +17,9 @@
   "author": "",
   "license": "MIT",
   "knip": {
-    "ignore": ["vitest.stryker.config.ts"]
+    "ignore": [
+      "vitest.stryker.config.ts"
+    ]
   },
   "devDependencies": {
     "@stryker-mutator/core": "^9.6.1",
