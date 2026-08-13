@@ -23,6 +23,7 @@
         "src/commands/press-guards.ts",
         "src/commands/create-footnote.ts",
         "src/commands/insert-or-navigate-footnotes.ts",
+        "src/commands/selection-footnote.ts",
         "src/linting/**/*.ts"
     ],
     "incremental": true,

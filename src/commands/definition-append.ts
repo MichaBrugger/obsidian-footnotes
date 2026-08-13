@@ -185,3 +185,37 @@ export function buildDefinitionAppend(
     }
     return { change: { from, to, text }, cursor, prepend };
 }
+
+/**
+ * `buildDefinitionAppend`'s edit with `body` seeded after the definition
+ * label — the selection-to-footnote conversion (issue #35) creates its
+ * definition pre-filled with the selected text. The label is the LAST
+ * occurrence in the change text (an optional section heading could carry a
+ * label-shaped line above it), and the returned cursor — already at the
+ * label's end — slides to the end of the body, before any trailing
+ * separator newline.
+ */
+export function seedDefinitionBody(
+    definition: {
+        change: EditorChange;
+        cursor: EditorPosition;
+        prepend?: EditorChange;
+    },
+    footnoteId: string,
+    body: string,
+): { change: EditorChange; cursor: EditorPosition; prepend?: EditorChange } {
+    const label = `[^${footnoteId}]: `;
+    const text = definition.change.text;
+    const at = text.lastIndexOf(label) + label.length;
+    return {
+        ...definition,
+        change: {
+            ...definition.change,
+            text: text.slice(0, at) + body + text.slice(at),
+        },
+        cursor: {
+            line: definition.cursor.line,
+            ch: definition.cursor.ch + body.length,
+        },
+    };
+}

@@ -51,6 +51,17 @@ Two commands cover Obsidian's inline `^[...]` style:
 
 <!-- GIF: inline footnote typed, then a clipboard paste -->
 
+### Turn selected text into a footnote
+
+Wrote something mid-sentence that really belongs in a footnote? Select it and press a footnote hotkey:
+
+- The **auto-numbered** hotkey replaces the selection with the next reference and moves the selected text into that footnote's definition, ready to edit.
+- The **inline** hotkey wraps the selection as `^[...]` right where it is.
+
+Selections work one line at a time, and any stray spaces at the edges of the selection stay in your sentence.
+
+<!-- GIF: select a clause, press hotkey, clause becomes a footnote -->
+
 ## Navigating footnotes
 
 The insert hotkeys double as navigation. What they do depends on where your cursor is:

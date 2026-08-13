@@ -25,6 +25,7 @@ import {
     navigateDefinitionLabelIfInside,
     warnProtectedCaretIfInside,
 } from "./press-guards";
+import { selectionPressHandled } from "./selection-footnote";
 import { activeTableCellEditor, resolveTableCellCursor, runOutsideTableCell, TableCellEditor } from "../editor/table-cursor";
 
 // The command entry points: each press walks the same decision cascade
@@ -88,6 +89,10 @@ export async function insertAutonumFootnote(plugin: FootnotePlugin) {
         // table — reads use the resolved position, writes go through the cell
         const cell = activeTableCellEditor(doc);
         const run = (cursorPosition: EditorPosition) => {
+            // a live selection claims the press before any caret guard —
+            // converting it is what the press MEANS then (issue #35)
+            if (selectionPressHandled(plugin, doc, cell, "autonum", cursorPosition))
+                return;
             // guards run INSIDE run(): the sub-editor fallback resolves the
             // real caret first (2026-08-11 review bug #9)
             if (caretGuardsHandled(plugin, doc, cell, cursorPosition)) return;
@@ -123,6 +128,10 @@ export async function insertNamedFootnote(plugin: FootnotePlugin) {
         // table — reads use the resolved position, writes go through the cell
         const cell = activeTableCellEditor(doc);
         const run = (cursorPosition: EditorPosition) => {
+            // a selection redirects to the auto-numbered/inline keys — the
+            // named flow's second press can't carry a body (issue #35)
+            if (selectionPressHandled(plugin, doc, cell, "named", cursorPosition))
+                return;
             // guards run INSIDE run() — same rationale as the autonum command
             if (caretGuardsHandled(plugin, doc, cell, cursorPosition)) return;
             const lineText = doc.getLine(cursorPosition.line);
@@ -233,6 +242,9 @@ function insertInlineText(
 export async function insertInlineFootnote(plugin: FootnotePlugin) {
     await withEditableEditor(plugin, (doc) => {
         const cell = activeTableCellEditor(doc);
+        // a live selection claims the press: it becomes "^[…]" in place
+        // (issue #35)
+        if (selectionPressHandled(plugin, doc, cell, "inline")) return;
         if (caretGuardsHandled(plugin, doc, cell)) return;
         // inside a definition label, jump back like the other footnote keys
         if (navigateDefinitionLabelIfInside(plugin, doc, cell)) return;
@@ -252,6 +264,10 @@ export async function insertInlineFootnote(plugin: FootnotePlugin) {
 export async function pasteInlineFootnote(plugin: FootnotePlugin) {
     await withEditableEditor(plugin, async (doc) => {
         const pasteCell = activeTableCellEditor(doc);
+        // a selection redirects to the auto-numbered/inline keys — the
+        // clipboard already carries this key's body (issue #35); before the
+        // clipboard await, like the guards below
+        if (selectionPressHandled(plugin, doc, pasteCell, "paste")) return;
         // the same guards every other insert command runs (missed here until
         // the 2026-08-07 QOL sweep; pinned by test/paste-inline-in-inline.test.ts)
         if (caretGuardsHandled(plugin, doc, pasteCell)) return;

@@ -54,6 +54,22 @@ Insert a numbered footnote into this sentence, put the caret back INSIDE its `[^
 - [ ] Type a bare `[^tag]` by hand, caret inside, inline hotkey → the definition is created like the named hotkey would
 - [ ] The paste-inline hotkey navigates the same way, and the clipboard stays untouched for the next real paste
 
+## Selection becomes a footnote (issue #35, 2026-08-12)
+
+Select text first, then press a footnote hotkey — the selection converts instead of inserting at the caret. Always on, single-line selections only.
+
+- [ ] Select a few words in this sentence and press the NUMBERED hotkey: the selection is replaced by `[^N]` and the selected text becomes that footnote's definition body at the bottom (popup shows it pre-filled when the popup setting is on; otherwise the caret jumps to the end of the body)
+- [ ] Select a few words and press the INLINE hotkey: the selection becomes `^[the words]` in place, caret after the closing bracket
+- [ ] Select with an extra space at either end (drag sloppily): the spaces stay in the prose, only the trimmed words move into the footnote
+- [ ] Select a whole line by dragging through the newline (caret ends at the start of the next line): the whole line still converts
+- [ ] Select across TWO lines: a toast asks for a single-line selection, nothing changes
+- [ ] Select something and press the NAMED hotkey: a toast redirects to the numbered/inline keys, nothing changes
+- [ ] Same for the paste-inline hotkey (and the clipboard is not read)
+- [ ] Select text inside the `inline code span` here, or inside the code block above: the protected-text toast appears, nothing changes
+- [ ] Select only whitespace: the press behaves like a normal insert at the caret
+- [ ] In a table cell with cell editing active, selecting a word and pressing the inline hotkey wraps it inside the cell; the numbered hotkey replaces it with `[^N]` and the pre-filled definition lands below the table
+- [ ] Undo (Ctrl+Z) after a conversion restores the selected text in one step
+
 ## Existing heading claims the first footnote (QOL)
 
 Turn on `Enable section heading` (heading `# Footnotes`), then insert a footnote into this sentence.

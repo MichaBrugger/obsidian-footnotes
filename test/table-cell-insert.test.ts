@@ -19,7 +19,7 @@ function fakeCell(text: string, head: number) {
     const cell: TableCellEditor = {
         state: {
             doc: { toString: () => text },
-            selection: { main: { head } },
+            selection: { main: { head, anchor: head } },
         },
         dispatch: (spec) => {
             dispatched.push(spec);
@@ -38,7 +38,7 @@ describe("insertInTableCell", () => {
         const { cell, dispatched } = fakeCell("Dolor ", 3);
         insertInTableCell(cell, fakePlugin(false), "[^]", 2);
         expect(dispatched).toEqual([
-            { changes: { from: 3, insert: "[^]" }, selection: { anchor: 5 } },
+            { changes: { from: 3, to: 3, insert: "[^]" }, selection: { anchor: 5 } },
         ]);
     });
 
@@ -46,7 +46,7 @@ describe("insertInTableCell", () => {
         const { cell, dispatched } = fakeCell("Dolor sit", 2);
         insertInTableCell(cell, fakePlugin(true), "[^]", 2);
         expect(dispatched).toEqual([
-            { changes: { from: 5, insert: "[^]" }, selection: { anchor: 7 } },
+            { changes: { from: 5, to: 5, insert: "[^]" }, selection: { anchor: 7 } },
         ]);
     });
 
@@ -55,7 +55,7 @@ describe("insertInTableCell", () => {
         const { cell, dispatched } = fakeCell("Dolor ", 6);
         insertInTableCell(cell, fakePlugin(true), "[^]", 2);
         expect(dispatched).toEqual([
-            { changes: { from: 6, insert: "[^]" }, selection: { anchor: 8 } },
+            { changes: { from: 6, to: 6, insert: "[^]" }, selection: { anchor: 8 } },
         ]);
     });
 

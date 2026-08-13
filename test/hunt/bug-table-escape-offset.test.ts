@@ -31,7 +31,7 @@ function fakeResolution(
     const cellView: TableCellEditor = {
         state: {
             doc: { toString: () => cellText },
-            selection: { main: { head } },
+            selection: { main: { head, anchor: head } },
         },
         dispatch() {},
     };
@@ -97,7 +97,7 @@ describe("table source-to-cell offset accounts for escape bytes (fixed 2026-08-1
         const cellView: TableCellEditor = {
             state: {
                 doc: { toString: () => "left | [^note]" },
-                selection: { main: { head: 8 } },
+                selection: { main: { head: 8, anchor: 8 } },
             },
             dispatch(spec) {
                 cellChanges.push(spec);

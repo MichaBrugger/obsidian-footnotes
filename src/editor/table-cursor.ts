@@ -19,7 +19,9 @@ import { EditorWithCm } from "./obsidian-internals";
 export interface TableCellEditor {
     state: {
         doc: { toString(): string };
-        selection: { main: { head: number } };
+        // anchor ≠ head is a live selection inside the cell — the
+        // selection-to-footnote conversion (issue #35) replaces that range
+        selection: { main: { head: number; anchor: number } };
     };
     dispatch(spec: {
         changes?: { from: number; to?: number; insert: string };

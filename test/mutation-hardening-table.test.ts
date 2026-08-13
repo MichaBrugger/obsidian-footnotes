@@ -77,7 +77,7 @@ describe("activeTableCellEditor", () => {
     // returns a fabricated view.
     it("returns null when the focused element is contentDOM itself, even if it self-contains", () => {
         const fakeView: TableCellEditor = {
-            state: { doc: { toString: () => "" }, selection: { main: { head: 0 } } },
+            state: { doc: { toString: () => "" }, selection: { main: { head: 0, anchor: 0 } } },
             dispatch() {},
         };
         const contentDOM: {
@@ -113,7 +113,7 @@ describe("activeTableCellEditor", () => {
             contains: () => false,
         };
         const fakeView: TableCellEditor = {
-            state: { doc: { toString: () => "" }, selection: { main: { head: 0 } } },
+            state: { doc: { toString: () => "" }, selection: { main: { head: 0, anchor: 0 } } },
             dispatch() {},
         };
         class ViewClass {
@@ -136,7 +136,7 @@ describe("activeTableCellEditor", () => {
             contains: () => true,
         };
         const fakeView: TableCellEditor = {
-            state: { doc: { toString: () => "" }, selection: { main: { head: 0 } } },
+            state: { doc: { toString: () => "" }, selection: { main: { head: 0, anchor: 0 } } },
             dispatch() {},
         };
         class ViewClass {
@@ -194,7 +194,7 @@ describe("activeTableCellEditor", () => {
             contains: () => true,
         };
         const fakeView: TableCellEditor = {
-            state: { doc: { toString: () => "x" }, selection: { main: { head: 0 } } },
+            state: { doc: { toString: () => "x" }, selection: { main: { head: 0, anchor: 0 } } },
             dispatch() {},
         };
         class ViewClass {
@@ -268,7 +268,7 @@ describe("resolveTableCellCursor (mutation hardening)", () => {
                 return {
                     state: {
                         doc: { toString: () => cellText },
-                        selection: { main: { head } },
+                        selection: { main: { head, anchor: head } },
                     },
                     dispatch() {},
                 };
@@ -403,7 +403,7 @@ describe("resolveTableCellCursor (mutation hardening)", () => {
         const contains = () => true;
         contentDOM = { ownerDocument: { activeElement: active }, contains };
         const fakeView: TableCellEditor = {
-            state: { doc: { toString: () => "" }, selection: { main: { head: 0 } } },
+            state: { doc: { toString: () => "" }, selection: { main: { head: 0, anchor: 0 } } },
             dispatch() {},
         };
         class ViewClass {

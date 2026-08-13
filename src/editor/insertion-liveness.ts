@@ -45,22 +45,25 @@ export function safeInsertionCh(lineText: string, ch: number): number {
 }
 
 /**
- * The caret line's masked twin AFTER inserting `insert` at `position` —
- * the liveness oracle for single-change insertions: an insertion can
- * COMPLETE a construct around it and be masked into it at birth ("$…$"
- * whose content previously had a space edge is the found case —
- * command-press property suite, 2026-08-12). Simulated against the whole
- * document so multi-line region state is honored.
+ * The caret line's masked twin AFTER replacing `[position.ch, toCh)` with
+ * `insert` (a plain insertion when `toCh` is omitted) — the liveness
+ * oracle for single-change edits: an insertion can COMPLETE a construct
+ * around it and be masked into it at birth ("$…$" whose content
+ * previously had a space edge is the found case — command-press property
+ * suite, 2026-08-12), and a selection REPLACEMENT (issue #35) can
+ * additionally un-close a construct whose closer it deletes. Simulated
+ * against the whole document so multi-line region state is honored.
  */
 export function simulatedMaskedLine(
     doc: Editor,
     position: EditorPosition,
     insert: string,
+    toCh: number = position.ch,
 ): string {
     const lines = docLines(doc);
     const lineText = lines[position.line];
     lines[position.line] =
-        lineText.slice(0, position.ch) + insert + lineText.slice(position.ch);
+        lineText.slice(0, position.ch) + insert + lineText.slice(toCh);
     return maskedLineAt(lines, position.line);
 }
 

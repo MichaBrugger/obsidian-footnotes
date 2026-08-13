@@ -21,6 +21,7 @@ function fakeEditor(line: string, ch: number): FakeDoc {
         appliedChanges: [] as EditorChange[],
         cursor: { line: 0, ch },
         getCursor: () => doc.cursor,
+        listSelections: () => [{ anchor: doc.cursor, head: doc.cursor }],
         getLine: () => line,
         lineCount: () => 1,
         setCursor(pos: EditorPosition) {

@@ -65,24 +65,49 @@ export function insertInTableCell(
             ? endOfWordOffset(cellText, head)
             : head,
     );
-    // the insertion can COMPLETE a construct around it and be masked into
-    // it at birth — "$…$" pairing is the found case (command-press
-    // property suite, 2026-08-12); cell text is a single line, so
-    // line-local masking decides
-    const simulatedCell = cellText.slice(0, at) + text + cellText.slice(at);
+    return dispatchCellEditIfLive(cell, text, at, at, caretOffsetInText);
+}
+
+/** Replace `[from, to)` of an actively edited table cell with `text` — the selection-to-footnote conversion's cell writer (issue #35). Same liveness refusal contract as insertInTableCell; the replaced range is the cell's own selection, so no end-of-word adjustment applies. */
+export function replaceInTableCell(
+    cell: TableCellEditor,
+    text: string,
+    from: number,
+    to: number,
+    caretOffsetInText: number,
+): boolean {
+    return dispatchCellEditIfLive(cell, text, from, to, caretOffsetInText);
+}
+
+// The shared cell write: refuse born-dead text, else dispatch through the
+// cell's own editor (never the main editor — that races the cell's
+// sync-back and corrupts the table) with the caret left inside the edit.
+function dispatchCellEditIfLive(
+    cell: TableCellEditor,
+    text: string,
+    from: number,
+    to: number,
+    caretOffsetInText: number,
+): boolean {
+    const cellText = cell.state.doc.toString();
+    // the edit can COMPLETE a construct around it and be masked into it at
+    // birth — "$…$" pairing is the found case (command-press property
+    // suite, 2026-08-12); cell text is a single line, so line-local
+    // masking decides
+    const simulatedCell = cellText.slice(0, from) + text + cellText.slice(to);
     const maskedCell = maskInlineRegions(simulatedCell);
     const live = text.startsWith("^[")
         ? // pasted content may carry its own inline code (masked inside the
           // brackets) — the inline SPAN surviving is what matters
-          inlineFootnoteSpanAt(maskedCell, at + 2)?.open === at
-        : maskedCell.slice(at, at + text.length) === text;
+          inlineFootnoteSpanAt(maskedCell, from + 2)?.open === from
+        : maskedCell.slice(from, from + text.length) === text;
     if (!live) {
         new Notice(ProtectedCreationNotice, 8000);
         return false;
     }
     cell.dispatch({
-        changes: { from: at, insert: text },
-        selection: { anchor: at + caretOffsetInText },
+        changes: { from, to, insert: text },
+        selection: { anchor: from + caretOffsetInText },
     });
     return true;
 }
@@ -111,8 +136,10 @@ function scheduleCreationLintAfterPopup(plugin: FootnotePlugin): () => void {
  * instead — and there a popup that failed AFTER its DOM existed is still
  * settling its teardown save, so an immediate lint would no-op behind the
  * busy gate; the settle-deferred lint registered here fires instead (E32).
+ * Exported for the selection-to-footnote conversion (issue #35), whose
+ * autonum flavor hands off to the popup the same way.
  */
-function openPopupForNewDefinition(
+export function openPopupForNewDefinition(
     plugin: FootnotePlugin,
     doc: Editor,
     cursorPosition: EditorPosition,

@@ -45,8 +45,14 @@ The suite has three kinds of files:
   colliding, fresh, or invalid — re-press for the definition, type its
   body), the inline cycle (plant `^[]`, type a body, re-press hops out or
   warns while empty), and paste with arbitrary `fc.string` clipboard
-  content through the whole command. Popup, table cells, and Reading view
-  stay smoke-suite territory.
+  content through the whole command. SELECTION conversions (issue #35) are
+  fuzzed with random single-line spans (reversed, whitespace-edged, empty):
+  a conversion moves EXACTLY the trimmed selected text into the footnote
+  and keeps the line's prefix/suffix, named/paste redirect without
+  editing, multi-line selections warn and edit nothing, and protected
+  lines survive conversion presses untouched. Popup, table cells, and
+  Reading view stay smoke-suite territory (the cell conversion writer has
+  deterministic pins in `test/selection-to-footnote.test.ts`).
 
 Properties run 200 cases each by default. Before a release, soak them:
 

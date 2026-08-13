@@ -3,7 +3,12 @@ import fc from "fast-check";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { docArb } from "./arbitraries";
+import { noticeCalls } from "./mocks/obsidian";
 import FootnotePlugin from "../src/main";
+import {
+    SelectionCommandNotice,
+    SelectionSpanNotice,
+} from "../src/commands/selection-footnote";
 import { isValidFootnoteName } from "../src/parsing/footnote-grammar";
 import {
     inlineFootnoteSpanAt,
@@ -72,11 +77,19 @@ function applyChanges(lines: string[], changes: EditorChange[]): string[] {
     return out.split("\n");
 }
 
-function pressEditor(lines: string[], cursor: EditorPosition): PressDoc {
+function pressEditor(
+    lines: string[],
+    cursor: EditorPosition,
+    // a live selection for the conversion properties (issue #35); the
+    // caret-press properties leave it collapsed
+    selection?: { anchor: EditorPosition; head: EditorPosition },
+): PressDoc {
     const doc = {
         lines: lines.slice(),
         cursor,
         getCursor: () => doc.cursor,
+        listSelections: () =>
+            selection ? [selection] : [{ anchor: doc.cursor, head: doc.cursor }],
         getLine: (n: number) => doc.lines[n],
         getValue: () => doc.lines.join("\n"),
         lineCount: () => doc.lines.length,
@@ -522,6 +535,189 @@ describe("creation-command invariants over random documents", () => {
                     } finally {
                         clipboardText = "generated clipboard text";
                     }
+                },
+            ),
+        );
+    });
+
+    // ---------- selection conversion (issue #35) ----------
+
+    // a random single-line selection: anchor/head on one generated line,
+    // possibly reversed, possibly empty or whitespace-only (both fall
+    // through to the caret cascade)
+    const selectionPressArb = fc
+        .tuple(
+            docArb,
+            fc.nat(1000),
+            fc.nat(1000),
+            fc.nat(30),
+            fc.boolean(),
+            settingsArb,
+        )
+        .map(([doc, linePick, chPick, lenPick, reversed, settings]) => {
+            const lines = normalizeEol(doc).text.split("\n");
+            const line = linePick % lines.length;
+            const a = chPick % (lines[line].length + 1);
+            const b = Math.min(a + (lenPick % 25), lines[line].length);
+            const [anchorCh, headCh] = reversed ? [b, a] : [a, b];
+            return {
+                lines,
+                span: { line, from: a, to: b },
+                selection: {
+                    anchor: { line, ch: anchorCh },
+                    head: { line, ch: headCh },
+                },
+                settings,
+            };
+        });
+
+    /** The trimmed core `[from, to)` of the span, exactly as the conversion shrinks it. */
+    function trimmedSpan(lineText: string, from: number, to: number) {
+        while (from < to && /\s/.test(lineText[from])) from++;
+        while (to > from && /\s/.test(lineText[to - 1])) to--;
+        return { from, to };
+    }
+
+    soakIt("converting a selection moves EXACTLY the selected text", async () => {
+        await fc.assert(
+            fc.asyncProperty(
+                selectionPressArb,
+                fc.constantFrom<CommandName>("autonum", "inline"),
+                async ({ lines, span, selection, settings }, command) => {
+                    const lineBefore = lines[span.line];
+                    const { from, to } = trimmedSpan(lineBefore, span.from, span.to);
+                    const protectedBefore = scanDocument(lines).isProtected;
+                    noticeCalls.length = 0;
+                    const doc = pressEditor(
+                        lines,
+                        { line: span.line, ch: span.from },
+                        selection,
+                    );
+                    await COMMANDS[command](fakePlugin(doc, settings));
+                    // protected text is never edited, converted or not —
+                    // same multiset conservation as the caret presses
+                    const counts = new Map<string, number>();
+                    for (const line of doc.lines) {
+                        counts.set(line, (counts.get(line) ?? 0) + 1);
+                    }
+                    for (let i = 0; i < lines.length; i++) {
+                        if (!protectedBefore[i]) continue;
+                        const left = counts.get(lines[i]) ?? 0;
+                        expect(
+                            left,
+                            `protected line lost: ${JSON.stringify(lines[i])}`,
+                        ).toBeGreaterThan(0);
+                        counts.set(lines[i], left - 1);
+                    }
+                    // an empty/whitespace-only selection falls through to
+                    // the caret cascade — the other properties own that
+                    if (from === to) return;
+                    if (doc.lines.join("\n") === lines.join("\n")) {
+                        // a refusal always explains itself
+                        expect(noticeCalls.length).toBeGreaterThan(0);
+                        return;
+                    }
+                    // converted: the selection line keeps its prefix and
+                    // suffix, and ONLY the trimmed span became the footnote.
+                    // The rare frontmatter-pinning prepend shifts every line
+                    // down by one — accept either position.
+                    const prefix = lineBefore.slice(0, from);
+                    const suffix = lineBefore.slice(to);
+                    const selText = lineBefore.slice(from, to);
+                    const candidates = [doc.lines[span.line], doc.lines[span.line + 1]];
+                    const changedLine = candidates.find(
+                        (l) =>
+                            l !== undefined &&
+                            l.startsWith(prefix) &&
+                            l.endsWith(suffix) &&
+                            l.length >= prefix.length + suffix.length,
+                    );
+                    expect(
+                        changedLine,
+                        `no converted line kept prefix+suffix of ${JSON.stringify(lineBefore)}`,
+                    ).toBeDefined();
+                    const middle = (changedLine as string).slice(
+                        prefix.length,
+                        (changedLine as string).length - suffix.length,
+                    );
+                    if (command === "inline") {
+                        expect(middle).toBe(
+                            `^[${sanitizeInlineFootnoteContent(selText)}]`,
+                        );
+                    } else {
+                        const reference = /^\[\^([^\]]+)\]$/.exec(middle);
+                        expect(
+                            reference,
+                            `autonum conversion left ${JSON.stringify(middle)} in place`,
+                        ).not.toBeNull();
+                        expect(doc.lines.join("\n")).toContain(
+                            `[^${(reference as RegExpExecArray)[1]}]: ${selText}`,
+                        );
+                    }
+                },
+            ),
+        );
+    });
+
+    soakIt("the named and paste keys REDIRECT on a selection, never edit", async () => {
+        await fc.assert(
+            fc.asyncProperty(
+                selectionPressArb,
+                fc.constantFrom<CommandName>("named", "paste"),
+                async ({ lines, span, selection, settings }, command) => {
+                    const { from, to } = trimmedSpan(
+                        lines[span.line],
+                        span.from,
+                        span.to,
+                    );
+                    if (from === to) return; // falls through to the cascade
+                    noticeCalls.length = 0;
+                    const doc = pressEditor(
+                        lines,
+                        { line: span.line, ch: span.from },
+                        selection,
+                    );
+                    await COMMANDS[command](fakePlugin(doc, settings));
+                    expect(doc.lines.join("\n")).toBe(lines.join("\n"));
+                    expect(
+                        noticeCalls.some(
+                            (args) => args[0] === SelectionCommandNotice,
+                        ),
+                    ).toBe(true);
+                },
+            ),
+        );
+    });
+
+    soakIt("a multi-line selection warns and edits nothing (all four keys)", async () => {
+        await fc.assert(
+            fc.asyncProperty(
+                pressArb,
+                fc.nat(1000),
+                fc.nat(1000),
+                async ({ lines, cursor, command, settings }, linePick, chPick) => {
+                    if (lines.length < 2) return;
+                    const l2 = cursor.line === lines.length - 1
+                        ? cursor.line - 1
+                        : cursor.line + 1;
+                    const [first, second] =
+                        cursor.line < l2
+                            ? [cursor, { line: l2, ch: chPick % (lines[l2].length + 1) }]
+                            : [{ line: l2, ch: chPick % (lines[l2].length + 1) }, cursor];
+                    // a drag ending at ch 0 of the very next line converts
+                    // as a full-line selection — that's the one exception
+                    if (second.line === first.line + 1 && second.ch === 0) return;
+                    const reversed = linePick % 2 === 1;
+                    const selection = reversed
+                        ? { anchor: second, head: first }
+                        : { anchor: first, head: second };
+                    noticeCalls.length = 0;
+                    const doc = pressEditor(lines, cursor, selection);
+                    await COMMANDS[command](fakePlugin(doc, settings));
+                    expect(doc.lines.join("\n")).toBe(lines.join("\n"));
+                    expect(
+                        noticeCalls.some((args) => args[0] === SelectionSpanNotice),
+                    ).toBe(true);
                 },
             ),
         );

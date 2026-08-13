@@ -23,6 +23,7 @@ function fakeEditor(lines: string[], cursor: EditorPosition): FakeDoc {
         appliedChanges: [] as EditorChange[],
         cursor,
         getCursor: () => doc.cursor,
+        listSelections: () => [{ anchor: doc.cursor, head: doc.cursor }],
         getLine: (n: number) => lines[n],
         wordAt: () => null,
         getValue: () => lines.join("\n"),
