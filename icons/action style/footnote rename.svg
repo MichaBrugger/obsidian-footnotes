@@ -24,7 +24,7 @@
      inkscape:deskcolor="#505050"
      showgrid="true"
      inkscape:zoom="32"
-     inkscape:cx="10.9375"
+     inkscape:cx="10.90625"
      inkscape:cy="13.421875"
      inkscape:window-width="1920"
      inkscape:window-height="991"
@@ -49,8 +49,9 @@
      id="layer3"><g
        id="g26"><path
          style="display:inline;fill:none;stroke:#000000;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none;stroke-opacity:1"
-         d="M 19,21 V 13"
-         id="path8" /><path
+         d="M 19,20 V 13"
+         id="path8"
+         sodipodi:nodetypes="cc" /><path
          d="m 22,18 -3,3 -3,-3"
          id="path7"
          style="display:inline;fill:none;stroke:#000000;stroke-width:2;stroke-linecap:round;stroke-linejoin:round" /><path
