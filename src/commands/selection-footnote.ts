@@ -46,6 +46,11 @@ export const SelectionCommandNotice =
     "To turn the selected text into a footnote, use the auto-numbered, named, or inline footnote command.";
 export const SelectionChangedNotice =
     "The note changed while naming the footnote. Reselect the text and try again.";
+// distinct from ProtectedCreationNotice on purpose (Jason's manual pass,
+// 2026-08-13): here the caret isn't INSIDE protected text — the selected
+// text CONTAINS some, and the footnote body can't carry it
+export const ProtectedSelectionNotice =
+    "No footnote was created: footnotes can't contain code, math, or other protected text.";
 
 export type FootnoteCommandKind = "autonum" | "named" | "inline" | "paste";
 
@@ -88,7 +93,7 @@ export function selectionPressHandled(
         // eats a delimiter can make a live result out of destroying the
         // construct (see the main-editor twin below)
         if (maskInlineRegions(cellText).slice(from, to).includes("\0")) {
-            new Notice(ProtectedCreationNotice, 8000);
+            new Notice(ProtectedSelectionNotice, 8000);
             return true;
         }
         const text = cellText.slice(from, to);
@@ -149,7 +154,7 @@ export function selectionPressHandled(
         ctx.scan.isProtected[resolved.from.line] ||
         ctx.maskedLine(resolved.from.line).slice(fromCh, toCh).includes("\0")
     ) {
-        new Notice(ProtectedCreationNotice, 8000);
+        new Notice(ProtectedSelectionNotice, 8000);
         return true;
     }
     const selection = {

@@ -297,16 +297,25 @@ export async function openFootnotePopup(
     };
     doc.addEventListener("mousedown", onDocMouseDown, true);
 
-    // bubble phase, so the embedded editor (e.g. vim mode leaving insert
-    // mode) gets first claim on Escape — and when it TOOK the key
-    // (defaultPrevented: vim left insert mode), the popup must stay open
-    // instead of also closing on the same press (E28)
-    containerEl.addEventListener("keydown", (evt: KeyboardEvent) => {
-        if (evt.key === "Escape" && !evt.defaultPrevented) {
+    // CAPTURE phase, reading the vim state directly: the embedded editor
+    // preventDefaults EVERY Escape (not just vim's), so the old bubble-
+    // phase defaultPrevented check never closed the popup at all —
+    // regression from the E28 cleanup, caught by the A3 manual pass
+    // (2026-08-13). E28's actual rule survives by asking vim itself: an
+    // editor still in INSERT mode keeps the key (leaving insert must not
+    // also close); anything else means "close me".
+    containerEl.addEventListener(
+        "keydown",
+        (evt: KeyboardEvent) => {
+            if (evt.key !== "Escape") return;
+            const inner = embed.editMode?.editor as EditorWithCm | undefined;
+            if (inner?.cm?.cm?.state?.vim?.insertMode) return;
             evt.preventDefault();
+            evt.stopPropagation();
             close(true);
-        }
-    });
+        },
+        true,
+    );
 
     // from here on, closing must also tear the DOM and the embed down
     domTeardown = (focusEditor: boolean) => {

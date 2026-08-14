@@ -22,8 +22,8 @@ interface ObsidianEditorView {
     posAtDOM?(node: Node): number;
     contentDOM: HTMLElement;
     focus(): void;
-    /** CM5-compatibility editor attached by the vim extension ("cm two levels deep"). */
-    cm?: unknown;
+    /** CM5-compatibility editor attached by the vim extension ("cm two levels deep"). `state.vim.insertMode` is how the popup's Escape handling tells "leave insert mode" apart from "close me" — the editor preventDefaults EVERY Escape, so event state can't (2026-08-13). */
+    cm?: { state?: { vim?: { insertMode?: boolean } } };
 }
 
 export interface EditorWithCm extends Editor {

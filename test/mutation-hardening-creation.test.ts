@@ -12,6 +12,7 @@ import {
     replaceInTableCell,
 } from "../src/commands/create-footnote";
 import {
+    ProtectedSelectionNotice,
     selectionPressHandled,
     SelectionCommandNotice,
     SelectionSpanNotice,
@@ -773,7 +774,7 @@ describe("the cell selection claim", () => {
             selectionPressHandled(fakePlugin(doc), doc, cell, "inline"),
         ).toBe(true);
         expect(dispatched).toEqual([]);
-        expect(noticed(ProtectedCreationNotice)).toBe(true);
+        expect(noticed(ProtectedSelectionNotice)).toBe(true);
     });
 });
 
@@ -805,7 +806,7 @@ describe("the main-editor selection claim", () => {
             selectionPressHandled(fakePlugin(doc), doc, null, "inline"),
         ).toBe(true);
         expect(doc.lines).toEqual(before);
-        expect(noticed(ProtectedCreationNotice)).toBe(true);
+        expect(noticed(ProtectedSelectionNotice)).toBe(true);
     });
 
     // L132 MethodExpression (the `.slice(fromCh, toCh)` dropped): code

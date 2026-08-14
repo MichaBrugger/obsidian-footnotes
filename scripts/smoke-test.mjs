@@ -742,6 +742,30 @@ async function main() {
         }
     });
 
+    await test("Escape closes the popup (regression 2026-08-13)", async () => {
+        // the embedded editor preventDefaults every Escape, so the old
+        // defaultPrevented-based close never fired — caught by Jason's A3
+        // manual pass; the fix reads the vim state directly in capture phase
+        resetSettings({ enablePopupEditor: true });
+        await setupNote("Alpha bravo charlie");
+        setCursorAndRun(0, 8, CMD_AUTONUM);
+        await pollUntil(
+            "popup open and focused",
+            `(() => { const p = document.querySelector('.footnote-shortcut-popup');
+                return !!(p && p.contains(document.activeElement)); })()`,
+            (v) => v === true,
+        );
+        action(
+            `document.activeElement.dispatchEvent(new KeyboardEvent('keydown', ` +
+            `{key:'Escape', code:'Escape', bubbles:true, cancelable:true}));`,
+        );
+        await pollUntil(
+            "popup closed by Escape",
+            `!document.querySelector('.footnote-shortcut-popup')`,
+            (v) => v === true,
+        );
+    });
+
     await test("a selection + the named key names the footnote through a modal", async () => {
         // issue #35's named flavor (2026-08-13): the named flow's usual
         // second press can't carry a body statelessly, so a selection press

@@ -12,6 +12,7 @@ import {
 } from "../src/commands/insert-or-navigate-footnotes";
 import {
     convertCellSelectionToNamed,
+    ProtectedSelectionNotice,
     convertSelectionToNamed,
     selectionPressHandled,
     SelectionChangedNotice,
@@ -368,7 +369,7 @@ describe("selections that refuse", () => {
         });
         await insertAutonumFootnote(fakePlugin(doc));
         expect(doc.lines).toEqual(before);
-        expect(noticed(ProtectedCreationNotice)).toBe(true);
+        expect(noticed(ProtectedSelectionNotice)).toBe(true);
     });
 
     it("a selection inside a fenced code block refuses (inline)", async () => {
@@ -379,7 +380,7 @@ describe("selections that refuse", () => {
         });
         await insertInlineFootnote(fakePlugin(doc));
         expect(doc.lines).toEqual(before);
-        expect(noticed(ProtectedCreationNotice)).toBe(true);
+        expect(noticed(ProtectedSelectionNotice)).toBe(true);
     });
 
     it("selecting part of a fence DELIMITER refuses (found by the conversion property)", async () => {
@@ -394,7 +395,7 @@ describe("selections that refuse", () => {
         });
         await insertInlineFootnote(fakePlugin(doc));
         expect(doc.lines).toEqual(before);
-        expect(noticed(ProtectedCreationNotice)).toBe(true);
+        expect(noticed(ProtectedSelectionNotice)).toBe(true);
     });
 
     it("selecting inside an inline code span refuses", async () => {
@@ -405,7 +406,7 @@ describe("selections that refuse", () => {
         });
         await insertAutonumFootnote(fakePlugin(doc));
         expect(doc.lines).toEqual(before);
-        expect(noticed(ProtectedCreationNotice)).toBe(true);
+        expect(noticed(ProtectedSelectionNotice)).toBe(true);
     });
 
     it("a replacement that would demote a quote and strand its own definition refuses", async () => {
@@ -496,7 +497,7 @@ describe("selections inside an actively edited table cell", () => {
             selectionPressHandled(fakePlugin(doc), doc, cell, "inline"),
         ).toBe(true);
         expect(dispatched).toEqual([]);
-        expect(noticed(ProtectedCreationNotice)).toBe(true);
+        expect(noticed(ProtectedSelectionNotice)).toBe(true);
     });
 
     it("the named key claims a cell selection for its modal, dispatching nothing yet", () => {
