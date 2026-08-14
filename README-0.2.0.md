@@ -8,37 +8,39 @@
 
 Create, navigate, and edit Obsidian footnotes with a single hotkey:
 
-- **One hotkey for everything**: insert a new footnote, or jump between a reference and its text
-- **Popup editor**: write the footnote right at your cursor, no scrolling to the bottom
+- **One hotkey for footnote creation/editing**: insert a new footnote, and jump between the footnote reference and its definition
+- **Popup editor**: edit the footnote right at your cursor, no scrolling to the bottom
 - **Auto-numbered, named, and inline** footnote styles
 - **Selection to footnote**: turn text you already wrote into a footnote in one press
 - **Rename a footnote** everywhere at once, like renaming a variable in a code editor
-- **Footnote linter**: renumber in reading order, gather definitions at the bottom, move references after punctuation
+- **Footnote linter** to keep footnotes tidy: renumber in reading order, gather definitions at the bottom, move references after punctuation
 - **Per-note prefixes** keep numbering unique across chapters of a larger document
 - Works on Obsidian Mobile
 
 <!-- GIF: hero. Press hotkey mid-sentence, popup opens at cursor, type the note, hotkey again to close -->
 
-## First things first: set up your hotkeys
+## FIRST: set up your hotkeys
 
 The plugin adds its commands **without hotkeys**, so assign your own right after installing. This is quick:
 
-`Settings → Hotkeys → search for "Footnote" → click the ⊕ next to a command → press your preferred keys`
+`Settings → Hotkeys → search for "Footnote Shortcut" → click the ⨁ next to a command → press your preferred keys`
 
-Of the plugin's seven commands, the four you'll press constantly deserve hotkeys. Here's what I use. Conveniently, they all sit next to each other at the end of the number row:
+Of the plugin's seven commands, the ones you'll press constantly deserve hotkeys. I personally use:
 
-| Command | Recommended hotkey |
-| --- | --- |
-| Insert / navigate auto-numbered footnote | <kbd>Alt</kbd>+<kbd>0</kbd> |
-| Insert / navigate named footnote | <kbd>Alt</kbd>+<kbd>-</kbd> |
-| Insert inline footnote | <kbd>Alt</kbd>+<kbd>=</kbd> |
-| Insert inline footnote from clipboard | <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>=</kbd> |
-
-The other three (**Rename footnote**, **Set footnote prefix**, and **Lint footnotes**) come up less often, so running them from the command palette works fine. Give them hotkeys too if they become part of your routine.
+| Command                                  | Recommended hotkey                           |
+| ---------------------------------------- | -------------------------------------------- |
+| Insert / navigate auto-numbered footnote | <kbd>Alt</kbd>+<kbd>0</kbd>                  |
+| Insert / navigate named footnote         | <kbd>Alt</kbd>+<kbd>-</kbd>                  |
+| Insert inline footnote                   | <kbd>Alt</kbd>+<kbd>=</kbd>                  |
+| Insert inline footnote from clipboard    | <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>=</kbd> |
 
 <!-- GIF or screenshot: assigning a hotkey in the Hotkeys settings tab -->
 
-Everything below also works from the command palette (<kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<kbd>P</kbd>) and, on mobile, from the toolbar.
+The other three (**Lint footnotes**, **Rename footnote**, and **Set footnote prefix**) come up less often, so running them from the command palette works fine. Give them hotkeys too if they become part of your routine.
+
+Everything also works from the command palette and on mobile from the toolbar.
+
+<!-- GIF or screenshot: mobile toolbar with footnote shortcut commands -->
 
 ## Creating footnotes
 
@@ -71,10 +73,10 @@ Two commands cover Obsidian's inline `^[...]` style:
 Sometimes you write something mid-sentence and realize it should be a footnote. Select it and press a footnote hotkey:
 
 - The **auto-numbered** hotkey replaces the selection with the next reference and moves the selected text into that footnote's definition.
-- The **named** hotkey asks for a name first, then does the same under `[^yourname]`.
+- The **named** hotkey asks you for a name first, then does the same under `[^yourname]`.
 - The **inline** hotkey wraps the selection as `^[...]` right where it is.
 
-Selections work one line at a time. Stray spaces at the edges of the selection stay in your sentence.
+Selections convert one line at a time.
 
 <!-- GIF: select a clause, press hotkey, clause becomes a footnote -->
 
@@ -82,8 +84,8 @@ Selections work one line at a time. Stray spaces at the edges of the selection s
 
 The insert hotkeys double as navigation. What they do depends on where your cursor is:
 
-- **On a reference** (inside `[^3]` in your text): jump to its note at the bottom. With the popup enabled, the note opens right there instead, and your cursor never moves.
-- **On a footnote's text at the bottom** (a `[^3]: …` line): jump back to where the reference is used in your text.
+- **On a footnote reference** (inside `[^3]` in your text): jump to its definition at the bottom. With the popup enabled, the note opens right there instead, and your cursor never moves.
+- **On a footnote definition at the bottom** (a `[^3]: …` line): jump back to where its reference is used in your text.
 - **Anywhere else**: insert a new footnote, as described above.
 
 One hotkey takes you back and forth between a reference and its note.
