@@ -11,5 +11,6 @@ The paragraph wants to move this aside for later readers.
 - [ ] INLINE hotkey on the same selection: it becomes `^[move this aside]` in place, caret after the bracket
 - [ ] Undo, select ` move this ` WITH the spaces: converting keeps both spaces in the sentence, only the words move
 - [ ] Select the whole line by dragging through the newline: the whole line still converts
-- [ ] NAMED hotkey with a selection: a toast redirects to the numbered/inline keys, nothing changes
-- [ ] Paste-inline hotkey with a selection: same redirect toast, and the clipboard is untouched
+- [ ] NAMED hotkey with a selection: a modal asks for the name; Enter creates `[^name]` with the selection as its definition, one undo reverts it all
+- [ ] In the modal: a name that's already defined, or one with a space, shows the reason inline and stays open; Escape cancels with nothing changed
+- [ ] Paste-inline hotkey with a selection: a toast redirects to the other keys, and the clipboard is untouched

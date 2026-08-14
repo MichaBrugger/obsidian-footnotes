@@ -130,8 +130,9 @@ export async function insertNamedFootnote(plugin: FootnotePlugin) {
         // table — reads use the resolved position, writes go through the cell
         const cell = activeTableCellEditor(doc);
         const run = (cursorPosition: EditorPosition) => {
-            // a selection redirects to the auto-numbered/inline keys — the
-            // named flow's second press can't carry a body (issue #35)
+            // a selection opens the name modal and converts under the typed
+            // name — the usual second press can't carry a body statelessly
+            // (issue #35; named flavor added 2026-08-13)
             if (selectionPressHandled(plugin, doc, cell, "named", cursorPosition))
                 return;
             // guards run INSIDE run() — same rationale as the autonum command

@@ -666,7 +666,7 @@ describe("creation-command invariants over random documents", () => {
         );
     });
 
-    soakIt("the named and paste keys REDIRECT on a selection, never edit", async () => {
+    soakIt("on a selection, paste REDIRECTS and named DEFERS to its modal — neither edits", async () => {
         await fc.assert(
             fc.asyncProperty(
                 selectionPressArb,
@@ -685,12 +685,24 @@ describe("creation-command invariants over random documents", () => {
                         selection,
                     );
                     await COMMANDS[command](fakePlugin(doc, settings));
+                    // the press itself never edits: paste explains itself,
+                    // named hands off to the name modal (whose submit is
+                    // covered by the deterministic pins — units can't
+                    // render it)
                     expect(doc.lines.join("\n")).toBe(lines.join("\n"));
-                    expect(
-                        noticeCalls.some(
-                            (args) => args[0] === SelectionCommandNotice,
-                        ),
-                    ).toBe(true);
+                    if (command === "paste") {
+                        expect(
+                            noticeCalls.some(
+                                (args) => args[0] === SelectionCommandNotice,
+                            ),
+                        ).toBe(true);
+                    } else {
+                        expect(
+                            noticeCalls.some(
+                                (args) => args[0] === SelectionCommandNotice,
+                            ),
+                        ).toBe(false);
+                    }
                 },
             ),
         );

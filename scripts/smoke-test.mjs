@@ -742,6 +742,35 @@ async function main() {
         }
     });
 
+    await test("a selection + the named key names the footnote through a modal", async () => {
+        // issue #35's named flavor (2026-08-13): the named flow's usual
+        // second press can't carry a body statelessly, so a selection press
+        // asks for the name in a modal and converts on Enter
+        resetSettings({ enablePopupEditor: false });
+        await setupNote("Alpha bravo charlie");
+        action(
+            `(() => { const v=${EDITOR}; ` +
+            `v.editor.setSelection({line:0,ch:6},{line:0,ch:11}); })();`,
+        );
+        action(`app.commands.executeCommandById('${CMD_NAMED}');`);
+        await pollUntil(
+            "name modal open",
+            `!!document.querySelector('.modal-container input')`,
+            (v) => v === true,
+        );
+        action(
+            `(() => { const input = document.querySelector('.modal-container input'); ` +
+            `input.value = 'brv'; input.dispatchEvent(new Event('input')); ` +
+            `input.dispatchEvent(new KeyboardEvent('keydown', {key:'Enter', bubbles:true})); })();`,
+        );
+        await pollUntil(
+            "selection converted under the typed name",
+            `(${EDITOR}).editor.getValue()`,
+            (v) => v === "Alpha [^brv] charlie\n\n[^brv]: bravo",
+            8000,
+        );
+    });
+
     await test("popup edits propagate live into the main editor (stock parity)", async () => {
         // DELIBERATE behavior (Jason, 2026-08-08): while the popup is open
         // it saves on the embed's own debounce, exactly like Obsidian's

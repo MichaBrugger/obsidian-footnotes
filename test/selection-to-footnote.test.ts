@@ -11,7 +11,10 @@ import {
     pasteInlineFootnote,
 } from "../src/commands/insert-or-navigate-footnotes";
 import {
+    convertCellSelectionToNamed,
+    convertSelectionToNamed,
     selectionPressHandled,
+    SelectionChangedNotice,
     SelectionCommandNotice,
     SelectionSpanNotice,
 } from "../src/commands/selection-footnote";
@@ -194,6 +197,109 @@ describe("the inline key converts a selection", () => {
     });
 });
 
+describe("the named key converts a selection through its modal (2026-08-13)", () => {
+    // the modal is thin wiring over convertSelectionToNamed — these drive
+    // the exported conversion the way its submit does
+    it("replaces the selection with [^name] and seeds the definition", () => {
+        const doc = fakeEditor(["The quick fox jumps"], { line: 0, ch: 4 });
+        const problem = convertSelectionToNamed(
+            fakePlugin(doc),
+            doc,
+            {
+                from: { line: 0, ch: 4 },
+                to: { line: 0, ch: 9 },
+                text: "quick",
+            },
+            "Speed2026",
+        );
+        expect(problem).toBeNull();
+        expect(doc.lines).toEqual([
+            "The [^Speed2026] fox jumps",
+            "",
+            "[^Speed2026]: quick",
+        ]);
+        expect(doc.cursor).toEqual({ line: 2, ch: "[^Speed2026]: quick".length });
+    });
+
+    it("healing an orphan: a name only dangling references carry is welcome", () => {
+        const doc = fakeEditor(["see [^lost] and quick brown"], { line: 0, ch: 16 });
+        const problem = convertSelectionToNamed(
+            fakePlugin(doc),
+            doc,
+            {
+                from: { line: 0, ch: 16 },
+                to: { line: 0, ch: 21 },
+                text: "quick",
+            },
+            "lost",
+        );
+        expect(problem).toBeNull();
+        expect(doc.lines).toEqual([
+            "see [^lost] and [^lost] brown",
+            "",
+            "[^lost]: quick",
+        ]);
+    });
+
+    it("refuses a name that is already DEFINED, inline", () => {
+        const before = ["The quick fox", "", "[^taken]: existing"];
+        const doc = fakeEditor(before, { line: 0, ch: 4 });
+        const problem = convertSelectionToNamed(
+            fakePlugin(doc),
+            doc,
+            { from: { line: 0, ch: 4 }, to: { line: 0, ch: 9 }, text: "quick" },
+            "Taken",
+        );
+        expect(problem).toBe('"[^Taken]" is already defined. Pick a new name.');
+        expect(doc.lines).toEqual(before);
+    });
+
+    it("refuses invalid names with the reason, inline", () => {
+        const doc = fakeEditor(["The quick fox"], { line: 0, ch: 4 });
+        const selection = {
+            from: { line: 0, ch: 4 },
+            to: { line: 0, ch: 9 },
+            text: "quick",
+        };
+        expect(
+            convertSelectionToNamed(fakePlugin(doc), doc, selection, "bad name"),
+        ).toBe("Footnote names can't contain spaces or backticks.");
+        expect(
+            convertSelectionToNamed(fakePlugin(doc), doc, selection, "a[b"),
+        ).toBe("Footnote names can't contain brackets.");
+        expect(doc.lines).toEqual(["The quick fox"]);
+    });
+
+    it("bails with a notice when the note changed under the open modal", () => {
+        const doc = fakeEditor(["The rapid fox"], { line: 0, ch: 4 });
+        const problem = convertSelectionToNamed(
+            fakePlugin(doc),
+            doc,
+            // captured before the note changed: the span no longer reads
+            // "quick"
+            { from: { line: 0, ch: 4 }, to: { line: 0, ch: 9 }, text: "quick" },
+            "fine",
+        );
+        expect(problem).toBeNull();
+        expect(doc.lines).toEqual(["The rapid fox"]);
+        expect(noticed(SelectionChangedNotice)).toBe(true);
+    });
+
+    it("refuses a born-dead conversion like autonum does", () => {
+        const before = ["> $$", "> quoted math[^75]"];
+        const doc = fakeEditor(before, { line: 0, ch: 0 });
+        const problem = convertSelectionToNamed(
+            fakePlugin(doc),
+            doc,
+            { from: { line: 0, ch: 0 }, to: { line: 0, ch: 1 }, text: ">" },
+            "dead",
+        );
+        expect(problem).toBeNull();
+        expect(doc.lines).toEqual(before);
+        expect(noticed(ProtectedCreationNotice)).toBe(true);
+    });
+});
+
 describe("selections that refuse", () => {
     it("a multi-line selection warns and edits nothing", async () => {
         const before = ["first line", "second line"];
@@ -219,7 +325,10 @@ describe("selections that refuse", () => {
         expect(noticed(SelectionSpanNotice)).toBe(true);
     });
 
-    it("the named key redirects instead of converting", async () => {
+    it("the named key claims the press for its name modal, editing nothing yet", async () => {
+        // the modal itself is DOM territory (smoke suite); in units the
+        // press must consume the selection silently and leave the document
+        // to the modal's submit
         const before = ["The quick fox"];
         const doc = fakeEditor(before, { line: 0, ch: 4 }, {
             anchor: { line: 0, ch: 4 },
@@ -227,7 +336,7 @@ describe("selections that refuse", () => {
         });
         await insertNamedFootnote(fakePlugin(doc));
         expect(doc.lines).toEqual(before);
-        expect(noticed(SelectionCommandNotice)).toBe(true);
+        expect(noticeCalls).toEqual([]);
     });
 
     it("the paste key redirects WITHOUT touching the clipboard", async () => {
@@ -390,13 +499,37 @@ describe("selections inside an actively edited table cell", () => {
         expect(noticed(ProtectedCreationNotice)).toBe(true);
     });
 
-    it("the named key redirects on a cell selection too", () => {
+    it("the named key claims a cell selection for its modal, dispatching nothing yet", () => {
         const { cell, dispatched } = fakeCell("plain word here", 6, 10);
         const doc = fakeEditor(["| plain word here |"], { line: 0, ch: 8 });
         expect(
             selectionPressHandled(fakePlugin(doc), doc, cell, "named"),
         ).toBe(true);
         expect(dispatched).toEqual([]);
-        expect(noticed(SelectionCommandNotice)).toBe(true);
+        expect(noticeCalls).toEqual([]);
+    });
+
+    it("the modal's submit converts the cell selection under the typed name", () => {
+        const { cell, dispatched } = fakeCell("plain word here", 6, 10);
+        const doc = fakeEditor(
+            ["| plain word here |", "| --- |", "| x |"],
+            { line: 0, ch: 8 },
+        );
+        const problem = convertCellSelectionToNamed(
+            fakePlugin(doc),
+            doc,
+            cell,
+            { from: 6, to: 10, text: "word" },
+            "src",
+            { line: 0, ch: 8 },
+        );
+        expect(problem).toBeNull();
+        expect(dispatched).toEqual([
+            {
+                changes: { from: 6, to: 10, insert: "[^src]" },
+                selection: { anchor: 6 + "[^src]".length },
+            },
+        ]);
+        expect(doc.lines[doc.lines.length - 1]).toBe("[^src]: word");
     });
 });

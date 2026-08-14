@@ -71,6 +71,7 @@ Two commands cover Obsidian's inline `^[...]` style:
 Sometimes you write something mid-sentence and realize it should be a footnote. Select it and press a footnote hotkey:
 
 - The **auto-numbered** hotkey replaces the selection with the next reference and moves the selected text into that footnote's definition.
+- The **named** hotkey asks for a name first, then does the same under `[^yourname]`.
 - The **inline** hotkey wraps the selection as `^[...]` right where it is.
 
 Selections work one line at a time. Stray spaces at the edges of the selection stay in your sentence.

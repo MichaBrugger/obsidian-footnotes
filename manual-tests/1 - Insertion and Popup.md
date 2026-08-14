@@ -60,6 +60,7 @@ Select text first, then press a footnote hotkey — the selection converts inste
 
 - [ ] Select a few words in this sentence and press the NUMBERED hotkey: the selection is replaced by `[^N]` and the selected text becomes that footnote's definition body at the bottom (popup shows it pre-filled when the popup setting is on; otherwise the caret jumps to the end of the body)
 - [ ] Select a few words and press the INLINE hotkey: the selection becomes `^[the words]` in place, caret after the closing bracket
+- [ ] Select a few words and press the NAMED hotkey: a modal asks for the name, and Enter creates `[^name]` with the selection as its definition (added 2026-08-13)
 - [ ] Select with an extra space at either end (drag sloppily): the spaces stay in the prose, only the trimmed words move into the footnote
 - [ ] Select a whole line by dragging through the newline (caret ends at the start of the next line): the whole line still converts
 - [ ] Select across TWO lines: a toast asks for a single-line selection, nothing changes

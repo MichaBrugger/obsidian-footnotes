@@ -696,7 +696,7 @@ describe("the selection notices", () => {
             "Select one stretch of text on a single line to turn it into a footnote.",
         );
         expect(SelectionCommandNotice).toBe(
-            "To turn the selected text into a footnote, use the auto-numbered or inline footnote command.",
+            "To turn the selected text into a footnote, use the auto-numbered, named, or inline footnote command.",
         );
     });
 });
