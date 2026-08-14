@@ -79,10 +79,20 @@ const fillerParagraphArb = fc
             : `${paragraph.slice(0, -1)}[^${name}]${paragraph.slice(-1)}`;
     });
 
+// definition bodies may carry NESTED references or inline footnotes:
+// hand-typed nesting the plugin refuses to CREATE but must always survive
+// (Jason's ruling + lint report, 2026-08-13). The generator was blind to
+// this whole class before — no soak could have caught a nested-footnote
+// lint bug.
+const definitionBodyPieceArb = fc.oneof(
+    { weight: 4, arbitrary: fc.constantFrom(...WORDS) },
+    { weight: 1, arbitrary: nameArb.map((n) => `sees [^${n}]`) },
+    { weight: 1, arbitrary: fc.constant("aside ^[nested inline]") },
+);
 const definitionBlockArb = fc
-    .tuple(nameArb, fc.constantFrom(...WORDS), fc.boolean())
-    .map(([n, w, continued]) =>
-        continued ? `[^${n}]: ${w}\n    continued ${w}` : `[^${n}]: ${w}`,
+    .tuple(nameArb, definitionBodyPieceArb, fc.boolean(), definitionBodyPieceArb)
+    .map(([n, body, continued, more]) =>
+        continued ? `[^${n}]: ${body}\n    continued ${more}` : `[^${n}]: ${body}`,
     );
 
 const fenceBlockArb = fc
