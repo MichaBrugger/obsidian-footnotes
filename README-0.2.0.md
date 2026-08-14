@@ -6,7 +6,16 @@
 
 ![Obsidian Downloads](https://img.shields.io/badge/dynamic/json?logo=obsidian&color=%23483699&label=downloads&query=%24%5B%27obsidian-footnotes%27%5D.downloads&url=https%3A%2F%2Fraw.githubusercontent.com%2Fobsidianmd%2Fobsidian-releases%2Fmaster%2Fcommunity-plugin-stats.json) [![Active Development](https://img.shields.io/badge/Maintenance%20Level-Actively%20Developed-brightgreen.svg)](https://gist.github.com/cheerfulstoic/d107229326a01ff0f333a1d3476e068d) ![Release Version](https://img.shields.io/github/v/release/MichaBrugger/obsidian-footnotes)
 
-Footnotes in Obsidian normally mean a lot of jumping around. You scroll to the bottom to check your numbering, type the reference, scroll down again to write the note, then scroll back to where you were. This plugin turns all of that into a single hotkey: press it to create a footnote, press it to jump between a footnote and its text, and edit the note in a small popup right at your cursor. There's also a linter that renumbers footnotes in reading order, collects them at the bottom, and moves references to the right side of punctuation.
+Create, navigate, and edit Obsidian footnotes with a single hotkey:
+
+- **One hotkey for everything**: insert a new footnote, or jump between a reference and its text
+- **Popup editor**: write the footnote right at your cursor, no scrolling to the bottom
+- **Auto-numbered, named, and inline** footnote styles
+- **Selection to footnote**: turn text you already wrote into a footnote in one press
+- **Rename a footnote** everywhere at once, like renaming a variable in a code editor
+- **Footnote linter**: renumber in reading order, gather definitions at the bottom, move references after punctuation
+- **Per-note prefixes** keep numbering unique across chapters of a larger document
+- Works on Obsidian Mobile
 
 <!-- GIF: hero. Press hotkey mid-sentence, popup opens at cursor, type the note, hotkey again to close -->
 
