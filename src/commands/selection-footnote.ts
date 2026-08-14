@@ -26,6 +26,7 @@ import {
     scanDocument,
 } from "../parsing/markdown-scan";
 import { openPopupForNewDefinition, replaceInTableCell } from "./create-footnote";
+import { warnDefinitionCaretIfInside } from "./press-guards";
 import { TableCellEditor } from "../editor/table-cursor";
 
 // Turning a selection into a footnote (issue #35): a creation press with a
@@ -155,6 +156,14 @@ export function selectionPressHandled(
         ctx.maskedLine(resolved.from.line).slice(fromCh, toCh).includes("\0")
     ) {
         new Notice(ProtectedSelectionNotice, 8000);
+        return true;
+    }
+    // a selection inside another footnote's definition would nest the new
+    // footnote into it — refused like the caret presses (Jason's ruling
+    // 2026-08-13)
+    if (
+        warnDefinitionCaretIfInside(doc, null, { line: resolved.from.line, ch: fromCh }, ctx)
+    ) {
         return true;
     }
     const selection = {

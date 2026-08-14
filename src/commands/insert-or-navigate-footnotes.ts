@@ -23,6 +23,7 @@ import { readingViewActive, viewEditor } from "../editor/obsidian-internals";
 import {
     caretGuardsHandled,
     navigateDefinitionLabelIfInside,
+    warnDefinitionCaretIfInside,
     warnProtectedCaretIfInside,
 } from "./press-guards";
 import { selectionPressHandled } from "./selection-footnote";
@@ -253,11 +254,14 @@ export async function insertInlineFootnote(plugin: FootnotePlugin) {
         if (navigateDefinitionLabelIfInside(plugin, doc, cell)) return;
         // inside a real reference, navigate instead of nesting "^[]"
         if (navigateReferenceIfInside(plugin, doc, cell)) return;
-        // creation in code/math/comment/frontmatter is blocked outright
+        // creation in code/math/comment/frontmatter is blocked outright —
+        // and inside another footnote's definition (nested footnotes are
+        // nonstandard markdown; Jason's ruling 2026-08-13)
         const cursorPosition =
             (cell ? resolveTableCellCursor(doc) : null) ?? doc.getCursor();
-        if (warnProtectedCaretIfInside(doc, cell, cursorPosition, docContext(doc)))
-            return;
+        const ctx = docContext(doc);
+        if (warnProtectedCaretIfInside(doc, cell, cursorPosition, ctx)) return;
+        if (warnDefinitionCaretIfInside(doc, cell, cursorPosition, ctx)) return;
 
         insertInlineText(plugin, "^[]", 2);
     });
@@ -277,12 +281,15 @@ export async function pasteInlineFootnote(plugin: FootnotePlugin) {
         if (navigateDefinitionLabelIfInside(plugin, doc, pasteCell)) return;
         if (navigateReferenceIfInside(plugin, doc, pasteCell)) return;
         // creation in code/math/comment/frontmatter is blocked outright —
-        // before the clipboard await, so a blocked press never reads it
+        // and inside another footnote's definition — before the clipboard
+        // await, so a blocked press never reads it
         const pastePosition =
             (pasteCell ? resolveTableCellCursor(doc) : null) ?? doc.getCursor();
-        if (
-            warnProtectedCaretIfInside(doc, pasteCell, pastePosition, docContext(doc))
-        ) {
+        const pasteCtx = docContext(doc);
+        if (warnProtectedCaretIfInside(doc, pasteCell, pastePosition, pasteCtx)) {
+            return;
+        }
+        if (warnDefinitionCaretIfInside(doc, pasteCell, pastePosition, pasteCtx)) {
             return;
         }
 

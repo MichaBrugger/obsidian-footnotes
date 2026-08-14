@@ -17,3 +17,9 @@ select me in here
 - [ ] With cell editing active, select `target` and press the INLINE hotkey: it becomes `^[target]` inside the cell, pipes intact
 - [ ] Undo, select `word` and press the NUMBERED hotkey: the cell gets `[^1]` and the prefilled definition lands below the table
 - [ ] Select only whitespace anywhere: the press behaves like a plain insert at the caret
+- [ ] With the caret in a footnote definition's body below, the INLINE hotkey refuses with the "can't go inside another footnote's definition" toast; the numbered hotkey jumps back to the reference instead (ruling 2026-08-13)
+- [ ] Selecting text inside the definition body and pressing a converting hotkey refuses the same way
+
+Fixture for the definition checks[^d].
+
+[^d]: press the inline hotkey with the caret right here

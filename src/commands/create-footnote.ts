@@ -32,7 +32,7 @@ import {
 } from "../editor/insertion-liveness";
 import { lintAfterFootnoteCreation } from "../linting/linter";
 import { findDefinitionBlocks, maskInlineRegions, maskedLineAt, scanDocument } from "../parsing/markdown-scan";
-import { warnProtectedCaretIfInside } from "./press-guards";
+import { warnDefinitionCaretIfInside, warnProtectedCaretIfInside } from "./press-guards";
 import { TableCellEditor } from "../editor/table-cursor";
 
 // The creation steps of the command cascade: mint a reference, append its
@@ -171,6 +171,9 @@ export function createAutonumFootnote(
 ): boolean {
     // creation in code/math/comment/frontmatter is blocked outright
     if (warnProtectedCaretIfInside(doc, cell, cursorPosition, ctx)) return true;
+    // ... and inside another footnote's definition (continuation lines —
+    // the label line's presses were claimed by the jump steps above)
+    if (warnDefinitionCaretIfInside(doc, cell, cursorPosition, ctx)) return true;
 
     // create new footnote with the next numerical index — namespaced by the
     // note's footnote-prefix property when set (#31) — reading the editor
@@ -443,6 +446,9 @@ export function createFootnoteReference(
     // AFTER the hop check above, so plain caret navigation out of a live
     // "[^]" never gets a bogus toast
     if (warnProtectedCaretIfInside(doc, null, cursorPosition, ctx)) return true;
+    // ... and inside another footnote's definition (Jason's ruling
+    // 2026-08-13)
+    if (warnDefinitionCaretIfInside(doc, null, cursorPosition, ctx)) return true;
 
     const prefix = resolvePrefix();
     if (prefix === null) return true;

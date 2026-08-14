@@ -12,7 +12,12 @@ import {
     ProtectedCreationNotice,
 } from "../editor/insertion-liveness";
 import { DocContext, docContext, docLines } from "../editor/doc-context";
-import { definitionLabelIn, maskInlineRegions, maskedLineAt } from "../parsing/markdown-scan";
+import {
+    definitionLabelIn,
+    findDefinitionBlocks,
+    maskInlineRegions,
+    maskedLineAt,
+} from "../parsing/markdown-scan";
 import { shouldJumpFromDefinitionToReference } from "./navigation";
 import { TableCellEditor } from "../editor/table-cursor";
 
@@ -101,6 +106,39 @@ export function warnProtectedCaretIfInside(
     }
     if (!inside) return false;
     new Notice(ProtectedCreationNotice, 8000);
+    return true;
+}
+
+export const DefinitionCreationNotice =
+    "No footnote was created: footnotes can't go inside another footnote's definition.";
+
+/**
+ * Footnote CREATION is blocked anywhere inside a definition block — the
+ * body after the label, and continuation lines (Jason's ruling
+ * 2026-08-13: Obsidian technically renders footnotes nested inside
+ * definitions, but that's wildly nonstandard markdown and the plugin
+ * won't create it; the popup embed also mis-renders such definitions).
+ * Label-line presses before the label's end never reach this — the
+ * navigation guards own them. Cells never hold real definitions. True =
+ * warned, press consumed.
+ */
+export function warnDefinitionCaretIfInside(
+    doc: Editor,
+    cell: TableCellEditor | null,
+    cursorPosition: EditorPosition,
+    ctx: DocContext,
+): boolean {
+    if (cell) return false;
+    const inside = findDefinitionBlocks(
+        ctx.lines,
+        ctx.scan.isProtected,
+        ctx.scan,
+    ).some(
+        (block) =>
+            cursorPosition.line >= block.start && cursorPosition.line <= block.end,
+    );
+    if (!inside) return false;
+    new Notice(DefinitionCreationNotice, 8000);
     return true;
 }
 

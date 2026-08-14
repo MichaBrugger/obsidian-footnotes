@@ -107,16 +107,20 @@ describe("inline presses inside a definition label (bug-inline-press-breaks-defi
         expect(reads.count).toBe(0);
     });
 
-    it("just past the label, the definition CONTENT still takes the inline footnote", async () => {
+    it("just past the label, the definition CONTENT refuses too (spec change 2026-08-13)", async () => {
+        // SUPERSEDED SPEC: this pin originally asserted that definition
+        // content past the label still takes an inline footnote. Jason's
+        // ruling from manual testing reversed that — nested footnotes are
+        // nonstandard markdown the plugin must not create — so the press
+        // now refuses with the definition-creation notice instead (see
+        // test/definition-caret-guard.test.ts for the whole family).
         const line = "[^1]: alpha";
         const doc = fakeEditor(["use[^1]", "", line], {
             line: 2,
             ch: line.length,
         });
         await insertInlineFootnote(fakePlugin(doc));
-        expect(doc.appliedChanges).toEqual([
-            { from: { line: 2, ch: line.length }, text: "^[]" },
-        ]);
+        expect(doc.appliedChanges).toEqual([]);
     });
 
     it("a definition-shaped label inside a fence is plain text and stays insertable... blocked by the protected-caret guard instead", async () => {
