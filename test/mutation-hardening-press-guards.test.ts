@@ -6,7 +6,6 @@ import { noticeCalls } from "./mocks/obsidian";
 import FootnotePlugin from "../src/main";
 import {
     caretGuardsHandled,
-    navigateDefinitionLabelIfInside,
     warnPrefilledReferenceIfInside,
     warnProtectedCaretIfInside,
 } from "../src/commands/press-guards";
@@ -185,53 +184,6 @@ describe("the protected-caret guard at a line's edges", () => {
             }),
         ).toBe(false);
         expect(noticeCalls).toEqual([]);
-    });
-});
-
-describe("the definition-label navigation guard", () => {
-    it("claims the press from inside the label and jumps to the reference", () => {
-        const doc = fakeEditor(["[^x]: text", "", "see [^x] here"], { line: 0, ch: 4 });
-        expect(navigateDefinitionLabelIfInside(fakePlugin(), doc, null)).toBe(true);
-        expect(doc.cursor.line).toBe(2);
-    });
-
-    it("leaves the press alone with the caret exactly AT the label end", () => {
-        // "[^x]:" ends at ch 5; the colon is the label's last character, and
-        // everything from there on is ordinary definition content
-        const doc = fakeEditor(["[^x]: text", "", "see [^x] here"], { line: 0, ch: 5 });
-        expect(navigateDefinitionLabelIfInside(fakePlugin(), doc, null)).toBe(false);
-        expect(doc.cursor).toEqual({ line: 0, ch: 5 });
-    });
-
-    it("leaves a label-shaped line inside a code fence alone (#41)", () => {
-        const doc = fakeEditor(["```", "[^x]: t", "```"], { line: 1, ch: 3 });
-        expect(navigateDefinitionLabelIfInside(fakePlugin(), doc, null)).toBe(false);
-        expect(doc.cursor).toEqual({ line: 1, ch: 3 });
-    });
-
-    it("never navigates from a table cell, even on a definition line", () => {
-        const doc = fakeEditor(["[^x]: text", "", "see [^x] here"], { line: 0, ch: 3 });
-        expect(
-            navigateDefinitionLabelIfInside(fakePlugin(), doc, fakeCell("word", 2)),
-        ).toBe(false);
-        expect(doc.cursor).toEqual({ line: 0, ch: 3 });
-    });
-
-    it("bounds the claim by the RAW label end, which masking can only extend", () => {
-        // the raw label is "[^a`]:" (ends at ch 6); masking the code span
-        // "`]:`" lets the name run on to the later "]:", so the masked label
-        // ends at ch 11. The raw gate decides — a caret at 6 is content
-        const doc = fakeEditor(["[^a`]:` b]: c"], { line: 0, ch: 6 });
-        expect(navigateDefinitionLabelIfInside(fakePlugin(), doc, null)).toBe(false);
-        expect(doc.cursor).toEqual({ line: 0, ch: 6 });
-    });
-
-    it("ignores a label that exists only AFTER code masking", () => {
-        // raw "[^a`[`b]: c" has a "[" in the name, so it is no label at all;
-        // its masked twin "[^a\0\0\0b]: c" would parse as one
-        const doc = fakeEditor(["[^a`[`b]: c"], { line: 0, ch: 3 });
-        expect(navigateDefinitionLabelIfInside(fakePlugin(), doc, null)).toBe(false);
-        expect(doc.cursor).toEqual({ line: 0, ch: 3 });
     });
 });
 

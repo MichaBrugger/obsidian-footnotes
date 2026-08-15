@@ -91,22 +91,27 @@ const LINES = [
 const noticed = () =>
     noticeCalls.some((args) => args[0] === DefinitionCreationNotice);
 
-describe("creation refuses inside a footnote definition", () => {
-    it("inline key in the definition body", async () => {
+describe("the inline pair NAVIGATES from inside a definition (ruling refined 2026-08-13)", () => {
+    // first ruling: refuse with a toast. Refined the same day: jump back
+    // to the reference EXACTLY like the numbered/named keys — same
+    // shouldJumpFromDefinitionToReference step, wired at the entries
+    it("inline key in the definition body jumps to the reference", async () => {
         const doc = fakeEditor(LINES, { line: 2, ch: 15 });
         await insertInlineFootnote(fakePlugin(doc));
         expect(doc.lines).toEqual(LINES);
-        expect(noticed()).toBe(true);
+        expect(noticed()).toBe(false);
+        expect(doc.cursor.line).toBe(0);
     });
 
-    it("inline key on a continuation line", async () => {
+    it("inline key on a continuation line jumps too", async () => {
         const doc = fakeEditor(LINES, { line: 3, ch: 10 });
         await insertInlineFootnote(fakePlugin(doc));
         expect(doc.lines).toEqual(LINES);
-        expect(noticed()).toBe(true);
+        expect(noticed()).toBe(false);
+        expect(doc.cursor.line).toBe(0);
     });
 
-    it("paste key in the definition body, before the clipboard is read", async () => {
+    it("paste key jumps before the clipboard is ever read", async () => {
         const reads = { count: 0 };
         vi.stubGlobal("navigator", {
             clipboard: {
@@ -119,8 +124,25 @@ describe("creation refuses inside a footnote definition", () => {
         const doc = fakeEditor(LINES, { line: 2, ch: 15 });
         await pasteInlineFootnote(fakePlugin(doc));
         expect(doc.lines).toEqual(LINES);
-        expect(noticed()).toBe(true);
+        expect(doc.cursor.line).toBe(0);
         expect(reads.count).toBe(0);
+    });
+
+    it("a label-shaped line inside a fence is no jump target (#41)", async () => {
+        const fenced = ["```", "[^x]: t", "```", "prose"];
+        const doc = fakeEditor(fenced, { line: 1, ch: 3 });
+        await insertInlineFootnote(fakePlugin(doc));
+        // no jump AND no insert — the protected-caret guard owns it
+        expect(doc.lines).toEqual(fenced);
+        expect(doc.cursor).toEqual({ line: 1, ch: 3 });
+    });
+
+    it("a name only masking could see is no definition at all", async () => {
+        // raw "[^a`[`b]: c" has "[" in the name, so no label; the masked
+        // twin would parse as one — the press falls through and inserts
+        const doc = fakeEditor(["[^a`[`b]: c"], { line: 0, ch: 10 });
+        await insertInlineFootnote(fakePlugin(doc));
+        expect(doc.lines[0]).toContain("^[]");
     });
 
     it("autonum key on a continuation line NAVIGATES instead of creating", async () => {

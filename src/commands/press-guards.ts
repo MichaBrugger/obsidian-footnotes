@@ -11,19 +11,17 @@ import {
     caretInsideMaskedSpan,
     ProtectedCreationNotice,
 } from "../editor/insertion-liveness";
-import { DocContext, docContext, docLines } from "../editor/doc-context";
+import { DocContext, docLines } from "../editor/doc-context";
 import {
-    definitionLabelIn,
     findDefinitionBlocks,
     maskInlineRegions,
     maskedLineAt,
 } from "../parsing/markdown-scan";
-import { shouldJumpFromDefinitionToReference } from "./navigation";
 import { TableCellEditor } from "../editor/table-cursor";
 
 // The press guards: a footnote key was pressed — does something OTHER than
 // creation own it? Empty placeholders warn, filled inline footnotes hop,
-// definition labels navigate back, and protected text refuses outright.
+// and protected text (definition interiors included) refuses outright.
 // Split out of the all-in-one commands file 2026-08-12: one subject, one
 // abstraction level below the command cascade that calls it.
 
@@ -142,38 +140,10 @@ export function warnDefinitionCaretIfInside(
     return true;
 }
 
-/**
- * When the caret sits INSIDE a definition label ("[^x]:" — before the end
- * of its colon), handle the press like the numbered/named cascade's step 1:
- * jump back to the first reference (or explain an orphan). Inserting inline
- * text there would shove the label off column 0, DESTROYING the definition
- * and orphaning its references (found by the command-press property suite,
- * 2026-08-12 — the inline pair never had the jump-from-definition step the
- * other keys start with). Definition CONTENT, at or past the label end, is
- * ordinary prose and stays insertable. Table cells never hold real
- * definitions, so a cell press skips this.
- */
-export function navigateDefinitionLabelIfInside(
-    plugin: FootnotePlugin,
-    doc: Editor,
-    cell: TableCellEditor | null,
-): boolean {
-    if (cell) return false;
-    const cursorPosition = doc.getCursor();
-    const lineText = doc.getLine(cursorPosition.line);
-    // raw-line gate first — this runs on every inline/paste press
-    const label = definitionLabelIn(lineText);
-    if (!label || cursorPosition.ch >= label.labelEnd) return false;
-    // a label-shaped line inside code is plain text (#41): no jump — the
-    // protected-caret guard downstream owns that caret
-    const ctx = docContext(doc);
-    const maskedLabel = definitionLabelIn(ctx.maskedLine(cursorPosition.line));
-    if (!maskedLabel || cursorPosition.ch >= maskedLabel.labelEnd) return false;
-    // however the jump resolves (first reference, or the orphan toast),
-    // the press is handled — "^[…]" must never land inside the label
-    shouldJumpFromDefinitionToReference(lineText, cursorPosition, plugin, doc, ctx);
-    return true;
-}
+// (navigateDefinitionLabelIfInside lived here 2026-08-12/13: the inline
+// pair's label-only navigation. Superseded by Jason's ruling — the inline
+// commands now run the SAME whole-block jump step as the numbered/named
+// keys, shouldJumpFromDefinitionToReference, wired at their entries.)
 
 /**
  * When the caret sits inside an untouched prefilled reference — "[^7-]",

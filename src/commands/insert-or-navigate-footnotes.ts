@@ -20,12 +20,7 @@ import { inlineFootnoteSpanAt, sanitizeInlineFootnoteContent } from "./inline-fo
 import { ProtectedCreationNotice, simulatedMaskedLine } from "../editor/insertion-liveness";
 import { shouldJumpFromDefinitionToReference, shouldJumpFromReferenceToDefinition } from "./navigation";
 import { readingViewActive, viewEditor } from "../editor/obsidian-internals";
-import {
-    caretGuardsHandled,
-    navigateDefinitionLabelIfInside,
-    warnDefinitionCaretIfInside,
-    warnProtectedCaretIfInside,
-} from "./press-guards";
+import { caretGuardsHandled, warnProtectedCaretIfInside } from "./press-guards";
 import { selectionPressHandled } from "./selection-footnote";
 import { activeTableCellEditor, resolveTableCellCursor, runOutsideTableCell, TableCellEditor } from "../editor/table-cursor";
 
@@ -250,18 +245,29 @@ export async function insertInlineFootnote(plugin: FootnotePlugin) {
         // (issue #35)
         if (selectionPressHandled(plugin, doc, cell, "inline")) return;
         if (caretGuardsHandled(plugin, doc, cell)) return;
-        // inside a definition label, jump back like the other footnote keys
-        if (navigateDefinitionLabelIfInside(plugin, doc, cell)) return;
-        // inside a real reference, navigate instead of nesting "^[]"
-        if (navigateReferenceIfInside(plugin, doc, cell)) return;
-        // creation in code/math/comment/frontmatter is blocked outright —
-        // and inside another footnote's definition (nested footnotes are
-        // nonstandard markdown; Jason's ruling 2026-08-13)
         const cursorPosition =
             (cell ? resolveTableCellCursor(doc) : null) ?? doc.getCursor();
         const ctx = docContext(doc);
+        // anywhere inside a definition (label, body, continuation), jump
+        // back to the reference EXACTLY like the numbered/named keys —
+        // nested footnotes are nonstandard markdown the plugin won't
+        // create, and a jump beats a toast (Jason's rulings 2026-08-13)
+        if (
+            !cell &&
+            shouldJumpFromDefinitionToReference(
+                doc.getLine(cursorPosition.line),
+                cursorPosition,
+                plugin,
+                doc,
+                ctx,
+            )
+        ) {
+            return;
+        }
+        // inside a real reference, navigate instead of nesting "^[]"
+        if (navigateReferenceIfInside(plugin, doc, cell)) return;
+        // creation in code/math/comment/frontmatter is blocked outright
         if (warnProtectedCaretIfInside(doc, cell, cursorPosition, ctx)) return;
-        if (warnDefinitionCaretIfInside(doc, cell, cursorPosition, ctx)) return;
 
         insertInlineText(plugin, "^[]", 2);
     });
@@ -278,18 +284,27 @@ export async function pasteInlineFootnote(plugin: FootnotePlugin) {
         // the same guards every other insert command runs (missed here until
         // the 2026-08-07 QOL sweep; pinned by test/paste-inline-in-inline.test.ts)
         if (caretGuardsHandled(plugin, doc, pasteCell)) return;
-        if (navigateDefinitionLabelIfInside(plugin, doc, pasteCell)) return;
-        if (navigateReferenceIfInside(plugin, doc, pasteCell)) return;
-        // creation in code/math/comment/frontmatter is blocked outright —
-        // and inside another footnote's definition — before the clipboard
-        // await, so a blocked press never reads it
         const pastePosition =
             (pasteCell ? resolveTableCellCursor(doc) : null) ?? doc.getCursor();
         const pasteCtx = docContext(doc);
-        if (warnProtectedCaretIfInside(doc, pasteCell, pastePosition, pasteCtx)) {
+        // inside a definition, jump back like every other footnote key —
+        // before the clipboard await, so a handled press never reads it
+        if (
+            !pasteCell &&
+            shouldJumpFromDefinitionToReference(
+                doc.getLine(pastePosition.line),
+                pastePosition,
+                plugin,
+                doc,
+                pasteCtx,
+            )
+        ) {
             return;
         }
-        if (warnDefinitionCaretIfInside(doc, pasteCell, pastePosition, pasteCtx)) {
+        if (navigateReferenceIfInside(plugin, doc, pasteCell)) return;
+        // creation in code/math/comment/frontmatter is blocked outright —
+        // before the clipboard await, so a blocked press never reads it
+        if (warnProtectedCaretIfInside(doc, pasteCell, pastePosition, pasteCtx)) {
             return;
         }
 
