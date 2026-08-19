@@ -795,6 +795,31 @@ async function main() {
         );
     });
 
+    await test("a multi-line selection becomes a multi-paragraph definition (2026-08-19)", async () => {
+        // the academic shape: whole paragraphs move into ONE definition,
+        // continuation lines indented four spaces under the label
+        resetSettings({ enablePopupEditor: false });
+        await setupNote("Intro line.\nFirst para body\n\nSecond para body\nOutro line.");
+        action(
+            `(() => { const v=${EDITOR}; ` +
+            `v.editor.setSelection({line:1,ch:0},{line:3,ch:16}); })();`,
+        );
+        action(`app.commands.executeCommandById('${CMD_AUTONUM}');`);
+        await pollUntil(
+            "selection converted into an indented multi-paragraph body",
+            `(${EDITOR}).editor.getValue()`,
+            (v) =>
+                v ===
+                "Intro line.\n[^1]\nOutro line.\n\n[^1]: First para body\n\n    Second para body",
+            8000,
+        );
+        // the caret must land at the end of the LAST body line, ready to edit
+        const cursor = readJson(`(${EDITOR}).editor.getCursor()`);
+        if (cursor.line !== 6 || cursor.ch !== "    Second para body".length) {
+            throw new Error(`caret landed at ${JSON.stringify(cursor)}`);
+        }
+    });
+
     await test("popup edits propagate live into the main editor (stock parity)", async () => {
         // DELIBERATE behavior (Jason, 2026-08-08): while the popup is open
         // it saves on the embed's own debounce, exactly like Obsidian's

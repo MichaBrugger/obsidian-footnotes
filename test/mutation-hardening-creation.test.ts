@@ -694,7 +694,7 @@ describe("the selection notices", () => {
     // against the exported constants, which a mutated constant satisfies.
     it("read exactly as written", () => {
         expect(SelectionSpanNotice).toBe(
-            "Select one stretch of text on a single line to turn it into a footnote.",
+            "Select one continuous stretch of text to turn it into a footnote.",
         );
         expect(SelectionCommandNotice).toBe(
             "To turn the selected text into a footnote, use the auto-numbered, named, or inline footnote command.",
@@ -763,18 +763,49 @@ describe("the cell selection claim", () => {
         ]);
     });
 
-    // L82 BlockStatement -> {} and ConditionalExpression -> false: selecting a
-    // whole math span produces a SIMULATED result that survives (the span
-    // wraps the math), so only the up-front protected check can refuse it.
-    it("refuses a cell selection that swallows a whole math span", () => {
+    // the caretInsideMaskedSpan edge pair (ConditionalExpression -> false,
+    // `||` -> `&&`): a cell selection CUTTING a math span refuses up front —
+    // the simulated result would survive precisely because the construct
+    // got destroyed. Both edges must be checked: the from-cut and the
+    // to-cut each catch a mutant the other leaves alive.
+    it("refuses a cell selection whose FROM edge cuts a math span", () => {
+        //                                     0123456
+        const { cell, dispatched } = fakeCell("a $x$ b", 3, 7);
+        const doc = fakeEditor(["| a $x$ b |"], { line: 0, ch: 5 });
+        expect(
+            selectionPressHandled(fakePlugin(doc), doc, cell, "inline"),
+        ).toBe(true);
+        expect(dispatched).toEqual([]);
+        expect(noticed(ProtectedSelectionNotice)).toBe(true);
+    });
+
+    it("refuses a cell selection whose TO edge cuts a math span", () => {
+        //                                     0123456
+        const { cell, dispatched } = fakeCell("a $x$ b", 0, 4);
+        const doc = fakeEditor(["| a $x$ b |"], { line: 0, ch: 2 });
+        expect(
+            selectionPressHandled(fakePlugin(doc), doc, cell, "inline"),
+        ).toBe(true);
+        expect(dispatched).toEqual([]);
+        expect(noticed(ProtectedSelectionNotice)).toBe(true);
+    });
+
+    // the containment flip (Jason's ruling 2026-08-19): a span selected
+    // WHOLE travels into the footnote — a mutant that refuses on any
+    // masked character in the span (the pre-2026-08-19 rule) dies here.
+    it("converts a cell selection that swallows a whole math span", () => {
         //                                     0123456
         const { cell, dispatched } = fakeCell("a $x$ b", 2, 5);
         const doc = fakeEditor(["| a $x$ b |"], { line: 0, ch: 4 });
         expect(
             selectionPressHandled(fakePlugin(doc), doc, cell, "inline"),
         ).toBe(true);
-        expect(dispatched).toEqual([]);
-        expect(noticed(ProtectedSelectionNotice)).toBe(true);
+        expect(dispatched).toEqual([
+            {
+                changes: { from: 2, to: 5, insert: "^[$x$]" },
+                selection: { anchor: 2 + "^[$x$]".length },
+            },
+        ]);
     });
 });
 
@@ -793,20 +824,46 @@ describe("the main-editor selection claim", () => {
         expect(doc.transactions).toEqual([]);
     });
 
-    // L131 LogicalOperator (`||` -> `&&`) and L82's main-editor twin: an
-    // unprotected LINE holding a masked span still refuses when the selection
-    // covers that span — and the simulated result would have survived.
-    it("refuses a selection that swallows a whole math span", () => {
+    // the main-editor edge-cut twins: strictly-inside edges refuse up front
+    // (the simulated result would survive because the construct got
+    // destroyed), while a span selected WHOLE converts — killing both the
+    // dropped-edge-check mutants and any regression to the pre-2026-08-19
+    // any-masked-character rule.
+    it("refuses a selection whose FROM edge cuts a math span", () => {
         const before = ["a $x$ b"];
-        const doc = fakeEditor(before, { line: 0, ch: 2 }, {
-            anchor: { line: 0, ch: 2 },
-            head: { line: 0, ch: 5 },
+        const doc = fakeEditor(before, { line: 0, ch: 3 }, {
+            anchor: { line: 0, ch: 3 },
+            head: { line: 0, ch: 7 },
         });
         expect(
             selectionPressHandled(fakePlugin(doc), doc, null, "inline"),
         ).toBe(true);
         expect(doc.lines).toEqual(before);
         expect(noticed(ProtectedSelectionNotice)).toBe(true);
+    });
+
+    it("refuses a selection whose TO edge cuts a math span", () => {
+        const before = ["a $x$ b"];
+        const doc = fakeEditor(before, { line: 0, ch: 0 }, {
+            anchor: { line: 0, ch: 0 },
+            head: { line: 0, ch: 4 },
+        });
+        expect(
+            selectionPressHandled(fakePlugin(doc), doc, null, "inline"),
+        ).toBe(true);
+        expect(doc.lines).toEqual(before);
+        expect(noticed(ProtectedSelectionNotice)).toBe(true);
+    });
+
+    it("converts a selection that swallows a whole math span", () => {
+        const doc = fakeEditor(["a $x$ b"], { line: 0, ch: 2 }, {
+            anchor: { line: 0, ch: 2 },
+            head: { line: 0, ch: 5 },
+        });
+        expect(
+            selectionPressHandled(fakePlugin(doc), doc, null, "inline"),
+        ).toBe(true);
+        expect(doc.lines).toEqual(["a ^[$x$] b"]);
     });
 
     // L132 MethodExpression (the `.slice(fromCh, toCh)` dropped): code
@@ -838,20 +895,55 @@ describe("the main-editor selection claim", () => {
         expect(doc.lines).toEqual(["alpha ^[beta] gamma"]);
     });
 
-    // L170 ConditionalExpression, `to.line === from.line + 1` -> true: only a
-    // selection ending at ch 0 of the very NEXT line normalizes to "the rest
-    // of this line"; one ending two lines down is genuinely multi-line.
-    it("does not normalize a selection ending two lines down", () => {
-        const before = ["first line", "second line", "third line"];
-        const doc = fakeEditor(before, { line: 0, ch: 2 }, {
-            anchor: { line: 0, ch: 2 },
-            head: { line: 2, ch: 0 },
-        });
+    // the trimSelectionEdges line-walk mutants (the `fromCh >= length` hop
+    // -> `>`, the `toCh === 0` hop -> `!== 0`, either while -> false): a
+    // drag ending at ch 0 two lines down sheds the whole blank tail —
+    // converting exactly the first line's core, not a body with trailing
+    // blank paragraphs (and never a whitespace text that would throw the
+    // conversion off).
+    it("sheds a trailing blank line AND the ch-0 overhang from a drag", () => {
+        const doc = fakeEditor(
+            ["first line", "", "third line"],
+            { line: 0, ch: 2 },
+            {
+                anchor: { line: 0, ch: 2 },
+                head: { line: 2, ch: 0 },
+            },
+        );
         expect(
             selectionPressHandled(fakePlugin(doc), doc, null, "autonum"),
         ).toBe(true);
-        expect(doc.lines).toEqual(before);
-        expect(noticed(SelectionSpanNotice)).toBe(true);
+        expect(doc.lines).toEqual([
+            "fi[^1]",
+            "",
+            "third line",
+            "",
+            "[^1]: rst line",
+        ]);
+    });
+
+    // the leading-edge twin: blank lines and indentation ahead of the text
+    // core stay in the prose, so the body's first line starts on content
+    it("sheds leading blank lines from a multi-line drag", () => {
+        const doc = fakeEditor(
+            ["head", "", "  payload text", "tail"],
+            { line: 0, ch: 4 },
+            {
+                anchor: { line: 0, ch: 4 },
+                head: { line: 2, ch: 14 },
+            },
+        );
+        expect(
+            selectionPressHandled(fakePlugin(doc), doc, null, "autonum"),
+        ).toBe(true);
+        expect(doc.lines).toEqual([
+            "head",
+            "",
+            "  [^1]",
+            "tail",
+            "",
+            "[^1]: payload text",
+        ]);
     });
 });
 

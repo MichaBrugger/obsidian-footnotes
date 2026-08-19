@@ -193,7 +193,9 @@ export function buildDefinitionAppend(
  * occurrence in the change text (an optional section heading could carry a
  * label-shaped line above it), and the returned cursor — already at the
  * label's end — slides to the end of the body, before any trailing
- * separator newline.
+ * separator newline. A multi-line body (a multi-paragraph selection,
+ * 2026-08-19, already carrying its continuation indent) lands the cursor
+ * at the end of its LAST line.
  */
 export function seedDefinitionBody(
     definition: {
@@ -207,15 +209,22 @@ export function seedDefinitionBody(
     const label = `[^${footnoteId}]: `;
     const text = definition.change.text;
     const at = text.lastIndexOf(label) + label.length;
+    const bodyLines = body.split("\n");
     return {
         ...definition,
         change: {
             ...definition.change,
             text: text.slice(0, at) + body + text.slice(at),
         },
-        cursor: {
-            line: definition.cursor.line,
-            ch: definition.cursor.ch + body.length,
-        },
+        cursor:
+            bodyLines.length === 1
+                ? {
+                      line: definition.cursor.line,
+                      ch: definition.cursor.ch + body.length,
+                  }
+                : {
+                      line: definition.cursor.line + bodyLines.length - 1,
+                      ch: bodyLines[bodyLines.length - 1].length,
+                  },
     };
 }

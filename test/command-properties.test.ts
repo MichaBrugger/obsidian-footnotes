@@ -6,8 +6,10 @@ import { docArb } from "./arbitraries";
 import { noticeCalls } from "./mocks/obsidian";
 import FootnotePlugin from "../src/main";
 import {
+    indentDefinitionBody,
     SelectionCommandNotice,
     SelectionSpanNotice,
+    trimSelectionEdges,
 } from "../src/commands/selection-footnote";
 import { isValidFootnoteName } from "../src/parsing/footnote-grammar";
 import {
@@ -540,42 +542,71 @@ describe("creation-command invariants over random documents", () => {
         );
     });
 
-    // ---------- selection conversion (issue #35) ----------
+    // ---------- selection conversion (issue #35 / multi-line 2026-08-19) ----------
 
-    // a random single-line selection: anchor/head on one generated line,
-    // possibly reversed, possibly empty or whitespace-only (both fall
-    // through to the caret cascade)
+    // a random selection: single-line half the time, spanning up to four
+    // lines otherwise, possibly reversed, possibly empty or whitespace-only
+    // (both fall through to the caret cascade)
     const selectionPressArb = fc
         .tuple(
             docArb,
             fc.nat(1000),
             fc.nat(1000),
             fc.nat(30),
+            fc.nat(1000),
+            fc.nat(4),
             fc.boolean(),
             settingsArb,
         )
-        .map(([doc, linePick, chPick, lenPick, reversed, settings]) => {
-            const lines = normalizeEol(doc).text.split("\n");
-            const line = linePick % lines.length;
-            const a = chPick % (lines[line].length + 1);
-            const b = Math.min(a + (lenPick % 25), lines[line].length);
-            const [anchorCh, headCh] = reversed ? [b, a] : [a, b];
-            return {
-                lines,
-                span: { line, from: a, to: b },
-                selection: {
-                    anchor: { line, ch: anchorCh },
-                    head: { line, ch: headCh },
-                },
-                settings,
-            };
-        });
+        .map(
+            ([doc, linePick, chPick, lenPick, chPick2, linesDown, reversed, settings]) => {
+                const lines = normalizeEol(doc).text.split("\n");
+                const line = linePick % lines.length;
+                const a = chPick % (lines[line].length + 1);
+                const toLine = Math.min(line + linesDown, lines.length - 1);
+                const b =
+                    toLine === line
+                        ? Math.min(a + (lenPick % 25), lines[line].length)
+                        : chPick2 % (lines[toLine].length + 1);
+                const from = { line, ch: a };
+                const to = { line: toLine, ch: b };
+                const [anchor, head] = reversed ? [to, from] : [from, to];
+                return {
+                    lines,
+                    span: { from, to },
+                    selection: { anchor, head },
+                    settings,
+                };
+            },
+        );
 
-    /** The trimmed core `[from, to)` of the span, exactly as the conversion shrinks it. */
-    function trimmedSpan(lineText: string, from: number, to: number) {
-        while (from < to && /\s/.test(lineText[from])) from++;
-        while (to > from && /\s/.test(lineText[to - 1])) to--;
-        return { from, to };
+    /** The trimmed core of the span, exactly as the conversion shrinks it (the shared production trim over a lines-array shim). */
+    function trimmedSpan(
+        lines: string[],
+        from: EditorPosition,
+        to: EditorPosition,
+    ): { from: EditorPosition; to: EditorPosition } | null {
+        return trimSelectionEdges(
+            { getLine: (n: number) => lines[n] } as unknown as Editor,
+            from,
+            to,
+        );
+    }
+
+    /** The LF-joined text of `[from, to)`. */
+    function spanText(
+        lines: string[],
+        from: EditorPosition,
+        to: EditorPosition,
+    ): string {
+        if (from.line === to.line) {
+            return lines[from.line].slice(from.ch, to.ch);
+        }
+        return [
+            lines[from.line].slice(from.ch),
+            ...lines.slice(from.line + 1, to.line),
+            lines[to.line].slice(0, to.ch),
+        ].join("\n");
     }
 
     soakIt("converting a selection moves EXACTLY the selected text", async () => {
@@ -584,24 +615,45 @@ describe("creation-command invariants over random documents", () => {
                 selectionPressArb,
                 fc.constantFrom<CommandName>("autonum", "inline"),
                 async ({ lines, span, selection, settings }, command) => {
-                    const lineBefore = lines[span.line];
-                    const { from, to } = trimmedSpan(lineBefore, span.from, span.to);
+                    const trimmed = trimmedSpan(lines, span.from, span.to);
                     const protectedBefore = scanDocument(lines).isProtected;
                     noticeCalls.length = 0;
-                    const doc = pressEditor(
-                        lines,
-                        { line: span.line, ch: span.from },
-                        selection,
-                    );
+                    const doc = pressEditor(lines, span.from, selection);
                     await COMMANDS[command](fakePlugin(doc, settings));
-                    // protected text is never edited, converted or not —
-                    // same multiset conservation as the caret presses
+                    const unchanged =
+                        doc.lines.join("\n") === lines.join("\n");
+                    // protected text is never LOST, converted or not: a
+                    // refusal (or fallthrough) conserves every protected
+                    // line verbatim; an autonum conversion may carry
+                    // protected lines the selection contained WHOLE into
+                    // the definition body, four-space-indented (2026-08-19).
+                    // The inline conversion flattens contained lines into
+                    // the wrapper, which the shape check below owns.
+                    const strictlyInside = (i: number) =>
+                        trimmed !== null &&
+                        (i > trimmed.from.line ||
+                            (i === trimmed.from.line && trimmed.from.ch === 0)) &&
+                        (i < trimmed.to.line ||
+                            (i === trimmed.to.line &&
+                                trimmed.to.ch === lines[i].length));
                     const counts = new Map<string, number>();
                     for (const line of doc.lines) {
                         counts.set(line, (counts.get(line) ?? 0) + 1);
                     }
                     for (let i = 0; i < lines.length; i++) {
                         if (!protectedBefore[i]) continue;
+                        if (!unchanged && trimmed !== null && strictlyInside(i)) {
+                            if (command === "inline") continue;
+                            const carried =
+                                i === trimmed.from.line
+                                    ? lines[i].slice(trimmed.from.ch)
+                                    : `    ${lines[i]}`;
+                            expect(
+                                doc.lines.join("\n"),
+                                `contained protected line lost: ${JSON.stringify(lines[i])}`,
+                            ).toContain(carried);
+                            continue;
+                        }
                         const left = counts.get(lines[i]) ?? 0;
                         expect(
                             left,
@@ -611,24 +663,27 @@ describe("creation-command invariants over random documents", () => {
                     }
                     // an empty/whitespace-only selection falls through to
                     // the caret cascade — the other properties own that
-                    if (from === to) return;
-                    if (doc.lines.join("\n") === lines.join("\n")) {
+                    if (trimmed === null) return;
+                    if (unchanged) {
                         // a refusal always explains itself
                         expect(noticeCalls.length).toBeGreaterThan(0);
                         return;
                     }
-                    // converted: the selection line keeps its prefix and
-                    // suffix, and ONLY the trimmed span became the footnote.
-                    // Lines inserted ABOVE the selection (a definition
-                    // appended after a mid-document block, the phantom-
-                    // frontmatter prepend) shift the converted line down —
-                    // search the whole possible shift window, and require
-                    // the middle to PARSE as the conversion (an empty
-                    // prefix+suffix would otherwise let any line match).
-                    const prefix = lineBefore.slice(0, from);
-                    const suffix = lineBefore.slice(to);
-                    const selText = lineBefore.slice(from, to);
-                    const shiftWindow = doc.lines.length - lines.length;
+                    // converted: the boundary lines keep their prefix and
+                    // suffix (stitched onto ONE line), and ONLY the trimmed
+                    // span became the footnote. Lines inserted ABOVE the
+                    // selection (a definition appended after a mid-document
+                    // block, the phantom-frontmatter prepend) shift the
+                    // converted line down — search the whole possible shift
+                    // window, and require the middle to PARSE as the
+                    // conversion (an empty prefix+suffix would otherwise
+                    // let any line match).
+                    const prefix = lines[trimmed.from.line].slice(0, trimmed.from.ch);
+                    const suffix = lines[trimmed.to.line].slice(trimmed.to.ch);
+                    const selText = spanText(lines, trimmed.from, trimmed.to);
+                    const removedLines = trimmed.to.line - trimmed.from.line;
+                    const shiftWindow =
+                        doc.lines.length - lines.length + removedLines;
                     const converted = (l: string | undefined) => {
                         if (
                             l === undefined ||
@@ -649,16 +704,16 @@ describe("creation-command invariants over random documents", () => {
                     };
                     let middle: string | null = null;
                     for (let shift = 0; shift <= shiftWindow && middle === null; shift++) {
-                        middle = converted(doc.lines[span.line + shift]);
+                        middle = converted(doc.lines[trimmed.from.line + shift]);
                     }
                     expect(
                         middle,
-                        `no line in the shift window converted ${JSON.stringify(lineBefore)}`,
+                        `no line in the shift window converted ${JSON.stringify(selText)}`,
                     ).not.toBeNull();
                     if (command === "autonum") {
                         const reference = /^\[\^([^\]]+)\]$/.exec(middle as string);
                         expect(doc.lines.join("\n")).toContain(
-                            `[^${(reference as RegExpExecArray)[1]}]: ${selText}`,
+                            `[^${(reference as RegExpExecArray)[1]}]: ${indentDefinitionBody(selText)}`,
                         );
                     }
                 },
@@ -672,18 +727,11 @@ describe("creation-command invariants over random documents", () => {
                 selectionPressArb,
                 fc.constantFrom<CommandName>("named", "paste"),
                 async ({ lines, span, selection, settings }, command) => {
-                    const { from, to } = trimmedSpan(
-                        lines[span.line],
-                        span.from,
-                        span.to,
-                    );
-                    if (from === to) return; // falls through to the cascade
+                    if (trimmedSpan(lines, span.from, span.to) === null) {
+                        return; // falls through to the cascade
+                    }
                     noticeCalls.length = 0;
-                    const doc = pressEditor(
-                        lines,
-                        { line: span.line, ch: span.from },
-                        selection,
-                    );
+                    const doc = pressEditor(lines, span.from, selection);
                     await COMMANDS[command](fakePlugin(doc, settings));
                     // the press itself never edits: paste explains itself,
                     // named hands off to the name modal (whose submit is
@@ -708,30 +756,29 @@ describe("creation-command invariants over random documents", () => {
         );
     });
 
-    soakIt("a multi-line selection warns and edits nothing (all four keys)", async () => {
+    soakIt("multiple selection ranges warn and edit nothing (all four keys)", async () => {
         await fc.assert(
             fc.asyncProperty(
                 pressArb,
                 fc.nat(1000),
                 fc.nat(1000),
                 async ({ lines, cursor, command, settings }, linePick, chPick) => {
-                    if (lines.length < 2) return;
-                    const l2 = cursor.line === lines.length - 1
-                        ? cursor.line - 1
-                        : cursor.line + 1;
-                    const [first, second] =
-                        cursor.line < l2
-                            ? [cursor, { line: l2, ch: chPick % (lines[l2].length + 1) }]
-                            : [{ line: l2, ch: chPick % (lines[l2].length + 1) }, cursor];
-                    // a drag ending at ch 0 of the very next line converts
-                    // as a full-line selection — that's the one exception
-                    if (second.line === first.line + 1 && second.ch === 0) return;
-                    const reversed = linePick % 2 === 1;
-                    const selection = reversed
-                        ? { anchor: second, head: first }
-                        : { anchor: first, head: second };
+                    // two disjoint non-empty ranges — a stray multi-cursor:
+                    // one footnote can't stand in for both, whatever the key
+                    const line = linePick % lines.length;
+                    const lineText = lines[line];
+                    if (lineText.length < 2) return;
+                    const cut = 1 + (chPick % (lineText.length - 1));
+                    const doc = pressEditor(lines, cursor);
+                    (doc as unknown as { listSelections: () => unknown }).listSelections =
+                        () => [
+                            { anchor: { line, ch: 0 }, head: { line, ch: cut } },
+                            {
+                                anchor: { line, ch: cut },
+                                head: { line, ch: lineText.length },
+                            },
+                        ];
                     noticeCalls.length = 0;
-                    const doc = pressEditor(lines, cursor, selection);
                     await COMMANDS[command](fakePlugin(doc, settings));
                     expect(doc.lines.join("\n")).toBe(lines.join("\n"));
                     expect(

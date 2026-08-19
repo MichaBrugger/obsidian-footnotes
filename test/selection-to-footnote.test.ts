@@ -20,6 +20,7 @@ import {
     SelectionSpanNotice,
 } from "../src/commands/selection-footnote";
 import { ProtectedCreationNotice, simulateChanges } from "../src/editor/insertion-liveness";
+import { DefinitionCreationNotice } from "../src/commands/press-guards";
 import { TableCellEditor } from "../src/editor/table-cursor";
 
 // Turning a selection into a footnote (issue #35, Jason's calls 2026-08-12:
@@ -301,18 +302,199 @@ describe("the named key converts a selection through its modal (2026-08-13)", ()
     });
 });
 
-describe("selections that refuse", () => {
-    it("a multi-line selection warns and edits nothing", async () => {
-        const before = ["first line", "second line"];
-        const doc = fakeEditor(before, { line: 0, ch: 0 }, {
-            anchor: { line: 0, ch: 6 },
-            head: { line: 1, ch: 6 },
+describe("a multi-line selection converts into a multi-paragraph definition (2026-08-19)", () => {
+    it("indents continuation lines four spaces under the seeded label", async () => {
+        const before = ["intro", "first para", "", "second para", "outro"];
+        const doc = fakeEditor(before, { line: 1, ch: 0 }, {
+            anchor: { line: 1, ch: 0 },
+            head: { line: 3, ch: "second para".length },
         });
         await insertAutonumFootnote(fakePlugin(doc));
-        expect(doc.lines).toEqual(before);
-        expect(noticed(SelectionSpanNotice)).toBe(true);
+        expect(doc.lines).toEqual([
+            "intro",
+            "[^1]",
+            "outro",
+            "",
+            "[^1]: first para",
+            "",
+            "    second para",
+        ]);
+        // the caret lands at the end of the LAST body line
+        expect(doc.cursor).toEqual({ line: 6, ch: "    second para".length });
     });
 
+    it("converts Jason's academic shape: paragraphs around a whole fenced code block", async () => {
+        const before = [
+            "This is a test.",
+            "First paragraph of the note.",
+            "",
+            "```",
+            "\tlorem ipsum dolor sit",
+            "```",
+            "",
+            "Closing paragraph.",
+        ];
+        const doc = fakeEditor(before, { line: 1, ch: 0 }, {
+            anchor: { line: 1, ch: 0 },
+            head: { line: 7, ch: "Closing paragraph.".length },
+        });
+        await insertAutonumFootnote(fakePlugin(doc));
+        expect(doc.lines).toEqual([
+            "This is a test.",
+            "[^1]",
+            "",
+            "[^1]: First paragraph of the note.",
+            "",
+            "    ```",
+            "    \tlorem ipsum dolor sit",
+            "    ```",
+            "",
+            "    Closing paragraph.",
+        ]);
+        expect(doc.cursor).toEqual({
+            line: 9,
+            ch: "    Closing paragraph.".length,
+        });
+    });
+
+    it("stitches the unselected prefix and suffix onto one line", async () => {
+        const doc = fakeEditor(
+            ["keep this. move me", "and me. keep too"],
+            { line: 0, ch: 11 },
+            {
+                anchor: { line: 0, ch: 11 },
+                head: { line: 1, ch: 7 },
+            },
+        );
+        await insertAutonumFootnote(fakePlugin(doc));
+        expect(doc.lines).toEqual([
+            "keep this. [^1] keep too",
+            "",
+            "[^1]: move me",
+            "    and me.",
+        ]);
+    });
+
+    it("sheds blank edge lines back into the prose", async () => {
+        const doc = fakeEditor(
+            ["", "the payload", "", "tail"],
+            { line: 0, ch: 0 },
+            { anchor: { line: 0, ch: 0 }, head: { line: 2, ch: 0 } },
+        );
+        await insertAutonumFootnote(fakePlugin(doc));
+        expect(doc.lines).toEqual([
+            "",
+            "[^1]",
+            "",
+            "tail",
+            "",
+            "[^1]: the payload",
+        ]);
+    });
+
+    it("the inline key flattens the paragraphs to one line, like paste", async () => {
+        const doc = fakeEditor(
+            ["see first para", "", "second para here"],
+            { line: 0, ch: 4 },
+            {
+                anchor: { line: 0, ch: 4 },
+                head: { line: 2, ch: "second para".length },
+            },
+        );
+        await insertInlineFootnote(fakePlugin(doc));
+        expect(doc.lines).toEqual(["see ^[first para second para] here"]);
+        expect(doc.cursor).toEqual({
+            line: 0,
+            ch: 4 + "^[first para second para]".length,
+        });
+    });
+
+    it("the named modal converts a multi-line selection under the typed name", () => {
+        const doc = fakeEditor(["para one", "para two"], { line: 0, ch: 0 });
+        const problem = convertSelectionToNamed(
+            fakePlugin(doc),
+            doc,
+            {
+                from: { line: 0, ch: 0 },
+                to: { line: 1, ch: 8 },
+                text: "para one\npara two",
+            },
+            "Smith2019",
+        );
+        expect(problem).toBeNull();
+        expect(doc.lines).toEqual([
+            "[^Smith2019]",
+            "",
+            "[^Smith2019]: para one",
+            "    para two",
+        ]);
+    });
+
+    it("the named modal notices a multi-line selection gone stale", () => {
+        const doc = fakeEditor(["para one", "para 2wo"], { line: 0, ch: 0 });
+        const problem = convertSelectionToNamed(
+            fakePlugin(doc),
+            doc,
+            {
+                from: { line: 0, ch: 0 },
+                to: { line: 1, ch: 8 },
+                text: "para one\npara two",
+            },
+            "fine",
+        );
+        expect(problem).toBeNull();
+        expect(doc.lines).toEqual(["para one", "para 2wo"]);
+        expect(noticed(SelectionChangedNotice)).toBe(true);
+    });
+});
+
+describe("whole protected constructs travel INTO the footnote (2026-08-19)", () => {
+    it("a selection containing a whole inline code span converts, span intact", async () => {
+        const doc = fakeEditor(
+            ["keep the `magic word` here"],
+            { line: 0, ch: 5 },
+            { anchor: { line: 0, ch: 5 }, head: { line: 0, ch: 21 } },
+        );
+        await insertAutonumFootnote(fakePlugin(doc));
+        expect(doc.lines).toEqual([
+            "keep [^1] here",
+            "",
+            "[^1]: the `magic word`",
+        ]);
+    });
+
+    it("a selection containing a whole math span converts (inline key)", async () => {
+        const doc = fakeEditor(["a $x$ b"], { line: 0, ch: 2 }, {
+            anchor: { line: 0, ch: 2 },
+            head: { line: 0, ch: 5 },
+        });
+        await insertInlineFootnote(fakePlugin(doc));
+        expect(doc.lines).toEqual(["a ^[$x$] b"]);
+    });
+
+    it("a whole $$ display-math block rides into the definition body", async () => {
+        const doc = fakeEditor(
+            ["prose before", "$$", "E = mc^2", "$$", "prose after"],
+            { line: 0, ch: 0 },
+            {
+                anchor: { line: 0, ch: 0 },
+                head: { line: 4, ch: "prose after".length },
+            },
+        );
+        await insertAutonumFootnote(fakePlugin(doc));
+        expect(doc.lines).toEqual([
+            "[^1]",
+            "",
+            "[^1]: prose before",
+            "    $$",
+            "    E = mc^2",
+            "    $$",
+            "    prose after",
+        ]);
+    });
+});
+
+describe("selections that refuse", () => {
     it("multiple selection ranges warn and edit nothing", async () => {
         const before = ["alpha beta gamma"];
         const doc = fakeEditor(before, { line: 0, ch: 0 });
@@ -421,6 +603,76 @@ describe("selections that refuse", () => {
         await insertAutonumFootnote(fakePlugin(doc));
         expect(doc.lines).toEqual(before);
         expect(noticed(ProtectedCreationNotice)).toBe(true);
+    });
+
+    it("a multi-line selection that CUTS a fence refuses (opener grabbed, closer left)", async () => {
+        // taking the opener and interior without the closer would turn the
+        // stranded "```" into an opener that swallows the rest of the note
+        const before = ["prose", "```", "code", "```", "below[^1]", "", "[^1]: x"];
+        const doc = fakeEditor(before, { line: 0, ch: 0 }, {
+            anchor: { line: 0, ch: 0 },
+            head: { line: 2, ch: 4 },
+        });
+        await insertAutonumFootnote(fakePlugin(doc));
+        expect(doc.lines).toEqual(before);
+        expect(noticed(ProtectedSelectionNotice)).toBe(true);
+    });
+
+    it("a multi-line selection ending inside a fence refuses", async () => {
+        const before = ["prose here", "```", "code", "```"];
+        const doc = fakeEditor(before, { line: 0, ch: 0 }, {
+            anchor: { line: 0, ch: 0 },
+            head: { line: 2, ch: 2 },
+        });
+        await insertAutonumFootnote(fakePlugin(doc));
+        expect(doc.lines).toEqual(before);
+        expect(noticed(ProtectedSelectionNotice)).toBe(true);
+    });
+
+    it("a selection ending mid inline-code on its last line refuses", async () => {
+        const before = ["take this", "and `co de` more"];
+        const doc = fakeEditor(before, { line: 0, ch: 0 }, {
+            anchor: { line: 0, ch: 0 },
+            head: { line: 1, ch: 7 },
+        });
+        await insertAutonumFootnote(fakePlugin(doc));
+        expect(doc.lines).toEqual(before);
+        expect(noticed(ProtectedSelectionNotice)).toBe(true);
+    });
+
+    it("a selection overlapping YAML frontmatter refuses", async () => {
+        // properties are note metadata, not prose — even swallowed whole
+        // they don't belong in a footnote body
+        const before = ["---", "title: x", "---", "prose here"];
+        const doc = fakeEditor(before, { line: 0, ch: 0 }, {
+            anchor: { line: 0, ch: 0 },
+            head: { line: 3, ch: 5 },
+        });
+        await insertAutonumFootnote(fakePlugin(doc));
+        expect(doc.lines).toEqual(before);
+        expect(noticed(ProtectedSelectionNotice)).toBe(true);
+    });
+
+    it("a multi-line selection lapping an existing definition refuses (no nesting)", async () => {
+        const before = ["prose[^a] here", "", "[^a]: existing", "tail prose"];
+        const doc = fakeEditor(before, { line: 0, ch: 0 }, {
+            anchor: { line: 0, ch: 0 },
+            head: { line: 2, ch: 6 },
+        });
+        await insertAutonumFootnote(fakePlugin(doc));
+        expect(doc.lines).toEqual(before);
+        expect(noticed(DefinitionCreationNotice)).toBe(true);
+    });
+
+    it("a multi-line selection swallowing a whole definition refuses too", async () => {
+        const before = ["prose[^a] here", "", "[^a]: existing", "", "tail prose"];
+        const doc = fakeEditor(before, { line: 1, ch: 0 }, {
+            anchor: { line: 1, ch: 0 },
+            head: { line: 4, ch: 10 },
+        });
+        await insertAutonumFootnote(fakePlugin(doc));
+        expect(doc.lines).toEqual(before);
+        expect(noticed(DefinitionCreationNotice)).toBe(true);
     });
 });
 

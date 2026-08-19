@@ -56,17 +56,20 @@ Insert a numbered footnote into this sentence, put the caret back INSIDE its `[^
 
 ## Selection becomes a footnote (issue #35, 2026-08-12)
 
-Select text first, then press a footnote hotkey — the selection converts instead of inserting at the caret. Always on, single-line selections only.
+Select text first, then press a footnote hotkey — the selection converts instead of inserting at the caret. Always on; multi-line selections become multi-paragraph definitions (2026-08-19).
 
 - [ ] Select a few words in this sentence and press the NUMBERED hotkey: the selection is replaced by `[^N]` and the selected text becomes that footnote's definition body at the bottom (popup shows it pre-filled when the popup setting is on; otherwise the caret jumps to the end of the body)
 - [ ] Select a few words and press the INLINE hotkey: the selection becomes `^[the words]` in place, caret after the closing bracket
 - [ ] Select a few words and press the NAMED hotkey: a modal asks for the name, and Enter creates `[^name]` with the selection as its definition (added 2026-08-13)
 - [ ] Select with an extra space at either end (drag sloppily): the spaces stay in the prose, only the trimmed words move into the footnote
 - [ ] Select a whole line by dragging through the newline (caret ends at the start of the next line): the whole line still converts
-- [ ] Select across TWO lines: a toast asks for a single-line selection, nothing changes
-- [ ] Select something and press the NAMED hotkey: a toast redirects to the numbered/inline keys, nothing changes
-- [ ] Same for the paste-inline hotkey (and the clipboard is not read)
-- [ ] Select text inside the `inline code span` here, or inside the code block above: the protected-text toast appears, nothing changes
+- [ ] Select across TWO PARAGRAPHS (blank line between) and press the NUMBERED hotkey: both move into ONE definition — the second paragraph indented four spaces under the label — and the note renders it as a single multi-paragraph footnote (2026-08-19)
+- [ ] Same selection with the INLINE hotkey: the paragraphs flatten onto one line inside `^[…]`, exactly like multi-line clipboard text
+- [ ] Select paragraphs AROUND a whole fenced code block: the fence travels into the definition intact (indented) and renders as code inside the footnote
+- [ ] Select something and press the PASTE-INLINE hotkey: a toast redirects to the other keys, nothing changes (and the clipboard is not read)
+- [ ] Select text inside the `inline code span` here, or inside the code block above: the cuts-through-protected-text toast appears, nothing changes
+- [ ] Select a stretch that ends HALFWAY into a code block (grab the opening fence but not the closer): same toast, nothing changes
+- [ ] Select an entire short `code span` INCLUDING both backticks, plus a word on each side: it converts — the span rides into the footnote whole (2026-08-19)
 - [ ] Select only whitespace: the press behaves like a normal insert at the caret
 - [ ] In a table cell with cell editing active, selecting a word and pressing the inline hotkey wraps it inside the cell; the numbered hotkey replaces it with `[^N]` and the pre-filled definition lands below the table
 - [ ] Undo (Ctrl+Z) after a conversion restores the selected text in one step

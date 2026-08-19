@@ -2,9 +2,12 @@
 
 Settings: defaults.
 
-- [ ] Select across BOTH of these two short lines and press the numbered hotkey: a toast asks for a single-line selection, nothing changes
-- [ ] Select `code words` inside the span on this line: `some code words here` — the protected-text toast appears, nothing changes
+- [ ] Select across BOTH of these two short lines and press the numbered hotkey: they convert into ONE definition, the second line indented four spaces under the label (multi-paragraph selections, 2026-08-19); undo restores both lines
+- [ ] With Ctrl-click, make TWO separate selections and press the numbered hotkey: a toast asks for one continuous stretch, nothing changes
+- [ ] Select `code words` inside the span on this line: `some code words here` — the cuts-through-protected-text toast appears, nothing changes
 - [ ] Select any text inside the fence below: same toast, nothing changes
+- [ ] Select from the line ABOVE the fence to just its opening ``` line (cutting the block in half): same toast, nothing changes
+- [ ] Select from the line above the fence through its closing ``` (the whole block): it converts — the fence rides into the definition indented, and renders as code inside the footnote
 
 ```
 select me in here

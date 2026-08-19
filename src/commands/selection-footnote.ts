@@ -14,10 +14,10 @@ import { DocContext, docContext, listExistingFootnoteDefinitions } from "../edit
 import { openFootnotePopup, popupEditingAvailable } from "./footnote-popup";
 import { inlineFootnoteSpanAt, sanitizeInlineFootnoteContent } from "./inline-footnotes";
 import {
+    caretInsideMaskedSpan,
     ProtectedCreationNotice,
     simulateChanges,
     simulatedAnchor,
-    simulatedMaskedLine,
 } from "../editor/insertion-liveness";
 import {
     findDefinitionBlocks,
@@ -26,7 +26,7 @@ import {
     scanDocument,
 } from "../parsing/markdown-scan";
 import { openPopupForNewDefinition, replaceInTableCell } from "./create-footnote";
-import { warnDefinitionCaretIfInside } from "./press-guards";
+import { DefinitionCreationNotice } from "./press-guards";
 import { TableCellEditor } from "../editor/table-cursor";
 
 // Turning a selection into a footnote (issue #35): a creation press with a
@@ -40,18 +40,30 @@ import { TableCellEditor } from "../editor/table-cursor";
 // press is genuinely ambiguous there. Always on, no toggle (Jason's call,
 // 2026-08-12): a press with a selection previously inserted at the stale
 // caret, which served nobody.
+//
+// Multi-line selections convert too (Jason's ask 2026-08-19 — academic
+// footnotes hold whole paragraphs): the autonum/named keys move the
+// selected block into a MULTI-PARAGRAPH definition (continuation lines
+// indented four spaces, the shape the scanner and the jump commands
+// already speak), and the inline key flattens it to one line exactly like
+// the clipboard paste does. Protected constructs (fences, math, comments,
+// inline spans) may ride along when the selection contains them WHOLE;
+// only a selection that CUTS one — an edge inside a construct, or a
+// delimiter grabbed without its partner, which would reclassify innocent
+// text below — refuses.
 
 export const SelectionSpanNotice =
-    "Select one stretch of text on a single line to turn it into a footnote.";
+    "Select one continuous stretch of text to turn it into a footnote.";
 export const SelectionCommandNotice =
     "To turn the selected text into a footnote, use the auto-numbered, named, or inline footnote command.";
 export const SelectionChangedNotice =
     "The note changed while naming the footnote. Reselect the text and try again.";
 // distinct from ProtectedCreationNotice on purpose (Jason's manual pass,
-// 2026-08-13): here the caret isn't INSIDE protected text — the selected
-// text CONTAINS some, and the footnote body can't carry it
+// 2026-08-13): here the caret isn't INSIDE protected text — the selection
+// EDGE cuts through some. Whole constructs inside the selection are fine
+// (2026-08-19); cutting one apart would corrupt what stays behind.
 export const ProtectedSelectionNotice =
-    "No footnote was created: footnotes can't contain code, math, or other protected text.";
+    "No footnote was created: the selection cuts through code, math, or other protected text. Select all of it or none of it.";
 
 export type FootnoteCommandKind = "autonum" | "named" | "inline" | "paste";
 
@@ -89,11 +101,16 @@ export function selectionPressHandled(
             new Notice(SelectionCommandNotice, 8000);
             return true;
         }
-        // protected text is refused UP FRONT, not just simulated: the
+        // protected-EDGE cut is refused UP FRONT, not just simulated: the
         // liveness checks prove the RESULT is live, but a selection that
-        // eats a delimiter can make a live result out of destroying the
-        // construct (see the main-editor twin below)
-        if (maskInlineRegions(cellText).slice(from, to).includes("\0")) {
+        // eats one delimiter of a span can make a live result out of
+        // destroying the construct. A span contained WHOLE travels into
+        // the footnote instead (2026-08-19; see the main-editor twin).
+        const maskedCell = maskInlineRegions(cellText);
+        if (
+            caretInsideMaskedSpan(maskedCell, from, false, false) ||
+            caretInsideMaskedSpan(maskedCell, to, false, false)
+        ) {
             new Notice(ProtectedSelectionNotice, 8000);
             return true;
         }
@@ -130,55 +147,221 @@ export function selectionPressHandled(
         new Notice(SelectionSpanNotice, 8000);
         return true;
     }
-    // shrink to the non-whitespace core: a selection made by double-click
-    // or drag routinely carries an edge space, and that space belongs to
-    // the prose, not to the footnote
-    const lineText = doc.getLine(resolved.from.line);
-    let fromCh = resolved.from.ch;
-    let toCh = resolved.to.ch;
-    while (fromCh < toCh && /\s/.test(lineText[fromCh])) fromCh++;
-    while (toCh > fromCh && /\s/.test(lineText[toCh - 1])) toCh--;
-    if (fromCh === toCh) return false;
+    // shrink to the non-whitespace core (line breaks included): a
+    // selection made by double-click or drag routinely carries an edge
+    // space or a trailing newline, and that whitespace belongs to the
+    // prose, not to the footnote
+    const trimmed = trimSelectionEdges(doc, resolved.from, resolved.to);
+    if (trimmed === null) return false;
     if (command === "paste") {
         new Notice(SelectionCommandNotice, 8000);
         return true;
     }
-    // protected text is refused UP FRONT, not just simulated: the born-dead
-    // checks prove the RESULT is live, but a selection that eats a
-    // delimiter makes a live result out of DESTROYING the construct —
-    // wrapping the first backtick of a fence opener un-fenced everything
-    // below it (found by the conversion property, 2026-08-12). Any masked
-    // character inside the trimmed span, or a span on a protected line,
-    // means the selected text belongs to code/math/comment territory.
     const ctx = docContext(doc);
+    const text = rangeText(ctx.lines, trimmed.from, trimmed.to);
+    // protected CUTS are refused UP FRONT, not just simulated: the
+    // born-dead checks prove the RESULT is live, but a selection that eats
+    // a delimiter makes a live result out of DESTROYING the construct —
+    // wrapping the first backtick of a fence opener un-fenced everything
+    // below it (found by the conversion property, 2026-08-12). Constructs
+    // contained WHOLE travel into the footnote instead (2026-08-19): an
+    // edge strictly inside protected text, or a replacement that would
+    // reclassify any line it doesn't touch, is what refuses.
+    const replacement =
+        command === "inline"
+            ? `^[${sanitizeInlineFootnoteContent(text)}]`
+            : "[^x]";
     if (
-        ctx.scan.isProtected[resolved.from.line] ||
-        ctx.maskedLine(resolved.from.line).slice(fromCh, toCh).includes("\0")
+        selectionCutsProtectedText(ctx, trimmed.from, trimmed.to) ||
+        replacementReclassifiesDoc(ctx, trimmed.from, trimmed.to, replacement)
     ) {
         new Notice(ProtectedSelectionNotice, 8000);
         return true;
     }
-    // a selection inside another footnote's definition would nest the new
-    // footnote into it — refused like the caret presses (Jason's ruling
-    // 2026-08-13)
+    // a selection inside — or lapping over — another footnote's definition
+    // would nest footnotes into each other, refused like the caret presses
+    // (Jason's ruling 2026-08-13). Any overlap counts: starting inside a
+    // block nests the new footnote into it, and swallowing a block nests
+    // it into the new footnote.
     if (
-        warnDefinitionCaretIfInside(doc, null, { line: resolved.from.line, ch: fromCh }, ctx)
+        findDefinitionBlocks(ctx.lines, ctx.scan.isProtected, ctx.scan).some(
+            (block) =>
+                trimmed.from.line <= block.end && trimmed.to.line >= block.start,
+        )
     ) {
+        new Notice(DefinitionCreationNotice, 8000);
         return true;
     }
-    const selection = {
-        from: { line: resolved.from.line, ch: fromCh },
-        to: { line: resolved.from.line, ch: toCh },
-        text: lineText.slice(fromCh, toCh),
-    };
+    const selection = { from: trimmed.from, to: trimmed.to, text };
     if (command === "inline") {
-        convertMainSelectionToInline(plugin, doc, selection);
+        convertMainSelectionToInline(plugin, doc, selection, ctx);
     } else if (command === "named") {
         new NameSelectionModal(plugin, doc, { kind: "main", selection }).open();
     } else {
         convertMainSelection(plugin, doc, selection, ctx, autonumFootnoteId(plugin, doc, ctx));
     }
     return true;
+}
+
+/**
+ * The selection's non-whitespace core, edges walked ACROSS line breaks
+ * (multi-line selections routinely start or end on a blank line), or null
+ * when nothing but whitespace is selected. Also normalizes the full-line
+ * drag (ending at ch 0 of the next line) back onto the dragged line.
+ */
+export function trimSelectionEdges(
+    doc: Editor,
+    from: EditorPosition,
+    to: EditorPosition,
+): { from: EditorPosition; to: EditorPosition } | null {
+    let { line: fromLine, ch: fromCh } = from;
+    let { line: toLine, ch: toCh } = to;
+    while (fromLine < toLine || fromCh < toCh) {
+        const lineText = doc.getLine(fromLine);
+        if (fromCh >= lineText.length) {
+            // the implicit line break is whitespace too
+            fromLine++;
+            fromCh = 0;
+            continue;
+        }
+        if (!/\s/.test(lineText[fromCh])) break;
+        fromCh++;
+    }
+    while (toLine > fromLine || toCh > fromCh) {
+        if (toCh === 0) {
+            toLine--;
+            toCh = doc.getLine(toLine).length;
+            continue;
+        }
+        if (!/\s/.test(doc.getLine(toLine)[toCh - 1])) break;
+        toCh--;
+    }
+    if (fromLine === toLine && fromCh === toCh) return null;
+    return {
+        from: { line: fromLine, ch: fromCh },
+        to: { line: toLine, ch: toCh },
+    };
+}
+
+/** The text `[from, to)` spans, LF-joined — the fake-editor-safe getRange. */
+function rangeText(
+    lines: string[],
+    from: EditorPosition,
+    to: EditorPosition,
+): string {
+    if (from.line === to.line) {
+        return (lines[from.line] ?? "").slice(from.ch, to.ch);
+    }
+    const parts = [(lines[from.line] ?? "").slice(from.ch)];
+    for (let i = from.line + 1; i < to.line; i++) parts.push(lines[i] ?? "");
+    parts.push((lines[to.line] ?? "").slice(0, to.ch));
+    return parts.join("\n");
+}
+
+/**
+ * Whether either selection EDGE cuts into protected text: strictly inside
+ * a masked span on its line, inside a multi-line region (comment/math/
+ * fence) that crosses the edge, or anywhere in YAML frontmatter (metadata
+ * is never prose — a footnote body carrying half a properties block helps
+ * nobody). Constructs the selection contains WHOLE pass: their edges see
+ * live text on the outside. Trimming guarantees the character AT `from`
+ * and BEFORE `to` exist, so only the outward-facing neighbor needs the
+ * open-region stand-in.
+ */
+function selectionCutsProtectedText(
+    ctx: DocContext,
+    from: EditorPosition,
+    to: EditorPosition,
+): boolean {
+    const { lines, scan } = ctx;
+    // frontmatter starts at line 0, so any overlap includes `from`
+    if (lines[0] === "---" && scan.isProtected[0]) {
+        for (let j = 1; j < lines.length; j++) {
+            if (/^(---|\.\.\.)\s*$/.test(lines[j])) {
+                if (from.line <= j) return true;
+                break;
+            }
+        }
+    }
+    // the startsIn* flags cover comment/math regions (quoted ones
+    // included); the partial scans add doc-level fences. A quoted fence
+    // crossing an edge at ch 0 slips past both — the born-dead simulation
+    // refuses it one step later.
+    const openAtFrom =
+        scan.startsInComment[from.line] ||
+        scan.startsInMath[from.line] ||
+        scanDocument(lines.slice(0, from.line)).endsProtected;
+    if (
+        caretInsideMaskedSpan(
+            ctx.maskedLine(from.line),
+            from.ch,
+            openAtFrom,
+            false, // `from` points AT a character — the after-side is on-line
+        )
+    ) {
+        return true;
+    }
+    const openAtTo =
+        to.line + 1 < lines.length
+            ? scan.startsInComment[to.line + 1] ||
+              scan.startsInMath[to.line + 1] ||
+              scanDocument(lines.slice(0, to.line + 1)).endsProtected
+            : scan.endsProtected;
+    return caretInsideMaskedSpan(
+        ctx.maskedLine(to.line),
+        to.ch,
+        false, // `to` follows a character — the before-side is on-line
+        openAtTo,
+    );
+}
+
+/**
+ * Whether replacing the selection with `replacement` changes the
+ * protection classification of ANY line the edit doesn't touch — the
+ * construct-destruction oracle: a selection that eats a fence delimiter
+ * (or completes/un-closes a region by removal) leaves a live-looking
+ * result precisely BECAUSE innocent text below got reclassified, which
+ * the reference/definition liveness checks can't see.
+ */
+function replacementReclassifiesDoc(
+    ctx: DocContext,
+    from: EditorPosition,
+    to: EditorPosition,
+    replacement: string,
+): boolean {
+    const before = ctx.scan;
+    const simulated = simulateChanges(ctx.lines, [
+        { from, to, text: replacement },
+    ]);
+    const after = scanDocument(simulated);
+    const delta = simulated.length - ctx.lines.length;
+    const changed = (i: number, j: number) =>
+        before.isProtected[i] !== after.isProtected[j] ||
+        before.startsInComment[i] !== after.startsInComment[j] ||
+        before.startsInMath[i] !== after.startsInMath[j];
+    for (let i = 0; i < from.line; i++) {
+        if (changed(i, i)) return true;
+    }
+    for (let i = to.line + 1; i < ctx.lines.length; i++) {
+        if (changed(i, i + delta)) return true;
+    }
+    return false;
+}
+
+/**
+ * `text` as a definition body: the first line rides the label, every
+ * later line becomes a four-space-indented continuation (the shape the
+ * scanner, the jump commands, and Obsidian's renderer all read as ONE
+ * multi-paragraph footnote). Whitespace-only lines become empty —
+ * paragraph separators inside the block.
+ */
+export function indentDefinitionBody(text: string): string {
+    return text
+        .split("\n")
+        .map((line, i) =>
+            i === 0 ? line : line.trim() === "" ? "" : `    ${line}`,
+        )
+        .join("\n");
 }
 
 /** The next auto-numbered id under the note's active prefix, or null when the prefix is invalid (its Notice already explained why). */
@@ -235,9 +418,8 @@ export function convertSelectionToNamed(
     const problem = namedSelectionProblem(doc, name, ctx);
     if (problem !== null) return problem;
     if (
-        selection.from.line >= doc.lineCount() ||
-        doc.getLine(selection.from.line).slice(selection.from.ch, selection.to.ch) !==
-            selection.text
+        selection.to.line >= doc.lineCount() ||
+        rangeText(ctx.lines, selection.from, selection.to) !== selection.text
     ) {
         new Notice(SelectionChangedNotice, 8000);
         return null;
@@ -269,9 +451,9 @@ export function convertCellSelectionToNamed(
 /**
  * The main editor's one usable selection range, oriented from ≤ to:
  * null = nothing selected, "multi" = unconvertible (multiple selection
- * ranges, or a range spanning lines — a footnote body is single-line). A
- * full-line drag ends at ch 0 of the NEXT line; that shape converts as
- * "to the end of the selected line" instead of refusing.
+ * ranges — one footnote can't stand in for several disjoint stretches).
+ * Line-spanning ranges are usable since 2026-08-19: they become
+ * multi-paragraph definitions.
  */
 function normalizedMainSelection(
     doc: Editor,
@@ -286,26 +468,28 @@ function normalizedMainSelection(
     let from = ranges[0].anchor;
     let to = ranges[0].head;
     if (posCmp(from, to) > 0) [from, to] = [to, from];
-    if (to.line === from.line + 1 && to.ch === 0) {
-        to = { line: from.line, ch: doc.getLine(from.line).length };
-    }
-    if (to.line !== from.line) return "multi";
     return { from, to };
 }
 
 // The inline flavor: the selection becomes "^[…]" in place, caret after
 // the closing bracket — the sanitizer (shared with paste) collapses
-// whitespace and escapes unbalanced brackets so the wrapper can't end
-// early. Same born-dead refusal as insertInlineText: the span must survive
-// on the masked simulated line (a selection inside protected text, or one
-// whose removal completes a construct around it, dies here).
+// whitespace (a multi-paragraph selection flattens to one line, exactly
+// like multi-line clipboard text) and escapes unbalanced brackets so the
+// wrapper can't end early. Same born-dead refusal as insertInlineText:
+// the span must survive on the masked simulated line (a selection inside
+// protected text, or one whose removal completes a construct around it,
+// dies here).
 function convertMainSelectionToInline(
     plugin: FootnotePlugin,
     doc: Editor,
     selection: { from: EditorPosition; to: EditorPosition; text: string },
+    ctx: DocContext,
 ): void {
     const text = `^[${sanitizeInlineFootnoteContent(selection.text)}]`;
-    const masked = simulatedMaskedLine(doc, selection.from, text, selection.to.ch);
+    const simulated = simulateChanges(ctx.lines, [
+        { from: selection.from, to: selection.to, text },
+    ]);
+    const masked = maskedLineAt(simulated, selection.from.line);
     if (inlineFootnoteSpanAt(masked, selection.from.ch + 2)?.open !== selection.from.ch) {
         new Notice(ProtectedCreationNotice, 8000);
         return;
@@ -336,10 +520,14 @@ function convertMainSelection(
     const footnoteReference = `[^${footnoteId}]`;
     const isFirstFootnote = listExistingFootnoteDefinitions(doc, ctx).length === 0;
 
+    // a multi-line selection becomes a multi-paragraph body: continuation
+    // lines indented four spaces under the label (2026-08-19)
+    const body = indentDefinitionBody(selection.text);
+    const bodyExtraLines = body.split("\n").length - 1;
     const definition = seedDefinitionBody(
         buildDefinitionAppend(doc, footnoteId, isFirstFootnote, plugin, ctx),
         footnoteId,
-        selection.text,
+        body,
     );
     const changes: EditorChange[] = [
         { from: selection.from, to: selection.to, text: footnoteReference },
@@ -348,18 +536,36 @@ function convertMainSelection(
     if (definition.prepend) changes.push(definition.prepend);
 
     // same verification as createAutonumFootnote: the new reference must be
-    // live and its definition must parse as a live block on the SIMULATED
-    // result; refuse like the protected-caret guard otherwise. The
-    // reference is re-found through simulatedAnchor — a definition appended
-    // ABOVE the selection shifts every later line (entry-corpus find,
-    // 2026-08-12)
+    // live and its definition must parse as a live block — one that claims
+    // every seeded continuation line — on the SIMULATED result; refuse like
+    // the protected-caret guard otherwise. BOTH anchors are re-found
+    // through simulatedAnchor — a definition appended ABOVE the selection
+    // shifts every later line (entry-corpus find, 2026-08-12), and a
+    // multi-line selection collapsing to "[^id]" shifts every line BELOW
+    // it, the appended definition included (2026-08-19)
     const simulated = simulateChanges(ctx.lines, changes);
     const simulatedScan = scanDocument(simulated);
+    const definitionAnchor = simulatedAnchor(ctx.lines, changes, 1, simulated);
+    const labelAt = definition.change.text.lastIndexOf(`[^${footnoteId}]: `);
+    const labelLine =
+        definitionAnchor.line +
+        definition.change.text.slice(0, labelAt).split("\n").length -
+        1;
+    // where the caret should land AFTER the transaction: the end of the
+    // seeded body, in simulated coordinates
+    const definitionCursor = {
+        line: labelLine + bodyExtraLines,
+        ch: definition.cursor.ch,
+    };
     const definitionLive = findDefinitionBlocks(
         simulated,
         simulatedScan.isProtected,
         simulatedScan,
-    ).some((block) => block.start === definition.cursor.line);
+    ).some(
+        (block) =>
+            block.start === labelLine &&
+            block.end >= labelLine + bodyExtraLines,
+    );
     const referenceAnchor = simulatedAnchor(ctx.lines, changes, 0, simulated);
     const referenceLive = referenceOccurrences(
         simulated[referenceAnchor.line],
@@ -384,10 +590,10 @@ function convertMainSelection(
             ch: referenceAnchor.ch + footnoteReference.length,
         };
         doc.transaction({ changes, selection: { from: afterReference } });
-        openPopupForNewDefinition(plugin, doc, selection.from, footnoteId, definition.cursor);
+        openPopupForNewDefinition(plugin, doc, selection.from, footnoteId, definitionCursor);
         // Stryker restore all
     } else {
-        moveCursorAndSetJumpPoint(doc, selection.from, definition.cursor, plugin, changes, true);
+        moveCursorAndSetJumpPoint(doc, selection.from, definitionCursor, plugin, changes, true);
     }
 }
 
