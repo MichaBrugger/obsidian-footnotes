@@ -7,6 +7,7 @@ import { noticeCalls } from "./mocks/obsidian";
 import FootnotePlugin from "../src/main";
 import {
     indentDefinitionBody,
+    InlineSelectionNotice,
     SelectionCommandNotice,
     SelectionSpanNotice,
     trimSelectionEdges,
@@ -622,13 +623,30 @@ describe("creation-command invariants over random documents", () => {
                     await COMMANDS[command](fakePlugin(doc, settings));
                     const unchanged =
                         doc.lines.join("\n") === lines.join("\n");
+                    // the inline key never converts a line-spanning
+                    // selection (Jason's revert of the flatten, 2026-08-20)
+                    // — it refuses with its own notice and edits nothing
+                    if (
+                        command === "inline" &&
+                        trimmed !== null &&
+                        trimmed.from.line !== trimmed.to.line
+                    ) {
+                        expect(unchanged).toBe(true);
+                        expect(
+                            noticeCalls.some(
+                                (args) => args[0] === InlineSelectionNotice,
+                            ),
+                        ).toBe(true);
+                        return;
+                    }
                     // protected text is never LOST, converted or not: a
                     // refusal (or fallthrough) conserves every protected
                     // line verbatim; an autonum conversion may carry
                     // protected lines the selection contained WHOLE into
                     // the definition body, four-space-indented (2026-08-19).
-                    // The inline conversion flattens contained lines into
-                    // the wrapper, which the shape check below owns.
+                    // (The inline key is single-line-only, so it can never
+                    // legitimately move a protected line — a regression
+                    // would fail the exact-conservation branch.)
                     const strictlyInside = (i: number) =>
                         trimmed !== null &&
                         (i > trimmed.from.line ||
@@ -642,8 +660,12 @@ describe("creation-command invariants over random documents", () => {
                     }
                     for (let i = 0; i < lines.length; i++) {
                         if (!protectedBefore[i]) continue;
-                        if (!unchanged && trimmed !== null && strictlyInside(i)) {
-                            if (command === "inline") continue;
+                        if (
+                            !unchanged &&
+                            trimmed !== null &&
+                            command !== "inline" &&
+                            strictlyInside(i)
+                        ) {
                             const carried =
                                 i === trimmed.from.line
                                     ? lines[i].slice(trimmed.from.ch)

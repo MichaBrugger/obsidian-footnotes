@@ -19,9 +19,11 @@ the rendered footnote must show the construct, not its raw markdown.
 Bulleted list (nested item included):
 
 before the list
+
 - alpha
     - nested
 - beta
+
 after the list
 
 - [ ] Converts; footnote renders the list with its nesting
@@ -29,9 +31,11 @@ after the list
 Numbered list and a task item:
 
 before numbers
+
 1. first
 2. second
 - [ ] task item
+
 after numbers
 
 - [ ] Converts; footnote renders the ordered list and the checkbox
@@ -39,8 +43,10 @@ after numbers
 Blockquote:
 
 before the quote
+
 > quoted line
 > second quoted
+
 after the quote
 
 - [ ] Converts; footnote renders a quote block
@@ -48,8 +54,10 @@ after the quote
 Callout:
 
 before the callout
+
 > [!note] Heads up
 > callout body
+
 after the callout
 
 - [ ] Converts; footnote (and popup) renders the callout box
@@ -86,15 +94,17 @@ after the images
 Table:
 
 before the table
+
 | a | b |
 | --- | --- |
 | 1 | 2 |
+
 after the table
 
 - [ ] Converts (source mode); the footnote renders the table
 - [ ] The indented table inside the definition doesn't confuse later lints (run Lint: nothing rewrites it)
 
-Fenced code and $$ math (already pinned in A9/units — rendering check only):
+Fenced code and `$$` math (already pinned in A9/units — rendering check only):
 
 before the fence
 ```
@@ -103,6 +113,7 @@ fenced code here
 $$
 E = mc^2
 $$
+inline math before $1+1\neq3$ and after
 after the fence
 
 - [ ] Converts; footnote renders the code block AND the math block
@@ -112,15 +123,19 @@ after the fence
 - [ ] Pick any two fixtures above, use the NAMED hotkey: modal opens, Enter
       converts identically under `[^yourname]`; one undo reverts everything
 
-## Inline key — the zoo flattens to one line
+## Inline key — multi-line selections REFUSE (ruling 2026-08-20)
 
-The inline key collapses line breaks to spaces (paste parity), so block
-structure is LOST by design — the text must still be intact and the `^[…]`
-must not break.
+Inline footnotes are single-line; flattening a multi-line selection was
+tried and reverted — it basically never looked correct outside clean
+paragraphs. A line-spanning selection now toasts and redirects to the
+numbered/named keys.
 
-- [ ] The image-links fixture: brackets stay unescaped, embeds still render inline
-- [ ] The blockquote fixture: `>` markers become literal text inside the footnote, wrapper intact
-- [ ] The table fixture: pipes become literal text, wrapper intact, nothing eats the note
+- [ ] Any multi-line fixture above + INLINE hotkey: the "Inline footnotes
+      are single-line" toast, nothing changes
+- [ ] A SINGLE image link selected on its own line + INLINE hotkey: converts,
+      brackets stay unescaped, the embed still renders inline
+- [ ] A full-line drag that ends at ch 0 of the next line still converts
+      (it normalizes to one line)
 
 ## Cut refusals (spot checks — the toast, nothing changes)
 
@@ -128,7 +143,7 @@ must not break.
       convert: allowed (tables aren't protected) — note whether the
       leftover half-table looks acceptable, this one is judgment territory
 - [ ] Select from above the fence through its opening ``` only: cuts-through-protected toast
-- [ ] Select from inside the $$ block to below it: same toast
+- [ ] Select from inside the `$$` block to below it: same toast
 
 ## Popup pass
 

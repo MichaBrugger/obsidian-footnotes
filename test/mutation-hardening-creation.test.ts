@@ -14,6 +14,7 @@ import {
 import {
     ProtectedSelectionNotice,
     selectionPressHandled,
+    InlineSelectionNotice,
     SelectionCommandNotice,
     SelectionSpanNotice,
 } from "../src/commands/selection-footnote";
@@ -698,6 +699,9 @@ describe("the selection notices", () => {
         );
         expect(SelectionCommandNotice).toBe(
             "To turn the selected text into a footnote, use the auto-numbered, named, or inline footnote command.",
+        );
+        expect(InlineSelectionNotice).toBe(
+            "Inline footnotes are single-line. Use the auto-numbered or named footnote command to convert a multi-line selection.",
         );
     });
 });

@@ -45,12 +45,14 @@ import { TableCellEditor } from "../editor/table-cursor";
 // footnotes hold whole paragraphs): the autonum/named keys move the
 // selected block into a MULTI-PARAGRAPH definition (continuation lines
 // indented four spaces, the shape the scanner and the jump commands
-// already speak), and the inline key flattens it to one line exactly like
-// the clipboard paste does. Protected constructs (fences, math, comments,
-// inline spans) may ride along when the selection contains them WHOLE;
-// only a selection that CUTS one — an edge inside a construct, or a
-// delimiter grabbed without its partner, which would reclassify innocent
-// text below — refuses.
+// already speak). The INLINE key refuses line-spanning selections and
+// redirects to those two keys instead (Jason's ruling 2026-08-20: the
+// flatten-like-paste behavior basically never looked correct on anything
+// but clean paragraphs, and paste already covers the flatten use case).
+// Protected constructs (fences, math, comments, inline spans) may ride
+// along when the selection contains them WHOLE; only a selection that
+// CUTS one — an edge inside a construct, or a delimiter grabbed without
+// its partner, which would reclassify innocent text below — refuses.
 
 export const SelectionSpanNotice =
     "Select one continuous stretch of text to turn it into a footnote.";
@@ -58,6 +60,11 @@ export const SelectionCommandNotice =
     "To turn the selected text into a footnote, use the auto-numbered, named, or inline footnote command.";
 export const SelectionChangedNotice =
     "The note changed while naming the footnote. Reselect the text and try again.";
+// inline footnotes are single-line by nature; flattening a multi-line
+// selection (paste parity) was tried and REVERTED (Jason, 2026-08-20) —
+// it basically never looked correct outside clean paragraphs
+export const InlineSelectionNotice =
+    "Inline footnotes are single-line. Use the auto-numbered or named footnote command to convert a multi-line selection.";
 // distinct from ProtectedCreationNotice on purpose (Jason's manual pass,
 // 2026-08-13): here the caret isn't INSIDE protected text — the selection
 // EDGE cuts through some. Whole constructs inside the selection are fine
@@ -155,6 +162,12 @@ export function selectionPressHandled(
     if (trimmed === null) return false;
     if (command === "paste") {
         new Notice(SelectionCommandNotice, 8000);
+        return true;
+    }
+    // the inline key only converts within one line — a line-spanning
+    // selection redirects to the definition-backed keys (2026-08-20)
+    if (command === "inline" && trimmed.from.line !== trimmed.to.line) {
+        new Notice(InlineSelectionNotice, 8000);
         return true;
     }
     const ctx = docContext(doc);
@@ -472,13 +485,12 @@ function normalizedMainSelection(
 }
 
 // The inline flavor: the selection becomes "^[…]" in place, caret after
-// the closing bracket — the sanitizer (shared with paste) collapses
-// whitespace (a multi-paragraph selection flattens to one line, exactly
-// like multi-line clipboard text) and escapes unbalanced brackets so the
-// wrapper can't end early. Same born-dead refusal as insertInlineText:
-// the span must survive on the masked simulated line (a selection inside
-// protected text, or one whose removal completes a construct around it,
-// dies here).
+// the closing bracket — single-line selections only (the entry redirects
+// line-spanning ones, 2026-08-20); the sanitizer (shared with paste)
+// collapses whitespace and escapes unbalanced brackets so the wrapper
+// can't end early. Same born-dead refusal as insertInlineText: the span
+// must survive on the masked simulated line (a selection inside protected
+// text, or one whose removal completes a construct around it, dies here).
 function convertMainSelectionToInline(
     plugin: FootnotePlugin,
     doc: Editor,

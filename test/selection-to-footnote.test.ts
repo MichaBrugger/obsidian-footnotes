@@ -12,6 +12,7 @@ import {
 } from "../src/commands/insert-or-navigate-footnotes";
 import {
     convertCellSelectionToNamed,
+    InlineSelectionNotice,
     ProtectedSelectionNotice,
     convertSelectionToNamed,
     selectionPressHandled,
@@ -392,21 +393,27 @@ describe("a multi-line selection converts into a multi-paragraph definition (202
         ]);
     });
 
-    it("the inline key flattens the paragraphs to one line, like paste", async () => {
+    it("the inline key REFUSES a multi-line selection, pointing at the other keys", async () => {
+        // flatten-like-paste was tried and reverted (Jason, 2026-08-20):
+        // it basically never looked correct outside clean paragraphs
+        const before = ["see first para", "", "second para here"];
+        const doc = fakeEditor(before, { line: 0, ch: 4 }, {
+            anchor: { line: 0, ch: 4 },
+            head: { line: 2, ch: "second para".length },
+        });
+        await insertInlineFootnote(fakePlugin(doc));
+        expect(doc.lines).toEqual(before);
+        expect(noticed(InlineSelectionNotice)).toBe(true);
+    });
+
+    it("a full-line drag still converts on the inline key (it normalizes to ONE line)", async () => {
         const doc = fakeEditor(
-            ["see first para", "", "second para here"],
-            { line: 0, ch: 4 },
-            {
-                anchor: { line: 0, ch: 4 },
-                head: { line: 2, ch: "second para".length },
-            },
+            ["wrap me", "next"],
+            { line: 0, ch: 0 },
+            { anchor: { line: 0, ch: 0 }, head: { line: 1, ch: 0 } },
         );
         await insertInlineFootnote(fakePlugin(doc));
-        expect(doc.lines).toEqual(["see ^[first para second para] here"]);
-        expect(doc.cursor).toEqual({
-            line: 0,
-            ch: 4 + "^[first para second para]".length,
-        });
+        expect(doc.lines).toEqual(["^[wrap me]", "next"]);
     });
 
     it("the named modal converts a multi-line selection under the typed name", () => {
@@ -817,23 +824,27 @@ describe("the block zoo converts (2026-08-19)", () => {
         "    below prose",
     ];
 
+    // fixtures are BLANK-PADDED like the A13 sheet (Jason's fix,
+    // 2026-08-20): in Live Preview most blocks only render correctly with
+    // a blank line between them and surrounding text, so that's the
+    // realistic selection shape
     it("a bulleted list (nested item included)", async () => {
-        const middle = ["- alpha", "    - nested", "- beta"];
+        const middle = ["", "- alpha", "    - nested", "- beta", ""];
         expect(await convertBlock(middle)).toEqual(indented(middle));
     });
 
     it("a numbered list and a task item", async () => {
-        const middle = ["1. first", "2. second", "- [ ] task"];
+        const middle = ["", "1. first", "2. second", "- [ ] task", ""];
         expect(await convertBlock(middle)).toEqual(indented(middle));
     });
 
     it("a blockquote", async () => {
-        const middle = ["> quoted line", "> second quoted"];
+        const middle = ["", "> quoted line", "> second quoted", ""];
         expect(await convertBlock(middle)).toEqual(indented(middle));
     });
 
     it("a callout", async () => {
-        const middle = ["> [!note] Heads up", "> callout body"];
+        const middle = ["", "> [!note] Heads up", "> callout body", ""];
         expect(await convertBlock(middle)).toEqual(indented(middle));
     });
 
@@ -853,22 +864,46 @@ describe("the block zoo converts (2026-08-19)", () => {
     });
 
     it("a table", async () => {
-        const middle = ["| a | b |", "| --- | --- |", "| 1 | 2 |"];
+        const middle = ["", "| a | b |", "| --- | --- |", "| 1 | 2 |", ""];
         expect(await convertBlock(middle)).toEqual(indented(middle));
     });
 
-    it("the inline key flattens an image link without escaping its brackets", async () => {
+    it("a fence, a $$ block, and inline math together (the A13 fixture)", async () => {
+        const middle = [
+            "```",
+            "fenced code here",
+            "```",
+            "$$",
+            "E = mc^2",
+            "$$",
+            "inline math before $1+1\\neq3$ and after",
+        ];
+        expect(await convertBlock(middle)).toEqual(indented(middle));
+    });
+
+    it("the inline key flattens a SINGLE-line image link without escaping its brackets", async () => {
         // balanced brackets pass the sanitizer untouched — the embed keeps
         // working inside the inline footnote
         const doc = fakeEditor(
-            ["see ![alt](https://x.org/p.png)", "and more here"],
+            ["see ![alt](https://x.org/p.png) here"],
             { line: 0, ch: 4 },
-            { anchor: { line: 0, ch: 4 }, head: { line: 1, ch: 8 } },
+            { anchor: { line: 0, ch: 4 }, head: { line: 0, ch: 31 } },
         );
         await insertInlineFootnote(fakePlugin(doc));
         expect(doc.lines).toEqual([
-            "see ^[![alt](https://x.org/p.png) and more] here",
+            "see ^[![alt](https://x.org/p.png)] here",
         ]);
+    });
+
+    it("the inline key refuses the zoo's multi-line fixtures like any other", async () => {
+        const before = ["see ![alt](https://x.org/p.png)", "and more here"];
+        const doc = fakeEditor(before, { line: 0, ch: 4 }, {
+            anchor: { line: 0, ch: 4 },
+            head: { line: 1, ch: 8 },
+        });
+        await insertInlineFootnote(fakePlugin(doc));
+        expect(doc.lines).toEqual(before);
+        expect(noticed(InlineSelectionNotice)).toBe(true);
     });
 
     it("the named modal takes a block-zoo selection too", () => {

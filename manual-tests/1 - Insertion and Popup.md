@@ -64,7 +64,7 @@ Select text first, then press a footnote hotkey — the selection converts inste
 - [ ] Select with an extra space at either end (drag sloppily): the spaces stay in the prose, only the trimmed words move into the footnote
 - [ ] Select a whole line by dragging through the newline (caret ends at the start of the next line): the whole line still converts
 - [ ] Select across TWO PARAGRAPHS (blank line between) and press the NUMBERED hotkey: both move into ONE definition — the second paragraph indented four spaces under the label — and the note renders it as a single multi-paragraph footnote (2026-08-19)
-- [ ] Same selection with the INLINE hotkey: the paragraphs flatten onto one line inside `^[…]`, exactly like multi-line clipboard text
+- [ ] Same selection with the INLINE hotkey: a toast says inline footnotes are single-line and points at the numbered/named keys, nothing changes (flatten reverted 2026-08-20)
 - [ ] Select paragraphs AROUND a whole fenced code block: the fence travels into the definition intact (indented) and renders as code inside the footnote
 - [ ] Select something and press the PASTE-INLINE hotkey: a toast redirects to the other keys, nothing changes (and the clipboard is not read)
 - [ ] Select text inside the `inline code span` here, or inside the code block above: the cuts-through-protected-text toast appears, nothing changes
