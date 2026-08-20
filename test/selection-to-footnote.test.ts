@@ -786,3 +786,112 @@ describe("selections inside an actively edited table cell", () => {
         expect(doc.lines[doc.lines.length - 1]).toBe("[^src]: word");
     });
 });
+
+// ---------------------------------------------------------------------------
+// the block zoo (2026-08-19): every block construct Obsidian speaks, selected
+// WHOLE inside a conversion — these pin the exact seeded definition so the
+// manual combo sheet (A13) can promise what the note will hold. Rendering
+// inside the footnote/popup is A13's eyeball territory; the text shape is
+// pinned here.
+// ---------------------------------------------------------------------------
+
+describe("the block zoo converts (2026-08-19)", () => {
+    /** Convert `middle` (with a prose line above and below it riding along) via autonum and return the resulting lines. */
+    async function convertBlock(middle: string[]): Promise<string[]> {
+        const lines = ["above prose", ...middle, "below prose", "tail stays"];
+        const lastSelected = lines.length - 2;
+        const doc = fakeEditor(lines, { line: 0, ch: 0 }, {
+            anchor: { line: 0, ch: 0 },
+            head: { line: lastSelected, ch: lines[lastSelected].length },
+        });
+        await insertAutonumFootnote(fakePlugin(doc));
+        return doc.lines;
+    }
+
+    const indented = (middle: string[]) => [
+        "[^1]",
+        "tail stays",
+        "",
+        "[^1]: above prose",
+        ...middle.map((l) => (l.trim() === "" ? "" : `    ${l}`)),
+        "    below prose",
+    ];
+
+    it("a bulleted list (nested item included)", async () => {
+        const middle = ["- alpha", "    - nested", "- beta"];
+        expect(await convertBlock(middle)).toEqual(indented(middle));
+    });
+
+    it("a numbered list and a task item", async () => {
+        const middle = ["1. first", "2. second", "- [ ] task"];
+        expect(await convertBlock(middle)).toEqual(indented(middle));
+    });
+
+    it("a blockquote", async () => {
+        const middle = ["> quoted line", "> second quoted"];
+        expect(await convertBlock(middle)).toEqual(indented(middle));
+    });
+
+    it("a callout", async () => {
+        const middle = ["> [!note] Heads up", "> callout body"];
+        expect(await convertBlock(middle)).toEqual(indented(middle));
+    });
+
+    it("a horizontal rule", async () => {
+        const middle = ["", "---", ""];
+        expect(await convertBlock(middle)).toEqual(indented(middle));
+    });
+
+    it("a heading", async () => {
+        const middle = ["", "## Section title", ""];
+        expect(await convertBlock(middle)).toEqual(indented(middle));
+    });
+
+    it("image links, markdown and wikilink embed flavors", async () => {
+        const middle = ["![alt text](https://example.org/pic.png)", "![[vault image.png]]"];
+        expect(await convertBlock(middle)).toEqual(indented(middle));
+    });
+
+    it("a table", async () => {
+        const middle = ["| a | b |", "| --- | --- |", "| 1 | 2 |"];
+        expect(await convertBlock(middle)).toEqual(indented(middle));
+    });
+
+    it("the inline key flattens an image link without escaping its brackets", async () => {
+        // balanced brackets pass the sanitizer untouched — the embed keeps
+        // working inside the inline footnote
+        const doc = fakeEditor(
+            ["see ![alt](https://x.org/p.png)", "and more here"],
+            { line: 0, ch: 4 },
+            { anchor: { line: 0, ch: 4 }, head: { line: 1, ch: 8 } },
+        );
+        await insertInlineFootnote(fakePlugin(doc));
+        expect(doc.lines).toEqual([
+            "see ^[![alt](https://x.org/p.png) and more] here",
+        ]);
+    });
+
+    it("the named modal takes a block-zoo selection too", () => {
+        const doc = fakeEditor(
+            ["pick > quoted", "- listed end"],
+            { line: 0, ch: 5 },
+        );
+        const problem = convertSelectionToNamed(
+            fakePlugin(doc),
+            doc,
+            {
+                from: { line: 0, ch: 5 },
+                to: { line: 1, ch: 8 },
+                text: "> quoted\n- listed",
+            },
+            "zoo",
+        );
+        expect(problem).toBeNull();
+        expect(doc.lines).toEqual([
+            "pick [^zoo] end",
+            "",
+            "[^zoo]: > quoted",
+            "    - listed",
+        ]);
+    });
+});
