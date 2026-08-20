@@ -353,6 +353,8 @@ export interface DocumentScan {
     startsInComment: boolean[];
     /** Line `i` begins inside a multi-line $$ math block (closer or interior line). */
     startsInMath: boolean[];
+    /** Line `i` begins inside an open fenced code block (interior or closer line, at any blockquote depth — the flag the selection edge-cut checks need, since a QUOTED fence is invisible to `endsProtected`). The opener line is NOT here, and neither is a line that killed a quoted fence by ending its quote. */
+    startsInFence: boolean[];
     /** A line appended at EOF would itself be protected: an unclosed comment, math block, or DOCUMENT-LEVEL fence runs to EOF (a blockquoted fence dies at the append point — the appended line ends its quote). Replaces move-to-bottom's probe re-scan (perf F6). */
     endsProtected: boolean;
 }
@@ -384,6 +386,7 @@ export function scanDocument(lines: string[]): DocumentScan {
     const isProtected = new Array<boolean>(lines.length).fill(false);
     const startsInComment = new Array<boolean>(lines.length).fill(false);
     const startsInMath = new Array<boolean>(lines.length).fill(false);
+    const startsInFence = new Array<boolean>(lines.length).fill(false);
     let i = 0;
 
     if (src[0] === "---") {
@@ -525,6 +528,7 @@ export function scanDocument(lines: string[]): DocumentScan {
             inDefinition = false;
             blockBoundary = false;
             isProtected[i] = true;
+            startsInFence[i] = true;
             // a closer counts only at the fence's own depth: "> ```" can't
             // close a document-level fence (it is code content there —
             // bug-blockquote-closes-bare-fence), and a doc-level "```"
@@ -727,6 +731,7 @@ export function scanDocument(lines: string[]): DocumentScan {
         isProtected,
         startsInComment,
         startsInMath,
+        startsInFence,
         // a quoted unclosed region can't reach an EOF append — the
         // appended line ends its quote, same as a blockquoted fence
         endsProtected:

@@ -724,20 +724,32 @@ describe("creation-command invariants over random documents", () => {
                         }
                         return /^\[\^([^\]]+)\]$/.test(middle) ? middle : null;
                     };
-                    let middle: string | null = null;
-                    for (let shift = 0; shift <= shiftWindow && middle === null; shift++) {
-                        middle = converted(doc.lines[trimmed.from.line + shift]);
+                    // a candidate line only counts when its OWN definition
+                    // carries the seeded body — with an empty prefix and
+                    // suffix, a pre-existing bare "[^1]" line sliding into
+                    // the window would otherwise satisfy the shape check
+                    // (30k-soak oracle bug, 2026-08-20)
+                    let found = false;
+                    for (let shift = 0; shift <= shiftWindow && !found; shift++) {
+                        const middle = converted(doc.lines[trimmed.from.line + shift]);
+                        if (middle === null) continue;
+                        if (command === "inline") {
+                            found = true;
+                            break;
+                        }
+                        const reference = /^\[\^([^\]]+)\]$/.exec(middle);
+                        found =
+                            reference !== null &&
+                            doc.lines
+                                .join("\n")
+                                .includes(
+                                    `[^${reference[1]}]: ${indentDefinitionBody(selText)}`,
+                                );
                     }
                     expect(
-                        middle,
+                        found,
                         `no line in the shift window converted ${JSON.stringify(selText)}`,
-                    ).not.toBeNull();
-                    if (command === "autonum") {
-                        const reference = /^\[\^([^\]]+)\]$/.exec(middle as string);
-                        expect(doc.lines.join("\n")).toContain(
-                            `[^${(reference as RegExpExecArray)[1]}]: ${indentDefinitionBody(selText)}`,
-                        );
-                    }
+                    ).toBe(true);
                 },
             ),
         );

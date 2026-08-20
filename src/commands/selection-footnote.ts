@@ -296,30 +296,45 @@ function selectionCutsProtectedText(
             }
         }
     }
-    // the startsIn* flags cover comment/math regions (quoted ones
-    // included); the partial scans add doc-level fences. A quoted fence
-    // crossing an edge at ch 0 slips past both — the born-dead simulation
-    // refuses it one step later.
-    const openAtFrom =
-        scan.startsInComment[from.line] ||
-        scan.startsInMath[from.line] ||
-        scanDocument(lines.slice(0, from.line)).endsProtected;
+    // the startsIn* trio says whether a multi-line region (comment, math,
+    // fence — quoted ones included) crosses the edge line's START; the
+    // fence flag exists precisely because a QUOTED fence is invisible to
+    // every endsProtected probe (30k-soak find, 2026-08-20: a full-line
+    // drag on a quoted fence's interior converted the line, demoting its
+    // quote and killing the fence).
+    const openInto = (line: number) =>
+        scan.startsInComment[line] ||
+        scan.startsInMath[line] ||
+        scan.startsInFence[line];
+    // a protected from-line carrying NO region flag is a legitimate edge
+    // only when it's a fence OPENER — its construct extends DOWN into the
+    // selection. Everything else protected-and-unflagged (quote-relative
+    // indented code starts with ">" at ch 0, where the whitespace trim
+    // can't shield the edge — the second 30k-soak find of 2026-08-20 —
+    // plus doc-level indented chunks and dead openers) refuses.
+    const fenceOpener = (line: number) =>
+        line + 1 < lines.length
+            ? scan.startsInFence[line + 1]
+            : scan.endsProtected;
+    if (
+        scan.isProtected[from.line] &&
+        !openInto(from.line) &&
+        !fenceOpener(from.line)
+    ) {
+        return true;
+    }
     if (
         caretInsideMaskedSpan(
             ctx.maskedLine(from.line),
             from.ch,
-            openAtFrom,
+            openInto(from.line),
             false, // `from` points AT a character — the after-side is on-line
         )
     ) {
         return true;
     }
     const openAtTo =
-        to.line + 1 < lines.length
-            ? scan.startsInComment[to.line + 1] ||
-              scan.startsInMath[to.line + 1] ||
-              scanDocument(lines.slice(0, to.line + 1)).endsProtected
-            : scan.endsProtected;
+        to.line + 1 < lines.length ? openInto(to.line + 1) : scan.endsProtected;
     return caretInsideMaskedSpan(
         ctx.maskedLine(to.line),
         to.ch,
@@ -351,7 +366,10 @@ function replacementReclassifiesDoc(
     const changed = (i: number, j: number) =>
         before.isProtected[i] !== after.isProtected[j] ||
         before.startsInComment[i] !== after.startsInComment[j] ||
-        before.startsInMath[i] !== after.startsInMath[j];
+        before.startsInMath[i] !== after.startsInMath[j] ||
+        // fence-role flips too: a closer whose opener the edit destroyed
+        // becomes an opener itself — same isProtected, different construct
+        before.startsInFence[i] !== after.startsInFence[j];
     for (let i = 0; i < from.line; i++) {
         if (changed(i, i)) return true;
     }

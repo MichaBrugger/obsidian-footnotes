@@ -636,6 +636,69 @@ describe("selections that refuse", () => {
         expect(noticed(ProtectedSelectionNotice)).toBe(true);
     });
 
+    it("a full-line drag on a QUOTED fence's interior refuses (30k-soak find, 2026-08-20)", async () => {
+        // the found counterexample: replacing the interior line (its "> "
+        // marker included) demoted the quote, which killed the fence and
+        // turned protected text into an inline footnote. Quoted fences are
+        // invisible to endsProtected, so the edge check needs the
+        // scanner's startsInFence flag.
+        const before = [
+            "---",
+            "title: t",
+            "---",
+            "alpha[^1].",
+            "",
+            "[^1]: alpha",
+            "",
+            "> ```",
+            "> fake[^1]",
+            "> ```",
+        ];
+        for (const command of [insertInlineFootnote, insertAutonumFootnote]) {
+            noticeCalls.length = 0;
+            const doc = fakeEditor(before, { line: 8, ch: 0 }, {
+                anchor: { line: 8, ch: 0 },
+                head: { line: 9, ch: 0 },
+            });
+            await command(fakePlugin(doc));
+            expect(doc.lines).toEqual(before);
+            expect(noticed(ProtectedSelectionNotice)).toBe(true);
+        }
+    });
+
+    it("selecting exactly a quoted fence's CLOSER line refuses", async () => {
+        // the closer's protection also comes from above — consuming it
+        // would leave the fence unclosed
+        const before = ["> ```", "> code", "> ```"];
+        const doc = fakeEditor(before, { line: 2, ch: 0 }, {
+            anchor: { line: 2, ch: 0 },
+            head: { line: 2, ch: 5 },
+        });
+        await insertInlineFootnote(fakePlugin(doc));
+        expect(doc.lines).toEqual(before);
+        expect(noticed(ProtectedSelectionNotice)).toBe(true);
+    });
+
+    it("a WHOLE quoted fence still converts (containment unaffected)", async () => {
+        const doc = fakeEditor(
+            ["take this", "", "> ```", "> code", "> ```", "", "and this"],
+            { line: 0, ch: 0 },
+            { anchor: { line: 0, ch: 0 }, head: { line: 6, ch: 8 } },
+        );
+        await insertAutonumFootnote(fakePlugin(doc));
+        expect(doc.lines).toEqual([
+            "[^1]",
+            "",
+            "[^1]: take this",
+            "",
+            "    > ```",
+            "    > code",
+            "    > ```",
+            "",
+            "    and this",
+        ]);
+    });
+
     it("a selection ending mid inline-code on its last line refuses", async () => {
         const before = ["take this", "and `co de` more"];
         const doc = fakeEditor(before, { line: 0, ch: 0 }, {
@@ -927,6 +990,43 @@ describe("the block zoo converts (2026-08-19)", () => {
             "",
             "[^zoo]: > quoted",
             "    - listed",
+        ]);
+    });
+});
+
+describe("quote-relative indented code refuses at the edges (second 30k-soak find, 2026-08-20)", () => {
+    it("a full-line drag on a quoted code line refuses (its '>' sits at ch 0)", async () => {
+        // the found counterexample, minimized: quote-relative indented
+        // code is protected but carries no region flag, and its quote
+        // marker at ch 0 is where the whitespace trim can't shield the
+        // edge — converting it consumed protected text
+        const before = ["", ">     > gap code[^88]", "", "alpha[^1]."];
+        for (const command of [insertInlineFootnote, insertAutonumFootnote]) {
+            noticeCalls.length = 0;
+            const doc = fakeEditor(before, { line: 1, ch: 0 }, {
+                anchor: { line: 0, ch: 0 },
+                head: { line: 2, ch: 0 },
+            });
+            await command(fakePlugin(doc));
+            expect(doc.lines).toEqual(before);
+            expect(noticed(ProtectedSelectionNotice)).toBe(true);
+        }
+    });
+
+    it("a doc-level indented chunk at the selection TAIL still travels (containment)", async () => {
+        const doc = fakeEditor(
+            ["take this", "", "    chunk line one", "    chunk line two"],
+            { line: 0, ch: 0 },
+            { anchor: { line: 0, ch: 0 }, head: { line: 3, ch: 18 } },
+        );
+        await insertAutonumFootnote(fakePlugin(doc));
+        expect(doc.lines).toEqual([
+            "[^1]",
+            "",
+            "[^1]: take this",
+            "",
+            "        chunk line one",
+            "        chunk line two",
         ]);
     });
 });
