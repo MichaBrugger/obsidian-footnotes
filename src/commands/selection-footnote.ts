@@ -383,14 +383,16 @@ function replacementReclassifiesDoc(
  * `text` as a definition body: the first line rides the label, every
  * later line becomes a four-space-indented continuation (the shape the
  * scanner, the jump commands, and Obsidian's renderer all read as ONE
- * multi-paragraph footnote). Whitespace-only lines become empty —
- * paragraph separators inside the block.
+ * multi-paragraph footnote). Whitespace-only lines become exactly "    "
+ * — still paragraph separators to the scanner and the renderer (both
+ * treat whitespace-only as blank), but visually flush with the
+ * continuation indent (Jason's ask, 2026-08-21).
  */
 export function indentDefinitionBody(text: string): string {
     return text
         .split("\n")
         .map((line, i) =>
-            i === 0 ? line : line.trim() === "" ? "" : `    ${line}`,
+            i === 0 ? line : line.trim() === "" ? "    " : `    ${line}`,
         )
         .join("\n");
 }

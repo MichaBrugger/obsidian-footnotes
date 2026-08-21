@@ -317,7 +317,7 @@ describe("a multi-line selection converts into a multi-paragraph definition (202
             "outro",
             "",
             "[^1]: first para",
-            "",
+            "    ",
             "    second para",
         ]);
         // the caret lands at the end of the LAST body line
@@ -345,11 +345,11 @@ describe("a multi-line selection converts into a multi-paragraph definition (202
             "[^1]",
             "",
             "[^1]: First paragraph of the note.",
-            "",
+            "    ",
             "    ```",
             "    \tlorem ipsum dolor sit",
             "    ```",
-            "",
+            "    ",
             "    Closing paragraph.",
         ]);
         expect(doc.cursor).toEqual({
@@ -690,11 +690,11 @@ describe("selections that refuse", () => {
             "[^1]",
             "",
             "[^1]: take this",
-            "",
+            "    ",
             "    > ```",
             "    > code",
             "    > ```",
-            "",
+            "    ",
             "    and this",
         ]);
     });
@@ -883,7 +883,7 @@ describe("the block zoo converts (2026-08-19)", () => {
         "tail stays",
         "",
         "[^1]: above prose",
-        ...middle.map((l) => (l.trim() === "" ? "" : `    ${l}`)),
+        ...middle.map((l) => (l.trim() === "" ? "    " : `    ${l}`)),
         "    below prose",
     ];
 
@@ -1024,7 +1024,7 @@ describe("quote-relative indented code refuses at the edges (second 30k-soak fin
             "[^1]",
             "",
             "[^1]: take this",
-            "",
+            "    ",
             "        chunk line one",
             "        chunk line two",
         ]);

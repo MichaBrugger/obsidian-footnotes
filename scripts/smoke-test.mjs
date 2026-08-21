@@ -810,7 +810,9 @@ async function main() {
             `(${EDITOR}).editor.getValue()`,
             (v) =>
                 v ===
-                "Intro line.\n[^1]\nOutro line.\n\n[^1]: First para body\n\n    Second para body",
+                // the body's paragraph separator is an INDENTED blank —
+                // "    " — flush with the continuations (Jason, 2026-08-21)
+                "Intro line.\n[^1]\nOutro line.\n\n[^1]: First para body\n    \n    Second para body",
             8000,
         );
         // the caret must land at the end of the LAST body line, ready to edit
