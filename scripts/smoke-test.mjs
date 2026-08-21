@@ -315,9 +315,15 @@ async function main() {
         // explicit disable/enable cycle re-evaluates main.js from disk
         // deterministically
         await sleep(2500);
+        // enablePluginAndSave PERSISTS the enablement: plain enablePlugin
+        // is session-only, and since the plugin isn't in the vault's saved
+        // community-plugins.json by default, an Obsidian restart after a
+        // session-only enable brought the vault up with the plugin OFF —
+        // every hotkey silently dead (Jason hit this 2026-08-21, reported
+        // as "footnote hotkeys do nothing")
         action(
             `(async () => { await app.plugins.disablePlugin('${PLUGIN_ID}'); ` +
-            `await app.plugins.enablePlugin('${PLUGIN_ID}'); })();`,
+            `await app.plugins.enablePluginAndSave('${PLUGIN_ID}'); })();`,
         );
         await pollUntil(
             "the reloaded plugin's commands",
@@ -820,6 +826,48 @@ async function main() {
         if (cursor.line !== 6 || cursor.ch !== "    Second para body".length) {
             throw new Error(`caret landed at ${JSON.stringify(cursor)}`);
         }
+    });
+
+    await test("TWO Alt-dragged selections toast and change nothing (Jason's report 2026-08-21)", async () => {
+        // the report itself was environmental (plugin left session-enabled
+        // only — see the deploy step), but this pins the real multi-range
+        // path end to end: refusal toast, document untouched
+        resetSettings({ enablePopupEditor: false });
+        await setupNote("alpha bravo\ncharlie delta");
+        action(
+            `(${EDITOR}).editor.setSelections([` +
+            `{anchor:{line:0,ch:0},head:{line:0,ch:5}},` +
+            `{anchor:{line:1,ch:0},head:{line:1,ch:7}}]);`,
+        );
+        action(`app.commands.executeCommandById('${CMD_AUTONUM}');`);
+        await pollUntil(
+            "the one-continuous-stretch toast",
+            `Array.from(document.querySelectorAll('.notice')).some(n => ` +
+            `n.textContent.includes('one continuous stretch'))`,
+            (v) => v === true,
+            6000,
+        );
+        const value = readJson(`(${EDITOR}).editor.getValue()`);
+        if (value !== "alpha bravo\ncharlie delta") {
+            throw new Error(`multi-range press edited the note: ${JSON.stringify(value)}`);
+        }
+    });
+
+    await test("multiple Alt-clicked CARETS fall through to a plain insert", async () => {
+        resetSettings({ enablePopupEditor: false });
+        await setupNote("alpha bravo\ncharlie delta");
+        action(
+            `(${EDITOR}).editor.setSelections([` +
+            `{anchor:{line:0,ch:5},head:{line:0,ch:5}},` +
+            `{anchor:{line:1,ch:7},head:{line:1,ch:7}}]);`,
+        );
+        action(`app.commands.executeCommandById('${CMD_AUTONUM}');`);
+        await pollUntil(
+            "one footnote at the primary caret",
+            `(${EDITOR}).editor.getValue()`,
+            (v) => v === "alpha[^1] bravo\ncharlie delta\n\n[^1]: ",
+            8000,
+        );
     });
 
     await test("popup edits propagate live into the main editor (stock parity)", async () => {

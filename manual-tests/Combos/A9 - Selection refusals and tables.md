@@ -3,7 +3,9 @@
 Settings: defaults.
 
 - [ ] Select across BOTH of these two short lines and press the numbered hotkey: they convert into ONE definition, the second line indented four spaces under the label (multi-paragraph selections, 2026-08-19); undo restores both lines
-- [ ] With Ctrl-click, make TWO separate selections and press the numbered hotkey: a toast asks for one continuous stretch, nothing changes
+- [ ] With Alt+DRAG (Windows; Option on macOS), make TWO separate selections and press the numbered hotkey: a toast asks for one continuous stretch, nothing changes (wording fixed 2026-08-21 — Ctrl-click was wrong; verified live via editor eval)
+- [ ] With Alt+CLICK, place two extra CARETS (no dragged ranges) and press the numbered hotkey: one footnote inserts at the primary caret, the extra carets are ignored (verified live 2026-08-21)
+- [ ] If EVERY footnote hotkey is dead, check the plugin is actually enabled — a killed smoke-test run used to leave it session-enabled only, so an Obsidian restart brought the vault up with the plugin off (fixed in the smoke script 2026-08-21)
 - [ ] Select `code words` inside the span on this line: `some code words here` — the cuts-through-protected-text toast appears, nothing changes
 - [ ] Select any text inside the fence below: same toast, nothing changes
 - [ ] Select from the line ABOVE the fence to just its opening ``` line (cutting the block in half): same toast, nothing changes

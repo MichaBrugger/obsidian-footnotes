@@ -515,6 +515,27 @@ describe("selections that refuse", () => {
         expect(noticed(SelectionSpanNotice)).toBe(true);
     });
 
+    it("multiple CARETS (empty ranges, Alt+click) fall through to a plain insert", async () => {
+        // verified against the live app 2026-08-21 (Jason's report): extra
+        // carets are ignored, the primary caret gets the footnote
+        const doc = fakeEditor(["alpha bravo", "charlie delta"], {
+            line: 0,
+            ch: 5,
+        });
+        (doc as unknown as { listSelections: () => unknown }).listSelections =
+            () => [
+                { anchor: { line: 0, ch: 5 }, head: { line: 0, ch: 5 } },
+                { anchor: { line: 1, ch: 7 }, head: { line: 1, ch: 7 } },
+            ];
+        await insertAutonumFootnote(fakePlugin(doc));
+        expect(doc.lines).toEqual([
+            "alpha[^1] bravo",
+            "charlie delta",
+            "",
+            "[^1]: ",
+        ]);
+    });
+
     it("the named key claims the press for its name modal, editing nothing yet", async () => {
         // the modal itself is DOM territory (smoke suite); in units the
         // press must consume the selection silently and leave the document
