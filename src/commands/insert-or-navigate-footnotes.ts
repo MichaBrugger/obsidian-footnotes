@@ -22,6 +22,7 @@ import { shouldJumpFromDefinitionToReference, shouldJumpFromReferenceToDefinitio
 import { readingViewActive, viewEditor } from "../editor/obsidian-internals";
 import { caretGuardsHandled, warnProtectedCaretIfInside } from "./press-guards";
 import { selectionPressHandled, submitActiveNameModal } from "./selection-footnote";
+import { multiCaretPastePressHandled, multiCaretPressHandled } from "./multi-caret";
 import { activeTableCellEditor, resolveTableCellCursor, runOutsideTableCell, TableCellEditor } from "../editor/table-cursor";
 
 // The command entry points: each press walks the same decision cascade
@@ -96,6 +97,10 @@ export async function insertAutonumFootnote(plugin: FootnotePlugin) {
             // converting it is what the press MEANS then (issue #35)
             if (selectionPressHandled(plugin, doc, cell, "autonum", cursorPosition))
                 return;
+            // several Alt-clicked carets: the same "[^N]" at every one,
+            // one definition (2026-08-22)
+            if (multiCaretPressHandled(plugin, doc, cell !== null, "autonum"))
+                return;
             // guards run INSIDE run(): the sub-editor fallback resolves the
             // real caret first (2026-08-11 review bug #9)
             if (caretGuardsHandled(plugin, doc, cell, cursorPosition)) return;
@@ -135,6 +140,10 @@ export async function insertNamedFootnote(plugin: FootnotePlugin) {
             // name — the usual second press can't carry a body statelessly
             // (issue #35; named flavor added 2026-08-13)
             if (selectionPressHandled(plugin, doc, cell, "named", cursorPosition))
+                return;
+            // several carets: a "[^]" skeleton at each with a cursor
+            // inside every bracket pair — typing names them all at once
+            if (multiCaretPressHandled(plugin, doc, cell !== null, "named"))
                 return;
             // guards run INSIDE run() — same rationale as the autonum command
             if (caretGuardsHandled(plugin, doc, cell, cursorPosition)) return;
@@ -249,6 +258,9 @@ export async function insertInlineFootnote(plugin: FootnotePlugin) {
         // a live selection claims the press: it becomes "^[…]" in place
         // (issue #35)
         if (selectionPressHandled(plugin, doc, cell, "inline")) return;
+        // several carets: "^[]" at each, a cursor inside every pair —
+        // typing writes the same body into all of them (2026-08-22)
+        if (multiCaretPressHandled(plugin, doc, cell !== null, "inline")) return;
         if (caretGuardsHandled(plugin, doc, cell)) return;
         const cursorPosition =
             (cell ? resolveTableCellCursor(doc) : null) ?? doc.getCursor();
@@ -286,6 +298,9 @@ export async function pasteInlineFootnote(plugin: FootnotePlugin) {
         // clipboard already carries this key's body (issue #35); before the
         // clipboard await, like the guards below
         if (selectionPressHandled(plugin, doc, pasteCell, "paste")) return;
+        // several carets: the same "^[clipboard]" at every one (2026-08-22)
+        if (await multiCaretPastePressHandled(plugin, doc, pasteCell !== null))
+            return;
         // the same guards every other insert command runs (missed here until
         // the 2026-08-07 QOL sweep; pinned by test/paste-inline-in-inline.test.ts)
         if (caretGuardsHandled(plugin, doc, pasteCell)) return;

@@ -518,9 +518,10 @@ describe("selections that refuse", () => {
         expect(noticed(SelectionSpanNotice)).toBe(true);
     });
 
-    it("multiple CARETS (empty ranges, Alt+click) fall through to a plain insert", async () => {
-        // verified against the live app 2026-08-21 (Jason's report): extra
-        // carets are ignored, the primary caret gets the footnote
+    it("multiple CARETS now insert the SAME footnote at every one (2026-08-22)", async () => {
+        // superseded behavior: extras used to be ignored (2026-08-21) —
+        // Jason's ask upgraded this to same-reference-everywhere; the full
+        // multi-caret contract lives in test/multi-caret.test.ts
         const doc = fakeEditor(["alpha bravo", "charlie delta"], {
             line: 0,
             ch: 5,
@@ -533,7 +534,7 @@ describe("selections that refuse", () => {
         await insertAutonumFootnote(fakePlugin(doc));
         expect(doc.lines).toEqual([
             "alpha[^1] bravo",
-            "charlie delta",
+            "charlie[^1] delta",
             "",
             "[^1]: ",
         ]);

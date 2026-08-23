@@ -908,7 +908,7 @@ async function main() {
         }
     });
 
-    await test("multiple Alt-clicked CARETS fall through to a plain insert", async () => {
+    await test("multiple Alt-clicked CARETS get the SAME footnote at every one (2026-08-22)", async () => {
         resetSettings({ enablePopupEditor: false });
         await setupNote("alpha bravo\ncharlie delta");
         action(
@@ -918,9 +918,46 @@ async function main() {
         );
         action(`app.commands.executeCommandById('${CMD_AUTONUM}');`);
         await pollUntil(
-            "one footnote at the primary caret",
+            "the same reference at both carets, one definition",
             `(${EDITOR}).editor.getValue()`,
-            (v) => v === "alpha[^1] bravo\ncharlie delta\n\n[^1]: ",
+            (v) => v === "alpha[^1] bravo\ncharlie[^1] delta\n\n[^1]: ",
+            8000,
+        );
+    });
+
+    await test("NAMED at several carets: skeletons everywhere, typing names them all", async () => {
+        resetSettings({ enablePopupEditor: false });
+        await setupNote("alpha bravo\ncharlie delta");
+        action(
+            `(${EDITOR}).editor.setSelections([` +
+            `{anchor:{line:0,ch:5},head:{line:0,ch:5}},` +
+            `{anchor:{line:1,ch:7},head:{line:1,ch:7}}]);`,
+        );
+        action(`app.commands.executeCommandById('${CMD_NAMED}');`);
+        await pollUntil(
+            "[^] skeletons at both carets",
+            `(${EDITOR}).editor.getValue()`,
+            (v) => v === "alpha[^] bravo\ncharlie[^] delta",
+            8000,
+        );
+        // replaceSelection writes at EVERY cursor — the same mechanism
+        // real multi-cursor typing uses
+        action(`(${EDITOR}).editor.replaceSelection('src');`);
+        await pollUntil(
+            "typing filled BOTH brackets",
+            `(${EDITOR}).editor.getValue()`,
+            (v) => v === "alpha[^src] bravo\ncharlie[^src] delta",
+            8000,
+        );
+        // second press with the caret on one filled reference completes
+        // the flow: its definition is created, shared by both references
+        action(`(${EDITOR}).editor.setCursor({line:0,ch:8});`);
+        action(`app.commands.executeCommandById('${CMD_NAMED}');`);
+        await pollUntil(
+            "one shared definition created",
+            `(${EDITOR}).editor.getValue()`,
+            (v) =>
+                v === "alpha[^src] bravo\ncharlie[^src] delta\n\n[^src]: ",
             8000,
         );
     });

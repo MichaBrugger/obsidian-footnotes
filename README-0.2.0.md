@@ -76,6 +76,8 @@ Sometimes you write something mid-sentence and realize it should be a footnote. 
 
 <!-- GIF: select a clause, press hotkey, clause becomes a footnote. Repeat for all 3 types. -->
 
+**Multiple cursors** (Alt+click) get the same footnote at every one of them — handy when one source is cited in several places. The auto-numbered hotkey puts the same `[^N]` at every cursor, sharing a single definition. The named and inline hotkeys drop their brackets at every cursor and leave a cursor inside each pair, so you type the name (or the footnote text) once and it lands everywhere; pasting as an inline footnote wraps the same clipboard text at every cursor. If any cursor sits where a footnote can't go, nothing is inserted anywhere — and one undo reverts the whole press.
+
 ## Navigating footnotes
 
 The insert hotkeys double as navigation. What they do depends on where your cursor is:
