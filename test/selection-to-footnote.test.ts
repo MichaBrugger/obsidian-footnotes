@@ -1,4 +1,4 @@
-import { Editor, EditorChange, EditorPosition } from "obsidian";
+import { App, Editor, EditorChange, EditorPosition } from "obsidian";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { noticeCalls } from "./mocks/obsidian";
@@ -23,6 +23,7 @@ import {
     SelectionSpanNotice,
 } from "../src/commands/selection-footnote";
 import { ProtectedCreationNotice, simulateChanges } from "../src/editor/insertion-liveness";
+import { commandHotkeys } from "../src/editor/obsidian-internals";
 import { DefinitionCreationNotice } from "../src/commands/press-guards";
 import { TableCellEditor } from "../src/editor/table-cursor";
 
@@ -1088,5 +1089,32 @@ describe("a footnote command submits the open name modal (2026-08-22)", () => {
         registerActiveNameModal(null);
         expect(submitActiveNameModal()).toBe(false);
         expect(submitted).toBe(1);
+    });
+});
+
+describe("commandHotkeys reads the hotkey registry defensively (2026-08-22)", () => {
+    it("custom assignment wins, defaults fall back, absent manager degrades to none", () => {
+        const app = (hm: unknown) => ({ hotkeyManager: hm }) as unknown as App;
+        const custom = [{ modifiers: ["Alt"], key: "0" }];
+        const defaults = [{ modifiers: ["Mod"], key: "9" }];
+        expect(
+            commandHotkeys(
+                app({ getHotkeys: () => custom, getDefaultHotkeys: () => defaults }),
+                "x:y",
+            ),
+        ).toEqual(custom);
+        expect(
+            commandHotkeys(
+                app({ getHotkeys: () => null, getDefaultHotkeys: () => defaults }),
+                "x:y",
+            ),
+        ).toEqual(defaults);
+        expect(
+            commandHotkeys(
+                app({ getHotkeys: () => null, getDefaultHotkeys: () => null }),
+                "x:y",
+            ),
+        ).toEqual([]);
+        expect(commandHotkeys(app(undefined), "x:y")).toEqual([]);
     });
 });

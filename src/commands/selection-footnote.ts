@@ -9,6 +9,7 @@ import {
 } from "../parsing/footnote-grammar";
 import { activeFootnotePrefix, footnotePrefixFromEditor } from "../parsing/footnote-prefix";
 import { moveCursorAndSetJumpPoint } from "../editor/cursor-motion";
+import { commandHotkeys } from "../editor/obsidian-internals";
 import { buildDefinitionAppend, seedDefinitionBody } from "./definition-append";
 import { DocContext, docContext, listExistingFootnoteDefinitions } from "../editor/doc-context";
 import { openFootnotePopup, popupEditingAvailable } from "./footnote-popup";
@@ -738,6 +739,30 @@ class NameSelectionModal extends Modal {
         // a closure, not `this`: submit() is private and the registry only
         // needs the one capability
         registerActiveNameModal({ submit: () => this.submit() });
+        // the registry above only serves the command palette and
+        // executeCommandById — a REAL keypress never reaches global
+        // hotkeys while a modal is open, because the modal's scope owns
+        // the keyboard (Jason's report 2026-08-22: "the dialog still only
+        // closes with Enter"). Speak the commands' own combos on this
+        // scope: the same keys that create footnotes submit the modal.
+        for (const commandId of [
+            "insert-autonumbered-footnote",
+            "insert-named-footnote",
+            "insert-inline-footnote",
+            "paste-inline-footnote",
+            "rename-footnote",
+        ]) {
+            for (const hotkey of commandHotkeys(
+                this.plugin.app,
+                `${this.plugin.manifest.id}:${commandId}`,
+            )) {
+                this.scope.register([...hotkey.modifiers], hotkey.key, (evt) => {
+                    evt.preventDefault();
+                    this.submit();
+                    return false;
+                });
+            }
+        }
         this.setTitle("Name the footnote");
         const { contentEl } = this;
 

@@ -3,6 +3,7 @@ import {
     Editor,
     EditorPosition,
     EventRef,
+    Hotkey,
     MarkdownView,
     TFile,
     Vault,
@@ -186,4 +187,34 @@ export interface WindowWithVim extends Window {
             ): void;
         };
     };
+}
+
+/**
+ * The undocumented per-command hotkey registry behind Settings → Hotkeys.
+ * Optional throughout — a future release renaming it degrades to "no
+ * combos", never a crash.
+ */
+interface HotkeyManager {
+    getHotkeys?(commandId: string): Hotkey[] | null | undefined;
+    getDefaultHotkeys?(commandId: string): Hotkey[] | null | undefined;
+}
+
+interface AppWithHotkeyManager extends App {
+    hotkeyManager?: HotkeyManager;
+}
+
+/**
+ * The key combos that currently trigger `commandId`: the user's custom
+ * assignment when one exists, else the command's defaults, else none. The
+ * name-the-footnote modal registers these on its own keyboard scope — a
+ * real keypress never reaches global hotkeys while a modal is open, so
+ * the modal must speak the commands' combos itself (2026-08-22).
+ */
+export function commandHotkeys(app: App, commandId: string): Hotkey[] {
+    const manager = (app as AppWithHotkeyManager).hotkeyManager;
+    return (
+        manager?.getHotkeys?.(commandId) ??
+        manager?.getDefaultHotkeys?.(commandId) ??
+        []
+    );
 }

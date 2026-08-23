@@ -818,8 +818,30 @@ async function main() {
             `(() => { const input = document.querySelector('.modal-container input'); ` +
             `input.value = 'cmd'; input.dispatchEvent(new Event('input')); })();`,
         );
-        // a footnote COMMAND (not Enter, not the button) submits the modal
-        action(`app.commands.executeCommandById('${CMD_AUTONUM}');`);
+        // the REAL keyboard path — a modal's scope owns the keyboard, so
+        // executeCommandById proving the registry is NOT enough (Jason's
+        // 2026-08-22 report: the first ship passed that way while actual
+        // keypresses were swallowed). Synthesize the assigned hotkey; when
+        // none is assigned, fall back to the command entry point.
+        const combo = readJson(
+            `(app.hotkeyManager.getHotkeys('${CMD_AUTONUM}') ?? ` +
+            `app.hotkeyManager.getDefaultHotkeys?.('${CMD_AUTONUM}') ?? [])[0] ?? null`,
+        );
+        if (combo) {
+            const mods = combo.modifiers ?? [];
+            const flag = (name) =>
+                mods.includes(name) ||
+                (name === (process.platform === "darwin" ? "Meta" : "Ctrl") &&
+                    mods.includes("Mod"));
+            action(
+                `document.querySelector('.modal-container input').dispatchEvent(` +
+                `new KeyboardEvent('keydown', {key:'${combo.key}', bubbles:true, ` +
+                `altKey:${flag("Alt")}, ctrlKey:${flag("Ctrl")}, ` +
+                `shiftKey:${flag("Shift")}, metaKey:${flag("Meta")}}));`,
+            );
+        } else {
+            action(`app.commands.executeCommandById('${CMD_AUTONUM}');`);
+        }
         await pollUntil(
             "command press converted under the typed name and closed the modal",
             `JSON.stringify({value: (${EDITOR}).editor.getValue(), ` +
