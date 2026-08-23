@@ -19,3 +19,17 @@ Para two tail.
 
 [^1]: def
 ```
+
+Multi-paragraph travel: a definition with a continuation line, a blank,
+and a second paragraph moves as ONE block:
+
+Para[^m] cite.
+
+[^m]: first line
+    continuation line
+
+    second paragraph, still the same footnote
+
+Tail prose.
+
+- [ ] After lint, the whole `[^m]` block sits below the tail, intact (blank separator included)
