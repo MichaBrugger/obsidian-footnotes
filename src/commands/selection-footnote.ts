@@ -745,17 +745,11 @@ class NameSelectionModal extends Modal {
         // the keyboard (Jason's report 2026-08-22: "the dialog still only
         // closes with Enter"). Speak the commands' own combos on this
         // scope: the same keys that create footnotes submit the modal.
-        for (const commandId of [
-            "insert-autonumbered-footnote",
-            "insert-named-footnote",
-            "insert-inline-footnote",
-            "paste-inline-footnote",
-            "rename-footnote",
-        ]) {
-            for (const hotkey of commandHotkeys(
-                this.plugin.app,
-                `${this.plugin.manifest.id}:${commandId}`,
-            )) {
+        // The ids come from the plugin's registration itself (never a
+        // second hand-kept list), and Scope does the combo matching — the
+        // one mechanism Obsidian provides for exactly this.
+        for (const commandId of this.plugin.editorCommandIds) {
+            for (const hotkey of commandHotkeys(this.plugin.app, commandId)) {
                 this.scope.register([...hotkey.modifiers], hotkey.key, (evt) => {
                     evt.preventDefault();
                     this.submit();

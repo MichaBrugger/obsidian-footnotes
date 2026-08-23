@@ -41,6 +41,10 @@ export default class FootnotePlugin extends Plugin {
   // invisible insertions and toasts about references the user can't see
   // (reported 2026-08-08). "Set footnote prefix" deliberately stays
   // available there; a frontmatter edit is legitimate in Reading view.
+
+  /** Full ids ("plugin:command") of every editor command, recorded at registration — the name modal's keyboard scope speaks exactly these commands' hotkeys. */
+  editorCommandIds: string[] = [];
+
   editableMarkdownView(): MarkdownView | null {
     const mdView = this.app.workspace.getActiveViewOfType(MarkdownView);
     return mdView && !readingViewActive(mdView) ? mdView : null;
@@ -114,6 +118,10 @@ export default class FootnotePlugin extends Plugin {
           void command.run(this);
         },
       });
+      // every editor command's FULL id, recorded as it registers — the
+      // name-the-footnote modal maps these to hotkey combos on its own
+      // keyboard scope, so the list can never drift from what's registered
+      this.editorCommandIds.push(`${this.manifest.id}:${command.id}`);
     }
     this.addCommand({
       id: "rename-footnote",
@@ -124,6 +132,7 @@ export default class FootnotePlugin extends Plugin {
         void renameFootnote(this);
       },
     });
+    this.editorCommandIds.push(`${this.manifest.id}:rename-footnote`);
     // right-click / long-press on a footnote also offers the rename, like
     // the native "Rename this heading" on heading lines
     registerRenameFootnoteMenu(this);
