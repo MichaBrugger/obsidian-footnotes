@@ -15,7 +15,9 @@ import {
     InlineSelectionNotice,
     ProtectedSelectionNotice,
     convertSelectionToNamed,
+    registerActiveNameModal,
     selectionPressHandled,
+    submitActiveNameModal,
     SelectionChangedNotice,
     SelectionCommandNotice,
     SelectionSpanNotice,
@@ -1049,5 +1051,42 @@ describe("quote-relative indented code refuses at the edges (second 30k-soak fin
             "        chunk line one",
             "        chunk line two",
         ]);
+    });
+});
+
+describe("a footnote command submits the open name modal (2026-08-22)", () => {
+    // the modal itself is DOM/smoke territory; these drive the exported
+    // registry the way onOpen/onClose do
+    afterEach(() => {
+        registerActiveNameModal(null);
+    });
+
+    it("any creation command submits the registered modal and edits nothing itself", async () => {
+        const submissions: string[] = [];
+        registerActiveNameModal({ submit: () => submissions.push("submit") });
+        const before = ["alpha bravo", "charlie"];
+        const doc = fakeEditor(before, { line: 0, ch: 3 });
+        await insertAutonumFootnote(fakePlugin(doc));
+        await insertInlineFootnote(fakePlugin(doc));
+        expect(submissions).toEqual(["submit", "submit"]);
+        expect(doc.lines).toEqual(before);
+    });
+
+    it("with no modal registered, commands run normally", async () => {
+        registerActiveNameModal(null);
+        const doc = fakeEditor(["alpha bravo"], { line: 0, ch: 5 });
+        await insertAutonumFootnote(fakePlugin(doc));
+        expect(doc.lines).toEqual(["alpha[^1] bravo", "", "[^1]: "]);
+    });
+
+    it("submitActiveNameModal reports whether a modal claimed the press", () => {
+        expect(submitActiveNameModal()).toBe(false);
+        let submitted = 0;
+        registerActiveNameModal({ submit: () => submitted++ });
+        expect(submitActiveNameModal()).toBe(true);
+        expect(submitted).toBe(1);
+        registerActiveNameModal(null);
+        expect(submitActiveNameModal()).toBe(false);
+        expect(submitted).toBe(1);
     });
 });

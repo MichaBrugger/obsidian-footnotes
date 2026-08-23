@@ -71,7 +71,7 @@ Two commands cover Obsidian's inline `^[...]` style:
 Sometimes you write something mid-sentence and realize it should be a footnote. Select it and press a footnote hotkey:
 
 - The **auto-numbered** hotkey replaces the selection with the next numbered footnote reference and moves the selected text into that footnote's definition. Multi-paragraph selections work too — the whole block becomes one multi-paragraph footnote, code blocks and all.
-- The **named** hotkey asks you for a name first, then does the same under `[^yourname]`.
+- The **named** hotkey asks you for a name first, then does the same under `[^yourname]`. Confirm with Enter, the Create button — or just press any footnote hotkey again.
 - The **inline** hotkey wraps the selection as `^[...]` right where it is (single-line selections only — for a multi-line selection it points you to the other two).
 
 <!-- GIF: select a clause, press hotkey, clause becomes a footnote. Repeat for all 3 types. -->

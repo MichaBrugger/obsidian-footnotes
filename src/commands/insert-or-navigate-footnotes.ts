@@ -21,7 +21,7 @@ import { ProtectedCreationNotice, simulatedMaskedLine } from "../editor/insertio
 import { shouldJumpFromDefinitionToReference, shouldJumpFromReferenceToDefinition } from "./navigation";
 import { readingViewActive, viewEditor } from "../editor/obsidian-internals";
 import { caretGuardsHandled, warnProtectedCaretIfInside } from "./press-guards";
-import { selectionPressHandled } from "./selection-footnote";
+import { selectionPressHandled, submitActiveNameModal } from "./selection-footnote";
 import { activeTableCellEditor, resolveTableCellCursor, runOutsideTableCell, TableCellEditor } from "../editor/table-cursor";
 
 // The command entry points: each press walks the same decision cascade
@@ -70,6 +70,11 @@ export async function withEditableEditor(
     plugin: FootnotePlugin,
     action: (doc: Editor) => void | Promise<void>,
 ): Promise<void> {
+    // an open Name-the-footnote modal claims the press FIRST: any footnote
+    // command submits it, exactly like Enter (Jason's ask 2026-08-22) —
+    // without this the command would act on the editor UNDER the modal,
+    // stacking a second modal over the first
+    if (submitActiveNameModal()) return;
     await settleFootnotePopupWithFeedback();
     if (toggleCloseFootnotePopup()) return;
     const mdView = plugin.app.workspace.getActiveViewOfType(MarkdownView);

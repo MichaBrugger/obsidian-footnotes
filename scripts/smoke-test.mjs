@@ -801,6 +801,39 @@ async function main() {
         );
     });
 
+    await test("a footnote command submits the open name modal, like Enter (2026-08-22)", async () => {
+        resetSettings({ enablePopupEditor: false });
+        await setupNote("Alpha bravo charlie");
+        action(
+            `(() => { const v=${EDITOR}; ` +
+            `v.editor.setSelection({line:0,ch:6},{line:0,ch:11}); })();`,
+        );
+        action(`app.commands.executeCommandById('${CMD_NAMED}');`);
+        await pollUntil(
+            "name modal open",
+            `!!document.querySelector('.modal-container input')`,
+            (v) => v === true,
+        );
+        action(
+            `(() => { const input = document.querySelector('.modal-container input'); ` +
+            `input.value = 'cmd'; input.dispatchEvent(new Event('input')); })();`,
+        );
+        // a footnote COMMAND (not Enter, not the button) submits the modal
+        action(`app.commands.executeCommandById('${CMD_AUTONUM}');`);
+        await pollUntil(
+            "command press converted under the typed name and closed the modal",
+            `JSON.stringify({value: (${EDITOR}).editor.getValue(), ` +
+            `modal: !!document.querySelector('.modal-container input')})`,
+            (v) =>
+                v ===
+                JSON.stringify({
+                    value: "Alpha [^cmd] charlie\n\n[^cmd]: bravo",
+                    modal: false,
+                }),
+            8000,
+        );
+    });
+
     await test("a multi-line selection becomes a multi-paragraph definition (2026-08-19)", async () => {
         // the academic shape: whole paragraphs move into ONE definition,
         // continuation lines indented four spaces under the label

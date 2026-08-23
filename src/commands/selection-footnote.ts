@@ -74,6 +74,32 @@ export const ProtectedSelectionNotice =
 
 export type FootnoteCommandKind = "autonum" | "named" | "inline" | "paste";
 
+// The open Name-the-footnote modal, if any — so a footnote command pressed
+// while it's open SUBMITS it (like Enter) instead of stacking a second
+// modal over the first (Jason's ask 2026-08-22, always on, no toggle;
+// mirrors the popup editor's press-again-to-close idiom). One slot is
+// enough: modals are app-global overlays and only one can be open.
+let activeNameModal: { submit: () => void } | null = null;
+
+/** NameSelectionModal registers itself here on open (null on close). Exported for units — production callers are the modal below. */
+export function registerActiveNameModal(
+    modal: { submit: () => void } | null,
+): void {
+    activeNameModal = modal;
+}
+
+/**
+ * Submit the open Name-the-footnote modal, if any: true = a modal was open
+ * and the press is consumed (converted under the typed name, closed on an
+ * empty name, or kept open showing why the name can't be used — exactly
+ * Enter's semantics). False = no modal; the command proceeds normally.
+ */
+export function submitActiveNameModal(): boolean {
+    if (activeNameModal === null) return false;
+    activeNameModal.submit();
+    return true;
+}
+
 /**
  * The selection claim every creation command checks first: when a usable
  * selection exists, convert it (autonum/inline), or explain why this key
@@ -709,6 +735,9 @@ class NameSelectionModal extends Modal {
     }
 
     onOpen() {
+        // a closure, not `this`: submit() is private and the registry only
+        // needs the one capability
+        registerActiveNameModal({ submit: () => this.submit() });
         this.setTitle("Name the footnote");
         const { contentEl } = this;
 
@@ -775,6 +804,7 @@ class NameSelectionModal extends Modal {
     }
 
     onClose() {
+        registerActiveNameModal(null);
         this.contentEl.empty();
     }
 }
