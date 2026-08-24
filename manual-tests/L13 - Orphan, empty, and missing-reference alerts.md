@@ -15,3 +15,4 @@ reference, and an untouched prefix placeholder [^3.] in this sentence.
 - [ ] The empty `[^]` gets its own alert (it won't render); the bare prefix placeholder `[^3.]` counts as unfilled exactly like `[^]` (QOL 2026-08-07)
 - [ ] `Delete orphaned references` ON + lint: `stray[^99]` is removed from the text, spacing healed (2026-08-10)
 - [ ] `Delete orphaned definitions` ON + lint: both orphan definitions are deleted (see L5 for the reindex interplay)
+- [ ] Hand-type a reference INSIDE a definition body (e.g. `[^used]: referenced definition citing[^lost]`) and lint: an alert names the nesting definition and says nested footnotes don't survive export — the lint never rewrites or deletes the nested content itself (2026-08-24)

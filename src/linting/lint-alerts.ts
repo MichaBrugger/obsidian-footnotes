@@ -3,11 +3,15 @@ import { Notice } from "obsidian";
 import type FootnotePlugin from "../main";
 import { footnotePrefix, footnotePrefixProblem } from "../parsing/footnote-prefix";
 import {
+    definitionLabelIn,
     DocumentScan,
+    findDefinitionBlocks,
     maskProtectedLines,
     normalizeEol,
     scanDocument,
 } from "../parsing/markdown-scan";
+import { referenceOccurrences } from "../parsing/footnote-grammar";
+import { inlineFootnoteSpanAt } from "../commands/inline-footnotes";
 import { duplicateFootnoteDefinitionNames } from "./rules/merge-duplicate-definitions";
 import { orphanedFootnoteDefinitionNames } from "./rules/remove-orphaned-definitions";
 import { orphanedFootnoteReferenceNames } from "./rules/remove-orphaned-references";
@@ -146,6 +150,64 @@ function noticeDuplicateDefinitions(
     );
 }
 
+/**
+ * Names of definitions that carry a footnote INSIDE their block — a live
+ * reference or inline footnote on the label line (after the label) or a
+ * continuation line. Nesting is prevented at creation plugin-wide
+ * (Jason's ruling 2026-08-24, Discord-confirmed nobody wants it), but
+ * hand-typed and pre-existing nesting can't be fixed automatically
+ * without losing content, so the lint ALERTS — the never-silent policy
+ * orphans and duplicates already follow. Masked fakes don't count.
+ */
+export function nestedFootnoteDefinitionNames(
+    lines: string[],
+    scan: DocumentScan,
+    masked: string[],
+): string[] {
+    const names: string[] = [];
+    for (const block of findDefinitionBlocks(lines, scan.isProtected, scan)) {
+        let nested = false;
+        for (let i = block.start; i <= block.end && !nested; i++) {
+            const startAt =
+                i === block.start
+                    ? definitionLabelIn(lines[i])?.labelEnd ?? 0
+                    : 0;
+            nested =
+                referenceOccurrences(lines[i], masked[i]).some(
+                    (occurrence) => occurrence.start >= startAt,
+                ) || lineHasInlineFootnote(masked[i]);
+        }
+        if (nested) names.push(block.name);
+    }
+    return names;
+}
+
+/** Whether the masked line carries a live inline footnote span. */
+function lineHasInlineFootnote(masked: string): boolean {
+    for (let i = 0; i < masked.length - 1; i++) {
+        if (masked[i] !== "^" || masked[i + 1] !== "[") continue;
+        const span = inlineFootnoteSpanAt(masked, i + 2);
+        if (span?.open === i) return true;
+        if (span) i = span.close;
+    }
+    return false;
+}
+
+function noticeNestedFootnotes(
+    lines: string[],
+    scan: DocumentScan,
+    masked: string[],
+) {
+    const names = nestedFootnoteDefinitionNames(lines, scan, masked);
+    if (names.length === 0) return;
+    new Notice(
+        names.length === 1
+            ? `This note has a footnote nested inside another footnote's definition (${referenceList(names)}). Nested footnotes don't survive export and most tools can't read them — move it into the text.`
+            : `This note has footnotes nested inside ${names.length} footnote definitions (${referenceList(names)}). Nested footnotes don't survive export and most tools can't read them — move them into the text.`,
+        8000,
+    );
+}
+
 // every lint entry point calls this with the POST-lint text, so the alerts
 // fire whether or not the rules changed anything. ONE normalize/scan/mask
 // is shared by all the alerts (2026-08-11 review perf item: the alerts
@@ -162,4 +224,5 @@ export function noticeLintAlerts(plugin: FootnotePlugin, markdown: string) {
     noticeOrphanedReferences(plugin, markdown, prefix, { lines, masked });
     noticeOrphanedDefinitions(plugin, markdown, { lines, scan });
     noticeDuplicateDefinitions(plugin, markdown, { lines, scan });
+    noticeNestedFootnotes(lines, scan, masked);
 }

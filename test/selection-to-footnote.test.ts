@@ -13,6 +13,7 @@ import {
 import {
     convertCellSelectionToNamed,
     InlineSelectionNotice,
+    NestedSelectionNotice,
     ProtectedSelectionNotice,
     convertSelectionToNamed,
     registerActiveNameModal,
@@ -1117,5 +1118,94 @@ describe("commandHotkeys reads the hotkey registry defensively (2026-08-22)", ()
             ),
         ).toEqual([]);
         expect(commandHotkeys(app(undefined), "x:y")).toEqual([]);
+    });
+});
+
+describe("nested footnotes are prevented in selections (2026-08-24)", () => {
+    // Jason's ruling after the Obsidian Academia Discord confirmed nobody
+    // nests footnotes: a selection touching a LIVE reference, "[^]"
+    // placeholder, or inline footnote refuses — full containment would
+    // nest it, partial overlap would corrupt it
+    it("a selection CONTAINING a reference refuses, note untouched", async () => {
+        const before = ["alpha cite[^1] omega", "", "[^1]: one"];
+        const doc = fakeEditor(before, { line: 0, ch: 0 }, {
+            anchor: { line: 0, ch: 0 },
+            head: { line: 0, ch: 20 },
+        });
+        await insertAutonumFootnote(fakePlugin(doc));
+        expect(doc.lines).toEqual(before);
+        expect(noticed(NestedSelectionNotice)).toBe(true);
+    });
+
+    it("a selection CUTTING a reference in half refuses (corruption guard)", async () => {
+        const before = ["alpha cite[^1] omega", "", "[^1]: one"];
+        const doc = fakeEditor(before, { line: 0, ch: 0 }, {
+            // "alpha cite[^" — grabs the opening of the reference only
+            anchor: { line: 0, ch: 0 },
+            head: { line: 0, ch: 12 },
+        });
+        await insertAutonumFootnote(fakePlugin(doc));
+        expect(doc.lines).toEqual(before);
+        expect(noticed(NestedSelectionNotice)).toBe(true);
+    });
+
+    it("a selection containing an INLINE footnote or a [^] placeholder refuses", async () => {
+        for (const line of ["keep ^[inline note] here", "keep [^] here"]) {
+            noticeCalls.length = 0;
+            const before = [line];
+            const doc = fakeEditor(before, { line: 0, ch: 0 }, {
+                anchor: { line: 0, ch: 0 },
+                head: { line: 0, ch: line.length },
+            });
+            await insertAutonumFootnote(fakePlugin(doc));
+            expect(doc.lines).toEqual(before);
+            expect(noticed(NestedSelectionNotice)).toBe(true);
+        }
+    });
+
+    it("a DEAD reference-shaped fake inside a contained code span still converts", async () => {
+        const doc = fakeEditor(
+            ["take `fake [^9] code` along", "", "tail"],
+            { line: 0, ch: 0 },
+            { anchor: { line: 0, ch: 0 }, head: { line: 0, ch: 27 } },
+        );
+        await insertAutonumFootnote(fakePlugin(doc));
+        expect(doc.lines).toEqual([
+            "[^1]",
+            "",
+            "tail",
+            "",
+            "[^1]: take `fake [^9] code` along",
+        ]);
+    });
+
+    it("the cell path refuses a selection containing a reference too", () => {
+        const dispatched: unknown[] = [];
+        const cell = {
+            state: {
+                doc: { toString: () => "cell cite[^1] end" },
+                selection: { main: { anchor: 0, head: 13 } },
+            },
+            dispatch: (spec: unknown) => {
+                dispatched.push(spec);
+            },
+        } as unknown as TableCellEditor;
+        const doc = fakeEditor(["| a |", "", "[^1]: one"], { line: 0, ch: 2 });
+        expect(
+            selectionPressHandled(fakePlugin(doc), doc, cell, "inline"),
+        ).toBe(true);
+        expect(dispatched).toEqual([]);
+        expect(noticed(NestedSelectionNotice)).toBe(true);
+    });
+
+    it("a multi-line selection with the reference on its SECOND line refuses", async () => {
+        const before = ["first line", "second cite[^1] line", "", "[^1]: one"];
+        const doc = fakeEditor(before, { line: 0, ch: 0 }, {
+            anchor: { line: 0, ch: 0 },
+            head: { line: 1, ch: 20 },
+        });
+        await insertAutonumFootnote(fakePlugin(doc));
+        expect(doc.lines).toEqual(before);
+        expect(noticed(NestedSelectionNotice)).toBe(true);
     });
 });

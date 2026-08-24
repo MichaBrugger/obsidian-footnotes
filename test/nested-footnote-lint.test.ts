@@ -4,11 +4,13 @@ import { lintFootnotes, LintOptions } from "../src/linting/linter";
 
 // Regression guards for HAND-TYPED footnotes nested inside definitions
 // (Jason's manual-testing report, 2026-08-13): the plugin refuses to
-// CREATE them (see definition-caret-guard), but users can still type
-// them, and the linter must keep working on such notes — probed
-// exhaustively when the report came in and pinned here so it stays true.
-// Nested content travels WITH its definition, is never mangled, and every
-// lint stays idempotent.
+// CREATE them — at the caret (definition-caret-guard) and since
+// 2026-08-24 in selections too (NestedSelectionNotice; Discord-confirmed
+// nobody wants nesting) — but users can still type them, and the linter
+// must keep working on such notes without mangling or deleting content:
+// prevention is creation-side, plus an ALERT (nested-footnote-alert
+// tests), never a destructive rewrite. Nested content travels WITH its
+// definition and every lint stays idempotent.
 
 const base: LintOptions = {
     fixPunctuation: true,

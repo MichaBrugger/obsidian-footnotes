@@ -66,6 +66,15 @@ export const SelectionChangedNotice =
 // it basically never looked correct outside clean paragraphs
 export const InlineSelectionNotice =
     "Inline footnotes are single-line. Use the auto-numbered or named footnote command to convert a multi-line selection.";
+// nested footnotes are prevented across the plugin (Jason's ruling
+// 2026-08-24, after the Obsidian Academia Discord confirmed nobody uses
+// them and modern style guides engineered the pattern out): converting a
+// selection that touches a live reference or inline footnote would nest
+// it into the new footnote's body — and a PARTIAL overlap would corrupt
+// the artifact it cuts. Dead reference-shaped text inside code spans is
+// not a footnote and still travels.
+export const NestedSelectionNotice =
+    "No footnote was created: the selection contains a footnote, and footnotes can't be nested inside other footnotes.";
 // distinct from ProtectedCreationNotice on purpose (Jason's manual pass,
 // 2026-08-13): here the caret isn't INSIDE protected text — the selection
 // EDGE cuts through some. Whole constructs inside the selection are fine
@@ -146,6 +155,11 @@ export function selectionPressHandled(
             caretInsideMaskedSpan(maskedCell, to, false, false)
         ) {
             new Notice(ProtectedSelectionNotice, 8000);
+            return true;
+        }
+        // no nesting in cells either (2026-08-24)
+        if (spanTouchesFootnote(cellText, maskedCell, from, to)) {
+            new Notice(NestedSelectionNotice, 8000);
             return true;
         }
         const text = cellText.slice(from, to);
@@ -232,6 +246,12 @@ export function selectionPressHandled(
         new Notice(DefinitionCreationNotice, 8000);
         return true;
     }
+    // ... and a selection touching any LIVE footnote artifact refuses too
+    // (nesting prevented plugin-wide, 2026-08-24)
+    if (selectionTouchesFootnote(ctx, trimmed.from, trimmed.to)) {
+        new Notice(NestedSelectionNotice, 8000);
+        return true;
+    }
     const selection = { from: trimmed.from, to: trimmed.to, text };
     if (command === "inline") {
         convertMainSelectionToInline(plugin, doc, selection, ctx);
@@ -281,6 +301,56 @@ export function trimSelectionEdges(
         from: { line: fromLine, ch: fromCh },
         to: { line: toLine, ch: toCh },
     };
+}
+
+/**
+ * Whether `[from, to)` on one line touches any LIVE footnote artifact — a
+ * reference, an empty "[^]" placeholder, or an inline footnote span. ANY
+ * overlap counts: full containment would nest the artifact into the new
+ * footnote's body, and a partial overlap would cut it apart. Masked
+ * (code/math/comment) fakes are not footnotes and don't count.
+ */
+function spanTouchesFootnote(
+    lineText: string,
+    masked: string,
+    from: number,
+    to: number,
+): boolean {
+    for (const occurrence of referenceOccurrences(lineText, masked)) {
+        if (occurrence.start < to && occurrence.end > from) return true;
+    }
+    for (
+        let i = 0;
+        (i = masked.indexOf("[^]", i)) !== -1;
+        i += "[^]".length
+    ) {
+        if (i < to && i + "[^]".length > from) return true;
+    }
+    for (let i = 0; i < masked.length - 1; i++) {
+        if (masked[i] !== "^" || masked[i + 1] !== "[") continue;
+        const span = inlineFootnoteSpanAt(masked, i + 2);
+        if (span?.open !== i) continue;
+        if (span.open < to && span.close + 1 > from) return true;
+        i = span.close;
+    }
+    return false;
+}
+
+/** The multi-line sweep of spanTouchesFootnote over a trimmed selection. */
+function selectionTouchesFootnote(
+    ctx: DocContext,
+    from: EditorPosition,
+    to: EditorPosition,
+): boolean {
+    for (let line = from.line; line <= to.line; line++) {
+        const lineText = ctx.lines[line] ?? "";
+        const start = line === from.line ? from.ch : 0;
+        const end = line === to.line ? to.ch : lineText.length;
+        if (spanTouchesFootnote(lineText, ctx.maskedLine(line), start, end)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 /** The text `[from, to)` spans, LF-joined — the fake-editor-safe getRange. */

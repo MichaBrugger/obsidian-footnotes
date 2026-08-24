@@ -73,6 +73,7 @@ Sometimes you write something mid-sentence and realize it should be a footnote. 
 - The **auto-numbered** hotkey replaces the selection with the next numbered footnote reference and moves the selected text into that footnote's definition. Multi-paragraph selections work too — the whole block becomes one multi-paragraph footnote, code blocks and all.
 - The **named** hotkey asks you for a name first, then does the same under `[^yourname]`. Confirm with Enter, the Create button — or just press any footnote hotkey again.
 - The **inline** hotkey wraps the selection as `^[...]` right where it is (single-line selections only — for a multi-line selection it points you to the other two).
+- A selection that contains (or cuts through) an existing footnote refuses to convert: footnotes can't be nested inside other footnotes. Nesting is prevented throughout the plugin — it doesn't survive export to Pandoc/LaTeX and most markdown tools can't read it — and linting alerts you if a note already has hand-typed nesting.
 
 <!-- GIF: select a clause, press hotkey, clause becomes a footnote. Repeat for all 3 types. -->
 
@@ -118,7 +119,7 @@ Each rule can be toggled individually in **Settings → Footnote Shortcut → Li
 - **Lint on save**: lints the note whenever you press <kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<kbd>S</kbd> (vim users: `:w` works too).
 - **Lint on footnote creation**: lints the note right after you create a new footnote.
 
-The linter also watches for problems it can't fix by itself, like an empty `[^]` reference you never named, and tells you about them.
+The linter also watches for problems it can't fix by itself and tells you about them: an empty `[^]` reference you never named, or a footnote nested inside another footnote's definition (nesting doesn't survive export, and the linter won't delete your content to fix it).
 
 ## For chapter notes: per-note footnote prefix
 

@@ -7,6 +7,10 @@ Settings: defaults.
 - [ ] With Alt+CLICK, place extra CARETS instead (no dragged ranges): the press inserts the same footnote at every caret — that's A14's sheet
 - [ ] Select `code words` inside the span on this line: `some code words here` — the cuts-through-protected-text toast appears, nothing changes
 - [ ] Select an entire short `code span` INCLUDING both backticks plus a word on each side: it converts — the span rides into the footnote whole (2026-08-19)
+- [ ] Select a stretch CONTAINING a live reference like this one[^n] and convert: the contains-a-footnote toast, nothing changes (no nesting, ruling 2026-08-24)
+- [ ] Select HALF of that reference (drag through `[^` only) and convert: same toast — a cut would corrupt it
+- [ ] Select a stretch containing an inline footnote^[like this] and convert: same toast
+- [ ] A dead fake in code — select `` `fake [^9]` `` whole with a word each side: it CONVERTS (masked fakes aren't footnotes)
 - [ ] Select any text inside the fence below: same toast, nothing changes
 - [ ] Select from the line ABOVE the fence to just its opening ``` line (cutting the block in half): same toast, nothing changes
 - [ ] Select from the line above the fence through its closing ``` (the whole block): it converts — the fence rides into the definition indented, and renders as code inside the footnote
@@ -28,3 +32,4 @@ select me in here
 Fixture for the definition checks[^d].
 
 [^d]: press the inline hotkey with the caret right here
+[^n]: nesting-refusal fixture definition
