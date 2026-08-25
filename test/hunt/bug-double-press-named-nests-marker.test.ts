@@ -1,5 +1,7 @@
-import { Editor, EditorChange, EditorPosition } from "obsidian";
 import { describe, expect, it } from "vitest";
+
+import { fakeEditor } from "../helpers/fake-editor";
+import { fakePlugin as sharedFakePlugin } from "../helpers/fake-plugin";
 
 import FootnotePlugin from "../../src/main";
 import { createFootnoteReference } from "../../src/commands/create-footnote";
@@ -16,50 +18,20 @@ import { createFootnoteReference } from "../../src/commands/create-footnote";
 // pinned 2026-07-17, hunt-bugs consolidation.
 // Provenance: iteration-1/eval-1/without_skill/run-1 (bug sweep, BUG 5).
 
-interface FakeDoc extends Editor {
-    appliedChanges: EditorChange[];
-    cursor: EditorPosition | null;
-}
-
-function fakeEditor(lines: string[]): FakeDoc {
-    const doc = {
-        appliedChanges: [] as EditorChange[],
-        cursor: null as EditorPosition | null,
-        getLine: (n: number) => lines[n],
-        lineCount: () => lines.length,
-        lastLine: () => lines.length - 1,
-        setCursor(pos: EditorPosition) {
-            doc.cursor = pos;
-        },
-        scrollIntoView() {},
-        transaction(spec: { changes?: EditorChange[]; selection?: { from: EditorPosition } }) {
-            if (spec.changes) doc.appliedChanges.push(...spec.changes);
-            if (spec.selection) doc.cursor = spec.selection.from;
-        },
-    };
-    return doc as unknown as FakeDoc;
-}
-
 function fakePlugin(overrides: Record<string, unknown> = {}): FootnotePlugin {
-    return {
-        app: { vault: {} },
-        settings: {
-            insertAtEndOfWord: false,
-            enablePopupEditor: false,
-            ...overrides,
-        },
-    } as unknown as FootnotePlugin;
+    return sharedFakePlugin({
+        insertAtEndOfWord: false,
+        enablePopupEditor: false,
+        ...overrides,
+    });
 }
 
 describe("bug: double-pressing the named hotkey nests [^] references", () => {
     it("does not insert a second [^] inside the empty reference", () => {
         const line = "[^]";
-        const doc = fakeEditor([line]);
+        const doc = fakeEditor([line], { edits: true });
         // caret between the brackets, where the first press left it
         createFootnoteReference(line, { line: 0, ch: 2 }, fakePlugin(), doc);
-        const inserted = doc.appliedChanges.some(
-            (change) => change.text === "[^]" && change.from.ch === 2,
-        );
-        expect(inserted).toBe(false);
+        expect(doc.lines).toEqual([line]);
     });
 });

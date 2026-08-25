@@ -1,4 +1,4 @@
-import { Editor, EditorPosition } from "obsidian";
+import { EditorPosition } from "obsidian";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { noticeCalls } from "./mocks/obsidian";
@@ -13,6 +13,9 @@ import { docContext } from "../src/editor/doc-context";
 import { ProtectedCreationNotice } from "../src/editor/insertion-liveness";
 import { TableCellEditor } from "../src/editor/table-cursor";
 
+import { fakeEditor as sharedFakeEditor, FakeEditor } from "./helpers/fake-editor";
+import { fakePlugin as sharedFakePlugin } from "./helpers/fake-plugin";
+
 // Mutation hardening for the press guards (Stryker re-baseline 2026-08-12:
 // press-guards scored 60%). The guards are driven DIRECTLY here, not through
 // the command entry points: the commands wrap them in simulate-and-verify
@@ -21,36 +24,16 @@ import { TableCellEditor } from "../src/editor/table-cursor";
 // why the edge conditions below survived. Each test pins one decision the
 // guard alone owns.
 
-interface FakeDoc extends Editor {
-    cursor: EditorPosition;
-}
-
-function fakeEditor(lines: string[], cursor: EditorPosition = { line: 0, ch: 0 }): FakeDoc {
-    const doc = {
-        cursor,
-        getCursor: () => doc.cursor,
-        getLine: (n: number) => lines[n],
-        getValue: () => lines.join("\n"),
-        lineCount: () => lines.length,
-        lastLine: () => lines.length - 1,
-        setCursor(pos: EditorPosition) {
-            doc.cursor = pos;
-        },
-        scrollIntoView() {},
-    };
-    return doc as unknown as FakeDoc;
+function fakeEditor(lines: string[], cursor: EditorPosition = { line: 0, ch: 0 }): FakeEditor {
+    return sharedFakeEditor(lines, { cursor, wholeDoc: true });
 }
 
 function fakePlugin(settings: Partial<FootnotePlugin["settings"]> = {}): FootnotePlugin {
-    return {
-        // moveCursorAndSetJumpPoint reads the vault config for vim mode
-        app: { vault: {} },
-        settings: {
-            enableFootnotePrefix: false,
-            enablePopupEditor: false,
-            ...settings,
-        },
-    } as unknown as FootnotePlugin;
+    return sharedFakePlugin({
+        enableFootnotePrefix: false,
+        enablePopupEditor: false,
+        ...settings,
+    });
 }
 
 function fakeCell(text: string, head: number): TableCellEditor {

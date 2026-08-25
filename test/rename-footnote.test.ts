@@ -1,10 +1,9 @@
-import { Editor, EditorPosition } from "obsidian";
+import { EditorPosition } from "obsidian";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 
 import { docArb } from "./arbitraries";
 import { noticeCalls } from "./mocks/obsidian";
-import FootnotePlugin from "../src/main";
 import {
     planFootnoteRename,
     renameFootnote,
@@ -20,6 +19,9 @@ import {
     scanDocument,
 } from "../src/parsing/markdown-scan";
 
+import { fakeEditor as sharedFakeEditor, FakeEditor } from "./helpers/fake-editor";
+import { fakePlugin as sharedFakePlugin } from "./helpers/fake-plugin";
+
 // Renaming a footnote (issue #36, Jason's calls 2026-08-12): every
 // masked-live occurrence — references and definition labels — renames
 // case-insensitively in one planned transaction; a taken name refuses
@@ -27,13 +29,8 @@ import {
 // simulation can't keep alive refuses whole ("dead"). The modal and the
 // command entry are thin wiring over the two pure functions probed here.
 
-function fakeEditor(lines: string[]): Editor {
-    return {
-        getLine: (n: number) => lines[n],
-        getValue: () => lines.join("\n"),
-        lineCount: () => lines.length,
-        lastLine: () => lines.length - 1,
-    } as unknown as Editor;
+function fakeEditor(lines: string[]): FakeEditor {
+    return sharedFakeEditor(lines, { wholeDoc: true });
 }
 
 function targetAt(lines: string[], cursor: EditorPosition): string | null {
@@ -178,20 +175,12 @@ describe("planFootnoteRename", () => {
 describe("the command entry", () => {
     it("explains itself when the caret is on nothing renameable", async () => {
         noticeCalls.length = 0;
-        const doc = {
-            ...fakeEditor(["plain prose here"]),
-            getCursor: () => ({ line: 0, ch: 3 }),
-            listSelections: () => [
-                { anchor: { line: 0, ch: 3 }, head: { line: 0, ch: 3 } },
-            ],
-        } as unknown as Editor;
-        const plugin = {
-            app: {
-                workspace: { getActiveViewOfType: () => ({ editor: doc }) },
-                vault: {},
-            },
-            settings: {},
-        } as unknown as FootnotePlugin;
+        const doc = sharedFakeEditor(["plain prose here"], {
+            wholeDoc: true,
+            cursor: { line: 0, ch: 3 },
+            selection: { anchor: { line: 0, ch: 3 }, head: { line: 0, ch: 3 } },
+        });
+        const plugin = sharedFakePlugin({}, doc);
         await renameFootnote(plugin);
         expect(noticeCalls.some((args) => args[0] === RenameTargetNotice)).toBe(
             true,

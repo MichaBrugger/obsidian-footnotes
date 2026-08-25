@@ -1,5 +1,7 @@
-import { Editor, EditorChange, EditorPosition } from "obsidian";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { fakeEditor as sharedFakeEditor, FakeEditor } from "./helpers/fake-editor";
+import { fakePlugin as sharedFakePlugin } from "./helpers/fake-plugin";
 
 import FootnotePlugin from "../src/main";
 import { pasteInlineFootnote } from "../src/commands/insert-or-navigate-footnotes";
@@ -11,45 +13,19 @@ import { pasteInlineFootnote } from "../src/commands/insert-or-navigate-footnote
 // press must hop the caret past the closing bracket instead, exactly like
 // insertInlineFootnote's second press.
 
-interface FakeDoc extends Editor {
-    appliedChanges: EditorChange[];
-    cursor: EditorPosition;
+function fakeEditor(line: string, ch: number): FakeEditor {
+    return sharedFakeEditor([line], { cursor: { line: 0, ch }, edits: true });
 }
 
-function fakeEditor(line: string, ch: number): FakeDoc {
-    const doc = {
-        appliedChanges: [] as EditorChange[],
-        cursor: { line: 0, ch },
-        getCursor: () => doc.cursor,
-        listSelections: () => [{ anchor: doc.cursor, head: doc.cursor }],
-        getLine: () => line,
-        lineCount: () => 1,
-        setCursor(pos: EditorPosition) {
-            doc.cursor = pos;
-        },
-        transaction(spec: {
-            changes?: EditorChange[];
-            selection?: { from: EditorPosition };
-        }) {
-            if (spec.changes) doc.appliedChanges.push(...spec.changes);
-            if (spec.selection) doc.cursor = spec.selection.from;
-        },
-    };
-    return doc as unknown as FakeDoc;
-}
-
-function fakePlugin(doc: FakeDoc): FootnotePlugin {
-    return {
-        app: {
-            workspace: { getActiveViewOfType: () => ({ editor: doc }) },
-            vault: {},
-        },
-        settings: {
+function fakePlugin(doc: FakeEditor): FootnotePlugin {
+    return sharedFakePlugin(
+        {
             insertAtEndOfWord: false,
             enablePopupEditor: false,
             enableFootnotePrefix: false,
         },
-    } as unknown as FootnotePlugin;
+        doc,
+    );
 }
 
 afterEach(() => {
@@ -64,7 +40,7 @@ describe("pasteInlineFootnote inside an inline footnote", () => {
         const line = "text ^[an inline footnote] more";
         const doc = fakeEditor(line, 10);
         await pasteInlineFootnote(fakePlugin(doc));
-        expect(doc.appliedChanges).toEqual([]);
+        expect(doc.lines).toEqual([line]);
         expect(doc.cursor).toEqual({ line: 0, ch: line.indexOf("]") + 1 });
     });
 
@@ -74,8 +50,6 @@ describe("pasteInlineFootnote inside an inline footnote", () => {
         });
         const doc = fakeEditor("plain text", 5);
         await pasteInlineFootnote(fakePlugin(doc));
-        expect(doc.appliedChanges).toEqual([
-            { from: { line: 0, ch: 5 }, text: "^[clip]" },
-        ]);
+        expect(doc.lines).toEqual(["plain^[clip] text"]);
     });
 });

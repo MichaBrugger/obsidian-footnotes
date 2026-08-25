@@ -1,5 +1,7 @@
-import { Editor, EditorChange, EditorPosition } from "obsidian";
+import { EditorPosition } from "obsidian";
 import { describe, expect, it } from "vitest";
+
+import { fakeEditor as sharedFakeEditor, FakeEditor } from "../helpers/fake-editor";
 
 import FootnotePlugin from "../../src/main";
 import { lintAfterFootnoteCreation } from "../../src/linting/linter";
@@ -8,46 +10,19 @@ import { lintAfterFootnoteCreation } from "../../src/linting/linter";
 // Hunt: 2026-08-09. Lens: interactions.
 // Root cause: commit a30761f guarded the lint COMMANDS with readingViewActive but not lintAfterFootnoteCreation, whose gates (file path, popup busy, table focus) all stay untripped by a Reading-view flip.
 
-interface FakeDoc extends Editor {
-    appliedChanges: EditorChange[];
-    cursor: EditorPosition;
-}
-
-function fakeEditor(lines: string[], cursor: EditorPosition): FakeDoc {
-    const doc = {
-        appliedChanges: [] as EditorChange[],
+function fakeEditor(lines: string[], cursor: EditorPosition): FakeEditor {
+    return sharedFakeEditor(lines, {
         cursor,
-        getCursor: () => doc.cursor,
-        getLine: (n: number) => lines[n] ?? "",
-        getValue: () => lines.join("\n"),
-        lineCount: () => lines.length,
-        lastLine: () => lines.length - 1,
-        wordAt: () => null,
-        offsetToPos(offset: number) {
-            let remaining = offset;
-            for (let line = 0; line < lines.length; line++) {
-                if (remaining <= lines[line].length) return { line, ch: remaining };
-                remaining -= lines[line].length + 1;
-            }
-            return { line: lines.length - 1, ch: lines.at(-1)?.length ?? 0 };
-        },
-        setCursor(pos: EditorPosition) {
-            doc.cursor = pos;
-        },
-        scrollIntoView() {},
-        transaction(spec: {
-            changes?: EditorChange[];
-            selection?: { from: EditorPosition };
-        }) {
-            if (spec.changes) doc.appliedChanges.push(...spec.changes);
-            if (spec.selection) doc.cursor = spec.selection.from;
-        },
-    };
-    return doc as unknown as FakeDoc;
+        edits: true,
+        wholeDoc: true,
+        words: true,
+    });
 }
 
+// the mdView shape (file, getMode) is richer than the shared fakePlugin's
+// editor-only support, so this double stays local
 function pluginFor(
-    doc: FakeDoc,
+    doc: FakeEditor,
     overrides: Record<string, boolean | string> = {},
     mode: "source" | "preview" = "source",
 ): FootnotePlugin {
@@ -92,7 +67,7 @@ describe("popup-deferred lint-on-creation vs Reading view (fixed 2026-08-10)", (
             "preview",
         );
         lintAfterFootnoteCreation(plugin, true, "note.md");
-        expect(doc.appliedChanges).toEqual([]);
+        expect(doc.lines).toEqual(lines);
         expect(doc.cursor).toEqual({ line: 2, ch: lines[2].length });
     });
 
@@ -107,6 +82,6 @@ describe("popup-deferred lint-on-creation vs Reading view (fixed 2026-08-10)", (
             "source",
         );
         lintAfterFootnoteCreation(plugin, true, "note.md");
-        expect(doc.appliedChanges.length).toBeGreaterThan(0);
+        expect(doc.transactions).toBeGreaterThan(0);
     });
 });

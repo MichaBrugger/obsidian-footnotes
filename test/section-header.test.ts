@@ -1,8 +1,9 @@
-import { Editor } from "obsidian";
 import { describe, expect, it } from "vitest";
 
 import { buildDefinitionAppend } from "../src/commands/definition-append";
-import type FootnotePlugin from "../src/main";
+
+import { fakeEditor } from "./helpers/fake-editor";
+import { fakePlugin as sharedFakePlugin } from "./helpers/fake-plugin";
 
 // The optional heading inserted above the first footnote definition. A blank
 // line ALWAYS separates the heading from the content above it (markdown
@@ -12,28 +13,18 @@ import type FootnotePlugin from "../src/main";
 // Asserted through buildDefinitionAppend, the one production consumer —
 // the helper itself went unexported (2026-08-11 review cleanliness).
 
-function fakePlugin(enabled: boolean, heading: string): FootnotePlugin {
-    return {
-        settings: {
-            enableFootnoteSectionHeading: enabled,
-            footnoteSectionHeading: heading,
-            enableRemoveBlankLastLines: false,
-        },
-    } as unknown as FootnotePlugin;
-}
-
-// a one-line note, so the whole heading policy shows up in the change text
-function fakeEditor(): Editor {
-    return {
-        getLine: () => "Alpha",
-        lineCount: () => 1,
-        lastLine: () => 0,
-    } as unknown as Editor;
+function fakePlugin(enabled: boolean, heading: string) {
+    return sharedFakePlugin({
+        enableFootnoteSectionHeading: enabled,
+        footnoteSectionHeading: heading,
+        enableRemoveBlankLastLines: false,
+    });
 }
 
 function firstFootnoteText(enabled: boolean, heading: string): string {
+    // a one-line note, so the whole heading policy shows up in the change text
     const { change } = buildDefinitionAppend(
-        fakeEditor(),
+        fakeEditor(["Alpha"]),
         "1",
         true,
         fakePlugin(enabled, heading),

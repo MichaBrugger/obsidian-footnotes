@@ -1,7 +1,12 @@
-import { Editor, EditorChange, EditorPosition } from "obsidian";
+import { EditorPosition } from "obsidian";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { noticeCalls } from "./mocks/obsidian";
+import {
+    fakeEditor as sharedFakeEditor,
+    FakeEditor,
+} from "./helpers/fake-editor";
+import { fakePlugin as sharedFakePlugin } from "./helpers/fake-plugin";
 
 import FootnotePlugin from "../src/main";
 import {
@@ -35,56 +40,31 @@ import { TableCellEditor } from "../src/editor/table-cursor";
 // built to diverge from one specific surviving mutant; the trailing comment
 // block lists the ones deliberately left alone (popup-only and equivalent).
 
-interface FakeDoc extends Editor {
-    lines: string[];
-    cursor: EditorPosition;
-    scrolls: number;
-    transactions: {
-        changes?: EditorChange[];
-        selection?: { from: EditorPosition };
-    }[];
-}
+// the fake's `transactions` is a COUNT here (shared fake), not the raw
+// spec list the old local fake kept — assertions below compare against
+// numbers accordingly. `scrolls` has no shared-fake equivalent (its
+// scrollIntoView is a fixed no-op), so this thin wrapper counts scroll
+// calls itself on top of the shared editor.
+type FakeDoc = FakeEditor & { scrolls: number };
 
 function fakeEditor(
     lines: string[],
     cursor: EditorPosition = { line: 0, ch: 0 },
     selection?: { anchor: EditorPosition; head: EditorPosition },
 ): FakeDoc {
-    const doc = {
-        lines: lines.slice(),
+    const doc = sharedFakeEditor(lines, {
         cursor,
-        scrolls: 0,
-        transactions: [] as {
-            changes?: EditorChange[];
-            selection?: { from: EditorPosition };
-        }[],
-        getCursor: () => doc.cursor,
-        listSelections: () =>
-            selection ? [selection] : [{ anchor: doc.cursor, head: doc.cursor }],
-        getLine: (n: number) => doc.lines[n],
-        getValue: () => doc.lines.join("\n"),
-        lineCount: () => doc.lines.length,
-        lastLine: () => doc.lines.length - 1,
-        wordAt: () => null,
-        setCursor(pos: EditorPosition) {
-            doc.cursor = pos;
-        },
-        scrollIntoView() {
-            doc.scrolls++;
-        },
-        transaction(spec: {
-            changes?: EditorChange[];
-            selection?: { from: EditorPosition };
-        }) {
-            // simulateChanges IS the transaction semantics the commands rely
-            // on (verbatim CodeMirror ordering) — reusing it keeps the fake
-            // honest, exactly as test/selection-to-footnote.test.ts does
-            doc.transactions.push(spec);
-            if (spec.changes) doc.lines = simulateChanges(doc.lines, spec.changes);
-            if (spec.selection) doc.cursor = spec.selection.from;
-        },
+        selection,
+        edits: true,
+        wholeDoc: true,
+        words: true,
+    }) as FakeDoc;
+    doc.scrolls = 0;
+    // the shared fake's scrollIntoView is already a no-op — just count calls
+    doc.scrollIntoView = () => {
+        doc.scrolls++;
     };
-    return doc as unknown as FakeDoc;
+    return doc;
 }
 
 type Settings = FootnotePlugin["settings"];
@@ -93,12 +73,8 @@ function fakePlugin(
     doc: FakeDoc,
     settings: Partial<Settings> = {},
 ): FootnotePlugin {
-    return {
-        app: {
-            workspace: { getActiveViewOfType: () => ({ editor: doc }) },
-            vault: {},
-        },
-        settings: {
+    return sharedFakePlugin(
+        {
             insertAtEndOfWord: false,
             enablePopupEditor: false,
             enableFootnotePrefix: false,
@@ -108,7 +84,8 @@ function fakePlugin(
             lintOnFootnoteCreation: false,
             ...settings,
         },
-    } as unknown as FootnotePlugin;
+        doc,
+    );
 }
 
 function fakeCell(text: string, head: number, anchor: number = head) {
@@ -289,7 +266,7 @@ describe("createAutonumFootnote", () => {
         expect(
             createAutonumFootnote("prose", { line: 0, ch: 5 }, fakePlugin(doc), doc),
         ).toBe(true);
-        expect(doc.transactions).toHaveLength(1);
+        expect(doc.transactions).toBe(1);
         expect(doc.cursor).toEqual({ line: 2, ch: "[^1]: ".length });
         expect(doc.scrolls).toBe(1);
     });
@@ -352,7 +329,7 @@ describe("createAutonumFootnote inside an actively edited table cell", () => {
         ).toBe(true);
         expect(dispatched).toEqual([]);
         expect(doc.lines).toEqual(before);
-        expect(doc.transactions).toEqual([]);
+        expect(doc.transactions).toBe(0);
         expect(noticed(ProtectedCreationNotice)).toBe(true);
     });
 });
@@ -610,7 +587,7 @@ describe("createFootnoteReference in the main editor", () => {
         ).toBe(true);
         expect(doc.cursor).toEqual({ line: 0, ch: 5 });
         expect(doc.lines).toEqual(["a [^] b"]);
-        expect(doc.transactions).toEqual([]);
+        expect(doc.transactions).toBe(0);
     });
 
     // L417 ConditionalExpression -> true: with no placeholder under the caret
@@ -656,7 +633,7 @@ describe("createFootnoteReference in the main editor", () => {
                 doc,
             ),
         ).toBe(true);
-        expect(doc.transactions).toEqual([]);
+        expect(doc.transactions).toBe(0);
         expect(messages()).toEqual([INVALID_PREFIX_NOTICE]);
     });
 
@@ -825,7 +802,7 @@ describe("the main-editor selection claim", () => {
         expect(
             selectionPressHandled(fakePlugin(doc), doc, null, "inline"),
         ).toBe(false);
-        expect(doc.transactions).toEqual([]);
+        expect(doc.transactions).toBe(0);
     });
 
     // the main-editor edge-cut twins: strictly-inside edges refuse up front
@@ -1101,13 +1078,8 @@ describe("the auto-numbered cell selection conversion", () => {
 // The rename planners
 // ---------------------------------------------------------------------------
 
-function renameDoc(lines: string[]): Editor {
-    return {
-        getLine: (n: number) => lines[n],
-        getValue: () => lines.join("\n"),
-        lineCount: () => lines.length,
-        lastLine: () => lines.length - 1,
-    } as unknown as Editor;
+function renameDoc(lines: string[]): FakeEditor {
+    return sharedFakeEditor(lines, { wholeDoc: true });
 }
 
 describe("renameTargetAtCursor", () => {

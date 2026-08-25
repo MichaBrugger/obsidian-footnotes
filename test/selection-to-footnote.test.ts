@@ -1,7 +1,12 @@
-import { App, Editor, EditorChange, EditorPosition } from "obsidian";
+import { App, EditorPosition } from "obsidian";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { noticeCalls } from "./mocks/obsidian";
+import {
+    fakeEditor as sharedFakeEditor,
+    FakeEditor,
+} from "./helpers/fake-editor";
+import { fakePlugin as sharedFakePlugin } from "./helpers/fake-plugin";
 
 import FootnotePlugin from "../src/main";
 import {
@@ -23,7 +28,7 @@ import {
     SelectionCommandNotice,
     SelectionSpanNotice,
 } from "../src/commands/selection-footnote";
-import { ProtectedCreationNotice, simulateChanges } from "../src/editor/insertion-liveness";
+import { ProtectedCreationNotice } from "../src/editor/insertion-liveness";
 import { commandHotkeys } from "../src/editor/obsidian-internals";
 import { DefinitionCreationNotice } from "../src/commands/press-guards";
 import { TableCellEditor } from "../src/editor/table-cursor";
@@ -35,51 +40,25 @@ import { TableCellEditor } from "../src/editor/table-cursor";
 // as "^[…]" in place. The generative twin lives in
 // command-properties.test.ts — these pin the concrete contracts.
 
-interface SelDoc extends Editor {
-    lines: string[];
-    cursor: EditorPosition;
-}
-
+// with `selection` undefined, the shared fake's listSelections falls back
+// to a live collapsed range at the current cursor — the same behavior the
+// old local fake's `selection ? [selection] : [...cursor...]` gave.
 function fakeEditor(
     lines: string[],
     cursor: EditorPosition,
     selection?: { anchor: EditorPosition; head: EditorPosition },
-): SelDoc {
-    const doc = {
-        lines: lines.slice(),
+): FakeEditor {
+    return sharedFakeEditor(lines, {
         cursor,
-        getCursor: () => doc.cursor,
-        listSelections: () =>
-            selection ? [selection] : [{ anchor: doc.cursor, head: doc.cursor }],
-        getLine: (n: number) => doc.lines[n],
-        getValue: () => doc.lines.join("\n"),
-        lineCount: () => doc.lines.length,
-        lastLine: () => doc.lines.length - 1,
-        setCursor(pos: EditorPosition) {
-            doc.cursor = pos;
-        },
-        scrollIntoView() {},
-        transaction(spec: {
-            changes?: EditorChange[];
-            selection?: { from: EditorPosition };
-        }) {
-            // simulateChanges IS the transaction semantics the commands rely
-            // on (verbatim CodeMirror ordering) — reusing it keeps the fake
-            // honest
-            if (spec.changes) doc.lines = simulateChanges(doc.lines, spec.changes);
-            if (spec.selection) doc.cursor = spec.selection.from;
-        },
-    };
-    return doc as unknown as SelDoc;
+        selection,
+        edits: true,
+        wholeDoc: true,
+    });
 }
 
-function fakePlugin(doc: SelDoc): FootnotePlugin {
-    return {
-        app: {
-            workspace: { getActiveViewOfType: () => ({ editor: doc }) },
-            vault: {},
-        },
-        settings: {
+function fakePlugin(doc: FakeEditor): FootnotePlugin {
+    return sharedFakePlugin(
+        {
             insertAtEndOfWord: false,
             enablePopupEditor: false,
             enableFootnotePrefix: false,
@@ -88,7 +67,8 @@ function fakePlugin(doc: SelDoc): FootnotePlugin {
             enableRemoveBlankLastLines: false,
             lintOnFootnoteCreation: false,
         },
-    } as unknown as FootnotePlugin;
+        doc,
+    );
 }
 
 beforeEach(() => {

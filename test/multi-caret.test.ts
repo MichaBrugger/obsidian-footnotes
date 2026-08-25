@@ -1,7 +1,12 @@
-import { Editor, EditorChange, EditorPosition } from "obsidian";
+import { EditorPosition } from "obsidian";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { noticeCalls } from "./mocks/obsidian";
+import {
+    fakeEditor as sharedFakeEditor,
+    FakeEditor,
+} from "./helpers/fake-editor";
+import { fakePlugin as sharedFakePlugin } from "./helpers/fake-plugin";
 
 import FootnotePlugin from "../src/main";
 import {
@@ -12,7 +17,7 @@ import {
 } from "../src/commands/insert-or-navigate-footnotes";
 import { MultiCaretFootnoteNotice } from "../src/commands/multi-caret";
 import { DefinitionCreationNotice } from "../src/commands/press-guards";
-import { ProtectedCreationNotice, simulateChanges } from "../src/editor/insertion-liveness";
+import { ProtectedCreationNotice } from "../src/editor/insertion-liveness";
 
 // Multiple Alt-clicked carets get the SAME footnote at every one
 // (2026-08-22, Jason's ask — one source cited many times; always on, no
@@ -22,70 +27,20 @@ import { ProtectedCreationNotice, simulateChanges } from "../src/editor/insertio
 // of them at once. These pin the transaction shapes; the live
 // multi-cursor typing is smoke/manual territory.
 
-interface MultiDoc extends Editor {
-    lines: string[];
-    cursor: EditorPosition;
-    selections: { from: EditorPosition }[] | null;
-    transactions: number;
-}
-
-function fakeEditor(
-    lines: string[],
-    carets: EditorPosition[],
-): MultiDoc {
-    const doc = {
-        lines: lines.slice(),
-        cursor: carets[0],
-        selections: null as { from: EditorPosition }[] | null,
-        transactions: 0,
-        getCursor: () => doc.cursor,
-        listSelections: () =>
-            carets.map((pos) => ({ anchor: pos, head: pos })),
-        getLine: (n: number) => doc.lines[n],
-        getValue: () => doc.lines.join("\n"),
-        lineCount: () => doc.lines.length,
-        lastLine: () => doc.lines.length - 1,
-        wordAt(pos: EditorPosition) {
-            const line = doc.lines[pos.line] ?? "";
-            const isWord = (c: string | undefined) => !!c && /[\w]/.test(c);
-            let start = pos.ch;
-            if (!isWord(line[start]) && isWord(line[start - 1])) start--;
-            if (!isWord(line[start])) return null;
-            let end = start;
-            while (isWord(line[start - 1])) start--;
-            while (isWord(line[end])) end++;
-            return {
-                from: { line: pos.line, ch: start },
-                to: { line: pos.line, ch: end },
-            };
-        },
-        setCursor(pos: EditorPosition) {
-            doc.cursor = pos;
-        },
-        scrollIntoView() {},
-        transaction(spec: {
-            changes?: EditorChange[];
-            selection?: { from: EditorPosition };
-            selections?: { from: EditorPosition }[];
-        }) {
-            doc.transactions++;
-            if (spec.changes) doc.lines = simulateChanges(doc.lines, spec.changes);
-            if (spec.selection) doc.cursor = spec.selection.from;
-            if (spec.selections) doc.selections = spec.selections;
-        },
-    };
-    return doc as unknown as MultiDoc;
+function fakeEditor(lines: string[], carets: EditorPosition[]): FakeEditor {
+    return sharedFakeEditor(lines, {
+        carets,
+        edits: true,
+        wholeDoc: true,
+        words: true,
+    });
 }
 
 type Settings = Partial<FootnotePlugin["settings"]>;
 
-function fakePlugin(doc: MultiDoc, settings: Settings = {}): FootnotePlugin {
-    return {
-        app: {
-            workspace: { getActiveViewOfType: () => ({ editor: doc }) },
-            vault: {},
-        },
-        settings: {
+function fakePlugin(doc: FakeEditor, settings: Settings = {}): FootnotePlugin {
+    return sharedFakePlugin(
+        {
             insertAtEndOfWord: false,
             enablePopupEditor: false,
             enableFootnotePrefix: false,
@@ -95,7 +50,8 @@ function fakePlugin(doc: MultiDoc, settings: Settings = {}): FootnotePlugin {
             lintOnFootnoteCreation: false,
             ...settings,
         },
-    } as unknown as FootnotePlugin;
+        doc,
+    );
 }
 
 beforeEach(() => {

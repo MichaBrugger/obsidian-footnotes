@@ -1,7 +1,8 @@
-import { Editor } from "obsidian";
 import { describe, expect, it } from "vitest";
 
 import { listExistingFootnoteDefinitions } from "../../src/editor/doc-context";
+
+import { fakeEditor } from "../helpers/fake-editor";
 
 // spec question: does Obsidian treat a definition inside a callout/blockquote
 // ("> [^1]: def") as live? (Same Obsidian-semantics question as
@@ -12,20 +13,13 @@ import { listExistingFootnoteDefinitions } from "../../src/editor/doc-context";
 // append a duplicate definition; a user working inside the callout would
 // expect the existing one to be found and reused.
 
-function fakeEditor(lines: string[]) {
-    return {
-        getLine: (n: number) => lines[n] ?? "",
-        getValue: () => lines.join("\n"),
-        lineCount: () => lines.length,
-        lastLine: () => lines.length - 1,
-    } as unknown as Editor;
-}
-
 describe("fixed 2026-08-10: definitions inside callouts are listed", () => {
     it("a definition inside a callout is listed", () => {
         expect(
             listExistingFootnoteDefinitions(
-                fakeEditor(["> [!note]", "> body[^1]", "> [^1]: def"]),
+                fakeEditor(["> [!note]", "> body[^1]", "> [^1]: def"], {
+                    wholeDoc: true,
+                }),
             ),
         ).toEqual(["1"]);
     });

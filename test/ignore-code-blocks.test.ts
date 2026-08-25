@@ -1,11 +1,12 @@
-import { Editor, EditorPosition } from "obsidian";
 import { describe, expect, it } from "vitest";
 
-import FootnotePlugin from "../src/main";
 import { listExistingFootnoteDefinitions } from "../src/editor/doc-context";
 import { shouldJumpFromDefinitionToReference, shouldJumpFromReferenceToDefinition } from "../src/commands/navigation";
 import { computeNextFootnoteNumber, referenceOccurrences } from "../src/parsing/footnote-grammar";
 import { maskProtectedLines } from "../src/parsing/markdown-scan";
+
+import { fakeEditor } from "./helpers/fake-editor";
+import { fakePlugin as sharedFakePlugin } from "./helpers/fake-plugin";
 
 // Issue #41: [^x]-shaped text inside code — fenced blocks, inline code, or
 // frontmatter — must be invisible to every scan the insert/navigate
@@ -13,22 +14,7 @@ import { maskProtectedLines } from "../src/parsing/markdown-scan";
 // autonumbering, suppressed the section heading (a fenced "[^x]:" counted
 // as an existing definition), and hijacked the hotkey on that line.
 
-function fakeEditor(lines: string[]) {
-    const cursorMoves: EditorPosition[] = [];
-    const doc = {
-        getLine: (n: number) => lines[n],
-        lineCount: () => lines.length,
-        lastLine: () => lines.length - 1,
-        setCursor: (pos: EditorPosition) => cursorMoves.push(pos),
-        scrollIntoView: () => {},
-    } as unknown as Editor;
-    return { doc, cursorMoves };
-}
-
-const fakePlugin = {
-    settings: { enablePopupEditor: false },
-    app: { vault: {} },
-} as unknown as FootnotePlugin;
+const fakePlugin = sharedFakePlugin({ enablePopupEditor: false });
 
 describe("computeNextFootnoteNumber ignores code", () => {
     it("skips numbered references inside fenced code blocks", () => {
@@ -54,7 +40,7 @@ describe("computeNextFootnoteNumber ignores code", () => {
 
 describe("listExistingFootnoteDefinitions ignores code", () => {
     it("does not count a definition-shaped line inside a fence", () => {
-        const { doc } = fakeEditor(["```", "[^1]: fake", "```", "[^2]: real"]);
+        const doc = fakeEditor(["```", "[^1]: fake", "```", "[^2]: real"]);
         expect(listExistingFootnoteDefinitions(doc)).toEqual(["2"]);
     });
 });
@@ -92,7 +78,7 @@ describe("reference occurrences ignore code", () => {
 
 describe("shouldJumpFromReferenceToDefinition ignores code", () => {
     it("does not navigate from a reference inside a fenced code block", () => {
-        const { doc } = fakeEditor(["```", "fake[^1]", "```", "[^1]: real"]);
+        const doc = fakeEditor(["```", "fake[^1]", "```", "[^1]: real"]);
         // caret inside the fenced "[^1]" — plain text, so the press must
         // fall through to insertion instead of navigating
         const handled = shouldJumpFromReferenceToDefinition(
@@ -105,7 +91,7 @@ describe("shouldJumpFromReferenceToDefinition ignores code", () => {
     });
 
     it("does not navigate from a reference inside inline code", () => {
-        const { doc } = fakeEditor(["see `x[^1]` here", "", "[^1]: real"]);
+        const doc = fakeEditor(["see `x[^1]` here", "", "[^1]: real"]);
         const handled = shouldJumpFromReferenceToDefinition(
             "see `x[^1]` here",
             { line: 0, ch: 8 },
@@ -116,7 +102,7 @@ describe("shouldJumpFromReferenceToDefinition ignores code", () => {
     });
 
     it("still navigates from a real reference on a line that also has code", () => {
-        const { doc, cursorMoves } = fakeEditor([
+        const doc = fakeEditor([
             "`[^1]` real[^1]",
             "",
             "[^1]: definition",
@@ -128,13 +114,13 @@ describe("shouldJumpFromReferenceToDefinition ignores code", () => {
             doc,
         );
         expect(handled).toBe(true);
-        expect(cursorMoves).toEqual([{ line: 2, ch: "[^1]: definition".length }]);
+        expect(doc.moves).toEqual([{ line: 2, ch: "[^1]: definition".length }]);
     });
 });
 
 describe("shouldJumpFromDefinitionToReference ignores code", () => {
     it("a definition-shaped line inside a fence is not a definition", () => {
-        const { doc } = fakeEditor(["```", "[^1]: fake", "```", "real[^1]"]);
+        const doc = fakeEditor(["```", "[^1]: fake", "```", "real[^1]"]);
         const handled = shouldJumpFromDefinitionToReference(
             "[^1]: fake",
             { line: 1, ch: 3 },
@@ -145,7 +131,7 @@ describe("shouldJumpFromDefinitionToReference ignores code", () => {
     });
 
     it("the jump-target search skips references inside code", () => {
-        const { doc, cursorMoves } = fakeEditor([
+        const doc = fakeEditor([
             "```",
             "x[^1]",
             "```",
@@ -160,7 +146,7 @@ describe("shouldJumpFromDefinitionToReference ignores code", () => {
         );
         expect(handled).toBe(true);
         // the first REAL occurrence is on line 3 — not the fenced line 1
-        expect(cursorMoves).toEqual([{ line: 3, ch: 8 }]);
+        expect(doc.moves).toEqual([{ line: 3, ch: 8 }]);
     });
 });
 

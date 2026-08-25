@@ -1,5 +1,7 @@
-import { Editor, EditorPosition } from "obsidian";
+import { Editor } from "obsidian";
 import { describe, expect, it } from "vitest";
+
+import { fakeEditor as sharedFakeEditor } from "./helpers/fake-editor";
 
 import { exitInlineFootnoteIfInside } from "../src/commands/inline-footnotes";
 
@@ -9,14 +11,8 @@ import { exitInlineFootnoteIfInside } from "../src/commands/inline-footnotes";
 // ("^[in [^named]line]").
 
 function fakeEditor(line: string, ch: number) {
-    const moves: EditorPosition[] = [];
-    const doc = {
-        getLine: () => line,
-        lineCount: () => 1,
-        getCursor: () => ({ line: 0, ch }),
-        setCursor: (pos: EditorPosition) => moves.push(pos),
-    } as unknown as Editor;
-    return { doc, moves };
+    const doc = sharedFakeEditor([line], { cursor: { line: 0, ch } });
+    return { doc, moves: doc.moves };
 }
 
 describe("exitInlineFootnoteIfInside", () => {

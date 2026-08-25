@@ -1,5 +1,8 @@
-import { Editor, EditorChange, EditorPosition } from "obsidian";
+import { EditorPosition } from "obsidian";
 import { describe, expect, it } from "vitest";
+
+import { fakeEditor as sharedFakeEditor, FakeEditor } from "./helpers/fake-editor";
+import { fakePlugin as sharedFakePlugin } from "./helpers/fake-plugin";
 
 import FootnotePlugin from "../src/main";
 import { navigateReferenceIfInside } from "../src/commands/insert-or-navigate-footnotes";
@@ -10,46 +13,19 @@ import { navigateReferenceIfInside } from "../src/commands/insert-or-navigate-fo
 // behaves like the numbered/named hotkey instead: jump to the reference's
 // definition, or create the definition when it is missing.
 
-interface FakeDoc extends Editor {
-    appliedChanges: EditorChange[];
-    cursor: EditorPosition | null;
-}
-
-function fakeEditor(lines: string[], cursor: EditorPosition): FakeDoc {
-    const doc = {
-        appliedChanges: [] as EditorChange[],
-        cursor,
-        getCursor: () => doc.cursor,
-        getLine: (n: number) => lines[n],
-        lineCount: () => lines.length,
-        lastLine: () => lines.length - 1,
-        setCursor(pos: EditorPosition) {
-            doc.cursor = pos;
-        },
-        scrollIntoView() {},
-        transaction(spec: {
-            changes?: EditorChange[];
-            selection?: { from: EditorPosition };
-        }) {
-            if (spec.changes) doc.appliedChanges.push(...spec.changes);
-            if (spec.selection) doc.cursor = spec.selection.from;
-        },
-    };
-    return doc as unknown as FakeDoc;
+function fakeEditor(lines: string[], cursor: EditorPosition): FakeEditor {
+    return sharedFakeEditor(lines, { cursor, edits: true });
 }
 
 function fakePlugin(): FootnotePlugin {
-    return {
-        app: { vault: {} },
-        settings: {
-            insertAtEndOfWord: false,
-            enablePopupEditor: false,
-            enableFootnotePrefix: false,
-            enableFootnoteSectionHeading: false,
-            footnoteSectionHeading: "",
-            enableRemoveBlankLastLines: true,
-        },
-    } as unknown as FootnotePlugin;
+    return sharedFakePlugin({
+        insertAtEndOfWord: false,
+        enablePopupEditor: false,
+        enableFootnotePrefix: false,
+        enableFootnoteSectionHeading: false,
+        footnoteSectionHeading: "",
+        enableRemoveBlankLastLines: true,
+    });
 }
 
 describe("navigateReferenceIfInside (inline hotkey on a regular reference)", () => {
@@ -61,19 +37,13 @@ describe("navigateReferenceIfInside (inline hotkey on a regular reference)", () 
         expect(navigateReferenceIfInside(fakePlugin(), doc, null)).toBe(true);
         // caret lands at the end of the definition, nothing was inserted
         expect(doc.cursor).toEqual({ line: 2, ch: "[^1]: one".length });
-        expect(doc.appliedChanges).toEqual([]);
+        expect(doc.lines).toEqual(["Alpha[^1] b", "", "[^1]: one"]);
     });
 
     it("creates the missing definition like the named hotkey would", () => {
         const doc = fakeEditor(["Alpha[^note] b"], { line: 0, ch: 8 });
         expect(navigateReferenceIfInside(fakePlugin(), doc, null)).toBe(true);
-        expect(doc.appliedChanges).toEqual([
-            {
-                from: { line: 0, ch: "Alpha[^note] b".length },
-                to: { line: 0, ch: "Alpha[^note] b".length },
-                text: "\n\n[^note]: ",
-            },
-        ]);
+        expect(doc.lines).toEqual(["Alpha[^note] b", "", "[^note]: "]);
     });
 
     it("reports false when the caret is not inside any reference", () => {
@@ -82,7 +52,7 @@ describe("navigateReferenceIfInside (inline hotkey on a regular reference)", () 
             ch: 2,
         });
         expect(navigateReferenceIfInside(fakePlugin(), doc, null)).toBe(false);
-        expect(doc.appliedChanges).toEqual([]);
+        expect(doc.lines).toEqual(["Alpha[^1] b", "", "[^1]: one"]);
     });
 
     it("a caret just past the closing bracket is outside (issue #49 parity)", () => {
@@ -99,6 +69,6 @@ describe("navigateReferenceIfInside (inline hotkey on a regular reference)", () 
             ch: 10,
         });
         expect(navigateReferenceIfInside(fakePlugin(), doc, null)).toBe(false);
-        expect(doc.appliedChanges).toEqual([]);
+        expect(doc.lines).toEqual(["code `x [^1] y` end", "", "[^1]: one"]);
     });
 });

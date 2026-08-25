@@ -1,33 +1,19 @@
-import { Editor, EditorPosition } from "obsidian";
 import { describe, expect, it } from "vitest";
 
-import FootnotePlugin from "../src/main";
 import {
     jumpToFootnoteDefinition,
     shouldJumpFromDefinitionToReference,
 } from "../src/commands/navigation";
+
+import { fakeEditor } from "./helpers/fake-editor";
+import { fakePlugin as sharedFakePlugin } from "./helpers/fake-plugin";
 
 // Bug (reported 2026-07-17, manual testing): jumping TO a multi-line definition
 // lands the caret on the LAST continuation line by design, but jumping BACK
 // only recognized the "[^x]:" line itself, so the hotkey on a continuation
 // line fell through the cascade and inserted a brand-new footnote.
 
-function fakeEditor(lines: string[]) {
-    const cursorMoves: EditorPosition[] = [];
-    const doc = {
-        getLine: (n: number) => lines[n],
-        lineCount: () => lines.length,
-        lastLine: () => lines.length - 1,
-        setCursor: (pos: EditorPosition) => cursorMoves.push(pos),
-        scrollIntoView: () => {},
-    } as unknown as Editor;
-    return { doc, cursorMoves };
-}
-
-const fakePlugin = {
-    settings: { enablePopupEditor: false },
-    app: { vault: {} },
-} as unknown as FootnotePlugin;
+const fakePlugin = sharedFakePlugin({ enablePopupEditor: false });
 
 const NOTE = [
     "jump from me[^multiline] here",
@@ -39,7 +25,7 @@ const NOTE = [
 
 describe("jumping back from a multi-line definition", () => {
     it("works from the definition's own line (existing behavior)", () => {
-        const { doc, cursorMoves } = fakeEditor(NOTE);
+        const doc = fakeEditor(NOTE);
         const handled = shouldJumpFromDefinitionToReference(
             NOTE[2],
             { line: 2, ch: 5 },
@@ -47,11 +33,11 @@ describe("jumping back from a multi-line definition", () => {
             doc,
         );
         expect(handled).toBe(true);
-        expect(cursorMoves).toEqual([{ line: 0, ch: 12 + "[^multiline]".length }]);
+        expect(doc.moves).toEqual([{ line: 0, ch: 12 + "[^multiline]".length }]);
     });
 
     it("works from a continuation line (where jump-to-definition parks the caret)", () => {
-        const { doc, cursorMoves } = fakeEditor(NOTE);
+        const doc = fakeEditor(NOTE);
         const handled = shouldJumpFromDefinitionToReference(
             NOTE[4],
             { line: 4, ch: NOTE[4].length },
@@ -59,7 +45,7 @@ describe("jumping back from a multi-line definition", () => {
             doc,
         );
         expect(handled).toBe(true);
-        expect(cursorMoves).toEqual([{ line: 0, ch: 12 + "[^multiline]".length }]);
+        expect(doc.moves).toEqual([{ line: 0, ch: 12 + "[^multiline]".length }]);
     });
 
     it("works from a blank-separated second paragraph of the definition", () => {
@@ -70,7 +56,7 @@ describe("jumping back from a multi-line definition", () => {
             "",
             "    second paragraph, still the same footnote",
         ];
-        const { doc, cursorMoves } = fakeEditor(lines);
+        const doc = fakeEditor(lines);
         const handled = shouldJumpFromDefinitionToReference(
             lines[4],
             { line: 4, ch: 10 },
@@ -78,12 +64,12 @@ describe("jumping back from a multi-line definition", () => {
             doc,
         );
         expect(handled).toBe(true);
-        expect(cursorMoves).toEqual([{ line: 0, ch: "reference[^m]".length }]);
+        expect(doc.moves).toEqual([{ line: 0, ch: "reference[^m]".length }]);
     });
 
     it("an indented line that belongs to no definition still falls through", () => {
         const lines = ["- list", "    indented item", "", "[^x]: definition"];
-        const { doc } = fakeEditor(lines);
+        const doc = fakeEditor(lines);
         const handled = shouldJumpFromDefinitionToReference(
             lines[1],
             { line: 1, ch: 6 },
@@ -95,7 +81,7 @@ describe("jumping back from a multi-line definition", () => {
 
     it("a continuation line inside a fence is not a definition", () => {
         const lines = ["```", "[^f]: fake", "    fake continuation", "```"];
-        const { doc } = fakeEditor(lines);
+        const doc = fakeEditor(lines);
         const handled = shouldJumpFromDefinitionToReference(
             lines[2],
             { line: 2, ch: 6 },
@@ -120,7 +106,7 @@ describe("jumping TO a definition lands at the block's real end", () => {
             "",
             "    second paragraph",
         ];
-        const { doc, cursorMoves } = fakeEditor(lines);
+        const doc = fakeEditor(lines);
         const handled = jumpToFootnoteDefinition(
             "m",
             { line: 0, ch: 5 },
@@ -128,7 +114,7 @@ describe("jumping TO a definition lands at the block's real end", () => {
             doc,
         );
         expect(handled).toBe(true);
-        expect(cursorMoves).toEqual([
+        expect(doc.moves).toEqual([
             { line: 4, ch: "    second paragraph".length },
         ]);
     });
@@ -145,7 +131,7 @@ describe("jumping TO a definition lands at the block's real end", () => {
             "[^d]: second",
             "    second continuation",
         ];
-        const { doc, cursorMoves } = fakeEditor(lines);
+        const doc = fakeEditor(lines);
         const handled = jumpToFootnoteDefinition(
             "d",
             { line: 0, ch: 3 },
@@ -153,7 +139,7 @@ describe("jumping TO a definition lands at the block's real end", () => {
             doc,
         );
         expect(handled).toBe(true);
-        expect(cursorMoves).toEqual([
+        expect(doc.moves).toEqual([
             { line: 5, ch: "    second continuation".length },
         ]);
     });
@@ -167,7 +153,7 @@ describe("jumping TO a definition lands at the block's real end", () => {
             "    E = mc^2",
             "    $$",
         ];
-        const { doc, cursorMoves } = fakeEditor(lines);
+        const doc = fakeEditor(lines);
         const handled = jumpToFootnoteDefinition(
             "m",
             { line: 0, ch: 5 },
@@ -175,6 +161,6 @@ describe("jumping TO a definition lands at the block's real end", () => {
             doc,
         );
         expect(handled).toBe(true);
-        expect(cursorMoves).toEqual([{ line: 5, ch: "    $$".length }]);
+        expect(doc.moves).toEqual([{ line: 5, ch: "    $$".length }]);
     });
 });

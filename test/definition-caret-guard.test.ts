@@ -1,7 +1,12 @@
-import { Editor, EditorChange, EditorPosition } from "obsidian";
+import { EditorPosition } from "obsidian";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { noticeCalls } from "./mocks/obsidian";
+import {
+    fakeEditor as sharedFakeEditor,
+    FakeEditor,
+} from "./helpers/fake-editor";
+import { fakePlugin as sharedFakePlugin } from "./helpers/fake-plugin";
 
 import FootnotePlugin from "../src/main";
 import {
@@ -11,7 +16,6 @@ import {
     pasteInlineFootnote,
 } from "../src/commands/insert-or-navigate-footnotes";
 import { DefinitionCreationNotice } from "../src/commands/press-guards";
-import { simulateChanges } from "../src/editor/insertion-liveness";
 
 // Jason's ruling (2026-08-13, from manual testing): Obsidian technically
 // renders footnotes nested inside footnote definitions, but that's wildly
@@ -21,48 +25,22 @@ import { simulateChanges } from "../src/editor/insertion-liveness";
 // continuation lines); label-line navigation and the definition-creation
 // cascade step are untouched.
 
-interface FakeDoc extends Editor {
-    lines: string[];
-    cursor: EditorPosition;
-}
-
 function fakeEditor(
     lines: string[],
     cursor: EditorPosition,
     selection?: { anchor: EditorPosition; head: EditorPosition },
-): FakeDoc {
-    const doc = {
-        lines: lines.slice(),
+): FakeEditor {
+    return sharedFakeEditor(lines, {
         cursor,
-        getCursor: () => doc.cursor,
-        listSelections: () =>
-            selection ? [selection] : [{ anchor: doc.cursor, head: doc.cursor }],
-        getLine: (n: number) => doc.lines[n],
-        getValue: () => doc.lines.join("\n"),
-        lineCount: () => doc.lines.length,
-        lastLine: () => doc.lines.length - 1,
-        setCursor(pos: EditorPosition) {
-            doc.cursor = pos;
-        },
-        scrollIntoView() {},
-        transaction(spec: {
-            changes?: EditorChange[];
-            selection?: { from: EditorPosition };
-        }) {
-            if (spec.changes) doc.lines = simulateChanges(doc.lines, spec.changes);
-            if (spec.selection) doc.cursor = spec.selection.from;
-        },
-    };
-    return doc as unknown as FakeDoc;
+        selection,
+        edits: true,
+        wholeDoc: true,
+    });
 }
 
-function fakePlugin(doc: FakeDoc): FootnotePlugin {
-    return {
-        app: {
-            workspace: { getActiveViewOfType: () => ({ editor: doc }) },
-            vault: {},
-        },
-        settings: {
+function fakePlugin(doc: FakeEditor): FootnotePlugin {
+    return sharedFakePlugin(
+        {
             insertAtEndOfWord: false,
             enablePopupEditor: false,
             enableFootnotePrefix: false,
@@ -71,7 +49,8 @@ function fakePlugin(doc: FakeDoc): FootnotePlugin {
             enableRemoveBlankLastLines: false,
             lintOnFootnoteCreation: false,
         },
-    } as unknown as FootnotePlugin;
+        doc,
+    );
 }
 
 beforeEach(() => {

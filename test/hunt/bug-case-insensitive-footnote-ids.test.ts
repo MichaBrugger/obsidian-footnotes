@@ -1,5 +1,7 @@
-import { Editor, EditorChange, EditorPosition } from "obsidian";
 import { describe, expect, it } from "vitest";
+
+import { fakeEditor } from "../helpers/fake-editor";
+import { fakePlugin as sharedFakePlugin } from "../helpers/fake-plugin";
 
 import FootnotePlugin from "../../src/main";
 import { createMatchingFootnoteDefinition } from "../../src/commands/create-footnote";
@@ -23,39 +25,12 @@ import { reindexFootnotes } from "../../src/linting/rules/re-index-footnotes";
 // while original casing is preserved in untouched output text.
 // Provenance: iteration-1/eval-1/without_skill/run-1 (bug sweep, BUG 1).
 
-interface FakeDoc extends Editor {
-    appliedChanges: EditorChange[];
-    cursor: EditorPosition | null;
-}
-
-function fakeEditor(lines: string[]): FakeDoc {
-    const doc = {
-        appliedChanges: [] as EditorChange[],
-        cursor: null as EditorPosition | null,
-        getLine: (n: number) => lines[n],
-        lineCount: () => lines.length,
-        lastLine: () => lines.length - 1,
-        setCursor(pos: EditorPosition) {
-            doc.cursor = pos;
-        },
-        scrollIntoView() {},
-        transaction(spec: { changes?: EditorChange[]; selection?: { from: EditorPosition } }) {
-            if (spec.changes) doc.appliedChanges.push(...spec.changes);
-            if (spec.selection) doc.cursor = spec.selection.from;
-        },
-    };
-    return doc as unknown as FakeDoc;
-}
-
 function fakePlugin(overrides: Record<string, unknown> = {}): FootnotePlugin {
-    return {
-        app: { vault: {} },
-        settings: {
-            insertAtEndOfWord: false,
-            enablePopupEditor: false,
-            ...overrides,
-        },
-    } as unknown as FootnotePlugin;
+    return sharedFakePlugin({
+        insertAtEndOfWord: false,
+        enablePopupEditor: false,
+        ...overrides,
+    });
 }
 
 describe("bug: footnote ids compared case-sensitively", () => {
@@ -76,11 +51,8 @@ describe("bug: footnote ids compared case-sensitively", () => {
     });
 
     it("the named command must not create a duplicate case-variant definition", () => {
-        const doc = fakeEditor([
-            "Alpha[^Note].",
-            "",
-            "[^note]: existing definition",
-        ]);
+        const lines = ["Alpha[^Note].", "", "[^note]: existing definition"];
+        const doc = fakeEditor(lines, { edits: true });
         // caret inside the [^Note] reference; a definition for this footnote exists
         // (case-insensitively), so this press should navigate, not create
         createMatchingFootnoteDefinition(
@@ -89,6 +61,6 @@ describe("bug: footnote ids compared case-sensitively", () => {
             fakePlugin(),
             doc,
         );
-        expect(doc.appliedChanges).toEqual([]);
+        expect(doc.lines).toEqual(lines);
     });
 });

@@ -1,5 +1,8 @@
-import { Editor, EditorChange, EditorPosition } from "obsidian";
+import { EditorPosition } from "obsidian";
 import { describe, expect, it } from "vitest";
+
+import { fakeEditor as sharedFakeEditor, FakeEditor } from "./helpers/fake-editor";
+import { fakePlugin as sharedFakePlugin } from "./helpers/fake-plugin";
 
 import FootnotePlugin from "../src/main";
 import { shouldJumpFromDefinitionToReference } from "../src/commands/navigation";
@@ -11,43 +14,16 @@ import { shouldJumpFromDefinitionToReference } from "../src/commands/navigation"
 // the (deleted) reference. The press is now handled with an explanatory
 // notice: cascade step 1 claims it and changes nothing.
 
-interface FakeDoc extends Editor {
-    appliedChanges: EditorChange[];
-    cursor: EditorPosition;
-}
-
-function fakeEditor(lines: string[], cursor: EditorPosition): FakeDoc {
-    const doc = {
-        appliedChanges: [] as EditorChange[],
-        cursor,
-        getCursor: () => doc.cursor,
-        getLine: (n: number) => lines[n],
-        lineCount: () => lines.length,
-        lastLine: () => lines.length - 1,
-        setCursor(pos: EditorPosition) {
-            doc.cursor = pos;
-        },
-        scrollIntoView() {},
-        transaction(spec: {
-            changes?: EditorChange[];
-            selection?: { from: EditorPosition };
-        }) {
-            if (spec.changes) doc.appliedChanges.push(...spec.changes);
-            if (spec.selection) doc.cursor = spec.selection.from;
-        },
-    };
-    return doc as unknown as FakeDoc;
+function fakeEditor(lines: string[], cursor: EditorPosition): FakeEditor {
+    return sharedFakeEditor(lines, { cursor, edits: true });
 }
 
 function fakePlugin(): FootnotePlugin {
-    return {
-        app: { vault: {} },
-        settings: {
-            insertAtEndOfWord: false,
-            enablePopupEditor: false,
-            enableFootnotePrefix: false,
-        },
-    } as unknown as FootnotePlugin;
+    return sharedFakePlugin({
+        insertAtEndOfWord: false,
+        enablePopupEditor: false,
+        enableFootnotePrefix: false,
+    });
 }
 
 describe("footnote hotkey on an orphaned definition", () => {
@@ -58,7 +34,7 @@ describe("footnote hotkey on an orphaned definition", () => {
         expect(
             shouldJumpFromDefinitionToReference(lines[2], cursor, fakePlugin(), doc),
         ).toBe(true);
-        expect(doc.appliedChanges).toEqual([]);
+        expect(doc.lines).toEqual(lines);
         expect(doc.cursor).toEqual(cursor);
     });
 
@@ -69,7 +45,7 @@ describe("footnote hotkey on an orphaned definition", () => {
         expect(
             shouldJumpFromDefinitionToReference(lines[3], cursor, fakePlugin(), doc),
         ).toBe(true);
-        expect(doc.appliedChanges).toEqual([]);
+        expect(doc.lines).toEqual(lines);
         expect(doc.cursor).toEqual(cursor);
     });
 

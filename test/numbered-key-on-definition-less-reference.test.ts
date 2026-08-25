@@ -1,5 +1,8 @@
-import { Editor, EditorChange, EditorPosition } from "obsidian";
+import { EditorPosition } from "obsidian";
 import { describe, expect, it } from "vitest";
+
+import { fakeEditor as sharedFakeEditor, FakeEditor } from "./helpers/fake-editor";
+import { fakePlugin as sharedFakePlugin } from "./helpers/fake-plugin";
 
 import FootnotePlugin from "../src/main";
 import { insertAutonumFootnote } from "../src/commands/insert-or-navigate-footnotes";
@@ -13,44 +16,18 @@ import { insertAutonumFootnote } from "../src/commands/insert-or-navigate-footno
 // half-built footnote instead, creating the missing definition, exactly like
 // the named and inline keys already do in that spot.
 
-interface FakeDoc extends Editor {
-    appliedChanges: EditorChange[];
-    cursor: EditorPosition;
-}
-
-function fakeEditor(lines: string[], cursor: EditorPosition): FakeDoc {
-    const doc = {
-        appliedChanges: [] as EditorChange[],
+function fakeEditor(lines: string[], cursor: EditorPosition): FakeEditor {
+    return sharedFakeEditor(lines, {
         cursor,
-        getCursor: () => doc.cursor,
-        listSelections: () => [{ anchor: doc.cursor, head: doc.cursor }],
-        getLine: (n: number) => lines[n],
-        wordAt: () => null,
-        getValue: () => lines.join("\n"),
-        lineCount: () => lines.length,
-        lastLine: () => lines.length - 1,
-        setCursor(pos: EditorPosition) {
-            doc.cursor = pos;
-        },
-        scrollIntoView() {},
-        transaction(spec: {
-            changes?: EditorChange[];
-            selection?: { from: EditorPosition };
-        }) {
-            if (spec.changes) doc.appliedChanges.push(...spec.changes);
-            if (spec.selection) doc.cursor = spec.selection.from;
-        },
-    };
-    return doc as unknown as FakeDoc;
+        edits: true,
+        wholeDoc: true,
+        words: true,
+    });
 }
 
-function fakePlugin(doc: FakeDoc): FootnotePlugin {
-    return {
-        app: {
-            workspace: { getActiveViewOfType: () => ({ editor: doc }) },
-            vault: {},
-        },
-        settings: {
+function fakePlugin(doc: FakeEditor): FootnotePlugin {
+    return sharedFakePlugin(
+        {
             insertAtEndOfWord: true,
             enablePopupEditor: false,
             enableFootnotePrefix: false,
@@ -59,7 +36,8 @@ function fakePlugin(doc: FakeDoc): FootnotePlugin {
             enableRemoveBlankLastLines: true,
             lintOnFootnoteCreation: false,
         },
-    } as unknown as FootnotePlugin;
+        doc,
+    );
 }
 
 describe("numbered key inside a definition-less reference", () => {
@@ -68,40 +46,27 @@ describe("numbered key inside a definition-less reference", () => {
         const line = "Alpha[^note] bravo";
         const doc = fakeEditor([line], { line: 0, ch: 8 });
         await insertAutonumFootnote(fakePlugin(doc));
-        expect(doc.appliedChanges).toEqual([
-            {
-                from: { line: 0, ch: line.length },
-                to: { line: 0, ch: line.length },
-                text: "\n\n[^note]: ",
-            },
-        ]);
+        expect(doc.lines).toEqual([line, "", "[^note]: "]);
     });
 
     it("does the same for a hand-typed numbered reference without a definition", async () => {
         const line = "Alpha[^7] bravo";
         const doc = fakeEditor([line], { line: 0, ch: 7 });
         await insertAutonumFootnote(fakePlugin(doc));
-        expect(doc.appliedChanges).toEqual([
-            {
-                from: { line: 0, ch: line.length },
-                to: { line: 0, ch: line.length },
-                text: "\n\n[^7]: ",
-            },
-        ]);
+        expect(doc.lines).toEqual([line, "", "[^7]: "]);
     });
 
     it("still navigates when the reference already has a definition", async () => {
         const lines = ["Alpha[^note] bravo", "", "[^note]: existing"];
         const doc = fakeEditor(lines, { line: 0, ch: 8 });
         await insertAutonumFootnote(fakePlugin(doc));
-        expect(doc.appliedChanges).toEqual([]);
+        expect(doc.lines).toEqual(lines);
         expect(doc.cursor).toEqual({ line: 2, ch: "[^note]: existing".length });
     });
 
     it("a caret outside any reference still inserts a numbered footnote", async () => {
         const doc = fakeEditor(["Alpha bravo"], { line: 0, ch: 2 });
         await insertAutonumFootnote(fakePlugin(doc));
-        const inserted = doc.appliedChanges.map((change) => change.text).join("");
-        expect(inserted).toContain("[^1]");
+        expect(doc.lines.join("\n")).toContain("[^1]");
     });
 });

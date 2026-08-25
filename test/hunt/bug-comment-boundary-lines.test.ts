@@ -1,4 +1,3 @@
-import { Editor } from "obsidian";
 import { describe, expect, it } from "vitest";
 
 import { listExistingFootnoteDefinitions } from "../../src/editor/doc-context";
@@ -6,20 +5,14 @@ import { computeNextFootnoteNumber } from "../../src/parsing/footnote-grammar";
 import { footnoteAfterPunctuation } from "../../src/linting/rules/footnote-after-punctuation";
 import { reindexFootnotes } from "../../src/linting/rules/re-index-footnotes";
 
+import { fakeEditor } from "../helpers/fake-editor";
+
 // BUG: the opener/closer lines of a multi-line HTML comment are protected
 // whole-line, so live text before "<!--" or after "-->" is invisible:
 // computeNextFootnoteNumber misses references there, and reindex renumbers the
 // definitions but not those references (pairing severed).
 // Hunt: 2026-08-09. Lens: contexts.
 // Root cause: protectedLines marks the whole boundary line protected.
-
-function fakeEditor(lines: string[]): Editor {
-    return {
-        getLine: (n: number) => lines[n],
-        lineCount: () => lines.length,
-        lastLine: () => lines.length - 1,
-    } as unknown as Editor;
-}
 
 describe("fixed 2026-08-10: multi-line comment boundary lines keep live text live", () => {
     it("a reference before an inline comment opener still counts", () => {

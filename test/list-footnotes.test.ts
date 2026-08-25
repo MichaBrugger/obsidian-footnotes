@@ -1,21 +1,14 @@
-import { Editor } from "obsidian";
 import { describe, expect, it } from "vitest";
 
 import { listExistingFootnoteDefinitions } from "../src/editor/doc-context";
 import { referenceOccurrences } from "../src/parsing/footnote-grammar";
 import { maskProtectedLines } from "../src/parsing/markdown-scan";
 
+import { fakeEditor } from "./helpers/fake-editor";
+
 // The document-scanning behavior the navigation cascade is built on:
 // definition names, and reference occurrences with positions. Includes the
 // 2026-07-14 regression pin: definitions only count at the start of a line.
-
-// Both functions only read lines, so the fake needs exactly two methods.
-function fakeEditor(lines: string[]): Editor {
-    return {
-        getLine: (n: number) => lines[n],
-        lineCount: () => lines.length,
-    } as unknown as Editor;
-}
 
 // The old listExistingFootnoteReferencesAndLocations died production-dead
 // (2026-08-11 review cleanliness); its pins now exercise the primitives the

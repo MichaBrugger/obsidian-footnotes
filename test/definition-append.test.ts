@@ -1,7 +1,10 @@
-import { Editor } from "obsidian";
 import { describe, expect, it } from "vitest";
 
+import { fakeEditor } from "./helpers/fake-editor";
+import { fakePlugin as sharedFakePlugin } from "./helpers/fake-plugin";
+
 import FootnotePlugin from "../src/main";
+import { FootnotePluginSettings } from "../src/settings";
 import { buildDefinitionAppend } from "../src/commands/definition-append";
 
 // Where a new footnote definition lands. Issue #55: when definitions already
@@ -10,23 +13,15 @@ import { buildDefinitionAppend } from "../src/commands/definition-append";
 // from the section (e.g. "#### Citations") the user keeps them under.
 // Only the very first footnote starts a new section at the end of the note.
 
-function fakeEditor(lines: string[]): Editor {
-    return {
-        getLine: (n: number) => lines[n],
-        lineCount: () => lines.length,
-        lastLine: () => lines.length - 1,
-    } as unknown as Editor;
-}
-
-function fakePlugin(overrides: Record<string, unknown> = {}): FootnotePlugin {
-    return {
-        settings: {
-            enableRemoveBlankLastLines: true,
-            enableFootnoteSectionHeading: false,
-            footnoteSectionHeading: "# Footnotes",
-            ...overrides,
-        },
-    } as unknown as FootnotePlugin;
+function fakePlugin(
+    overrides: Partial<FootnotePluginSettings> = {},
+): FootnotePlugin {
+    return sharedFakePlugin({
+        enableRemoveBlankLastLines: true,
+        enableFootnoteSectionHeading: false,
+        footnoteSectionHeading: "# Footnotes",
+        ...overrides,
+    });
 }
 
 describe("buildDefinitionAppend", () => {

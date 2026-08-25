@@ -1,30 +1,15 @@
-import { Editor, EditorPosition } from "obsidian";
 import { describe, expect, it } from "vitest";
 
-import FootnotePlugin from "../src/main";
 import { shouldJumpFromDefinitionToReference } from "../src/commands/navigation";
 import { tableRowCellSpans } from "../src/editor/table-cursor";
 import { removeOrphanedFootnoteReferences } from "../src/linting/rules/remove-orphaned-references";
 
+import { fakeEditor } from "./helpers/fake-editor";
+import { fakePlugin as sharedFakePlugin } from "./helpers/fake-plugin";
+
 // Promoted from a parallel review's scratch probes (2026-08-10).
 
-function fakeEditor(lines: string[]) {
-    const cursorMoves: EditorPosition[] = [];
-    const doc = {
-        getLine: (n: number) => lines[n] ?? "",
-        getValue: () => lines.join("\n"),
-        lineCount: () => lines.length,
-        lastLine: () => lines.length - 1,
-        setCursor: (pos: EditorPosition) => cursorMoves.push(pos),
-        scrollIntoView: () => {},
-    } as unknown as Editor;
-    return { doc, cursorMoves };
-}
-
-const fakePlugin = {
-    settings: { enablePopupEditor: false },
-    app: { vault: {} },
-} as unknown as FootnotePlugin;
+const fakePlugin = sharedFakePlugin({ enablePopupEditor: false });
 
 describe("navigation twin — blockquoted duplicate label as phantom jump target", () => {
     it("caret on a column-0 definition whose only twin is a blockquoted duplicate label: should report, not jump", () => {
@@ -32,16 +17,16 @@ describe("navigation twin — blockquoted duplicate label as phantom jump target
         // Mirrors the pinned lone-callout case ("reports instead of jumping
         // to itself") — a definition label is not a reference.
         const lines = ["[^1]: first", "> [^1]: second"];
-        const { doc, cursorMoves } = fakeEditor(lines);
+        const doc = fakeEditor(lines, { wholeDoc: true });
         shouldJumpFromDefinitionToReference(lines[0], { line: 0, ch: 2 }, fakePlugin, doc);
-        expect(cursorMoves).toEqual([]);
+        expect(doc.moves).toEqual([]);
     });
 
     it("control: column-0 duplicates correctly report (labels excluded at column 0)", () => {
         const lines = ["[^1]: first", "[^1]: second"];
-        const { doc, cursorMoves } = fakeEditor(lines);
+        const doc = fakeEditor(lines, { wholeDoc: true });
         shouldJumpFromDefinitionToReference(lines[0], { line: 0, ch: 2 }, fakePlugin, doc);
-        expect(cursorMoves).toEqual([]);
+        expect(doc.moves).toEqual([]);
     });
 });
 

@@ -1,7 +1,8 @@
-import { Editor } from "obsidian";
 import { describe, expect, it } from "vitest";
 
 import { listExistingFootnoteDefinitions } from "../../src/editor/doc-context";
+
+import { fakeEditor } from "../helpers/fake-editor";
 
 // BUG: listExistingFootnoteDefinitions leaks NUL bytes when a footnote name
 // contains a backtick span. It reads the maskProtectedLines/maskInlineCode
@@ -13,13 +14,6 @@ import { listExistingFootnoteDefinitions } from "../../src/editor/doc-context";
 // same fix. If that name is later written back (buildDefinitionAppend composing a
 // "[^name]:" line) the NULs land in the saved document.
 // Hunt: 2026-07-17. Lens: grammar. Severity: wrong-output.
-
-function fakeEditor(lines: string[]): Editor {
-    return {
-        getLine: (n: number) => lines[n],
-        lineCount: () => lines.length,
-    } as unknown as Editor;
-}
 
 describe("bug: definition name with an inline-code span leaks NUL characters", () => {
     it("keeps the real backtick characters of the footnote name", () => {

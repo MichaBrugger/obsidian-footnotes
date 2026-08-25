@@ -3,17 +3,17 @@ import { describe, expect, it } from "vitest";
 
 import { footnotePrefix, footnotePrefixFromEditor } from "../src/parsing/footnote-prefix";
 
+import { fakeEditor } from "./helpers/fake-editor";
+
 // Perf helper (2026-08-07): footnotePrefixFromEditor reads only the
 // frontmatter block through the editor line API, replacing the per-press
 // doc.getValue() the guards used to make. It must agree with the
 // string-based footnotePrefix on every note shape.
-
-function fakeEditor(lines: string[]): Editor {
-    return {
-        getLine: (n: number) => lines[n],
-        lineCount: () => lines.length,
-    } as unknown as Editor;
-}
+//
+// fakeEditor is built WITHOUT `wholeDoc` here on purpose: it disables
+// getValue(), so this suite proves footnotePrefixFromEditor never falls back
+// to reading the whole document — the exact perf contract this helper
+// exists to enforce.
 
 describe("footnotePrefixFromEditor", () => {
     const cases: string[][] = [

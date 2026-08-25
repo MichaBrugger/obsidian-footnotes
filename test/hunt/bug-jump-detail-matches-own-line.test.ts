@@ -1,8 +1,9 @@
-import { Editor, EditorPosition } from "obsidian";
 import { describe, expect, it } from "vitest";
 
-import FootnotePlugin from "../../src/main";
 import { shouldJumpFromDefinitionToReference } from "../../src/commands/navigation";
+
+import { fakeEditor } from "../helpers/fake-editor";
+import { fakePlugin as sharedFakePlugin } from "../helpers/fake-plugin";
 
 // BUG: jump-from-definition-to-reference matches the definition's own line. It scans
 // `masked[i].indexOf("[^name]")` over ALL lines including the definition line
@@ -17,26 +18,11 @@ import { shouldJumpFromDefinitionToReference } from "../../src/commands/navigati
 // line, but indexOf doesn't use it.
 // Hunt: 2026-07-17. Lens: contexts / regressions. Severity: wrong-output.
 
-function fakeEditor(lines: string[]) {
-    const cursorMoves: EditorPosition[] = [];
-    const doc = {
-        getLine: (n: number) => lines[n],
-        lineCount: () => lines.length,
-        lastLine: () => lines.length - 1,
-        setCursor: (pos: EditorPosition) => cursorMoves.push(pos),
-        scrollIntoView: () => {},
-    } as unknown as Editor;
-    return { doc, cursorMoves };
-}
-
-const fakePlugin = {
-    settings: { enablePopupEditor: false },
-    app: { vault: {} },
-} as unknown as FootnotePlugin;
+const fakePlugin = sharedFakePlugin({ enablePopupEditor: false });
 
 describe("bug: definition->reference jump matches the definition's own line", () => {
     it("does not jump to its own definition line when the definition sits above the reference", () => {
-        const { doc, cursorMoves } = fakeEditor([
+        const doc = fakeEditor([
             "[^1]: definition",
             "text[^1] here",
         ]);
@@ -48,7 +34,7 @@ describe("bug: definition->reference jump matches the definition's own line", ()
         );
         // the real reference use is on line 1 (ch 8, just past "[^1]"); the
         // definition line is not a reference and must not be the target
-        expect(cursorMoves).toEqual([{ line: 1, ch: 8 }]);
+        expect(doc.moves).toEqual([{ line: 1, ch: 8 }]);
     });
 
     it("never jumps onto itself for an orphan definition with no reference", () => {
@@ -57,7 +43,7 @@ describe("bug: definition->reference jump matches the definition's own line", ()
         // press is HANDLED (true) with an explanatory notice — see
         // test/orphan-definition-press.test.ts — but it must still never move
         // the cursor anywhere, least of all onto its own line.
-        const { doc, cursorMoves } = fakeEditor([
+        const doc = fakeEditor([
             "[^orphan]: text",
             "unrelated prose",
         ]);
@@ -67,6 +53,6 @@ describe("bug: definition->reference jump matches the definition's own line", ()
             fakePlugin,
             doc,
         );
-        expect(cursorMoves).toEqual([]);
+        expect(doc.moves).toEqual([]);
     });
 });
