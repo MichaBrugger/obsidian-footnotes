@@ -18,3 +18,4 @@ The paragraph wants to move this aside for later readers.
 - [ ] In the modal: a name that's already defined, or one with a space, shows the reason inline and stays open; Escape cancels with nothing changed
 - [ ] With the modal open and a name typed, press ANY footnote hotkey (numbered/named/inline): it submits exactly like Enter — footnote created, modal closed (2026-08-22); with an INVALID name typed, the hotkey shows the inline reason and the modal stays open
 - [ ] Paste-inline hotkey with a selection: a toast redirects to the other keys, and the clipboard is untouched
+- [ ] With `Lint on footnote creation` and `Reindex` ON (popup off), add a `[^5]` + `[^5]: five` above the example paragraph first: converting a selection (NUMBERED, and NAMED via the modal) renumbers everything (`[^5]`→`[^1]`, the new footnote→`[^2]`/its name kept) right after the conversion — every footnote-creating press lints, same as a plain insert (2026-08-25)

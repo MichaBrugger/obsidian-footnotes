@@ -56,7 +56,10 @@ function fakeEditor(
     });
 }
 
-function fakePlugin(doc: FakeEditor): FootnotePlugin {
+function fakePlugin(
+    doc: FakeEditor,
+    overrides: Partial<FootnotePlugin["settings"]> = {},
+): FootnotePlugin {
     return sharedFakePlugin(
         {
             insertAtEndOfWord: false,
@@ -66,6 +69,7 @@ function fakePlugin(doc: FakeEditor): FootnotePlugin {
             footnoteSectionHeading: "",
             enableRemoveBlankLastLines: false,
             lintOnFootnoteCreation: false,
+            ...overrides,
         },
         doc,
     );
@@ -181,6 +185,60 @@ describe("the inline key converts a selection", () => {
         );
         await insertInlineFootnote(fakePlugin(doc));
         expect(doc.lines).toEqual(["pay ^[a \\] b] now"]);
+    });
+});
+
+describe("lint-on-footnote-creation covers selection conversions (parity, Jason's ask 2026-08-25)", () => {
+    it("the autonum conversion lints the note after converting", async () => {
+        const doc = fakeEditor(
+            ["alpha[^5] quick fox", "", "[^5]: five"],
+            { line: 0, ch: 15 },
+            { anchor: { line: 0, ch: 10 }, head: { line: 0, ch: 15 } },
+        );
+        await insertAutonumFootnote(
+            fakePlugin(doc, {
+                lintOnFootnoteCreation: true,
+                lintReindex: true,
+            }),
+        );
+        // the conversion minted [^6] with a seeded definition; the creation
+        // lint then renumbered 5→1, 6→2 — exactly what a plain caret
+        // insert with the same settings produces
+        expect(doc.lines).toEqual([
+            "alpha[^1] [^2] fox",
+            "",
+            "[^1]: five",
+            "[^2]: quick",
+        ]);
+    });
+
+    it("the named-modal conversion lints the note after converting", () => {
+        const doc = fakeEditor(["alpha[^5] quick fox", "", "[^5]: five"], {
+            line: 0,
+            ch: 10,
+        });
+        const problem = convertSelectionToNamed(
+            fakePlugin(doc, {
+                lintOnFootnoteCreation: true,
+                lintReindex: true,
+            }),
+            doc,
+            {
+                from: { line: 0, ch: 10 },
+                to: { line: 0, ch: 15 },
+                text: "quick",
+            },
+            "note",
+        );
+        expect(problem).toBeNull();
+        // reindex renumbers the numbered footnote; the named one keeps its
+        // name (renumber-named is off)
+        expect(doc.lines).toEqual([
+            "alpha[^1] [^note] fox",
+            "",
+            "[^1]: five",
+            "[^note]: quick",
+        ]);
     });
 });
 

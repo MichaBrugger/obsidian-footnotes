@@ -167,10 +167,10 @@ function openPopupForNewDefinition(
  * to the user, in the popup (the caret parks just past the primary new
  * reference; openPopupForNewDefinition schedules the creation lint for
  * after the popup settles) or by jumping to `definitionCursor`.
- * `afterJump` runs only on the jump arm — the caret inserts lint on
- * creation there (single-caret since the feature shipped, multi-caret
- * since Jason's parity ask 2026-08-25); selection conversions never
- * have, their shipped behavior.
+ * `afterJump` runs only on the jump arm — every main-editor caller
+ * passes the creation lint there since Jason's parity ruling
+ * (2026-08-25): anything that creates a footnote lints when the setting
+ * says so. Cell creations stay out (see landCellDefinitionAppend).
  */
 export function landDefinitionBackedInsertion(opts: {
     plugin: FootnotePlugin;

@@ -33,6 +33,7 @@ import {
     replaceInTableCell,
 } from "./create-footnote";
 import { DefinitionCreationNotice } from "./press-guards";
+import { lintAfterFootnoteCreation } from "../linting/linter";
 import { TableCellEditor } from "../editor/table-cursor";
 
 // Turning a selection into a footnote (issue #35): a creation press with a
@@ -715,6 +716,15 @@ function convertMainSelection(
         afterReference: {
             line: referenceAnchor.line,
             ch: referenceAnchor.ch + footnoteReference.length,
+        },
+        // a conversion CREATES a footnote, so "Lint on footnote creation"
+        // covers it like every other creation press (Jason's parity ask
+        // 2026-08-25). The reland no-ops here by construction: the seeded
+        // definition is never empty, so there is no unique empty
+        // definition to re-target and the caret stays where the landing
+        // put it
+        afterJump: () => {
+            lintAfterFootnoteCreation(plugin, true);
         },
     });
 }
