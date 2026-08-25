@@ -23,6 +23,7 @@ import {
 } from "../editor/insertion-liveness";
 import { maskedLineAt } from "../parsing/markdown-scan";
 import { landDefinitionBackedInsertion } from "./create-footnote";
+import { lintAfterFootnoteCreation } from "../linting/linter";
 import {
     warnDefinitionCaretIfInside,
     warnProtectedCaretIfInside,
@@ -226,6 +227,13 @@ function insertReferenceAtEveryCaret(
         afterReference: {
             line: verified.anchors[0].line,
             ch: verified.anchors[0].ch + footnoteReference.length,
+        },
+        // full parity with the single-caret insert (Jason's ask
+        // 2026-08-25): creating the footnote lints the note when the
+        // setting says so — reindexing renames every minted reference
+        // consistently, and the reland targets the ONE new definition
+        afterJump: () => {
+            lintAfterFootnoteCreation(plugin, true);
         },
     });
 }

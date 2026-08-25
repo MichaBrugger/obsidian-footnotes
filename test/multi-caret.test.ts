@@ -103,6 +103,32 @@ describe("the auto-numbered key at several carets", () => {
         ]);
     });
 
+    it("lint-on-footnote-creation fires after a multi-caret insert, like a single-caret one (parity, Jason's ask 2026-08-25)", async () => {
+        const doc = fakeEditor(
+            ["alpha[^5] bravo", "charlie", "", "[^5]: five"],
+            [
+                { line: 0, ch: 15 },
+                { line: 1, ch: 7 },
+            ],
+        );
+        await insertAutonumFootnote(
+            fakePlugin(doc, {
+                lintOnFootnoteCreation: true,
+                lintReindex: true,
+            }),
+        );
+        // the press minted [^6] at both carets with one definition; the
+        // creation lint then renumbered 5→1, 6→2 — exactly what the same
+        // press at a single caret produces
+        expect(doc.lines).toEqual([
+            "alpha[^1] bravo[^2]",
+            "charlie[^2]",
+            "",
+            "[^1]: five",
+            "[^2]: ",
+        ]);
+    });
+
     it("end-of-word hops every caret, and same-word carets collapse to ONE insert", async () => {
         const doc = fakeEditor(
             ["alpha bravo"],
