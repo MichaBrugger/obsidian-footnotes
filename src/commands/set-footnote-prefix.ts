@@ -1,8 +1,9 @@
-import { MarkdownView, Modal, Notice, Setting, TFile } from "obsidian";
+import { MarkdownView, Notice, TFile } from "obsidian";
 
 import type FootnotePlugin from "../main";
 import { footnotePrefixProblem } from "../parsing/footnote-prefix";
 import { ensureTextPropertyType } from "../editor/obsidian-internals";
+import { ValidatedTextModal } from "./validated-text-modal";
 
 // The "Set footnote prefix" command's modal: one text input that writes the
 // footnote-prefix frontmatter property on Enter (or the Save button). An
@@ -10,62 +11,25 @@ import { ensureTextPropertyType } from "../editor/obsidian-internals";
 // inline and keeps the modal open until the value is fixed (or the user
 // cancels with Escape). An empty value removes the property.
 
-export class SetFootnotePrefixModal extends Modal {
+export class SetFootnotePrefixModal extends ValidatedTextModal {
     private plugin: FootnotePlugin;
     private file: TFile;
-    private value: string;
-    private errorEl!: HTMLElement;
 
     constructor(plugin: FootnotePlugin, file: TFile, currentPrefix: string) {
-        super(plugin.app);
+        super(plugin.app, {
+            title: "Set footnote prefix",
+            fieldName: "Prefix",
+            fieldDesc:
+                'Written to the note\'s footnote-prefix property. With "2." the auto-numbered command inserts [^2.1], then [^2.2], and so on. Leave empty to remove the property.',
+            buttonText: "Save",
+            placeholder: "2.",
+            initialValue: currentPrefix,
+        });
         this.plugin = plugin;
         this.file = file;
-        this.value = currentPrefix;
     }
 
-    onOpen() {
-        this.setTitle("Set footnote prefix");
-        const { contentEl } = this;
-
-        new Setting(contentEl)
-            .setName("Prefix")
-            .setDesc(
-                'Written to the note\'s footnote-prefix property. With "2." the auto-numbered command inserts [^2.1], then [^2.2], and so on. Leave empty to remove the property.',
-            )
-            .addText((text) => {
-                text.setPlaceholder("2.")
-                    .setValue(this.value)
-                    .onChange((value) => {
-                        this.value = value;
-                        this.showProblem(null);
-                    });
-                text.inputEl.addEventListener("keydown", (evt) => {
-                    if (evt.key === "Enter") {
-                        evt.preventDefault();
-                        void this.submit();
-                    }
-                });
-                text.inputEl.focus();
-                text.inputEl.select();
-            });
-
-        this.errorEl = contentEl.createDiv({
-            cls: "footnote-shortcut-prefix-error",
-        });
-
-        new Setting(contentEl).addButton((button) =>
-            button
-                .setButtonText("Save")
-                .setCta()
-                .onClick(() => void this.submit()),
-        );
-    }
-
-    private showProblem(problem: string | null) {
-        this.errorEl.setText(problem ?? "");
-    }
-
-    private async submit() {
+    protected async submit() {
         const prefix = this.value.trim();
         const problem = footnotePrefixProblem(prefix);
         if (problem) {
@@ -108,9 +72,5 @@ export class SetFootnotePrefixModal extends Modal {
                     : "Footnote prefix removed.",
             );
         }
-    }
-
-    onClose() {
-        this.contentEl.empty();
     }
 }

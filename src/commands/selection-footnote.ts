@@ -1,6 +1,7 @@
-import { Editor, EditorChange, EditorPosition, Modal, Notice, Setting } from "obsidian";
+import { Editor, EditorChange, EditorPosition, Notice } from "obsidian";
 
 import type FootnotePlugin from "../main";
+import { ValidatedTextModal } from "./validated-text-modal";
 import {
     computeNextFootnoteNumber,
     idListIncludes,
@@ -791,23 +792,28 @@ type NamedSelectionTarget =
 // functions above; this is thin wiring.
 // Stryker disable all: modal DOM against the live app — smoke-test
 // territory, unreachable from units (same policy as RenameFootnoteModal).
-class NameSelectionModal extends Modal {
+class NameSelectionModal extends ValidatedTextModal {
     private plugin: FootnotePlugin;
     private doc: Editor;
     private target: NamedSelectionTarget;
-    private value = "";
-    private errorEl!: HTMLElement;
 
     constructor(plugin: FootnotePlugin, doc: Editor, target: NamedSelectionTarget) {
-        super(plugin.app);
+        super(plugin.app, {
+            title: "Name the footnote",
+            fieldName: "Name",
+            fieldDesc: `Replaces the selection with "[^name]" and moves the selected text into that footnote's definition.`,
+            buttonText: "Create",
+            placeholder: "Smith2019",
+        });
         this.plugin = plugin;
         this.doc = doc;
         this.target = target;
     }
 
     onOpen() {
-        // a closure, not `this`: submit() is private and the registry only
-        // needs the one capability
+        // a closure, not `this`: submit() is protected and the registry
+        // only needs the one capability. This modal alone participates in
+        // the active-modal protocol — the base class knows nothing of it.
         registerActiveNameModal({
             submit: () => {
                 this.submit();
@@ -831,43 +837,10 @@ class NameSelectionModal extends Modal {
                 });
             }
         }
-        this.setTitle("Name the footnote");
-        const { contentEl } = this;
-
-        new Setting(contentEl)
-            .setName("Name")
-            .setDesc(
-                `Replaces the selection with "[^name]" and moves the selected text into that footnote's definition.`,
-            )
-            .addText((text) => {
-                text.setPlaceholder("Smith2019").onChange((value) => {
-                    this.value = value;
-                    this.errorEl.setText("");
-                });
-                text.inputEl.addEventListener("keydown", (evt) => {
-                    if (evt.key === "Enter") {
-                        evt.preventDefault();
-                        this.submit();
-                    }
-                });
-                text.inputEl.focus();
-            });
-
-        this.errorEl = contentEl.createDiv({
-            cls: "footnote-shortcut-prefix-error",
-        });
-
-        new Setting(contentEl).addButton((button) =>
-            button
-                .setButtonText("Create")
-                .setCta()
-                .onClick(() => {
-                    this.submit();
-                }),
-        );
+        super.onOpen();
     }
 
-    private submit() {
+    protected submit() {
         const name = this.value.trim();
         if (name === "") {
             this.close();
@@ -890,7 +863,7 @@ class NameSelectionModal extends Modal {
                       this.target.cursorPosition,
                   );
         if (problem !== null) {
-            this.errorEl.setText(problem);
+            this.showProblem(problem);
             return;
         }
         this.close();
@@ -898,7 +871,7 @@ class NameSelectionModal extends Modal {
 
     onClose() {
         registerActiveNameModal(null);
-        this.contentEl.empty();
+        super.onClose();
     }
 }
 // Stryker restore all

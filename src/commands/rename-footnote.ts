@@ -1,6 +1,7 @@
-import { Editor, EditorChange, EditorPosition, MarkdownView, Modal, Notice, Setting } from "obsidian";
+import { Editor, EditorChange, EditorPosition, MarkdownView, Notice } from "obsidian";
 
 import type FootnotePlugin from "../main";
+import { ValidatedTextModal } from "./validated-text-modal";
 import {
     isValidFootnoteName,
     occurrenceAtCursor,
@@ -263,64 +264,23 @@ export async function renameFootnote(plugin: FootnotePlugin) {
 // excluded for the same reason; this one shares a file with the pure
 // planners, so the exemption is scoped here). Coverage-verified by the
 // 2026-08-12 incremental run: every mutant below was no-coverage.
-class RenameFootnoteModal extends Modal {
-    private plugin: FootnotePlugin;
+class RenameFootnoteModal extends ValidatedTextModal {
     private doc: Editor;
     private oldName: string;
-    private value: string;
-    private errorEl!: HTMLElement;
 
     constructor(plugin: FootnotePlugin, doc: Editor, oldName: string) {
-        super(plugin.app);
-        this.plugin = plugin;
+        super(plugin.app, {
+            title: "Rename footnote",
+            fieldName: "New name",
+            fieldDesc: `Renames every "[^${oldName}]" reference and its definition in this note. Copies inside code or math stay untouched.`,
+            buttonText: "Rename",
+            initialValue: oldName,
+        });
         this.doc = doc;
         this.oldName = oldName;
-        this.value = oldName;
     }
 
-    onOpen() {
-        this.setTitle("Rename footnote");
-        const { contentEl } = this;
-
-        new Setting(contentEl)
-            .setName("New name")
-            .setDesc(
-                `Renames every "[^${this.oldName}]" reference and its definition in this note. Copies inside code or math stay untouched.`,
-            )
-            .addText((text) => {
-                text.setValue(this.value).onChange((value) => {
-                    this.value = value;
-                    this.showProblem(null);
-                });
-                text.inputEl.addEventListener("keydown", (evt) => {
-                    if (evt.key === "Enter") {
-                        evt.preventDefault();
-                        this.submit();
-                    }
-                });
-                text.inputEl.focus();
-                text.inputEl.select();
-            });
-
-        this.errorEl = contentEl.createDiv({
-            cls: "footnote-shortcut-prefix-error",
-        });
-
-        new Setting(contentEl).addButton((button) =>
-            button
-                .setButtonText("Rename")
-                .setCta()
-                .onClick(() => {
-                    this.submit();
-                }),
-        );
-    }
-
-    private showProblem(problem: string | null) {
-        this.errorEl.setText(problem ?? "");
-    }
-
-    private submit() {
+    protected submit() {
         const newName = this.value.trim();
         // planned against the CURRENT document — the note may have changed
         // while the modal was open
@@ -349,9 +309,5 @@ class RenameFootnoteModal extends Modal {
                     `Renamed "[^${this.oldName}]" to "[^${newName}]" in ${plan.count} ${plan.count === 1 ? "place" : "places"}.`,
                 );
         }
-    }
-
-    onClose() {
-        this.contentEl.empty();
     }
 }
