@@ -156,8 +156,9 @@ export async function openFootnotePopup(
         if (cmView) cmView.focus();
         else editor.focus();
     };
-    // land the cursor right after the reference so typing continues seamlessly
-    // (a named footnote would otherwise leave it inside the brackets);
+    // land the cursor right after the reference so the user can keep typing
+    // the sentence (a named footnote would otherwise leave it inside the
+    // brackets);
     // string search, since the id isn't regex-safe
     const placeCursorAfterReference = () => {
         const cursor = editor.getCursor();

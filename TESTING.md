@@ -94,9 +94,11 @@ Standing rules:
 
 ## Mutation testing — `npm run mutation`
 
-Stryker mutates the pure-logic modules (`src/markdown-scan.ts`,
-`src/linting/`, `src/insert-or-navigate-footnotes.ts`,
-`src/table-cursor.ts`) and reruns the covering tests per mutant
+Stryker mutates the pure-logic modules — all of `src/parsing/` and
+`src/linting/`, plus the non-DOM parts of `src/editor/` and
+`src/commands/` (the exact list is the `mutate` array in
+`stryker.config.json`; plugin bootstrap, settings UI, and the popup are
+smoke-test territory) — and reruns the covering tests per mutant
 (`coverageAnalysis: perTest`). A surviving mutant is a logic change no
 test noticed — either add a test or accept it knowingly.
 
