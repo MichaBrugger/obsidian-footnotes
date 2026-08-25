@@ -1,15 +1,61 @@
 # Attack surface — obsidian-footnotes
 
-Last verified against the code: 2026-08-10 (commit fa493c6). Second full
-sweep added 24 confirmed-bug pins + 7 spec-question pins in test/hunt/
-(bug-*.test.ts / spec-*.test.ts, all it.fails) covering: case-sensitive
-prefix scanning, masked-name identity beyond the listing fix, YAML-comment
-prefix parsing, HTML-comment boundary/short-form/mask-order/opener classes,
+Last verified against the code: 2026-08-25 (post skills-refactor sweep).
+Third full sweep (2026-08-25, all six lenses + per-finding skeptics with
+micromark/@codemirror-state ground truth) added 7 confirmed-bug pins
+(11 it.fails tests): code-span-in-name hides a real definition
+(bug-code-span-name-hides-definition — mask runs before label carving;
+real parsers carve the label FIRST), fenced code inside definition
+continuations unprotected → orphan deletion eats code text
+(bug-definition-continuation-fence-unprotected — fences lack the
+definition-relative content-indent that listStack gives lists, while
+comment/math openers are indent-insensitive there), inline-wrap CLOSE
+bracket never liveness-checked in any inline entry point
+(bug-inline-wrap-close-swallowed — emergent `$…$` swallows the closer),
+simulateChanges same-from tie drops a character vs real CM6 semantics
+(bug-simulate-changes-tie-drops-text — insert-before-replace, no loss;
+real transactions are fine, but born-dead verdicts/cursor landings use
+the corrupt simulation, and the shared test fake applies edits through
+it BY DESIGN), nested-alert name dedupe missing
+(bug-nested-alert-duplicate-names), mixed drag-selection + collapsed
+caret silently drops the caret (bug-mixed-selection-extra-caret-dropped
+— the 2026-08-22 ruling never covered the mixed shape), and rename to a
+bare id silently swept back by apply-prefix
+(bug-rename-swept-back-by-apply-prefix — planFootnoteRename is
+prefix-blind). TWO PROBE-ERROR lessons worth keeping: (1) for
+`[^a\`]:\`x]` the RAW side is CORRECT and the masked twin fabricates a
+phantom reference — masking a char to NUL can only EXTEND a `[^…]`
+match, so raw-vs-masked divergence does not automatically mean the raw
+gate is wrong (referenceOccurrenceAtCursor's raw gate doubles as a
+phantom guard; its "pure perf" comment overclaims); (2) the shared
+test fake (test/helpers/fake-editor.ts) applies transactions through
+simulateChanges, so a simulateChanges bug shows up as fake-document
+"corruption" that real CM6 would not produce — always cross-check
+command-level corruption claims against @codemirror/state.
+Cleared clean this sweep: regressions lens (all 2026-08-25 extractions
+— referenceOccurrenceAtCursor, definitionLabelWithName,
+verifyLiveFootnoteInsertion, the landing helpers — carry their moved
+fixes at every entry point), fence info-string/tilde interleaving, EOF
+protected regions, lint pipeline ordering/idempotence on 16 adversarial
+docs, multi-line conversion bodies × full lint pipeline, conversion ×
+prefix × creation-lint.
+Second full sweep (2026-08-10) added 24 confirmed-bug pins + 7
+spec-question pins covering: case-sensitive prefix scanning, masked-name
+identity beyond the listing fix, YAML-comment prefix parsing,
+HTML-comment boundary/short-form/mask-order/opener classes,
 blockquote+list fence containers, reindex cap/cycle/stranded-frontmatter,
 astral word-walk, table escape offsets, unsafe-integer autonumbering,
 escaped references, inline-footnote double-parsing, reading-view deferred lint.
 If `git log` shows newer feature commits, treat their modules as prime
-hunting ground and update this file at the end of the hunt.
+hunting ground and update this file at the end of the hunt. Post-2026-08-25
+module changes to know: the raw-gate/masked-confirm lookup lives in
+`referenceOccurrenceAtCursor` (doc-context), the label twin in
+`definitionLabelWithName` (footnote-grammar), the born-dead verdict in
+`verifyLiveFootnoteInsertion` (insertion-liveness), landings in
+`landDefinitionBackedInsertion`/`landCellDefinitionAppend`
+(create-footnote), the auto-lint gate in `safeLintTarget` (linter), and
+the three modals share `ValidatedTextModal`. Lint-on-creation now fires
+for single-caret, multi-caret, AND selection conversions (cells never).
 
 ## Module map
 
