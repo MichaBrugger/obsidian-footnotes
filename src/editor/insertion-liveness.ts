@@ -1,8 +1,8 @@
 import { Editor, EditorChange, EditorPosition } from "obsidian";
 
 import { docLines } from "./doc-context";
-import { escapedAt } from "../parsing/footnote-grammar";
-import { maskedLineAt } from "../parsing/markdown-scan";
+import { escapedAt, referenceOccurrences } from "../parsing/footnote-grammar";
+import { findDefinitionBlocks, maskedLineAt, scanDocument } from "../parsing/markdown-scan";
 
 // The born-dead safety kit: will inserted text still MEAN what it says
 // once it lands? An insertion can be swallowed by an escape or an
@@ -152,4 +152,62 @@ export function caretInsideMaskedSpan(
     const before = ch > 0 ? masked[ch - 1] === "\0" : openAtStart;
     const after = ch < masked.length ? masked[ch] === "\0" : openAtEnd;
     return before && after;
+}
+
+/**
+ * The shared born-dead verdict for definition-backed insertions — the
+ * single-caret insert, the multi-caret insert, and the selection
+ * conversion each cloned this block before 2026-08-25. On the SIMULATED
+ * result: every reference change must still parse as a live "[^id]"
+ * occurrence at its shifted anchor (simulatedAnchor — a definition
+ * appended ABOVE the caret shifts later lines, a collapsing selection
+ * shifts lines below it), and the definition must parse as a live block
+ * starting at `definitionLabelLine` that claims every seeded
+ * continuation line. Null = something died — the caller toasts
+ * ProtectedCreationNotice and refuses the whole press (atomicity: one
+ * dead landing refuses the lot). Every failure mode this guards was
+ * found by the command-press property suite (2026-08-12).
+ *
+ * Pass `simulated` when the caller already simulated (to derive the
+ * label line); otherwise it is computed here.
+ */
+export function verifyLiveFootnoteInsertion(opts: {
+    lines: string[];
+    changes: EditorChange[];
+    /** indices into `changes` that write a "[^id]" reference */
+    referenceChangeIndices: number[];
+    footnoteId: string;
+    /** the definition label's line in POST-transaction coordinates */
+    definitionLabelLine: number;
+    /** seeded continuation lines under the label (multi-line bodies) */
+    definitionBodyExtraLines?: number;
+    simulated?: string[];
+}): { anchors: EditorPosition[] } | null {
+    const simulated = opts.simulated ?? simulateChanges(opts.lines, opts.changes);
+    const simulatedScan = scanDocument(simulated);
+    const bodyExtraLines = opts.definitionBodyExtraLines ?? 0;
+    const definitionLive = findDefinitionBlocks(
+        simulated,
+        simulatedScan.isProtected,
+        simulatedScan,
+    ).some(
+        (block) =>
+            block.start === opts.definitionLabelLine &&
+            block.end >= opts.definitionLabelLine + bodyExtraLines,
+    );
+    if (!definitionLive) return null;
+    const anchors = opts.referenceChangeIndices.map((index) =>
+        simulatedAnchor(opts.lines, opts.changes, index, simulated),
+    );
+    const everyReferenceLive = anchors.every((anchor) =>
+        referenceOccurrences(
+            simulated[anchor.line],
+            maskedLineAt(simulated, anchor.line),
+        ).some(
+            (occurrence) =>
+                occurrence.start === anchor.ch &&
+                occurrence.name === opts.footnoteId,
+        ),
+    );
+    return everyReferenceLive ? { anchors } : null;
 }

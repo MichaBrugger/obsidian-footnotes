@@ -12,7 +12,6 @@ import {
     emptyReferenceStart,
     idListIncludes,
     isValidFootnoteName,
-    referenceOccurrences,
 } from "../parsing/footnote-grammar";
 import { footnotePopupBusy, openFootnotePopup, popupEditingAvailable, runAfterNextPopupSettle } from "./footnote-popup";
 import { activeFootnotePrefix, footnotePrefixFromEditor } from "../parsing/footnote-prefix";
@@ -28,12 +27,11 @@ import { inlineFootnoteSpanAt } from "./inline-footnotes";
 import {
     ProtectedCreationNotice,
     safeInsertionCh,
-    simulateChanges,
-    simulatedAnchor,
     simulatedMaskedLine,
+    verifyLiveFootnoteInsertion,
 } from "../editor/insertion-liveness";
 import { lintAfterFootnoteCreation } from "../linting/linter";
-import { findDefinitionBlocks, maskInlineRegions, maskedLineAt, scanDocument } from "../parsing/markdown-scan";
+import { maskInlineRegions, maskedLineAt } from "../parsing/markdown-scan";
 import { warnDefinitionCaretIfInside, warnProtectedCaretIfInside } from "./press-guards";
 import { TableCellEditor } from "../editor/table-cursor";
 
@@ -139,13 +137,13 @@ function scheduleCreationLintAfterPopup(plugin: FootnotePlugin): () => void {
  * instead — and there a popup that failed AFTER its DOM existed is still
  * settling its teardown save, so an immediate lint would no-op behind the
  * busy gate; the settle-deferred lint registered here fires instead (E32).
- * Exported for the selection-to-footnote conversion (issue #35), whose
- * autonum flavor hands off to the popup the same way.
+ * Every definition-backed insertion reaches here through
+ * landDefinitionBackedInsertion below (2026-08-25 unification).
  */
 // Stryker disable all: popup handoff against the live workspace — smoke-test
 // territory, unreachable from units (coverage-verified by the 2026-08-12
 // re-baseline: every mutant in this function was no-coverage)
-export function openPopupForNewDefinition(
+function openPopupForNewDefinition(
     plugin: FootnotePlugin,
     doc: Editor,
     cursorPosition: EditorPosition,
@@ -161,6 +159,101 @@ export function openPopupForNewDefinition(
     });
 }
 // Stryker restore all
+
+/**
+ * The main-editor landing shared by every definition-backed insertion —
+ * single caret, multi-caret, and selection conversion each cloned this
+ * branch before 2026-08-25: apply `changes` and hand the new definition
+ * to the user, in the popup (the caret parks just past the primary new
+ * reference; openPopupForNewDefinition schedules the creation lint for
+ * after the popup settles) or by jumping to `definitionCursor`.
+ * `afterJump` runs only on the jump arm — the single-caret insert lints
+ * on creation there; multi-caret and selection conversions never have
+ * (their shipped behavior, preserved as-is by this extraction).
+ */
+export function landDefinitionBackedInsertion(opts: {
+    plugin: FootnotePlugin;
+    doc: Editor;
+    changes: EditorChange[];
+    /** where the press began — popup close and jump both return relative to it */
+    origin: EditorPosition;
+    footnoteId: string;
+    /** where the definition text awaits the caret (post-transaction coordinates) */
+    definitionCursor: EditorPosition;
+    /** the popup arm's caret landing: just past the primary new reference */
+    afterReference: EditorPosition;
+    afterJump?: () => void;
+}): void {
+    if (popupEditingAvailable(opts.plugin)) {
+        // Stryker disable all: popup arm — units run popup-off, so mutants
+        // here are no-coverage noise; smoke territory (verified 2026-08-12)
+        opts.doc.transaction({
+            changes: opts.changes,
+            selection: { from: opts.afterReference },
+        });
+        openPopupForNewDefinition(
+            opts.plugin,
+            opts.doc,
+            opts.origin,
+            opts.footnoteId,
+            opts.definitionCursor,
+        );
+        // Stryker restore all
+    } else {
+        moveCursorAndSetJumpPoint(
+            opts.doc,
+            opts.origin,
+            opts.definitionCursor,
+            opts.plugin,
+            opts.changes,
+            true,
+        );
+        opts.afterJump?.();
+    }
+}
+
+/**
+ * The cell-flavor landing shared by the autonum cell insert and the cell
+ * selection conversion: the reference is already written through the
+ * cell's OWN editor (never the main editor — that races the cell's
+ * sync-back, issue #28), so only the definition changes touch the main
+ * editor here. No creation lint on either arm: table-cell creations
+ * skip the trigger entirely (see lintAfterFootnoteCreation's contract).
+ */
+export function landCellDefinitionAppend(opts: {
+    plugin: FootnotePlugin;
+    doc: Editor;
+    definitionChanges: EditorChange[];
+    origin: EditorPosition;
+    footnoteId: string;
+    definitionCursor: EditorPosition;
+}): void {
+    if (popupEditingAvailable(opts.plugin)) {
+        // Stryker disable all: popup arm — units run popup-off, so mutants
+        // here are no-coverage noise; smoke territory (verified 2026-08-12)
+        opts.doc.transaction({ changes: opts.definitionChanges });
+        void openFootnotePopup(opts.plugin, opts.footnoteId, () => {
+            moveCursorAndSetJumpPoint(
+                opts.doc,
+                opts.origin,
+                opts.definitionCursor,
+                opts.plugin,
+                undefined,
+                true,
+            );
+        });
+        // Stryker restore all
+    } else {
+        moveCursorAndSetJumpPoint(
+            opts.doc,
+            opts.origin,
+            opts.definitionCursor,
+            opts.plugin,
+            opts.definitionChanges,
+            true,
+        );
+    }
+}
 
 /** Cascade step 4 (autonum): insert the next-numbered reference at the caret (through `cell` when in a table) and append its definition, then popup or jump per settings. */
 export function createAutonumFootnote(
@@ -218,21 +311,16 @@ export function createAutonumFootnote(
         // the phantom-frontmatter prepend (see buildDefinitionAppend) rides
         // the same transaction; it edits above the table, which is outside
         // the cell sub-editor's region and therefore safe (issue #28 policy)
-        const definitionChanges = definition.prepend
-            ? [definition.prepend, definition.change]
-            : [definition.change];
-        if (popupEditingAvailable(plugin)) {
-            // Stryker disable all: popup arm — units run popup-off, so
-            // mutants here are no-coverage noise; smoke territory
-            // (verified 2026-08-12)
-            doc.transaction({ changes: definitionChanges });
-            void openFootnotePopup(plugin, footnoteId, () => {
-                moveCursorAndSetJumpPoint(doc, cursorPosition, definition.cursor, plugin, undefined, true);
-            });
-            // Stryker restore all
-        } else {
-            moveCursorAndSetJumpPoint(doc, cursorPosition, definition.cursor, plugin, definitionChanges, true);
-        }
+        landCellDefinitionAppend({
+            plugin,
+            doc,
+            definitionChanges: definition.prepend
+                ? [definition.prepend, definition.change]
+                : [definition.change],
+            origin: cursorPosition,
+            footnoteId,
+            definitionCursor: definition.cursor,
+        });
         return true;
     }
 
@@ -251,47 +339,38 @@ export function createAutonumFootnote(
     // line swallows everything below, including the definition this very
     // transaction appends; between two loose dollars it can COMPLETE an
     // inline-math pair that swallows the reference (both found by the
-    // command-press property suite, 2026-08-12). Verify on the SIMULATED
-    // result that the new reference is live and its definition parses as a
-    // live block; refuse like the protected-caret guard otherwise. The
-    // reference is re-found through simulatedAnchor: a definition appended
-    // ABOVE the caret shifts every later line, and reading the caret's
-    // original line index falsely refused mid-document-definition notes
-    // (found by the entry corpus, 2026-08-12).
-    const simulated = simulateChanges(ctx.lines, changes);
-    const simulatedScan = scanDocument(simulated);
-    const definitionLive = findDefinitionBlocks(
-        simulated,
-        simulatedScan.isProtected,
-        simulatedScan,
-    ).some((block) => block.start === definition.cursor.line);
-    const referenceAnchor = simulatedAnchor(ctx.lines, changes, 0, simulated);
-    const referenceLive = referenceOccurrences(
-        simulated[referenceAnchor.line],
-        maskedLineAt(simulated, referenceAnchor.line),
-    ).some(
-        (occurrence) =>
-            occurrence.start === referenceAnchor.ch &&
-            occurrence.name === footnoteId,
-    );
-    if (!definitionLive || !referenceLive) {
+    // command-press property suite, 2026-08-12). verifyLiveFootnoteInsertion
+    // owns the simulate-and-verify (and the simulatedAnchor re-find that a
+    // definition appended ABOVE the caret makes necessary); refuse like
+    // the protected-caret guard when anything died.
+    const verified = verifyLiveFootnoteInsertion({
+        lines: ctx.lines,
+        changes,
+        referenceChangeIndices: [0],
+        footnoteId,
+        definitionLabelLine: definition.cursor.line,
+    });
+    if (!verified) {
         new Notice(ProtectedCreationNotice, 8000);
         return true;
     }
 
-    if (popupEditingAvailable(plugin)) {
-        // type the definition in a popup instead of jumping to the bottom;
-        // the cursor only moves past the new reference
-        // Stryker disable all: popup arm — units run popup-off, so mutants
-        // here are no-coverage noise; smoke territory (verified 2026-08-12)
-        const afterReference = { line: referenceAnchor.line, ch: referenceAnchor.ch + footnoteReference.length };
-        doc.transaction({ changes, selection: { from: afterReference } });
-        openPopupForNewDefinition(plugin, doc, cursorPosition, footnoteId, definition.cursor);
-        // Stryker restore all
-    } else {
-        moveCursorAndSetJumpPoint(doc, cursorPosition, definition.cursor, plugin, changes, true);
-        lintAfterFootnoteCreation(plugin, true);
-    }
+    const referenceAnchor = verified.anchors[0];
+    landDefinitionBackedInsertion({
+        plugin,
+        doc,
+        changes,
+        origin: cursorPosition,
+        footnoteId,
+        definitionCursor: definition.cursor,
+        afterReference: {
+            line: referenceAnchor.line,
+            ch: referenceAnchor.ch + footnoteReference.length,
+        },
+        afterJump: () => {
+            lintAfterFootnoteCreation(plugin, true);
+        },
+    });
     return true;
 }
 

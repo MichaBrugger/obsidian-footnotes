@@ -8,10 +8,9 @@ import {
     referenceOccurrences,
 } from "../parsing/footnote-grammar";
 import { activeFootnotePrefix, footnotePrefixFromEditor } from "../parsing/footnote-prefix";
-import { adjustFootnotePosition, moveCursorAndSetJumpPoint } from "../editor/cursor-motion";
+import { adjustFootnotePosition } from "../editor/cursor-motion";
 import { buildDefinitionAppend } from "./definition-append";
 import { DocContext, docContext, listExistingFootnoteDefinitions } from "../editor/doc-context";
-import { popupEditingAvailable } from "./footnote-popup";
 import {
     inlineFootnoteSpanAt,
     sanitizeInlineFootnoteContent,
@@ -20,9 +19,10 @@ import {
     ProtectedCreationNotice,
     simulateChanges,
     simulatedAnchor,
+    verifyLiveFootnoteInsertion,
 } from "../editor/insertion-liveness";
-import { findDefinitionBlocks, maskedLineAt, scanDocument } from "../parsing/markdown-scan";
-import { openPopupForNewDefinition } from "./create-footnote";
+import { maskedLineAt } from "../parsing/markdown-scan";
+import { landDefinitionBackedInsertion } from "./create-footnote";
 import {
     warnDefinitionCaretIfInside,
     warnProtectedCaretIfInside,
@@ -204,45 +204,30 @@ function insertReferenceAtEveryCaret(
     changes.push(definition.change);
     if (definition.prepend) changes.push(definition.prepend);
 
-    const simulated = simulateChanges(ctx.lines, changes);
-    const simulatedScan = scanDocument(simulated);
-    const definitionLive = findDefinitionBlocks(
-        simulated,
-        simulatedScan.isProtected,
-        simulatedScan,
-    ).some((block) => block.start === definition.cursor.line);
-    const anchors = targets.map((_, index) =>
-        simulatedAnchor(ctx.lines, changes, index, simulated),
-    );
-    const everyReferenceLive = anchors.every((anchor) =>
-        referenceOccurrences(
-            simulated[anchor.line],
-            maskedLineAt(simulated, anchor.line),
-        ).some(
-            (occurrence) =>
-                occurrence.start === anchor.ch && occurrence.name === footnoteId,
-        ),
-    );
-    if (!definitionLive || !everyReferenceLive) {
+    const verified = verifyLiveFootnoteInsertion({
+        lines: ctx.lines,
+        changes,
+        referenceChangeIndices: targets.map((_, index) => index),
+        footnoteId,
+        definitionLabelLine: definition.cursor.line,
+    });
+    if (!verified) {
         new Notice(ProtectedCreationNotice, 8000);
         return;
     }
 
-    const origin = targets[0];
-    if (popupEditingAvailable(plugin)) {
-        // Stryker disable all: popup arm — units run popup-off, so mutants
-        // here are no-coverage noise; smoke territory (same policy as the
-        // single-caret insert)
-        const afterPrimary = {
-            line: anchors[0].line,
-            ch: anchors[0].ch + footnoteReference.length,
-        };
-        doc.transaction({ changes, selection: { from: afterPrimary } });
-        openPopupForNewDefinition(plugin, doc, origin, footnoteId, definition.cursor);
-        // Stryker restore all
-    } else {
-        moveCursorAndSetJumpPoint(doc, origin, definition.cursor, plugin, changes, true);
-    }
+    landDefinitionBackedInsertion({
+        plugin,
+        doc,
+        changes,
+        origin: targets[0],
+        footnoteId,
+        definitionCursor: definition.cursor,
+        afterReference: {
+            line: verified.anchors[0].line,
+            ch: verified.anchors[0].ch + footnoteReference.length,
+        },
+    });
 }
 
 // The skeleton flavor shared by named ("[^]"), inline ("^[]"), and paste

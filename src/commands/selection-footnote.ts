@@ -13,13 +13,13 @@ import { moveCursorAndSetJumpPoint } from "../editor/cursor-motion";
 import { commandHotkeys } from "../editor/obsidian-internals";
 import { buildDefinitionAppend, seedDefinitionBody } from "./definition-append";
 import { DocContext, docContext, listExistingFootnoteDefinitions } from "../editor/doc-context";
-import { openFootnotePopup, popupEditingAvailable } from "./footnote-popup";
 import { inlineFootnoteSpanAt, sanitizeInlineFootnoteContent } from "./inline-footnotes";
 import {
     caretInsideMaskedSpan,
     ProtectedCreationNotice,
     simulateChanges,
     simulatedAnchor,
+    verifyLiveFootnoteInsertion,
 } from "../editor/insertion-liveness";
 import {
     findDefinitionBlocks,
@@ -27,7 +27,11 @@ import {
     maskedLineAt,
     scanDocument,
 } from "../parsing/markdown-scan";
-import { openPopupForNewDefinition, replaceInTableCell } from "./create-footnote";
+import {
+    landCellDefinitionAppend,
+    landDefinitionBackedInsertion,
+    replaceInTableCell,
+} from "./create-footnote";
 import { DefinitionCreationNotice } from "./press-guards";
 import { TableCellEditor } from "../editor/table-cursor";
 
@@ -665,16 +669,15 @@ function convertMainSelection(
     ];
     if (definition.prepend) changes.push(definition.prepend);
 
-    // same verification as createAutonumFootnote: the new reference must be
-    // live and its definition must parse as a live block — one that claims
-    // every seeded continuation line — on the SIMULATED result; refuse like
-    // the protected-caret guard otherwise. BOTH anchors are re-found
-    // through simulatedAnchor — a definition appended ABOVE the selection
-    // shifts every later line (entry-corpus find, 2026-08-12), and a
-    // multi-line selection collapsing to "[^id]" shifts every line BELOW
-    // it, the appended definition included (2026-08-19)
+    // same verification as createAutonumFootnote, generalized to a seeded
+    // multi-line body: the definition block must claim every seeded
+    // continuation line. The label line is derived through simulatedAnchor
+    // FIRST — a definition appended ABOVE the selection shifts every later
+    // line (entry-corpus find, 2026-08-12), and a multi-line selection
+    // collapsing to "[^id]" shifts every line BELOW it, the appended
+    // definition included (2026-08-19) — then the shared
+    // verifyLiveFootnoteInsertion reuses the same simulated result.
     const simulated = simulateChanges(ctx.lines, changes);
-    const simulatedScan = scanDocument(simulated);
     const definitionAnchor = simulatedAnchor(ctx.lines, changes, 1, simulated);
     const labelAt = definition.change.text.lastIndexOf(`[^${footnoteId}]: `);
     const labelLine =
@@ -687,44 +690,33 @@ function convertMainSelection(
         line: labelLine + bodyExtraLines,
         ch: definition.cursor.ch,
     };
-    const definitionLive = findDefinitionBlocks(
+    const verified = verifyLiveFootnoteInsertion({
+        lines: ctx.lines,
+        changes,
+        referenceChangeIndices: [0],
+        footnoteId,
+        definitionLabelLine: labelLine,
+        definitionBodyExtraLines: bodyExtraLines,
         simulated,
-        simulatedScan.isProtected,
-        simulatedScan,
-    ).some(
-        (block) =>
-            block.start === labelLine &&
-            block.end >= labelLine + bodyExtraLines,
-    );
-    const referenceAnchor = simulatedAnchor(ctx.lines, changes, 0, simulated);
-    const referenceLive = referenceOccurrences(
-        simulated[referenceAnchor.line],
-        maskedLineAt(simulated, referenceAnchor.line),
-    ).some(
-        (occurrence) =>
-            occurrence.start === referenceAnchor.ch &&
-            occurrence.name === footnoteId,
-    );
-    if (!definitionLive || !referenceLive) {
+    });
+    if (!verified) {
         new Notice(ProtectedCreationNotice, 8000);
         return;
     }
 
-    if (popupEditingAvailable(plugin)) {
-        // edit the pre-filled definition in a popup; the cursor only moves
-        // past the new reference
-        // Stryker disable all: popup arm — units run popup-off, so mutants
-        // here are no-coverage noise; smoke territory (verified 2026-08-12)
-        const afterReference = {
+    const referenceAnchor = verified.anchors[0];
+    landDefinitionBackedInsertion({
+        plugin,
+        doc,
+        changes,
+        origin: selection.from,
+        footnoteId,
+        definitionCursor,
+        afterReference: {
             line: referenceAnchor.line,
             ch: referenceAnchor.ch + footnoteReference.length,
-        };
-        doc.transaction({ changes, selection: { from: afterReference } });
-        openPopupForNewDefinition(plugin, doc, selection.from, footnoteId, definitionCursor);
-        // Stryker restore all
-    } else {
-        moveCursorAndSetJumpPoint(doc, selection.from, definitionCursor, plugin, changes, true);
-    }
+        },
+    });
 }
 
 // The definition-backed flavor inside an actively edited table cell,
@@ -755,21 +747,16 @@ function convertCellSelection(
         footnoteId,
         selection.text,
     );
-    const definitionChanges = definition.prepend
-        ? [definition.prepend, definition.change]
-        : [definition.change];
-    const origin = cursorPosition ?? doc.getCursor();
-    if (popupEditingAvailable(plugin)) {
-        // Stryker disable all: popup arm — units run popup-off, so mutants
-        // here are no-coverage noise; smoke territory (verified 2026-08-12)
-        doc.transaction({ changes: definitionChanges });
-        void openFootnotePopup(plugin, footnoteId, () => {
-            moveCursorAndSetJumpPoint(doc, origin, definition.cursor, plugin, undefined, true);
-        });
-        // Stryker restore all
-    } else {
-        moveCursorAndSetJumpPoint(doc, origin, definition.cursor, plugin, definitionChanges, true);
-    }
+    landCellDefinitionAppend({
+        plugin,
+        doc,
+        definitionChanges: definition.prepend
+            ? [definition.prepend, definition.change]
+            : [definition.change],
+        origin: cursorPosition ?? doc.getCursor(),
+        footnoteId,
+        definitionCursor: definition.cursor,
+    });
 }
 
 /** What the name modal converts on submit: the captured main-editor or cell selection. */
