@@ -1,4 +1,4 @@
-import { Editor, EditorChange, EditorPosition } from "obsidian";
+import { EditorPosition } from "obsidian";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { noticeCalls } from "./mocks/obsidian";
@@ -10,6 +10,11 @@ import {
     insertNamedFootnote,
     pasteInlineFootnote,
 } from "../src/commands/insert-or-navigate-footnotes";
+import {
+    fakeEditor as sharedFakeEditor,
+    FakeEditor,
+} from "./helpers/fake-editor";
+import { fakePlugin as sharedFakePlugin } from "./helpers/fake-plugin";
 
 // Jason's rule (2026-08-12, always on — no toggle, inline spans included):
 // footnote CREATION is blocked when the caret sits inside code, math, a
@@ -19,43 +24,13 @@ import {
 // untouched (it never reaches protected text — the masked gates fall
 // through).
 
-interface FakeDoc extends Editor {
-    appliedChanges: EditorChange[];
-    cursor: EditorPosition;
+function fakeEditor(lines: string[], cursor: EditorPosition): FakeEditor {
+    return sharedFakeEditor(lines, { cursor, edits: true, wholeDoc: true });
 }
 
-function fakeEditor(lines: string[], cursor: EditorPosition): FakeDoc {
-    const doc = {
-        appliedChanges: [] as EditorChange[],
-        cursor,
-        getCursor: () => doc.cursor,
-        listSelections: () => [{ anchor: doc.cursor, head: doc.cursor }],
-        getLine: (n: number) => lines[n],
-        getValue: () => lines.join("\n"),
-        lineCount: () => lines.length,
-        lastLine: () => lines.length - 1,
-        setCursor(pos: EditorPosition) {
-            doc.cursor = pos;
-        },
-        scrollIntoView() {},
-        transaction(spec: {
-            changes?: EditorChange[];
-            selection?: { from: EditorPosition };
-        }) {
-            if (spec.changes) doc.appliedChanges.push(...spec.changes);
-            if (spec.selection) doc.cursor = spec.selection.from;
-        },
-    };
-    return doc as unknown as FakeDoc;
-}
-
-function fakePlugin(doc: FakeDoc): FootnotePlugin {
-    return {
-        app: {
-            workspace: { getActiveViewOfType: () => ({ editor: doc }) },
-            vault: {},
-        },
-        settings: {
+function fakePlugin(doc: FakeEditor): FootnotePlugin {
+    return sharedFakePlugin(
+        {
             insertAtEndOfWord: false,
             enablePopupEditor: false,
             enableFootnotePrefix: false,
@@ -64,7 +39,8 @@ function fakePlugin(doc: FakeDoc): FootnotePlugin {
             enableRemoveBlankLastLines: true,
             lintOnFootnoteCreation: false,
         },
-    } as unknown as FootnotePlugin;
+        doc,
+    );
 }
 
 beforeEach(() => {

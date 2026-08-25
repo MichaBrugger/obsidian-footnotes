@@ -53,6 +53,14 @@ export type FakeEditor = Editor & {
     cursor: EditorPosition;
     /** number of transaction() calls (atomicity assertions) */
     transactions: number;
+    /**
+     * every EditorChange handed to transaction(), in order — the raw
+     * specs, for pins that assert exactly what a press asked the editor
+     * to do. (The old appliedChanges-family fakes recorded these WITHOUT
+     * applying them; this helper records and applies, which is strictly
+     * more realistic and keeps those assertions valid.)
+     */
+    appliedChanges: EditorChange[];
     /** what the last transaction's `selections` requested, if any */
     selections: { from: EditorPosition }[] | null;
     /** every setCursor call in order (jump-target assertions) */
@@ -77,6 +85,7 @@ export function fakeEditor(
         transactions: 0,
         selections: null as { from: EditorPosition }[] | null,
         moves: [] as EditorPosition[],
+        appliedChanges: [] as EditorChange[],
     };
     const methods = {
         getLine: (n: number) => state.lines[n],
@@ -129,8 +138,10 @@ export function fakeEditor(
                   selections?: { from: EditorPosition }[];
               }) => {
                   state.transactions++;
-                  if (spec.changes)
+                  if (spec.changes) {
+                      state.appliedChanges.push(...spec.changes);
                       state.lines = simulateChanges(state.lines, spec.changes);
+                  }
                   if (spec.selection) state.cursor = spec.selection.from;
                   if (spec.selections) state.selections = spec.selections;
               }

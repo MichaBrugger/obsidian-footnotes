@@ -1,4 +1,4 @@
-import { Editor, EditorChange, EditorPosition } from "obsidian";
+import { EditorPosition } from "obsidian";
 import { describe, expect, it } from "vitest";
 
 import FootnotePlugin from "../src/main";
@@ -11,6 +11,11 @@ import { warnPrefilledReferenceIfInside } from "../src/commands/press-guards";
 // the stub Notice records into noticeCalls — vi.mock("obsidian") does not
 // survive `isolate: false` (see the note in test/mocks/obsidian.ts)
 import { noticeCalls } from "./mocks/obsidian";
+import {
+    fakeEditor as sharedFakeEditor,
+    FakeEditor,
+} from "./helpers/fake-editor";
+import { fakePlugin as sharedFakePlugin } from "./helpers/fake-plugin";
 
 // Prefix-at-bracket-creation (requested 2026-07-20, replacing the
 // definition-time rename): with an active footnote-prefix the named command
@@ -20,47 +25,19 @@ import { noticeCalls } from "./mocks/obsidian";
 // (2026-08-05; it used to hop out, which was harder to understand).
 // Definition creation no longer renames anything.
 
-interface FakeDoc extends Editor {
-    appliedChanges: EditorChange[];
-    cursor: EditorPosition | null;
-}
-
-function fakeEditor(lines: string[], cursor: EditorPosition): FakeDoc {
-    const doc = {
-        appliedChanges: [] as EditorChange[],
-        cursor,
-        getCursor: () => doc.cursor,
-        getValue: () => lines.join("\n"),
-        getLine: (n: number) => lines[n],
-        lineCount: () => lines.length,
-        lastLine: () => lines.length - 1,
-        setCursor(pos: EditorPosition) {
-            doc.cursor = pos;
-        },
-        scrollIntoView() {},
-        transaction(spec: {
-            changes?: EditorChange[];
-            selection?: { from: EditorPosition };
-        }) {
-            if (spec.changes) doc.appliedChanges.push(...spec.changes);
-            if (spec.selection) doc.cursor = spec.selection.from;
-        },
-    };
-    return doc as unknown as FakeDoc;
+function fakeEditor(lines: string[], cursor: EditorPosition): FakeEditor {
+    return sharedFakeEditor(lines, { cursor, edits: true, wholeDoc: true });
 }
 
 function fakePlugin(enablePrefix: boolean): FootnotePlugin {
-    return {
-        app: { vault: {} },
-        settings: {
-            insertAtEndOfWord: false,
-            enablePopupEditor: false,
-            enableFootnotePrefix: enablePrefix,
-            enableFootnoteSectionHeading: false,
-            footnoteSectionHeading: "",
-            enableRemoveBlankLastLines: true,
-        },
-    } as unknown as FootnotePlugin;
+    return sharedFakePlugin({
+        insertAtEndOfWord: false,
+        enablePopupEditor: false,
+        enableFootnotePrefix: enablePrefix,
+        enableFootnoteSectionHeading: false,
+        footnoteSectionHeading: "",
+        enableRemoveBlankLastLines: true,
+    });
 }
 
 const FRONTMATTER = ["---", "footnote-prefix: 7-", "---"];

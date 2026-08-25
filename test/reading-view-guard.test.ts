@@ -1,4 +1,4 @@
-import { Editor, EditorChange, EditorPosition } from "obsidian";
+import { EditorPosition } from "obsidian";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import FootnotePlugin from "../src/main";
@@ -8,6 +8,10 @@ import {
     insertNamedFootnote,
     pasteInlineFootnote,
 } from "../src/commands/insert-or-navigate-footnotes";
+import {
+    fakeEditor as sharedFakeEditor,
+    FakeEditor,
+} from "./helpers/fake-editor";
 
 // BUG (reported by Jason 2026-08-08, probed live the same day): in Reading
 // view the commands passed their checks and ran the whole cascade against
@@ -17,37 +21,12 @@ import {
 // could not see. Text-editing commands must be inert in Reading view; the
 // editor state there is not something the user can watch or fix.
 
-interface FakeDoc extends Editor {
-    appliedChanges: EditorChange[];
-    cursor: EditorPosition;
+function fakeEditor(lines: string[], cursor: EditorPosition): FakeEditor {
+    return sharedFakeEditor(lines, { cursor, edits: true, wholeDoc: true });
 }
 
-function fakeEditor(lines: string[], cursor: EditorPosition): FakeDoc {
-    const doc = {
-        appliedChanges: [] as EditorChange[],
-        cursor,
-        getCursor: () => doc.cursor,
-        listSelections: () => [{ anchor: doc.cursor, head: doc.cursor }],
-        getLine: (n: number) => lines[n],
-        getValue: () => lines.join("\n"),
-        lineCount: () => lines.length,
-        lastLine: () => lines.length - 1,
-        setCursor(pos: EditorPosition) {
-            doc.cursor = pos;
-        },
-        scrollIntoView() {},
-        transaction(spec: {
-            changes?: EditorChange[];
-            selection?: { from: EditorPosition };
-        }) {
-            if (spec.changes) doc.appliedChanges.push(...spec.changes);
-            if (spec.selection) doc.cursor = spec.selection.from;
-        },
-    };
-    return doc as unknown as FakeDoc;
-}
-
-function previewPlugin(doc: FakeDoc): FootnotePlugin {
+// richer view (getMode) than the shared plugin fake supports — stays local
+function previewPlugin(doc: FakeEditor): FootnotePlugin {
     return {
         app: {
             workspace: {

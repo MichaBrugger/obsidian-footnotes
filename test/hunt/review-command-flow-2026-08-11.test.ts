@@ -1,4 +1,4 @@
-import { Editor, EditorChange, EditorPosition } from "obsidian";
+import { EditorPosition } from "obsidian";
 import { describe, expect, it, vi } from "vitest";
 
 import { noticeCalls } from "../mocks/obsidian";
@@ -11,6 +11,11 @@ import {
     insertInlineFootnote,
     insertNamedFootnote,
 } from "../../src/commands/insert-or-navigate-footnotes";
+import {
+    fakeEditor as sharedFakeEditor,
+    FakeEditor,
+} from "../helpers/fake-editor";
+import { fakePlugin as sharedFakePlugin } from "../helpers/fake-plugin";
 
 // Pins for the 2026-08-11 review's command-flow bugs:
 //   #6 the empty-"[^]" hop used LINE-LOCAL masking while its guard used
@@ -25,46 +30,16 @@ import {
 //  #13 openFootnotePopup's no-view early return skipped onUnavailable,
 //      stranding the fallback jump and the deferred creation lint
 
-interface FakeDoc extends Editor {
-    appliedChanges: EditorChange[];
-    cursor: EditorPosition;
-}
-
-function fakeEditor(lines: string[], cursor: EditorPosition): FakeDoc {
-    const doc = {
-        appliedChanges: [] as EditorChange[],
-        cursor,
-        getCursor: () => doc.cursor,
-        listSelections: () => [{ anchor: doc.cursor, head: doc.cursor }],
-        getLine: (n: number) => lines[n],
-        getValue: () => lines.join("\n"),
-        lineCount: () => lines.length,
-        lastLine: () => lines.length - 1,
-        setCursor(pos: EditorPosition) {
-            doc.cursor = pos;
-        },
-        scrollIntoView() {},
-        transaction(spec: {
-            changes?: EditorChange[];
-            selection?: { from: EditorPosition };
-        }) {
-            if (spec.changes) doc.appliedChanges.push(...spec.changes);
-            if (spec.selection) doc.cursor = spec.selection.from;
-        },
-    };
-    return doc as unknown as FakeDoc;
+function fakeEditor(lines: string[], cursor: EditorPosition): FakeEditor {
+    return sharedFakeEditor(lines, { cursor, edits: true, wholeDoc: true });
 }
 
 function fakePlugin(
-    doc: FakeDoc,
+    doc: FakeEditor,
     settings: Record<string, unknown> = {},
 ): FootnotePlugin {
-    return {
-        app: {
-            workspace: { getActiveViewOfType: () => ({ editor: doc }) },
-            vault: {},
-        },
-        settings: {
+    return sharedFakePlugin(
+        {
             insertAtEndOfWord: false,
             enablePopupEditor: false,
             enableFootnotePrefix: false,
@@ -74,7 +49,8 @@ function fakePlugin(
             lintOnFootnoteCreation: false,
             ...settings,
         },
-    } as unknown as FootnotePlugin;
+        doc,
+    );
 }
 
 describe("bug #6: the empty-[^] hop must be document-aware", () => {

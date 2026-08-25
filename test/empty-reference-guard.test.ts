@@ -1,4 +1,4 @@
-import { Editor, EditorChange, EditorPosition } from "obsidian";
+import { EditorPosition } from "obsidian";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { noticeCalls } from "./mocks/obsidian";
@@ -10,6 +10,11 @@ import {
     insertNamedFootnote,
     pasteInlineFootnote,
 } from "../src/commands/insert-or-navigate-footnotes";
+import {
+    fakeEditor as sharedFakeEditor,
+    FakeEditor,
+} from "./helpers/fake-editor";
+import { fakePlugin as sharedFakePlugin } from "./helpers/fake-plugin";
 
 // QOL sweep (2026-08-07): any footnote command pressed with the caret inside
 // an abandoned empty reference "[^]" warns ("give it a name") and leaves the
@@ -18,43 +23,13 @@ import {
 // never see "[^]" because the reference regexes require a non-empty name —
 // nested a new insertion INTO it ("[^[^1]]", "[^^[]]"), corrupting the note.
 
-interface FakeDoc extends Editor {
-    appliedChanges: EditorChange[];
-    cursor: EditorPosition;
+function fakeEditor(lines: string[], cursor: EditorPosition): FakeEditor {
+    return sharedFakeEditor(lines, { cursor, edits: true, wholeDoc: true });
 }
 
-function fakeEditor(lines: string[], cursor: EditorPosition): FakeDoc {
-    const doc = {
-        appliedChanges: [] as EditorChange[],
-        cursor,
-        getCursor: () => doc.cursor,
-        listSelections: () => [{ anchor: doc.cursor, head: doc.cursor }],
-        getLine: (n: number) => lines[n],
-        getValue: () => lines.join("\n"),
-        lineCount: () => lines.length,
-        lastLine: () => lines.length - 1,
-        setCursor(pos: EditorPosition) {
-            doc.cursor = pos;
-        },
-        scrollIntoView() {},
-        transaction(spec: {
-            changes?: EditorChange[];
-            selection?: { from: EditorPosition };
-        }) {
-            if (spec.changes) doc.appliedChanges.push(...spec.changes);
-            if (spec.selection) doc.cursor = spec.selection.from;
-        },
-    };
-    return doc as unknown as FakeDoc;
-}
-
-function fakePlugin(doc: FakeDoc): FootnotePlugin {
-    return {
-        app: {
-            workspace: { getActiveViewOfType: () => ({ editor: doc }) },
-            vault: {},
-        },
-        settings: {
+function fakePlugin(doc: FakeEditor): FootnotePlugin {
+    return sharedFakePlugin(
+        {
             insertAtEndOfWord: false,
             enablePopupEditor: false,
             enableFootnotePrefix: false,
@@ -63,7 +38,8 @@ function fakePlugin(doc: FakeDoc): FootnotePlugin {
             enableRemoveBlankLastLines: true,
             lintOnFootnoteCreation: false,
         },
-    } as unknown as FootnotePlugin;
+        doc,
+    );
 }
 
 afterEach(() => {

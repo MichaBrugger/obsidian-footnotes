@@ -1,10 +1,15 @@
-import { Editor, EditorChange, EditorPosition } from "obsidian";
+import { EditorPosition } from "obsidian";
 import { describe, expect, it } from "vitest";
 
 import FootnotePlugin from "../../src/main";
 import { createMatchingFootnoteDefinition } from "../../src/commands/create-footnote";
 import { shouldJumpFromDefinitionToReference, shouldJumpFromReferenceToDefinition } from "../../src/commands/navigation";
 import { reindexFootnotes } from "../../src/linting/rules/re-index-footnotes";
+import {
+    fakeEditor as sharedFakeEditor,
+    FakeEditor,
+} from "../helpers/fake-editor";
+import { fakePlugin as sharedFakePlugin } from "../helpers/fake-plugin";
 
 // Scenario: a footnote whose name contains an inline-code span ("[^x`c`y]")
 // gets a NUL-masked identity on reference-scanning paths but its raw identity on
@@ -17,45 +22,20 @@ import { reindexFootnotes } from "../../src/linting/rules/re-index-footnotes";
 // text (the re-slice fix pinned in bug-definition-name-inline-code-nul was only
 // applied to the definition-listing path).
 
-interface FakeDoc extends Editor {
-    appliedChanges: EditorChange[];
-    cursor: EditorPosition;
-}
-
-function fakeEditor(lines: string[], cursor: EditorPosition = { line: 0, ch: 0 }): FakeDoc {
-    const doc = {
-        appliedChanges: [] as EditorChange[],
-        cursor,
-        getCursor: () => doc.cursor,
-        getLine: (n: number) => lines[n],
-        getValue: () => lines.join("\n"),
-        lineCount: () => lines.length,
-        lastLine: () => lines.length - 1,
-        setCursor(pos: EditorPosition) {
-            doc.cursor = pos;
-        },
-        scrollIntoView() {},
-        transaction(spec: { changes?: EditorChange[]; selection?: { from: EditorPosition } }) {
-            if (spec.changes) doc.appliedChanges.push(...spec.changes);
-            if (spec.selection) doc.cursor = spec.selection.from;
-        },
-    };
-    return doc as unknown as FakeDoc;
+function fakeEditor(lines: string[], cursor: EditorPosition = { line: 0, ch: 0 }): FakeEditor {
+    return sharedFakeEditor(lines, { cursor, edits: true, wholeDoc: true });
 }
 
 function fakePlugin(): FootnotePlugin {
-    return {
-        app: { vault: {} },
-        settings: {
-            enablePopupEditor: false,
-            enableFootnoteSectionHeading: false,
-            enableRemoveBlankLastLines: true,
-            footnoteSectionHeading: "",
-            insertAtEndOfWord: false,
-            lintOnFootnoteCreation: false,
-            enableFootnotePrefix: false,
-        },
-    } as unknown as FootnotePlugin;
+    return sharedFakePlugin({
+        enablePopupEditor: false,
+        enableFootnoteSectionHeading: false,
+        enableRemoveBlankLastLines: true,
+        footnoteSectionHeading: "",
+        insertAtEndOfWord: false,
+        lintOnFootnoteCreation: false,
+        enableFootnotePrefix: false,
+    });
 }
 
 describe("press-jump (reference → definition) with a code-span-named footnote (fixed 2026-08-10)", () => {

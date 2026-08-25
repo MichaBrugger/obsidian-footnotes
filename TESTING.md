@@ -16,6 +16,15 @@ definitions only, so `vitest.config.ts` aliases it to the runtime stub in
 `test/mocks/obsidian.ts` — extend the stub (empty classes / no-ops) if a
 new import breaks test startup.
 
+Specs build editor state with the shared fakes in `test/helpers/`
+(`fakeEditor`, `fakePlugin`) instead of hand-rolling doubles. Editor
+capabilities are opt-in (`cursor`, `carets`, `selection`, `edits`,
+`wholeDoc`, `words`) and a disabled method throws naming its option, so
+leaving a capability off is an assertion that the code under test never
+uses it. `test/fake-editor-helper.test.ts` pins the helper's own
+contract. Purpose-built doubles (the offset-splicing linter fake, richer
+view shapes) stay local to their specs.
+
 The suite has three kinds of files:
 
 - **Feature specs** (`test/*.test.ts`) — one file per unit under test:

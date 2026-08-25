@@ -1,4 +1,4 @@
-import { Editor, EditorChange, EditorPosition } from "obsidian";
+import { EditorPosition } from "obsidian";
 import { describe, expect, it } from "vitest";
 
 import FootnotePlugin from "../../src/main";
@@ -6,6 +6,11 @@ import {
     insertAutonumFootnote,
     insertInlineFootnote,
 } from "../../src/commands/insert-or-navigate-footnotes";
+import {
+    fakeEditor as sharedFakeEditor,
+    FakeEditor,
+} from "../helpers/fake-editor";
+import { fakePlugin as sharedFakePlugin } from "../helpers/fake-plugin";
 
 // Found by the command-press property suite (2026-08-12, shrunk from
 // "\[^81]. alpha[^1].", caret between "\" and "["): inserting a footnote
@@ -17,43 +22,13 @@ import {
 // footnote. The shared position adjuster now nudges such an insertion one
 // column left, BEFORE the escaping backslash: both meanings survive.
 
-interface FakeDoc extends Editor {
-    appliedChanges: EditorChange[];
-    cursor: EditorPosition;
+function fakeEditor(lines: string[], cursor: EditorPosition): FakeEditor {
+    return sharedFakeEditor(lines, { cursor, edits: true, wholeDoc: true });
 }
 
-function fakeEditor(lines: string[], cursor: EditorPosition): FakeDoc {
-    const doc = {
-        appliedChanges: [] as EditorChange[],
-        cursor,
-        getCursor: () => doc.cursor,
-        listSelections: () => [{ anchor: doc.cursor, head: doc.cursor }],
-        getLine: (n: number) => lines[n],
-        getValue: () => lines.join("\n"),
-        lineCount: () => lines.length,
-        lastLine: () => lines.length - 1,
-        setCursor(pos: EditorPosition) {
-            doc.cursor = pos;
-        },
-        scrollIntoView() {},
-        transaction(spec: {
-            changes?: EditorChange[];
-            selection?: { from: EditorPosition };
-        }) {
-            if (spec.changes) doc.appliedChanges.push(...spec.changes);
-            if (spec.selection) doc.cursor = spec.selection.from;
-        },
-    };
-    return doc as unknown as FakeDoc;
-}
-
-function fakePlugin(doc: FakeDoc): FootnotePlugin {
-    return {
-        app: {
-            workspace: { getActiveViewOfType: () => ({ editor: doc }) },
-            vault: {},
-        },
-        settings: {
+function fakePlugin(doc: FakeEditor): FootnotePlugin {
+    return sharedFakePlugin(
+        {
             insertAtEndOfWord: false,
             enablePopupEditor: false,
             enableFootnotePrefix: false,
@@ -62,7 +37,8 @@ function fakePlugin(doc: FakeDoc): FootnotePlugin {
             enableRemoveBlankLastLines: false,
             lintOnFootnoteCreation: false,
         },
-    } as unknown as FootnotePlugin;
+        doc,
+    );
 }
 
 describe("insertion directly after an escaping backslash (bug-insert-after-backslash)", () => {
