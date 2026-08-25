@@ -258,6 +258,32 @@ export function lintBlockedByPrefix(markdown: string): string | null {
     return `Linting canceled: this note's footnote-prefix ("${prefix}") is invalid. ${footnotePrefixProblem(prefix)}`;
 }
 
+/**
+ * The automatic triggers' shared safety gate (lint-on-save and
+ * lint-on-footnote-creation both used to spell it out): the active
+ * markdown view and its editor, or null when linting must not touch the
+ * document — no editable view (viewEditor: a deferred view has no
+ * editor despite the typings), Reading view (never edit the hidden
+ * buffer, 2026-08-08), a pending popup save owning the file, or a
+ * table-cell / nested sub-editor owning focus (the issue-#28 corruption
+ * family). Mutable territory: units reach it through
+ * lintAfterFootnoteCreation (bug-reading-view-deferred-lint pins the
+ * Reading-view bail).
+ */
+function safeLintTarget(
+    plugin: FootnotePlugin,
+): { mdView: MarkdownView; doc: Editor } | null {
+    const mdView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
+    const doc = mdView && viewEditor(mdView);
+    if (!mdView || !doc) return null;
+    if (readingViewActive(mdView)) return null;
+    // Stryker disable next-line all: popup liveness is footnote-popup module
+    // state only a live embedRegistry can set — smoke territory (2026-08-12)
+    if (footnotePopupBusy()) return null;
+    if (activeTableCellEditor(doc) || nestedSubEditorOwnsFocus(doc)) return null;
+    return { mdView, doc };
+}
+
 // Stryker disable all: live-Obsidian integration (workspace views, the
 // save-command wrapper, the vim adapter) — smoke-test territory the unit
 // suite never reaches, so mutants here are unkillable noise by design
@@ -265,14 +291,9 @@ export function lintBlockedByPrefix(markdown: string): string | null {
 // Lint the active note synchronously when it's safe to; the save hook calls
 // this right before delegating, so the save writes the linted text.
 function lintActiveNoteIfSafe(plugin: FootnotePlugin) {
-    const mdView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
-    // viewEditor: a deferred view has no editor despite the typings
-    const doc = mdView && viewEditor(mdView);
-    if (!mdView || !doc) return;
-    // Reading view: never edit the hidden buffer (2026-08-08)
-    if (readingViewActive(mdView)) return;
-    if (footnotePopupBusy()) return; // a pending popup save owns the file
-    if (activeTableCellEditor(doc) || nestedSubEditorOwnsFocus(doc)) return;
+    const target = safeLintTarget(plugin);
+    if (!target) return;
+    const doc = target.doc;
     // same message as the Lint footnotes command: with every rule off the
     // pipeline is a no-op by construction, and "No linting needed." would
     // wrongly imply the note was checked and found clean (E34)
@@ -415,22 +436,16 @@ export function lintAfterFootnoteCreation(
     expectedFilePath?: string,
 ) {
     if (!plugin.settings.lintOnFootnoteCreation) return;
-    const mdView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
-    // viewEditor: a deferred view has no editor despite the typings
-    const doc = mdView && viewEditor(mdView);
-    if (!mdView || !doc) return;
-    // Reading view: never edit the hidden buffer (2026-08-08) — the popup
-    // path defers this call, so the user may have flipped modes since the
-    // footnote was created (no leaf change fires on a mode flip)
-    if (readingViewActive(mdView)) return;
+    // the shared gate covers Reading view too — the popup path defers
+    // this call, so the user may have flipped modes since the footnote
+    // was created (no leaf change fires on a mode flip)
+    const target = safeLintTarget(plugin);
+    if (!target) return;
+    const doc = target.doc;
     // a deferred (popup-path) lint must not fire on some OTHER note the
     // user has since switched to
-    if (expectedFilePath && mdView.file?.path !== expectedFilePath) return;
-    // Stryker disable next-line all: popup liveness is footnote-popup module
-    // state only a live embedRegistry can set — smoke territory, like the
-    // identical guard inside the disable region above (verified 2026-08-12)
-    if (footnotePopupBusy()) return;
-    if (activeTableCellEditor(doc) || nestedSubEditorOwnsFocus(doc)) return;
+    if (expectedFilePath && target.mdView.file?.path !== expectedFilePath)
+        return;
     const before = doc.getValue();
     // silent on a blocked prefix: the insert path already explained it
     if (lintBlockedByPrefix(before)) return;
