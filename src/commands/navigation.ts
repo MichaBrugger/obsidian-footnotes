@@ -2,14 +2,13 @@ import { Editor, EditorPosition, Notice } from "obsidian";
 
 import type FootnotePlugin from "../main";
 import { moveCursorAndSetJumpPoint } from "../editor/cursor-motion";
-import { DocContext, docContext, listExistingFootnoteDefinitions } from "../editor/doc-context";
 import {
-    footnoteReferenceMatches,
-    idListIncludes,
-    occurrenceAtCursor,
-    referenceAtCursor,
-    referenceOccurrences,
-} from "../parsing/footnote-grammar";
+    DocContext,
+    docContext,
+    listExistingFootnoteDefinitions,
+    referenceOccurrenceAtCursor,
+} from "../editor/doc-context";
+import { idListIncludes, referenceOccurrences } from "../parsing/footnote-grammar";
 import { openFootnotePopup, popupEditingAvailable } from "./footnote-popup";
 import { definitionLabelIn, findDefinitionBlocks } from "../parsing/markdown-scan";
 
@@ -160,49 +159,31 @@ export function shouldJumpFromReferenceToDefinition(
     doc: Editor,
     ctx?: DocContext,
 ): boolean {
-    // Jump cursor TO definition reference:
-    // find the reference whose brackets contain the cursor on this line,
-    // then place the cursor at that footnote's definition line. This runs on
-    // every keypress of both commands and a whole-document scan here is
-    // measurable on large notes, so the raw line gates first — masking
-    // (which needs the whole document for fence state) only runs when
-    // the caret actually sits on something reference-shaped.
-    const rawReferences = footnoteReferenceMatches(lineText).map((match) => ({
-        footnote: match[0],
-        startIndex: match.index ?? 0,
-    }));
-    if (referenceAtCursor(rawReferences, cursorPosition.ch) === null) return false;
+    // Jump cursor TO definition reference: find the reference whose
+    // brackets contain the cursor on this line, then place the cursor at
+    // that footnote's definition line. The shared lookup raw-gates before
+    // masking — this runs on every keypress of both commands, and the
+    // whole-document scan is measurable on large notes (perf F1, #41
+    // masked re-check, NUL-safe name re-slice; see
+    // referenceOccurrenceAtCursor).
+    const hit = referenceOccurrenceAtCursor(lineText, cursorPosition, doc, ctx);
+    if (hit === null) return false;
+    ctx = hit.ctx;
+    const footnoteName = hit.target.name;
 
-    // #41: re-check against the masked twin — a reference inside a fence or
-    // inline code is plain text, so the press falls through to insertion.
-    // referenceOccurrences re-slices each raw name: a code span inside the
-    // name masks to NULs, and the masked name would break the definition
-    // lookup and jump below (bug-masked-name-identity).
-    // The context is built only past the raw gate — this step runs on
-    // every press, most of which sit on plain text (perf F1)
-    ctx ??= docContext(doc);
-    const target = occurrenceAtCursor(
-        referenceOccurrences(lineText, ctx.maskedLine(cursorPosition.line)),
-        cursorPosition.ch,
-    );
-    if (target !== null) {
-        const footnoteName = target.name;
-
-        // references without a definition line fall through to the
-        // definition-creation paths (ids compared case-insensitively)
-        if (!idListIncludes(listExistingFootnoteDefinitions(doc, ctx), footnoteName)) {
-            return false;
-        }
-
-        if (popupEditingAvailable(plugin)) {
-            // the popup's close callback runs LATER, after its save may
-            // have edited the document — it must build a FRESH context
-            void openFootnotePopup(plugin, footnoteName, () => {
-                jumpToFootnoteDefinition(footnoteName, cursorPosition, plugin, doc);
-            });
-            return true;
-        }
-        return jumpToFootnoteDefinition(footnoteName, cursorPosition, plugin, doc, ctx);
+    // references without a definition line fall through to the
+    // definition-creation paths (ids compared case-insensitively)
+    if (!idListIncludes(listExistingFootnoteDefinitions(doc, ctx), footnoteName)) {
+        return false;
     }
-    return false;
+
+    if (popupEditingAvailable(plugin)) {
+        // the popup's close callback runs LATER, after its save may
+        // have edited the document — it must build a FRESH context
+        void openFootnotePopup(plugin, footnoteName, () => {
+            jumpToFootnoteDefinition(footnoteName, cursorPosition, plugin, doc);
+        });
+        return true;
+    }
+    return jumpToFootnoteDefinition(footnoteName, cursorPosition, plugin, doc, ctx);
 }

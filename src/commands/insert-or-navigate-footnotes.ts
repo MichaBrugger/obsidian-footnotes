@@ -1,12 +1,6 @@
 import { Editor, EditorPosition, MarkdownView, Notice } from "obsidian";
 
 import type FootnotePlugin from "../main";
-import {
-    footnoteReferenceMatches,
-    occurrenceAtCursor,
-    referenceAtCursor,
-    referenceOccurrences,
-} from "../parsing/footnote-grammar";
 import { settleFootnotePopupWithFeedback, toggleCloseFootnotePopup } from "./footnote-popup";
 import { adjustFootnotePosition, moveCursorAndSetJumpPoint } from "../editor/cursor-motion";
 import {
@@ -15,7 +9,7 @@ import {
     createMatchingFootnoteDefinition,
     insertInTableCell,
 } from "./create-footnote";
-import { docContext } from "../editor/doc-context";
+import { docContext, referenceOccurrenceAtCursor } from "../editor/doc-context";
 import { inlineFootnoteSpanAt, sanitizeInlineFootnoteContent } from "./inline-footnotes";
 import { ProtectedCreationNotice, simulatedMaskedLine } from "../editor/insertion-liveness";
 import { shouldJumpFromDefinitionToReference, shouldJumpFromReferenceToDefinition } from "./navigation";
@@ -181,28 +175,17 @@ export function navigateReferenceIfInside(
     const cursorPosition =
         (cell ? resolveTableCellCursor(doc) : null) ?? doc.getCursor();
     const lineText = doc.getLine(cursorPosition.line);
-    // raw-line gate first — masking needs the whole document, and this runs
-    // on every inline-command press (same rationale as
-    // shouldJumpFromReferenceToDefinition)
-    const rawReferences = footnoteReferenceMatches(lineText).map((match) => ({
-        footnote: match[0],
-        startIndex: match.index ?? 0,
-    }));
-    if (referenceAtCursor(rawReferences, cursorPosition.ch) === null) return false;
+    // the shared lookup raw-gates before masking — this runs on every
+    // inline-command press, and a "[^x]" inside code is plain text where
+    // inserting an inline footnote is fine (perf F1, #41 semantics; see
+    // referenceOccurrenceAtCursor). The one context it builds past the
+    // gate serves the rest of the press.
+    const hit = referenceOccurrenceAtCursor(lineText, cursorPosition, doc);
+    if (hit === null) return false;
 
-    // the masked twin decides for real: a "[^x]" inside code is plain text,
-    // and inserting an inline footnote there is fine (#41 semantics).
-    // One shared context past the gate serves the rest of the press (F1)
-    const ctx = docContext(doc);
-    const occurrences = referenceOccurrences(
-        lineText,
-        ctx.maskedLine(cursorPosition.line),
-    );
-    if (occurrenceAtCursor(occurrences, cursorPosition.ch) === null) return false;
-
-    if (shouldJumpFromReferenceToDefinition(lineText, cursorPosition, plugin, doc, ctx))
+    if (shouldJumpFromReferenceToDefinition(lineText, cursorPosition, plugin, doc, hit.ctx))
         return true;
-    if (createMatchingFootnoteDefinition(lineText, cursorPosition, plugin, doc, ctx))
+    if (createMatchingFootnoteDefinition(lineText, cursorPosition, plugin, doc, hit.ctx))
         return true;
     // however the cascade resolved (e.g. an invalid name's warning), the
     // press is handled — "^[…]" must never land inside the reference

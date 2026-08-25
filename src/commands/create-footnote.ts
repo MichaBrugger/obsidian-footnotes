@@ -10,18 +10,20 @@ import type FootnotePlugin from "../main";
 import {
     computeNextFootnoteNumber,
     emptyReferenceStart,
-    footnoteReferenceMatches,
     idListIncludes,
     isValidFootnoteName,
-    occurrenceAtCursor,
-    referenceAtCursor,
     referenceOccurrences,
 } from "../parsing/footnote-grammar";
 import { footnotePopupBusy, openFootnotePopup, popupEditingAvailable, runAfterNextPopupSettle } from "./footnote-popup";
 import { activeFootnotePrefix, footnotePrefixFromEditor } from "../parsing/footnote-prefix";
 import { adjustFootnotePosition, endOfWordOffset, moveCursorAndSetJumpPoint } from "../editor/cursor-motion";
 import { buildDefinitionAppend } from "./definition-append";
-import { DocContext, docContext, listExistingFootnoteDefinitions } from "../editor/doc-context";
+import {
+    DocContext,
+    docContext,
+    listExistingFootnoteDefinitions,
+    referenceOccurrenceAtCursor,
+} from "../editor/doc-context";
 import { inlineFootnoteSpanAt } from "./inline-footnotes";
 import {
     ProtectedCreationNotice,
@@ -306,74 +308,60 @@ export function createMatchingFootnoteDefinition(
     // is the cursor inside a footnote reference on this line?
     // does that reference have a definition line?
     // if not, create it and place cursor there
-    // (raw-line gate first, masked re-check after — same rationale and #41
-    // semantics as navigation's shouldJumpFromReferenceToDefinition)
-    const rawReferences = footnoteReferenceMatches(lineText).map((match) => ({
-        footnote: match[0],
-        startIndex: match.index ?? 0,
-    }));
-    if (referenceAtCursor(rawReferences, cursorPosition.ch) === null) {
+    // (the shared lookup raw-gates before masking — perf F1, #41 masked
+    // re-check, NUL-safe name re-slice; creating a definition from a
+    // masked name once wrote literal NUL bytes into the note,
+    // bug-masked-name-identity. See referenceOccurrenceAtCursor.)
+    const hit = referenceOccurrenceAtCursor(lineText, cursorPosition, doc, ctx);
+    if (hit === null) {
         return false;
     }
+    ctx = hit.ctx;
+    const footnoteId = hit.target.name;
 
-    // built only past the raw gate (perf F1). referenceOccurrences
-    // re-slices each raw name — a code span inside the name masks to NULs,
-    // and creating a definition from the masked name wrote literal NUL
-    // bytes into the note (bug-masked-name-identity)
-    ctx ??= docContext(doc);
-    const target = occurrenceAtCursor(
-        referenceOccurrences(lineText, ctx.maskedLine(cursorPosition.line)),
-        cursorPosition.ch,
-    );
-
-    if (target !== null) {
-        const footnoteId = target.name;
-
-        // a spaced or backticked name is an authoring mistake Obsidian
-        // won't render; warn instead of creating a definition that can't work
-        if (!isValidFootnoteName(footnoteId)) {
-            const offender = footnoteId.includes("`")
-                ? "backticks"
-                : "spaces";
-            new Notice(
-                `Footnote name "${footnoteId}" contains ${offender}, so Obsidian won't render it as a footnote. Remove the ${offender}.`,
-                8000,
-            );
-            return true;
-        }
-
-        const list = listExistingFootnoteDefinitions(doc, ctx);
-
-        // ids are case-insensitive — a "[^note]:" definition already covers
-        // a "[^Note]" reference, so this must navigate, not create a duplicate
-        if (!idListIncludes(list, footnoteId)) {
-            const definition = buildDefinitionAppend(doc, footnoteId, list.length === 0, plugin, ctx);
-            // the phantom-frontmatter prepend rides the same
-            // transaction (see buildDefinitionAppend)
-            const definitionChanges = definition.prepend
-                ? [definition.prepend, definition.change]
-                : [definition.change];
-
-            if (popupEditingAvailable(plugin)) {
-                // type the definition in a popup instead of jumping to the
-                // bottom; the cursor stays on the reference
-                // Stryker disable all: popup arm — units run popup-off, so
-                // mutants here are no-coverage noise; smoke territory
-                // (verified 2026-08-12)
-                doc.transaction({ changes: definitionChanges });
-                openPopupForNewDefinition(plugin, doc, cursorPosition, footnoteId, definition.cursor);
-                // Stryker restore all
-            } else {
-                moveCursorAndSetJumpPoint(doc, cursorPosition, definition.cursor, plugin, definitionChanges, true);
-                lintAfterFootnoteCreation(plugin, true);
-            }
-
-            return true;
-        }
-        // the reference already has a definition — not this step's
-        // press to handle; the cascade continues
-        return false;
+    // a spaced or backticked name is an authoring mistake Obsidian
+    // won't render; warn instead of creating a definition that can't work
+    if (!isValidFootnoteName(footnoteId)) {
+        const offender = footnoteId.includes("`")
+            ? "backticks"
+            : "spaces";
+        new Notice(
+            `Footnote name "${footnoteId}" contains ${offender}, so Obsidian won't render it as a footnote. Remove the ${offender}.`,
+            8000,
+        );
+        return true;
     }
+
+    const list = listExistingFootnoteDefinitions(doc, ctx);
+
+    // ids are case-insensitive — a "[^note]:" definition already covers
+    // a "[^Note]" reference, so this must navigate, not create a duplicate
+    if (!idListIncludes(list, footnoteId)) {
+        const definition = buildDefinitionAppend(doc, footnoteId, list.length === 0, plugin, ctx);
+        // the phantom-frontmatter prepend rides the same
+        // transaction (see buildDefinitionAppend)
+        const definitionChanges = definition.prepend
+            ? [definition.prepend, definition.change]
+            : [definition.change];
+
+        if (popupEditingAvailable(plugin)) {
+            // type the definition in a popup instead of jumping to the
+            // bottom; the cursor stays on the reference
+            // Stryker disable all: popup arm — units run popup-off, so
+            // mutants here are no-coverage noise; smoke territory
+            // (verified 2026-08-12)
+            doc.transaction({ changes: definitionChanges });
+            openPopupForNewDefinition(plugin, doc, cursorPosition, footnoteId, definition.cursor);
+            // Stryker restore all
+        } else {
+            moveCursorAndSetJumpPoint(doc, cursorPosition, definition.cursor, plugin, definitionChanges, true);
+            lintAfterFootnoteCreation(plugin, true);
+        }
+
+        return true;
+    }
+    // the reference already has a definition — not this step's
+    // press to handle; the cascade continues
     return false;
 }
 

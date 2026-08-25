@@ -1,4 +1,4 @@
-import { Editor } from "obsidian";
+import { Editor, EditorPosition } from "obsidian";
 
 import {
     definitionLabelIn,
@@ -7,6 +7,13 @@ import {
     maskProtectedLines,
     scanDocument,
 } from "../parsing/markdown-scan";
+import {
+    footnoteReferenceMatches,
+    occurrenceAtCursor,
+    referenceAtCursor,
+    ReferenceOccurrence,
+    referenceOccurrences,
+} from "../parsing/footnote-grammar";
 
 // One press's shared read-only view of the document. Depends only on
 // markdown-scan + Obsidian types — split out of the all-in-one commands
@@ -91,4 +98,38 @@ export function docContext(doc: Editor): DocContext {
     const maskedLines = (): string[] =>
         full ?? (full = maskProtectedLines(lines, scan));
     return { lines, scan, maskedLine, maskedLines };
+}
+
+/**
+ * The shared "is the caret on a LIVE reference?" lookup — cascade steps
+ * 2–3 and the inline commands all start with it (three byte-identical
+ * copies before 2026-08-25). The RAW line gates first: this runs on
+ * every press, masking needs the whole document, and most presses sit
+ * on plain text (perf F1). Only past that gate is the DocContext built
+ * and the masked twin consulted — a "[^x]" inside a fence or inline
+ * code is plain text, so the press falls through to insertion (#41).
+ * referenceOccurrences re-slices each name from the raw line, so a code
+ * span inside the name can't leak NULs (bug-masked-name-identity).
+ * Returns the occurrence together with the context that judged it —
+ * pass that ctx onward so the press keeps its one-scan budget.
+ */
+export function referenceOccurrenceAtCursor(
+    lineText: string,
+    cursorPosition: EditorPosition,
+    doc: Editor,
+    ctx?: DocContext,
+): { target: ReferenceOccurrence; ctx: DocContext } | null {
+    const rawReferences = footnoteReferenceMatches(lineText).map((match) => ({
+        footnote: match[0],
+        startIndex: match.index ?? 0,
+    }));
+    if (referenceAtCursor(rawReferences, cursorPosition.ch) === null) {
+        return null;
+    }
+    ctx ??= docContext(doc);
+    const target = occurrenceAtCursor(
+        referenceOccurrences(lineText, ctx.maskedLine(cursorPosition.line)),
+        cursorPosition.ch,
+    );
+    return target === null ? null : { target, ctx };
 }
