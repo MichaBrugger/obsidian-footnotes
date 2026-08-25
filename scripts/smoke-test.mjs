@@ -187,6 +187,21 @@ function setSettings(patch) {
 
 let failures = 0;
 let skips = 0;
+let filtered = 0;
+let ran = 0;
+
+// --filter <substring> runs only the tests whose name contains the
+// substring (case-insensitive) — the suite is 70+ sequential tests
+// against the live app, so iterating on one new test shouldn't cost a
+// full run every time. Deploy, settings backup/restore, and the scratch
+// note still happen; only the test bodies are skipped.
+const filterFlagIdx = process.argv.indexOf("--filter");
+const nameFilter =
+    filterFlagIdx !== -1 ? (process.argv[filterFlagIdx + 1] ?? "") : null;
+if (filterFlagIdx !== -1 && !nameFilter) {
+    console.error("--filter needs a substring, e.g. --filter \"multi-caret\"");
+    process.exit(2);
+}
 
 class SkipTest extends Error {}
 
@@ -213,6 +228,11 @@ async function requireVisibleWindow() {
 }
 
 async function test(name, fn) {
+    if (nameFilter !== null && !name.toLowerCase().includes(nameFilter.toLowerCase())) {
+        filtered++;
+        return;
+    }
+    ran++;
     try {
         await fn();
         console.log(`  PASS  ${name}`);
@@ -1854,8 +1874,16 @@ async function main() {
     // restore state and clean up (restoreState also covers every abort path)
     restoreState("suite finished");
 
+    if (nameFilter !== null && ran === 0) {
+        console.error(`\n--filter "${nameFilter}" matched no test names`);
+        process.exit(2);
+    }
     const skipNote = skips > 0 ? ` (${skips} skipped — rerun with the Obsidian window visible)` : "";
-    console.log(failures === 0 ? `\nall smoke tests passed${skipNote}` : `\n${failures} smoke test(s) FAILED${skipNote}`);
+    const filterNote =
+        nameFilter !== null
+            ? ` (--filter "${nameFilter}": ${filtered} test(s) not run)`
+            : "";
+    console.log(failures === 0 ? `\nall smoke tests passed${skipNote}${filterNote}` : `\n${failures} smoke test(s) FAILED${skipNote}${filterNote}`);
     process.exit(failures === 0 ? 0 : 1);
 }
 

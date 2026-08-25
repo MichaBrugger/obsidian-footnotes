@@ -41,8 +41,9 @@ automatically. Please don't develop against a vault you care about.
 | `npm test` | Vitest unit tests |
 | `npm run test:smoke` | Integration tests against a live Obsidian instance |
 
-The release workflow gates on lint and the unit tests, so run those two
-locally before opening a PR. Smoke tests need a running Obsidian with a
+CI runs lint, the unit tests, and the build on every push and PR (and the
+release workflow gates on the same three), so run them locally before
+opening a PR. Smoke tests need a running Obsidian with a
 sandbox vault — see [TESTING.md](TESTING.md) for the setup; if you can't run
 them, say so in the PR and they'll be run for you.
 

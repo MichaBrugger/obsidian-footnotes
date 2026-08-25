@@ -23,6 +23,6 @@ export default defineConfig([
 		},
 	},
 	{
-		ignores: ["node_modules/**", "main.js", "scripts/**", "tests/**"],
+		ignores: ["node_modules/**", "main.js", "scripts/**", "test/**"],
 	},
 ]);

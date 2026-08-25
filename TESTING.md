@@ -137,7 +137,9 @@ Requirements:
   deliberate minimize)
 
 Flags: `npm run test:smoke -- --no-deploy` tests whatever build is already
-loaded instead of deploying first.
+loaded instead of deploying first. `npm run test:smoke -- --filter "popup"`
+runs only the tests whose name contains the substring (case-insensitive) —
+for iterating on one new test without a full 70-test run.
 
 Notes for writing new smoke tests:
 

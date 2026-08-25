@@ -1,0 +1,38 @@
+# The same three checks release.yml gates a release on, run on every
+# push and PR instead of only at tag time — before this existed, a
+# regression could sit on master indefinitely with only CodeQL watching.
+# Smoke tests need a live Obsidian instance and stay a local step; knip
+# and mutation testing stay local pre-release audits (TESTING.md).
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npx vitest run
+
+      - name: Build plugin
+        run: npm run build

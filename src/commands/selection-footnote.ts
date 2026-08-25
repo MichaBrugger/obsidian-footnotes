@@ -808,7 +808,11 @@ class NameSelectionModal extends Modal {
     onOpen() {
         // a closure, not `this`: submit() is private and the registry only
         // needs the one capability
-        registerActiveNameModal({ submit: () => this.submit() });
+        registerActiveNameModal({
+            submit: () => {
+                this.submit();
+            },
+        });
         // the registry above only serves the command palette and
         // executeCommandById — a REAL keypress never reaches global
         // hotkeys while a modal is open, because the modal's scope owns
