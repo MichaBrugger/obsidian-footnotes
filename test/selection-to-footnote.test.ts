@@ -539,9 +539,9 @@ describe("selections that refuse", () => {
         const reads = { count: 0 };
         vi.stubGlobal("navigator", {
             clipboard: {
-                readText: async () => {
+                readText: () => {
                     reads.count++;
-                    return "clip";
+                    return Promise.resolve("clip");
                 },
             },
         });

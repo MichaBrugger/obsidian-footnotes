@@ -80,8 +80,10 @@ Standing rules:
   pin in `test/hunt/` — properties discover, pins remember.
 - New *generic* invariants ("lint never does X to any document") belong in
   `test/properties.test.ts`; new *specific* behavior gets a normal spec.
-- Tests marked *characterization* pin current behavior that hasn't been
-  blessed as intended — flip the expectation to change the spec.
+- Mark a test *characterization* when it pins current behavior that
+  hasn't been blessed as intended — flip the expectation to change the
+  spec. (The original batch was folded away once its behaviors were
+  ruled on; the marker outlives any one test.)
 - **Unit tests defend against our changes; smoke tests defend against
   Obsidian's.** Anything that touches undocumented internals (table cell
   sub-editors, embedRegistry) must keep a smoke test — a mocked unit test
@@ -93,13 +95,23 @@ Standing rules:
 
 ## Static analysis — `npm run lint` and `npm run knip`
 
-- `npm run lint`: ESLint over `src/` with the official Obsidian plugin
-  guidelines plus typescript-eslint's `strict-type-checked` preset
-  (type-aware). Fix findings with typed code, not disable comments.
+- `npm run lint`: ESLint over `src/` and `test/` with the official
+  Obsidian plugin guidelines plus typescript-eslint's
+  `strict-type-checked` preset (type-aware). Fix findings with typed
+  code, not disable comments. Two rules are off for `test/` only (see
+  the comment in `eslint.config.mjs`): `no-extraneous-class` (test
+  doubles legitimately mirror external class shapes) and
+  `no-global-this` (tests run under node, where the guideline's
+  `window` global doesn't exist).
 - `npm run knip`: dead exports, unused files, unused/unlisted
   dependencies. The repo is kept at **zero findings** — if knip flags new
   code, either wire it in (see rule-examples.test.ts for the pattern) or
   delete it.
+
+Line coverage (`npm run coverage`) exists for ad-hoc "is this path
+reached at all?" questions; the quality signal this project actually
+gates on is mutation testing below — high line coverage with weak
+assertions still lets mutants live.
 
 ## Mutation testing — `npm run mutation`
 

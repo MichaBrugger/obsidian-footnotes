@@ -23,7 +23,7 @@ describe("footnotePrefixFromEditor", () => {
         [["no frontmatter", "footnote-prefix: 9."], []],
         [["---", "unclosed frontmatter", "footnote-prefix: 3."], []],
         [["---\r", "footnote-prefix: 4.\r", "---\r", "crlf body"], []],
-    ].map(([lines]) => lines as string[]);
+    ].map(([lines]) => lines);
 
     it("matches footnotePrefix on every note shape", () => {
         for (const lines of cases) {

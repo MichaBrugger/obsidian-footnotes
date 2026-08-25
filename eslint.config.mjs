@@ -23,6 +23,21 @@ export default defineConfig([
 		},
 	},
 	{
-		ignores: ["node_modules/**", "main.js", "scripts/**", "test/**"],
+		// test doubles legitimately mirror external CLASS shapes with empty
+		// or static-only classes: test/mocks/obsidian.ts stubs the obsidian
+		// package's class exports, and the table smoke-twin builds fake
+		// CodeMirror view classes — no-extraneous-class would force fake
+		// instance state onto shapes whose emptiness is the point
+		files: ["test/**/*.ts"],
+		rules: {
+			"@typescript-eslint/no-extraneous-class": "off",
+			// tests run under node, where the Obsidian guideline's
+			// window/activeWindow globals do not exist — its auto-fix
+			// rewrote a globalThis slot to `window` and broke the suite
+			"obsidianmd/no-global-this": "off",
+		},
+	},
+	{
+		ignores: ["node_modules/**", "main.js", "scripts/**"],
 	},
 ]);

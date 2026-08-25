@@ -35,7 +35,7 @@ afterEach(() => {
 describe("pasteInlineFootnote inside an inline footnote", () => {
     it("hops out instead of nesting the clipboard into it", async () => {
         vi.stubGlobal("navigator", {
-            clipboard: { readText: async () => "clip" },
+            clipboard: { readText: () => Promise.resolve("clip") },
         });
         const line = "text ^[an inline footnote] more";
         const doc = fakeEditor(line, 10);
@@ -46,7 +46,7 @@ describe("pasteInlineFootnote inside an inline footnote", () => {
 
     it("still pastes normally when the caret is outside", async () => {
         vi.stubGlobal("navigator", {
-            clipboard: { readText: async () => "clip" },
+            clipboard: { readText: () => Promise.resolve("clip") },
         });
         const doc = fakeEditor("plain text", 5);
         await pasteInlineFootnote(fakePlugin(doc));

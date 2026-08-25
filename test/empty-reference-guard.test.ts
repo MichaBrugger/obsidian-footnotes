@@ -74,7 +74,7 @@ describe("footnote commands inside an empty [^] reference", () => {
 
     it("paste command warns instead of nesting the clipboard into it", async () => {
         vi.stubGlobal("navigator", {
-            clipboard: { readText: async () => "clip" },
+            clipboard: { readText: () => Promise.resolve("clip") },
         });
         const doc = fakeEditor([LINE], { ...INSIDE });
         await pasteInlineFootnote(fakePlugin(doc));

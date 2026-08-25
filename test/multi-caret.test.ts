@@ -179,7 +179,7 @@ describe("the named and inline keys at several carets", () => {
 describe("the paste key at several carets", () => {
     it("wraps the SAME clipboard text at every caret, cursor after each", async () => {
         vi.stubGlobal("navigator", {
-            clipboard: { readText: async () => "same source" },
+            clipboard: { readText: () => Promise.resolve("same source") },
         });
         const doc = fakeEditor(
             ["alpha bravo"],
@@ -198,7 +198,7 @@ describe("the paste key at several carets", () => {
 
     it("an empty clipboard toasts and edits nothing", async () => {
         vi.stubGlobal("navigator", {
-            clipboard: { readText: async () => "   " },
+            clipboard: { readText: () => Promise.resolve("   ") },
         });
         const before = ["alpha bravo"];
         const doc = fakeEditor(before, [

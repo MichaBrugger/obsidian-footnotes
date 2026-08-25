@@ -100,9 +100,9 @@ describe("definitionLabelIn", () => {
     it("nameEnd advances past a multi-character name, not backward", () => {
         const label = definitionLabelIn("[^long-name]: text");
         expect(label).not.toBeNull();
-        expect(label!.nameStart).toBe(2);
-        expect(label!.nameEnd).toBe(2 + "long-name".length);
-        expect(label!.labelEnd).toBe("[^long-name]:".length);
+        expect(label?.nameStart).toBe(2);
+        expect(label?.nameEnd).toBe(2 + "long-name".length);
+        expect(label?.labelEnd).toBe("[^long-name]:".length);
     });
 
     it("a blockquoted definition's name positions shift by the prefix length", () => {

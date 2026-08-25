@@ -89,7 +89,7 @@ function fakeEditor(
                 const to = change.to ? doc.posToOffset(change.to) : from;
                 doc.value =
                     doc.value.slice(0, from) +
-                    (change.text ?? "") +
+                    change.text +
                     doc.value.slice(to);
             }
             if (spec.selection) doc.cursor = spec.selection.from;
@@ -217,7 +217,7 @@ describe("lintOptionsFromSettings", () => {
         it(`${flag} flips ${option} and nothing else`, () => {
             const off = lintOptionsFromSettings(pluginFor(null, ALL_OFF), "", "");
             const on = lintOptionsFromSettings(
-                pluginFor(null, { ...ALL_OFF, [flag]: true } as Settings),
+                pluginFor(null, { ...ALL_OFF, [flag]: true }),
                 "",
                 "",
             );
@@ -378,7 +378,7 @@ describe("lintAfterFootnoteCreation guards", () => {
     // of the (absent) view's mode throws.
     it("survives having no active markdown view", () => {
         expect(() =>
-            lintAfterFootnoteCreation(pluginFor(null), false),
+            { lintAfterFootnoteCreation(pluginFor(null), false); },
         ).not.toThrow();
         expect(noticeCalls).toEqual([]);
     });
@@ -387,10 +387,10 @@ describe("lintAfterFootnoteCreation guards", () => {
     // no editor, so only the disjunction catches it.
     it("survives a deferred view that has no editor yet", () => {
         expect(() =>
-            lintAfterFootnoteCreation(
+            { lintAfterFootnoteCreation(
                 pluginFor({ file: { path: "note.md" }, getMode: () => "source" }),
                 false,
-            ),
+            ); },
         ).not.toThrow();
         expect(noticeCalls).toEqual([]);
     });
@@ -409,11 +409,11 @@ describe("lintAfterFootnoteCreation guards", () => {
     it("survives an armed lint whose view has no file", () => {
         const doc = fakeEditor(DIRTY);
         expect(() =>
-            lintAfterFootnoteCreation(
+            { lintAfterFootnoteCreation(
                 pluginFor(viewFor(doc, null)),
                 false,
                 "note.md",
-            ),
+            ); },
         ).not.toThrow();
         expect(doc.value).toBe(DIRTY);
     });

@@ -25,9 +25,10 @@ function pluginWithSavedData(data: Record<string, unknown>): {
 } {
     const plugin = bareFootnotePlugin();
     let saveCount = 0;
-    plugin.loadData = async () => data;
-    plugin.saveData = async () => {
+    plugin.loadData = () => Promise.resolve(data);
+    plugin.saveData = () => {
         saveCount++;
+        return Promise.resolve();
     };
     return { plugin, saves: () => saveCount };
 }
@@ -98,8 +99,8 @@ describe("one-shot settings migration (heading-mangle bug fix)", () => {
 
     it("a fresh install stamps the version without changing any default", async () => {
         const plugin = bareFootnotePlugin();
-        plugin.loadData = async () => null;
-        plugin.saveData = async () => {};
+        plugin.loadData = () => Promise.resolve(null);
+        plugin.saveData = () => Promise.resolve();
         await plugin.loadSettings();
         expect(plugin.settings.settingsVersion).toBe(2);
         expect(plugin.settings.footnoteSectionHeading).toBe("# Footnotes");

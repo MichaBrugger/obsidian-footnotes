@@ -201,13 +201,13 @@ describe("rename property", () => {
 
     it(
         "renameTargetAtCursor is total and truthful at ANY caret (the menu gate)",
-        async () => {
+        () => {
             // the right-click menu shows "Rename footnote" exactly when this
             // resolver returns a name — so at any caret in any document it
             // must never throw, never fire inside protected text, only name
             // footnotes the document really has, and always hand
             // planFootnoteRename something it can answer
-            await fc.assert(
+            fc.assert(
                 fc.property(
                     docArb,
                     fc.nat(1000),
@@ -264,8 +264,8 @@ describe("rename property", () => {
 
     it(
         "a successful rename maps the name everywhere and touches nothing else",
-        async () => {
-            await fc.assert(
+        () => {
+            fc.assert(
                 fc.property(
                     docArb,
                     fc.nat(1000),

@@ -125,7 +125,7 @@ describe("bug #8: the section heading belongs to the first DEFINITION", () => {
         const texts = doc.appliedChanges.map((c) => c.text);
         expect(texts).toContain("[^2]");
         expect(
-            texts.some((t) => t?.includes("# Footnotes") && t.includes("[^2]: ")),
+            texts.some((t) => t.includes("# Footnotes") && t.includes("[^2]: ")),
         ).toBe(true);
     });
 });

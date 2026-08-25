@@ -9,8 +9,8 @@ import FootnotePlugin from "../src/main";
 
 function pluginWithSavedData(data: Record<string, unknown>): FootnotePlugin {
     const plugin = new (FootnotePlugin as unknown as new () => FootnotePlugin)();
-    plugin.loadData = async () => data;
-    plugin.saveData = async () => {};
+    plugin.loadData = () => Promise.resolve(data);
+    plugin.saveData = () => Promise.resolve();
     return plugin;
 }
 

@@ -251,7 +251,7 @@ describe("moveCursorAndSetJumpPoint: vim jump list", () => {
         installVimAdapter(false);
         const { doc } = motionEditor();
         expect(() =>
-            moveCursorAndSetJumpPoint(doc, OLD_POS, NEW_POS, motionPlugin(true)),
+            { moveCursorAndSetJumpPoint(doc, OLD_POS, NEW_POS, motionPlugin(true)); },
         ).not.toThrow();
         expect(vimJumps).toEqual([]);
     });
@@ -263,7 +263,7 @@ describe("moveCursorAndSetJumpPoint: vim jump list", () => {
         installVimAdapter();
         const { doc } = motionEditor("no-cm");
         expect(() =>
-            moveCursorAndSetJumpPoint(doc, OLD_POS, NEW_POS, motionPlugin(true)),
+            { moveCursorAndSetJumpPoint(doc, OLD_POS, NEW_POS, motionPlugin(true)); },
         ).not.toThrow();
         expect(vimJumps).toEqual([
             { cm: undefined, from: OLD_POS, to: NEW_POS },

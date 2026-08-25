@@ -12,7 +12,7 @@ import { referenceAtCursor } from "../src/parsing/footnote-grammar";
 const references = (line: string) =>
     [...line.matchAll(/\[\^([^[\]]+)\](?!:)/g)].map((m) => ({
         footnote: m[0],
-        startIndex: m.index ?? 0,
+        startIndex: m.index,
     }));
 
 describe("referenceAtCursor", () => {

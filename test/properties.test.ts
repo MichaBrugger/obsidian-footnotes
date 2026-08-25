@@ -34,7 +34,7 @@ fc.configureGlobal({ numRuns: Number(process.env.FC_NUM_RUNS ?? 200) });
 // hangs, not for 5000 double-parses (the oracle "failed" a soak purely by
 // exceeding it); scale the ceiling with the run count
 const SOAK_TIMEOUT = Math.max(30_000, Number(process.env.FC_NUM_RUNS ?? 200) * 60);
-const soakIt = (name: string, fn: () => void) => it(name, fn, SOAK_TIMEOUT);
+const soakIt = (name: string, fn: () => void) => { it(name, fn, SOAK_TIMEOUT); };
 
 // The document generator lives in ./arbitraries.ts so the sample-corpus
 // script can render the same docs in Obsidian for human review.

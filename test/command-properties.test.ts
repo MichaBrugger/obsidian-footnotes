@@ -42,7 +42,7 @@ import {
 fc.configureGlobal({ numRuns: Number(process.env.FC_NUM_RUNS ?? 200) });
 const SOAK_TIMEOUT = Math.max(30_000, Number(process.env.FC_NUM_RUNS ?? 200) * 60);
 const soakIt = (name: string, fn: () => Promise<void>) =>
-    it(name, fn, SOAK_TIMEOUT);
+    { it(name, fn, SOAK_TIMEOUT); };
 
 // ---------- a fake editor that APPLIES its transactions ----------
 
@@ -67,7 +67,7 @@ function applyChanges(lines: string[], changes: EditorChange[]): string[] {
         .map((change, index) => ({
             from: offsetOf(change.from),
             to: change.to ? offsetOf(change.to) : offsetOf(change.from),
-            text: change.text ?? "",
+            text: change.text,
             index,
         }))
         // same-position insertions concatenate in change order (CodeMirror
@@ -238,7 +238,7 @@ const ALLOWED_SHAPE_DELTAS: Record<CommandName, number[]> = {
 let clipboardText = "generated clipboard text";
 beforeAll(() => {
     vi.stubGlobal("navigator", {
-        clipboard: { readText: async () => clipboardText },
+        clipboard: { readText: () => Promise.resolve(clipboardText) },
     });
 });
 afterAll(() => {

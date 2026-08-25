@@ -399,9 +399,8 @@ describe("resolveTableCellCursor (mutation hardening)", () => {
             },
         };
         const startLine = 5;
-        let contentDOM: unknown;
         const contains = () => true;
-        contentDOM = { ownerDocument: { activeElement: active }, contains };
+        const contentDOM: unknown = { ownerDocument: { activeElement: active }, contains };
         const fakeView: TableCellEditor = {
             state: { doc: { toString: () => "" }, selection: { main: { head: 0, anchor: 0 } } },
             dispatch() {},

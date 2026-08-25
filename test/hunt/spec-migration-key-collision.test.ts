@@ -19,12 +19,12 @@ function bareFootnotePlugin(): FootnotePlugin {
 describe("decided 2026-08-10: the newer heading key wins a data.json collision", () => {
     it("both PascalCase and camelCase heading keys: the newer key should win", async () => {
         const plugin = bareFootnotePlugin();
-        plugin.loadData = async () => ({
+        plugin.loadData = () => Promise.resolve({
             FootnoteSectionHeading: "Plain Old",
             footnoteSectionHeading: "# New",
             settingsVersion: 0,
         });
-        plugin.saveData = async () => {};
+        plugin.saveData = () => Promise.resolve();
         await plugin.loadSettings();
         expect(plugin.settings.footnoteSectionHeading).toBe("# New");
     });

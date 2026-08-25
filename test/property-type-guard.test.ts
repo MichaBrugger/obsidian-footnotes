@@ -46,7 +46,7 @@ describe("ensureTextPropertyType", () => {
 
     it("survives a missing registry", () => {
         expect(() =>
-            ensureTextPropertyType({} as unknown as App, "footnote-prefix"),
+            { ensureTextPropertyType({} as unknown as App, "footnote-prefix"); },
         ).not.toThrow();
     });
 
@@ -59,7 +59,7 @@ describe("ensureTextPropertyType", () => {
             },
         } as unknown as App;
         expect(() =>
-            ensureTextPropertyType(app, "footnote-prefix"),
+            { ensureTextPropertyType(app, "footnote-prefix"); },
         ).not.toThrow();
     });
 });
