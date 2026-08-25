@@ -184,6 +184,7 @@ export function landDefinitionBackedInsertion(opts: {
     afterReference: EditorPosition;
     afterJump?: () => void;
 }): void {
+    // Stryker disable next-line ConditionalExpression, BlockStatement: units run popup-off, so which arm fires is smoke territory — the full smoke suite drives both
     if (popupEditingAvailable(opts.plugin)) {
         // Stryker disable all: popup arm — units run popup-off, so mutants
         // here are no-coverage noise; smoke territory (verified 2026-08-12)
@@ -228,6 +229,7 @@ export function landCellDefinitionAppend(opts: {
     footnoteId: string;
     definitionCursor: EditorPosition;
 }): void {
+    // Stryker disable next-line ConditionalExpression, BlockStatement: units run popup-off, so which arm fires is smoke territory — the full smoke suite drives both
     if (popupEditingAvailable(opts.plugin)) {
         // Stryker disable all: popup arm — units run popup-off, so mutants
         // here are no-coverage noise; smoke territory (verified 2026-08-12)
