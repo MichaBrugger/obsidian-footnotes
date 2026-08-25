@@ -1,7 +1,9 @@
-import { referenceOccurrences } from "../../parsing/footnote-grammar";
+import {
+    definitionLabelWithName,
+    referenceOccurrences,
+} from "../../parsing/footnote-grammar";
 import {
     DefinitionBlock,
-    definitionLabelIn,
     DocumentScan,
     findDefinitionBlocks,
     maskProtectedLines,
@@ -49,12 +51,12 @@ function scanReferences(
     const labelStartAt = new Array<number>(lines.length).fill(-1);
     for (let i = 0; i < lines.length; i++) {
         if (scan.isProtected[i]) continue;
-        const label = definitionLabelIn(maskedLines[i]);
-        if (!label) continue;
-        labelStartAt[i] = label.nameStart - 2;
-        if (label.nameStart > 2) {
+        const hit = definitionLabelWithName(lines[i], maskedLines[i]);
+        if (!hit) continue;
+        labelStartAt[i] = hit.label.nameStart - 2;
+        if (hit.label.nameStart > 2) {
             blocks.push({
-                name: lines[i].slice(label.nameStart, label.nameEnd),
+                name: hit.name,
                 start: i,
                 end: i,
             });

@@ -1,13 +1,13 @@
 import { Editor, EditorPosition } from "obsidian";
 
 import {
-    definitionLabelIn,
     DocumentScan,
     maskLineRegions,
     maskProtectedLines,
     scanDocument,
 } from "../parsing/markdown-scan";
 import {
+    definitionLabelWithName,
     footnoteReferenceMatches,
     occurrenceAtCursor,
     referenceAtCursor,
@@ -61,13 +61,10 @@ export function listExistingFootnoteDefinitions(
     const lines = ctx.lines;
     const masked = ctx.maskedLines();
     for (let i = 0; i < lines.length; i++) {
-        const label = definitionLabelIn(masked[i]);
-        if (label) {
-            // re-slice the ORIGINAL line: a code span inside the name masks
-            // to NULs, and the masked name would otherwise leak them into
-            // saved output (its reference sibling re-slices for the same reason)
-            definitionNames.push(lines[i].slice(label.nameStart, label.nameEnd));
-        }
+        // definitionLabelWithName owns the masked-match/raw-re-slice
+        // invariant (a code span inside the name masks to NULs)
+        const hit = definitionLabelWithName(lines[i], masked[i]);
+        if (hit) definitionNames.push(hit.name);
     }
     return definitionNames;
 }

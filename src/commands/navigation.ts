@@ -8,7 +8,11 @@ import {
     listExistingFootnoteDefinitions,
     referenceOccurrenceAtCursor,
 } from "../editor/doc-context";
-import { idListIncludes, referenceOccurrences } from "../parsing/footnote-grammar";
+import {
+    definitionLabelWithName,
+    idListIncludes,
+    referenceOccurrences,
+} from "../parsing/footnote-grammar";
 import { openFootnotePopup, popupEditingAvailable } from "./footnote-popup";
 import { definitionLabelIn, findDefinitionBlocks } from "../parsing/markdown-scan";
 
@@ -55,10 +59,14 @@ export function shouldJumpFromDefinitionToReference(
     } else {
         // a blockquoted/callout label ("> [^x]: …", C22) is a definition
         // too, but never part of a column-0 definition BLOCK — match the
-        // caret's masked line and re-slice the raw name
-        const label = definitionLabelIn(ctx.maskedLine(cursorPosition.line));
-        if (label && label.nameStart > 2) {
-            definitionName = lineText.slice(label.nameStart, label.nameEnd);
+        // caret's masked line (nameStart > 2 means a blockquote prefix
+        // precedes the label)
+        const hit = definitionLabelWithName(
+            lineText,
+            ctx.maskedLine(cursorPosition.line),
+        );
+        if (hit && hit.label.nameStart > 2) {
+            definitionName = hit.name;
         }
     }
     if (definitionName !== null) {
@@ -116,16 +124,10 @@ export function jumpToFootnoteDefinition(
     const masked = ctx.maskedLines();
     let labelLine = -1;
     for (let i = 0; i < masked.length; i++) {
-        const label = definitionLabelIn(masked[i]);
         // ids are case-insensitive: the definition label may differ in casing
-        // from the reference name that sent us here. Re-slice the ORIGINAL
-        // line for the name — a code span inside it masks to NULs
-        // (bug-masked-name-identity)
-        if (
-            label &&
-            lines[i].slice(label.nameStart, label.nameEnd).toLowerCase() ===
-                footnoteName.toLowerCase()
-        ) {
+        // from the reference name that sent us here
+        const hit = definitionLabelWithName(lines[i], masked[i]);
+        if (hit && hit.name.toLowerCase() === footnoteName.toLowerCase()) {
             labelLine = i;
         }
     }

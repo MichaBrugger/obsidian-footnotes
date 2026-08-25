@@ -1,4 +1,4 @@
-import { maskProtectedLines } from "./markdown-scan";
+import { definitionLabelIn, maskProtectedLines } from "./markdown-scan";
 
 // The reference GRAMMAR: what counts as a "[^name]" reference, how names
 // are compared, and the autonumbering scan. Pure text functions with no
@@ -51,6 +51,23 @@ export interface ReferenceOccurrence {
     start: number;
     /** Index just past the closing "]". */
     end: number;
+}
+
+/**
+ * The definition label on `line`, matched against its MASKED twin but
+ * with the name re-sliced from the RAW line — the label-side twin of
+ * referenceOccurrences below, carrying the same bug-masked-name-identity
+ * invariant: a code span inside the name masks to NULs, and a NUL-bearing
+ * name can never equal the raw reference it must pair with. The label's
+ * positions index into both twins (masking preserves indices). Null when
+ * the masked line carries no label. (rename-footnote keeps its own
+ * raw-gate-first variant: it needs the RAW label's positions before the
+ * masked twin exists, then masked-confirms liveness.)
+ */
+export function definitionLabelWithName(line: string, masked: string) {
+    const label = definitionLabelIn(masked);
+    if (!label) return null;
+    return { label, name: line.slice(label.nameStart, label.nameEnd) };
 }
 
 /**

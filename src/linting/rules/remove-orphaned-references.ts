@@ -1,6 +1,9 @@
-import { isValidFootnoteName, referenceOccurrences } from "../../parsing/footnote-grammar";
 import {
-    definitionLabelIn,
+    definitionLabelWithName,
+    isValidFootnoteName,
+    referenceOccurrences,
+} from "../../parsing/footnote-grammar";
+import {
     maskProtectedLines,
     normalizeEol,
     scanDocument,
@@ -22,15 +25,12 @@ import { FootnoteRule } from "../rule";
 //    an IN-PROGRESS footnote mid-naming, owned by the unnamed-reference alert —
 //    deleting it out from under the user's caret would be data loss.
 
-/** The definition names present in the note, case-folded — column-0 labels and blockquoted/callout ones (C22). Masked scan, raw re-slice (a code span in a name masks to NULs). */
+/** The definition names present in the note, case-folded — column-0 labels and blockquoted/callout ones (C22). definitionLabelWithName owns the masked-scan/raw-re-slice invariant. */
 function definitionNamesFolded(lines: string[], masked: string[]): Set<string> {
     const names = new Set<string>();
     for (let i = 0; i < masked.length; i++) {
-        const label = definitionLabelIn(masked[i]);
-        if (!label) continue;
-        names.add(
-            lines[i].slice(label.nameStart, label.nameEnd).toLowerCase(),
-        );
+        const hit = definitionLabelWithName(lines[i], masked[i]);
+        if (hit) names.add(hit.name.toLowerCase());
     }
     return names;
 }
