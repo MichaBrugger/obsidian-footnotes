@@ -120,6 +120,7 @@ export function referenceOccurrenceAtCursor(
         footnote: match[0],
         startIndex: match.index ?? 0,
     }));
+    // Stryker disable next-line ConditionalExpression, BlockStatement, LogicalOperator: the raw gate is pure perf — deleting it is behavior-identical (the masked check below decides the same way), just slower on every press
     if (referenceAtCursor(rawReferences, cursorPosition.ch) === null) {
         return null;
     }
