@@ -525,7 +525,13 @@ export function scanDocument(lines: string[]): DocumentScan {
         }
         if (fence) {
             inIndentedCode = false;
-            inDefinition = false;
+            // inDefinition survives a fence interior — same rationale as
+            // the comment/math branches: a definition-content fence
+            // ("    ```" at the continuation indent, 2026-08-25) is PART
+            // of its definition. Every other fence's opener already reset
+            // inDefinition before opening (an unindented opener runs the
+            // <4-indent re-decide; a list-marker opener line does too),
+            // so nothing else changes.
             blockBoundary = false;
             isProtected[i] = true;
             startsInFence[i] = true;
@@ -701,6 +707,22 @@ export function scanDocument(lines: string[]): DocumentScan {
                 listFenceContentIndent = contentColumn;
             }
         }
+        // ...and inside an open DEFINITION, whose continuations sit at
+        // content column 4 — a "    ```" there is a real fence, exactly
+        // like the list case above (GFM gives footnote definitions the
+        // same container treatment; the comment/math openers were already
+        // indentation-insensitive here while fences were not, and the
+        // delete-orphaned-references rule ATE code text out of the
+        // unprotected interior — hunt 2026-08-25,
+        // bug-definition-continuation-fence-unprotected)
+        if (!open && depth === 0 && inDefinition) {
+            const wide = rest.match(/^( *)(`{3,}|~{3,})/);
+            if (wide && wide[1].length <= 4 + 3) {
+                fenceLine = rest;
+                open = wide;
+                listFenceContentIndent = 4;
+            }
+        }
         if (open && isFenceOpener(fenceLine, open[2])) {
             fence = {
                 char: open[2][0],
@@ -850,12 +872,32 @@ export function removeLineRanges(
     return out;
 }
 
-/** Every definition with its continuation lines (indented lines, plus blank runs that lead to more indented lines). Pass the full `scan` when available: a continuation can OPEN a multi-line comment/math region ("    $$"), and only the scan's startsIn* facts let the walk absorb that region's protected interior instead of splitting the block in half (Sol bug #3, 2026-08-10). */
+/** Every definition with its continuation lines (indented lines, plus blank runs that lead to more indented lines). Pass the full `scan` when available: a continuation can OPEN a multi-line comment/math region ("    $$") or a definition-content fence ("    ```", 2026-08-25), and only the scan's startsIn* facts let the walk absorb that construct's protected interior instead of splitting the block in half (Sol bug #3, 2026-08-10). */
 export function findDefinitionBlocks(
     lines: string[],
     isProtected: boolean[],
-    scan?: Pick<DocumentScan, "startsInComment" | "startsInMath">,
+    scan?: Pick<
+        DocumentScan,
+        "startsInComment" | "startsInMath" | "startsInFence"
+    >,
 ): DefinitionBlock[] {
+    // a protected line the walk may absorb into an open block: the
+    // interior/closer of a comment, math, or fence region whose opener
+    // was a continuation already absorbed into this block (a region open
+    // BEFORE the definition would have protected the label line itself),
+    // or a protected line AT THE CONTINUATION INDENT (four-plus spaces) —
+    // a definition-content construct's own opener, like the "    ```"
+    // fence riding the continuation indent (hunt 2026-08-25). The indent
+    // floor matters: a DOC-level fence opener with incidental leading
+    // spaces (" ```") is protected and indented too, but it ends the
+    // block — only the {0,3}-cap-defying four-space column marks a
+    // construct the definition owns.
+    const absorbable = (j: number) =>
+        isProtected[j] &&
+        (!!scan?.startsInComment[j] ||
+            !!scan?.startsInMath[j] ||
+            !!scan?.startsInFence[j] ||
+            /^ {4}/.test(lines[j]));
     const blocks: DefinitionBlock[] = [];
     for (let i = 0; i < lines.length; i++) {
         if (isProtected[i]) continue;
@@ -866,12 +908,7 @@ export function findDefinitionBlocks(
         let j = i + 1;
         while (j < lines.length) {
             if (isProtected[j]) {
-                // a protected line that STARTS inside a comment/math
-                // region is that region's interior — and reaching it here
-                // means the opener was a continuation already absorbed
-                // into this block (a region open before the definition
-                // would have protected the label line itself)
-                if (scan && (scan.startsInComment[j] || scan.startsInMath[j])) {
+                if (absorbable(j)) {
                     end = j++;
                     continue;
                 }
@@ -883,13 +920,13 @@ export function findDefinitionBlocks(
             }
             if (lines[j].trim() !== "") break;
             // a blank run continues the block only when indented content
-            // (of an unprotected line) follows it
+            // (unprotected, or an absorbable construct) follows it
             let k = j;
             while (k < lines.length && lines[k].trim() === "") k++;
             if (
                 k < lines.length &&
-                !isProtected[k] &&
-                IndentedContent.test(lines[k])
+                ((!isProtected[k] && IndentedContent.test(lines[k])) ||
+                    absorbable(k))
             ) {
                 end = k;
                 j = k + 1;

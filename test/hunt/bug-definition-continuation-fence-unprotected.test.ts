@@ -28,12 +28,12 @@ const FENCED_IN_CONTINUATION = [
 ];
 
 describe("fences inside definition continuations", () => {
-    it.fails("orphan-reference deletion leaves the fenced [^9] alone", () => {
+    it("orphan-reference deletion leaves the fenced [^9] alone", () => {
         const before = FENCED_IN_CONTINUATION.join("\n");
         expect(removeOrphanedFootnoteReferences(before)).toBe(before);
     });
 
-    it.fails("the scanner protects the fence interior like it protects a comment there", () => {
+    it("the scanner protects the fence interior like it protects a comment there", () => {
         // the HTML-comment twin of this fixture IS protected at the same
         // 4-space column (indentation-insensitive opener); the fence must
         // classify the same way
