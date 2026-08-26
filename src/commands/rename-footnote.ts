@@ -8,6 +8,7 @@ import {
     referenceOccurrences,
 } from "../parsing/footnote-grammar";
 import { DocContext, docContext } from "../editor/doc-context";
+import { footnotePrefixFromEditor, footnotePrefixProblem } from "../parsing/footnote-prefix";
 import { simulateChanges } from "../editor/insertion-liveness";
 import {
     definitionLabelIn,
@@ -76,6 +77,18 @@ export function planFootnoteRename(
     oldName: string,
     newName: string,
     ctx: DocContext = docContext(doc),
+    options?: {
+        /**
+         * The note's footnote-prefix when the Apply-footnote-prefix
+         * sweep is ARMED (prefix feature on + that lint rule on + a
+         * valid prefix) — an out-of-namespace new name then refuses
+         * with the prefix to type instead of being silently renamed
+         * back by the very next lint (hunt 2026-08-25,
+         * bug-rename-swept-back-by-apply-prefix). Callers with the
+         * sweep unarmed omit it; bare names stay legal and durable.
+         */
+        sweepPrefix?: string;
+    },
 ): RenamePlan {
     if (newName === oldName || newName === "") return { kind: "noop" };
     if (/[[\]]/.test(newName)) {
@@ -88,6 +101,16 @@ export function planFootnoteRename(
         return {
             kind: "invalid",
             reason: "Footnote names can't contain spaces or backticks.",
+        };
+    }
+    const sweepPrefix = options?.sweepPrefix;
+    if (
+        sweepPrefix &&
+        !newName.toLowerCase().startsWith(sweepPrefix.toLowerCase())
+    ) {
+        return {
+            kind: "invalid",
+            reason: `This note's footnote-prefix is "${sweepPrefix}" and the "Apply footnote prefix" lint rule is on, so the next lint would rename "[^${newName}]" to "[^${sweepPrefix}${newName}]". Start the name with "${sweepPrefix}" to make it stick.`,
         };
     }
 
@@ -265,6 +288,7 @@ export async function renameFootnote(plugin: FootnotePlugin) {
 // planners, so the exemption is scoped here). Coverage-verified by the
 // 2026-08-12 incremental run: every mutant below was no-coverage.
 class RenameFootnoteModal extends ValidatedTextModal {
+    private plugin: FootnotePlugin;
     private doc: Editor;
     private oldName: string;
 
@@ -276,15 +300,31 @@ class RenameFootnoteModal extends ValidatedTextModal {
             buttonText: "Rename",
             initialValue: oldName,
         });
+        this.plugin = plugin;
         this.doc = doc;
         this.oldName = oldName;
+    }
+
+    /** The note's prefix when the Apply-footnote-prefix sweep is armed and would re-prefix a bare rename on the very next lint — read at submit time, like the plan itself (the frontmatter may have changed while the modal was open). Invalid prefixes don't arm: lint refuses to run under one (lintBlockedByPrefix). */
+    private armedSweepPrefix(): string | undefined {
+        if (
+            !this.plugin.settings.enableFootnotePrefix ||
+            !this.plugin.settings.lintApplyPrefix
+        ) {
+            return undefined;
+        }
+        const prefix = footnotePrefixFromEditor(this.doc);
+        if (!prefix || footnotePrefixProblem(prefix) !== null) return undefined;
+        return prefix;
     }
 
     protected submit() {
         const newName = this.value.trim();
         // planned against the CURRENT document — the note may have changed
         // while the modal was open
-        const plan = planFootnoteRename(this.doc, this.oldName, newName);
+        const plan = planFootnoteRename(this.doc, this.oldName, newName, undefined, {
+            sweepPrefix: this.armedSweepPrefix(),
+        });
         switch (plan.kind) {
             case "noop":
                 this.close();

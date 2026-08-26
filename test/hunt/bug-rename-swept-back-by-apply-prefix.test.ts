@@ -5,21 +5,18 @@ import { fakePlugin } from "../helpers/fake-plugin";
 import { planFootnoteRename } from "../../src/commands/rename-footnote";
 import { lintFootnotes, lintOptionsFromSettings } from "../../src/linting/linter";
 
-// BUG (hunt 2026-08-25, interactions lens; skeptic-confirmed, upgraded
-// from spec question): with footnote-prefix "p." active, renaming
-// [^p.1] to the bare number "5" succeeds with no warning — and the very
-// next lint with apply-footnote-prefix on sweeps [^5] straight back
-// into the namespace as the byte-identical original [^p.1]. The user's
-// explicit rename is silently undone. planFootnoteRename consults no
-// plugin/settings at all (unlike every creation path, which
-// auto-prefixes or refuses), and apply-prefix's bare-id heuristic
-// cannot tell "legacy footnote never prefixed" from "user just escaped
-// the namespace" — nor is it numeric-only: renaming to any unprefixed
-// NAME gets swept too (renameFor prefixes named ids, per its own
-// [^note] -> [^3.note] example), it just doesn't round-trip to the
-// exact original id. Either fix satisfies this pin: the rename plan
-// refuses/warns under an active prefix, or an applied rename survives
-// the next lint.
+// BUG fixed 2026-08-25 (hunt, interactions lens): with footnote-prefix
+// "p." active AND the Apply-footnote-prefix lint rule on, renaming
+// [^p.1] to the bare "5" used to succeed silently — and the very next
+// lint swept [^5] back into the namespace as the byte-identical
+// original [^p.1], undoing the user's explicit rename with no notice.
+// planFootnoteRename consulted no prefix state at all (unlike every
+// creation path). NOW: the rename modal passes the ARMED sweep prefix
+// (feature on + lint rule on + valid note prefix) as
+// options.sweepPrefix, and the plan refuses an out-of-namespace name
+// with an inline reason naming the prefix to type — no silent undo can
+// follow. With the sweep unarmed (either toggle off), bare renames
+// stay allowed and durable, exactly as before.
 
 function docWithPrefix(): FakeEditor {
     return sharedFakeEditor(
@@ -35,22 +32,39 @@ function docWithPrefix(): FakeEditor {
     );
 }
 
-describe("rename to a bare number under an active footnote-prefix", () => {
-    it.fails("an applied rename survives the next apply-prefix lint (or the plan refuses)", () => {
+describe("rename under an ARMED apply-prefix sweep", () => {
+    it("refuses an out-of-namespace name, naming the prefix", () => {
         const doc = docWithPrefix();
-        const plan = planFootnoteRename(doc, "p.1", "5");
-        if (plan.kind !== "renamed") {
-            // a future prefix-aware plan may refuse or warn here — that
-            // satisfies the pin's invariant (no silent undo can follow)
-            return;
+        const plan = planFootnoteRename(doc, "p.1", "5", undefined, {
+            sweepPrefix: "p.",
+        });
+        expect(plan.kind).toBe("invalid");
+        if (plan.kind === "invalid") {
+            expect(plan.reason).toContain('"p."');
         }
+    });
+
+    it("a name inside the namespace renames normally", () => {
+        const doc = docWithPrefix();
+        const plan = planFootnoteRename(doc, "p.1", "p.cite", undefined, {
+            sweepPrefix: "p.",
+        });
+        expect(plan.kind).toBe("renamed");
+    });
+});
+
+describe("rename with the sweep UNARMED (apply-prefix lint off)", () => {
+    it("a bare rename is allowed and survives the next lint", () => {
+        const doc = docWithPrefix();
+        const plan = planFootnoteRename(doc, "p.1", "cite");
+        expect(plan.kind).toBe("renamed");
+        if (plan.kind !== "renamed") return;
         doc.transaction({ changes: plan.changes });
-        expect(doc.lines.join("\n")).toContain("[^5]");
 
         const plugin = fakePlugin(
             {
                 enableFootnotePrefix: true,
-                lintApplyPrefix: true,
+                lintApplyPrefix: false,
                 lintReindex: true,
             },
             doc,
@@ -60,6 +74,6 @@ describe("rename to a bare number under an active footnote-prefix", () => {
             before,
             lintOptionsFromSettings(plugin, "", before),
         );
-        expect(after).toContain("[^5]");
+        expect(after).toContain("[^cite]");
     });
 });
