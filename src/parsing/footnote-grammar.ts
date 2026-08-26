@@ -66,6 +66,7 @@ export interface ReferenceOccurrence {
  */
 export function definitionLabelWithName(line: string, masked: string) {
     const label = definitionLabelIn(masked);
+    // Stryker disable next-line ConditionalExpression: a label visible on the masked twin is always visible at the SAME positions on the raw line (masking only writes NULs, and NULs can't spell "[^" or "]:"), so forcing the fallback is behavior-identical — the fast path is perf
     if (label) return { label, name: line.slice(label.nameStart, label.nameEnd) };
     // The masked twin can LOSE a real label: a backtick inside the NAME
     // pairing with one in the body ("[^a`b]: c`d") masks the label's own

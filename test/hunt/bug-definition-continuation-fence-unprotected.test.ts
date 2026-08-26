@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { scanDocument } from "../../src/parsing/markdown-scan";
+import { findDefinitionBlocks, scanDocument } from "../../src/parsing/markdown-scan";
 import { removeOrphanedFootnoteReferences } from "../../src/linting/rules/remove-orphaned-references";
 
 // BUG, data loss (hunt 2026-08-25, contexts lens; skeptic-confirmed with
@@ -39,5 +39,41 @@ describe("fences inside definition continuations", () => {
         // classify the same way
         const scan = scanDocument(FENCED_IN_CONTINUATION);
         expect(scan.isProtected[2]).toBe(true);
+    });
+});
+
+describe("boundaries of the definition-content fence branch (2026-08-25 mutation audit)", () => {
+    it("a fence at the definition content column's +3 limit (7 spaces) still opens", () => {
+        const scan = scanDocument([
+            "[^1]: para one",
+            "       ```",
+            "       inside [^9]",
+            "       ```",
+        ]);
+        expect(scan.isProtected[2]).toBe(true);
+    });
+
+    it("a blank line between the label and the fence still absorbs the fence into the block", () => {
+        const lines = [
+            "[^1]: para one",
+            "",
+            "    ```",
+            "    inside",
+            "    ```",
+        ];
+        const scan = scanDocument(lines);
+        expect(
+            findDefinitionBlocks(lines, scan.isProtected, scan),
+        ).toEqual([{ name: "1", start: 0, end: 4 }]);
+    });
+
+    it("the absorb indent test anchors at line START, not any 4-space run", () => {
+        // a DOC-level fence opener with one leading space and an interior
+        // 4-space run must still END the block when a blank run lands on it
+        const lines = ["[^1]: a", "", " ```    x", " code", " ```"];
+        const scan = scanDocument(lines);
+        expect(
+            findDefinitionBlocks(lines, scan.isProtected, scan),
+        ).toEqual([{ name: "1", start: 0, end: 0 }]);
     });
 });

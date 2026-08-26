@@ -43,3 +43,25 @@ describe("same-from tie between a replace and a zero-length insert", () => {
         expect(anchor).toEqual({ line: 0, ch: 4 });
     });
 });
+
+describe("same-from tie between two zero-length inserts", () => {
+    // array order is the CM6 contract for stacked inserts — pins the
+    // resolveChanges index tiebreak (2026-08-25 mutation audit: the
+    // a.index - b.index term had no direct pin)
+    it("concatenates in array order", () => {
+        const changes: EditorChange[] = [
+            { from: { line: 0, ch: 2 }, text: "AA" },
+            { from: { line: 0, ch: 2 }, text: "BB" },
+        ];
+        const simulated = simulateChanges(["...."], changes);
+        expect(simulated).toEqual(["..AABB.."]);
+        expect(simulatedAnchor(["...."], changes, 0, simulated)).toEqual({
+            line: 0,
+            ch: 2,
+        });
+        expect(simulatedAnchor(["...."], changes, 1, simulated)).toEqual({
+            line: 0,
+            ch: 4,
+        });
+    });
+});

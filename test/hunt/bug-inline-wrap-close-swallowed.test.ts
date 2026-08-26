@@ -8,6 +8,7 @@ import FootnotePlugin from "../../src/main";
 import { selectionPressHandled } from "../../src/commands/selection-footnote";
 import { pasteInlineFootnote } from "../../src/commands/insert-or-navigate-footnotes";
 import { ProtectedCreationNotice } from "../../src/editor/insertion-liveness";
+import { inlineWrapLandsIntact } from "../../src/commands/inline-footnotes";
 
 // BUG (hunt 2026-08-25, contexts lens; skeptic-confirmed): every
 // inline-footnote liveness check verifies only the wrapper's OPEN
@@ -81,5 +82,14 @@ describe("an emergent math span swallowing the inline wrapper's close bracket", 
         await pasteInlineFootnote(fakePlugin(doc));
         expect(doc.lines[0]).toBe(line);
         expect(refused()).toBe(true);
+    });
+});
+
+describe("inlineWrapLandsIntact's own contract (2026-08-25 mutation audit)", () => {
+    it("a span that merely CONTAINS the probe but opens elsewhere refuses, even when its close coincides", () => {
+        // span opens at 0 and closes at 4; probing at=1 with wrapLength 4
+        // makes the close test alone pass (1 + 4 - 1 === 4) — only the
+        // open check refuses
+        expect(inlineWrapLandsIntact("^[ab]", 1, 4)).toBe(false);
     });
 });

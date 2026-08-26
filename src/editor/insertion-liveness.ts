@@ -97,12 +97,14 @@ function resolveChanges(lines: string[], changes: EditorChange[]) {
             text: change.text,
             index,
         }))
+        // Stryker disable ConditionalExpression, ArithmeticOperator: whether the comparator's tiebreak mutants flip anything depends on which argument order the engine's sort probes with, not on behavior — the tie ORDER contract itself (insert-before-replace, array order among stacked inserts) is pinned in bug-simulate-changes-tie-drops-text
         .sort(
             (a, b) =>
                 a.from - b.from ||
                 Number(a.to > a.from) - Number(b.to > b.from) ||
                 a.index - b.index,
         );
+    // Stryker restore all
 }
 
 // Apply the resolved changes left-to-right against the original text,
@@ -116,6 +118,7 @@ function applyResolvedChanges(
 ): { out: string; landing: number[] } {
     let out = "";
     let pos = 0;
+    // Stryker disable next-line ArrayDeclaration: the length hint is an allocation hint only — every slot is assigned by index below, so new Array() is behavior-identical
     const landing = new Array<number>(resolved.length);
     for (const change of resolved) {
         out += text.slice(pos, Math.max(pos, change.from));
