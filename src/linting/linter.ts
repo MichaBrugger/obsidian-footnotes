@@ -7,8 +7,15 @@ import {
     toggleCloseFootnotePopup,
 } from "../commands/footnote-popup";
 import { jumpToFootnoteDefinition } from "../commands/navigation";
+import { docContext } from "../editor/doc-context";
+import { definitionLabelWithName } from "../parsing/footnote-grammar";
 import { footnotePrefix, footnotePrefixProblem } from "../parsing/footnote-prefix";
-import { maskProtectedLines, normalizeEol, restoreEol } from "../parsing/markdown-scan";
+import {
+    findDefinitionBlocks,
+    maskProtectedLines,
+    normalizeEol,
+    restoreEol,
+} from "../parsing/markdown-scan";
 import { AppWithCommands, AppWithPlugins, readingViewActive, viewEditor, WindowWithVim } from "../editor/obsidian-internals";
 import { activeTableCellEditor, nestedSubEditorOwnsFocus, runOutsideTableCell } from "../editor/table-cursor";
 import { applyFootnotePrefix } from "./rules/apply-footnote-prefix";
@@ -415,6 +422,46 @@ function uniqueEmptyDefinitionName(doc: Editor): string | null {
     return found;
 }
 
+// The seeded twin of uniqueEmptyDefinitionName, for the selection
+// conversions (A8 report, 2026-08-26): their fresh definition is never
+// empty — it carries the converted text — so after a lint that may have
+// renumbered AND moved it, the seeded body is what identifies the footnote
+// just created. A definition matches when its whole block is exactly
+// "[^name]: " plus the body (continuation lines included — the conversion
+// wrote them, and the lint rules move and rename blocks without editing
+// their bodies). Several matches are ambiguous, same as the empty twin.
+function uniqueSeededDefinitionName(doc: Editor, body: string): string | null {
+    const ctx = docContext(doc);
+    const bodyLines = body.split("\n");
+    let found: string | null = null;
+    for (const block of findDefinitionBlocks(
+        ctx.lines,
+        ctx.scan.isProtected,
+        ctx.scan,
+    )) {
+        if (block.end - block.start !== bodyLines.length - 1) continue;
+        const hit = definitionLabelWithName(
+            ctx.lines[block.start],
+            ctx.maskedLine(block.start),
+        );
+        if (!hit) continue;
+        if (ctx.lines[block.start] !== `[^${hit.name}]: ${bodyLines[0]}`) {
+            continue;
+        }
+        let same = true;
+        for (let j = 1; j < bodyLines.length; j++) {
+            if (ctx.lines[block.start + j] !== bodyLines[j]) {
+                same = false;
+                break;
+            }
+        }
+        if (!same) continue;
+        if (found !== null) return null; // ambiguous
+        found = hit.name;
+    }
+    return found;
+}
+
 /**
  * "Lint on footnote creation" (replacing lint-on-focused-file-change,
  * 2026-08-05): lint the active note right after a new footnote definition was
@@ -424,7 +471,10 @@ function uniqueEmptyDefinitionName(doc: Editor): string | null {
  *
  * The creation sites call this directly on the jump-to-definition path (and
  * `relandCursor` puts the caret back on the new — possibly renumbered —
- * empty definition afterwards). On the popup path they defer it through
+ * definition afterwards: the unique empty one, or with `seededBody` the
+ * unique definition carrying exactly that body, which is how a selection
+ * conversion's pre-filled footnote is found again after the lint moved or
+ * renumbered it — A8 report, 2026-08-26). On the popup path they defer it through
  * runAfterNextPopupSettle instead: linting under a live popup could
  * renumber the id the popup is bound to. Table-cell creations skip the
  * trigger entirely (editing the document while a cell sub-editor owns
@@ -434,6 +484,7 @@ export function lintAfterFootnoteCreation(
     plugin: FootnotePlugin,
     relandCursor: boolean,
     expectedFilePath?: string,
+    seededBody?: string,
 ) {
     if (!plugin.settings.lintOnFootnoteCreation) return;
     // the shared gate covers Reading view too — the popup path defers
@@ -461,7 +512,10 @@ export function lintAfterFootnoteCreation(
     new Notice("Footnotes linted.");
     noticeLintAlerts(plugin, after);
     if (relandCursor) {
-        const target = uniqueEmptyDefinitionName(doc);
+        const target =
+            seededBody === undefined
+                ? uniqueEmptyDefinitionName(doc)
+                : uniqueSeededDefinitionName(doc, seededBody);
         if (target !== null) {
             jumpToFootnoteDefinition(target, doc.getCursor(), plugin, doc);
         }

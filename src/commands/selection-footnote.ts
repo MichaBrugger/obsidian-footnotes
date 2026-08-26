@@ -725,12 +725,14 @@ function convertMainSelection(
         },
         // a conversion CREATES a footnote, so "Lint on footnote creation"
         // covers it like every other creation press (Jason's parity ask
-        // 2026-08-25). The reland no-ops here by construction: the seeded
-        // definition is never empty, so there is no unique empty
-        // definition to re-target and the caret stays where the landing
-        // put it
+        // 2026-08-25). The seeded body is how the reland finds the new
+        // definition again after the lint may have renumbered and MOVED it
+        // — the empty-definition reland can't (a conversion's definition
+        // is never empty), and without a reland the caret was left on
+        // whatever the lint's minimal replacement put at its old spot
+        // (Jason's A8 report, 2026-08-26)
         afterJump: () => {
-            lintAfterFootnoteCreation(plugin, true);
+            lintAfterFootnoteCreation(plugin, true, undefined, body);
         },
     });
 }

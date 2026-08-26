@@ -242,6 +242,97 @@ describe("lint-on-footnote-creation covers selection conversions (parity, Jason'
     });
 });
 
+describe("the creation lint relands the caret on the seeded definition (A8 report, 2026-08-26)", () => {
+    // Jason's A8 manual pass: with lint-on-creation + reindex on (popup
+    // off), converting a selection while [^5]/[^5]: five sit ABOVE the
+    // paragraph left the caret on the WRONG footnote — the lint moves and
+    // renumbers the seeded definition, and the empty-definition reland
+    // can't find it (a conversion's definition is never empty), so the
+    // caret was left wherever the lint's minimal replacement dropped it.
+    const paragraph =
+        "The paragraph wants to move this aside for later readers.";
+    const before = [
+        "alpha[^5]",
+        "",
+        "[^5]: five",
+        "",
+        paragraph,
+        "",
+        "tail text",
+    ];
+    const selected = {
+        anchor: { line: 4, ch: paragraph.indexOf("move") },
+        head: { line: 4, ch: paragraph.indexOf(" for later") },
+    };
+    const lintSettings = {
+        lintOnFootnoteCreation: true,
+        lintReindex: true,
+        lintMoveToBottom: true,
+    };
+
+    it("the autonum conversion's caret follows the renumbered, moved definition", async () => {
+        const doc = fakeEditor(before, selected.anchor, selected);
+        await insertAutonumFootnote(fakePlugin(doc, lintSettings));
+        // the conversion minted [^6]; the lint gathered both definitions
+        // at the bottom and renumbered 5→1, 6→2
+        const landing = doc.lines.indexOf("[^2]: move this aside");
+        expect(landing).toBeGreaterThan(doc.lines.indexOf("tail text"));
+        expect(doc.cursor).toEqual({
+            line: landing,
+            ch: "[^2]: move this aside".length,
+        });
+    });
+
+    it("the named conversion's caret follows the moved definition", () => {
+        const doc = fakeEditor(before, selected.anchor);
+        const problem = convertSelectionToNamed(
+            fakePlugin(doc, lintSettings),
+            doc,
+            {
+                from: selected.anchor,
+                to: selected.head,
+                text: "move this aside",
+            },
+            "note",
+        );
+        expect(problem).toBeNull();
+        const landing = doc.lines.indexOf("[^note]: move this aside");
+        expect(landing).toBeGreaterThan(doc.lines.indexOf("tail text"));
+        expect(doc.cursor).toEqual({
+            line: landing,
+            ch: "[^note]: move this aside".length,
+        });
+    });
+
+    it("a multi-line conversion's caret lands at the end of the moved body's last line", async () => {
+        const doc = fakeEditor(
+            [
+                "alpha[^5]",
+                "",
+                "[^5]: five",
+                "",
+                "first paragraph",
+                "",
+                "second paragraph",
+                "",
+                "tail text",
+            ],
+            { line: 4, ch: 0 },
+            { anchor: { line: 4, ch: 0 }, head: { line: 6, ch: "second paragraph".length } },
+        );
+        await insertAutonumFootnote(fakePlugin(doc, lintSettings));
+        // the seeded multi-paragraph body travels with its label
+        const landing = doc.lines.indexOf("[^2]: first paragraph");
+        expect(landing).toBeGreaterThan(doc.lines.indexOf("tail text"));
+        expect(doc.lines[landing + 1]).toBe("    ");
+        expect(doc.lines[landing + 2]).toBe("    second paragraph");
+        expect(doc.cursor).toEqual({
+            line: landing + 2,
+            ch: "    second paragraph".length,
+        });
+    });
+});
+
 describe("the named key converts a selection through its modal (2026-08-13)", () => {
     // the modal is thin wiring over convertSelectionToNamed — these drive
     // the exported conversion the way its submit does
