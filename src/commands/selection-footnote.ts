@@ -596,11 +596,17 @@ function normalizedMainSelection(
 ): { from: EditorPosition; to: EditorPosition } | "multi" | null {
     const posCmp = (a: EditorPosition, b: EditorPosition) =>
         a.line - b.line || a.ch - b.ch;
-    const ranges = doc
-        .listSelections()
-        .filter((range) => posCmp(range.anchor, range.head) !== 0);
+    const all = doc.listSelections();
+    const ranges = all.filter(
+        (range) => posCmp(range.anchor, range.head) !== 0,
+    );
     if (ranges.length === 0) return null;
-    if (ranges.length > 1) return "multi";
+    // ONE real range plus extra collapsed carets (shift-drag then
+    // Alt-click) is exactly as ambiguous as two real ranges — the press
+    // used to convert the selection and silently DISCARD the extra
+    // caret, the very silent-drop the multi-caret feature exists to
+    // prevent (hunt 2026-08-25, bug-mixed-selection-extra-caret-dropped)
+    if (ranges.length > 1 || all.length > ranges.length) return "multi";
     let from = ranges[0].anchor;
     let to = ranges[0].head;
     if (posCmp(from, to) > 0) [from, to] = [to, from];

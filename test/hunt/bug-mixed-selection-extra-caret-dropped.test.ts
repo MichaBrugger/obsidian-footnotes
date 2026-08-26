@@ -30,7 +30,7 @@ afterEach(() => {
 });
 
 describe("a drag-selection plus an extra collapsed caret", () => {
-    it.fails("the extra caret's intent is not silently discarded", async () => {
+    it("the extra caret's intent is not silently discarded", async () => {
         const doc = sharedFakeEditor(["quick fox", "second line"], {
             cursor: { line: 0, ch: 0 },
             edits: true,

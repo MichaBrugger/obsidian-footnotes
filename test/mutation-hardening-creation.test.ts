@@ -860,10 +860,15 @@ describe("the main-editor selection claim", () => {
         expect(doc.lines).toEqual(["`code` ^[word] here"]);
     });
 
-    // L162 MethodExpression (the whole `.filter(…)` dropped) and L164
-    // ConditionalExpression -> true: an EMPTY range alongside a real one (a
-    // stray multi-cursor) is not a second selection.
-    it("ignores empty ranges when counting selections", () => {
+    // CONTRACT FLIP (hunt 2026-08-25,
+    // bug-mixed-selection-extra-caret-dropped): a real range plus a stray
+    // collapsed caret used to convert the selection and silently DISCARD
+    // the caret; it now refuses atomically like any other multi-range
+    // press. The old filter mutants stay dead elsewhere: dropping the
+    // `.filter(…)` turns all-collapsed presses into "multi" (the
+    // multi-caret pins fail), and forcing the multi condition true breaks
+    // every plain conversion above.
+    it("refuses a real selection with a stray collapsed caret alongside", () => {
         const doc = fakeEditor(["alpha beta gamma"], { line: 0, ch: 0 });
         (doc as unknown as { listSelections: () => unknown }).listSelections =
             () => [
@@ -873,7 +878,8 @@ describe("the main-editor selection claim", () => {
         expect(
             selectionPressHandled(fakePlugin(doc), doc, null, "inline"),
         ).toBe(true);
-        expect(doc.lines).toEqual(["alpha ^[beta] gamma"]);
+        expect(doc.lines).toEqual(["alpha beta gamma"]);
+        expect(messages()).toContain(SelectionSpanNotice);
     });
 
     // the trimSelectionEdges line-walk mutants (the `fromCh >= length` hop
