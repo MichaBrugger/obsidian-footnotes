@@ -120,7 +120,7 @@ export function referenceOccurrenceAtCursor(
         footnote: match[0],
         startIndex: match.index ?? 0,
     }));
-    // Stryker disable next-line ConditionalExpression, BlockStatement, LogicalOperator: the raw gate is pure perf — deleting it is behavior-identical (the masked check below decides the same way), just slower on every press
+    // Stryker disable next-line ConditionalExpression, BlockStatement, LogicalOperator: units can't tell the arms apart cheaply, but this gate is NOT just perf — masking can only EXTEND a "[^…]" match (NUL satisfies the name class), so on lines like "[^a`]:`x]" the masked twin fabricates a phantom reference where the raw line correctly reads a definition label; the raw gate is what keeps the phantom out (hunt 2026-08-25, probe-error adjudication, micromark-verified)
     if (referenceAtCursor(rawReferences, cursorPosition.ch) === null) {
         return null;
     }

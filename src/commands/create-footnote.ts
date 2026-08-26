@@ -181,18 +181,22 @@ export function landDefinitionBackedInsertion(opts: {
     footnoteId: string;
     /** where the definition text awaits the caret (post-transaction coordinates) */
     definitionCursor: EditorPosition;
-    /** the popup arm's caret landing: just past the primary new reference */
-    afterReference: EditorPosition;
+    /** the popup arm's caret landing just past the primary new reference — omitted by the definition-only append (createMatchingFootnoteDefinition), whose caret already sits on the existing reference */
+    afterReference?: EditorPosition;
     afterJump?: () => void;
 }): void {
     // Stryker disable next-line ConditionalExpression, BlockStatement: units run popup-off, so which arm fires is smoke territory — the full smoke suite drives both
     if (popupEditingAvailable(opts.plugin)) {
         // Stryker disable all: popup arm — units run popup-off, so mutants
         // here are no-coverage noise; smoke territory (verified 2026-08-12)
-        opts.doc.transaction({
-            changes: opts.changes,
-            selection: { from: opts.afterReference },
-        });
+        opts.doc.transaction(
+            opts.afterReference
+                ? {
+                      changes: opts.changes,
+                      selection: { from: opts.afterReference },
+                  }
+                : { changes: opts.changes },
+        );
         openPopupForNewDefinition(
             opts.plugin,
             opts.doc,
@@ -422,24 +426,22 @@ export function createMatchingFootnoteDefinition(
         const definition = buildDefinitionAppend(doc, footnoteId, list.length === 0, plugin, ctx);
         // the phantom-frontmatter prepend rides the same
         // transaction (see buildDefinitionAppend)
-        const definitionChanges = definition.prepend
-            ? [definition.prepend, definition.change]
-            : [definition.change];
-
-        if (popupEditingAvailable(plugin)) {
-            // type the definition in a popup instead of jumping to the
-            // bottom; the cursor stays on the reference
-            // Stryker disable all: popup arm — units run popup-off, so
-            // mutants here are no-coverage noise; smoke territory
-            // (verified 2026-08-12)
-            doc.transaction({ changes: definitionChanges });
-            openPopupForNewDefinition(plugin, doc, cursorPosition, footnoteId, definition.cursor);
-            // Stryker restore all
-        } else {
-            moveCursorAndSetJumpPoint(doc, cursorPosition, definition.cursor, plugin, definitionChanges, true);
-            lintAfterFootnoteCreation(plugin, true);
-        }
-
+        landDefinitionBackedInsertion({
+            plugin,
+            doc,
+            changes: definition.prepend
+                ? [definition.prepend, definition.change]
+                : [definition.change],
+            origin: cursorPosition,
+            footnoteId,
+            definitionCursor: definition.cursor,
+            // no afterReference: this press appends a definition for an
+            // EXISTING reference the caret already sits on — nothing to
+            // park past
+            afterJump: () => {
+                lintAfterFootnoteCreation(plugin, true);
+            },
+        });
         return true;
     }
     // the reference already has a definition — not this step's
