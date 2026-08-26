@@ -52,7 +52,7 @@ const refused = () =>
     noticeCalls.some((args) => args[0] === ProtectedCreationNotice);
 
 describe("an emergent math span swallowing the inline wrapper's close bracket", () => {
-    it.fails("the selection conversion refuses instead of landing a corrupted wrap", () => {
+    it("the selection conversion refuses instead of landing a corrupted wrap", () => {
         const selection: { anchor: EditorPosition; head: EditorPosition } = {
             anchor: { line: 0, ch: 7 },
             head: { line: 0, ch: 13 }, // "cost $"
@@ -68,7 +68,7 @@ describe("an emergent math span swallowing the inline wrapper's close bracket", 
         expect(refused()).toBe(true);
     });
 
-    it.fails("the paste insert refuses the same shape at a bare caret", async () => {
+    it("the paste insert refuses the same shape at a bare caret", async () => {
         vi.stubGlobal("navigator", {
             clipboard: { readText: () => Promise.resolve("cost $") },
         });

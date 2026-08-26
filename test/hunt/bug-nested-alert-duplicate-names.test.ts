@@ -18,7 +18,7 @@ import {
 // at-most-three-names list.
 
 describe("nested-footnote alert vs duplicate definitions of one name", () => {
-    it.fails("the alert lists each nested NAME once, like its sibling alerts", () => {
+    it("the alert lists each nested NAME once, like its sibling alerts", () => {
         const doc =
             "text with no reference to z anywhere.\n\n[^z]: contains ^[an inline note] here\n[^z]: second copy also nested [^w]\n\n[^w]: w body";
         const lines = normalizeEol(doc).text.split("\n");

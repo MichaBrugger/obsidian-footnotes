@@ -13,7 +13,7 @@ import { moveCursorAndSetJumpPoint } from "../editor/cursor-motion";
 import { commandHotkeys } from "../editor/obsidian-internals";
 import { buildDefinitionAppend, seedDefinitionBody } from "./definition-append";
 import { DocContext, docContext, listExistingFootnoteDefinitions } from "../editor/doc-context";
-import { inlineFootnoteSpanAt, sanitizeInlineFootnoteContent } from "./inline-footnotes";
+import { inlineFootnoteSpanAt, inlineWrapLandsIntact, sanitizeInlineFootnoteContent } from "./inline-footnotes";
 import {
     caretInsideMaskedSpan,
     ProtectedCreationNotice,
@@ -625,7 +625,7 @@ function convertMainSelectionToInline(
         { from: selection.from, to: selection.to, text },
     ]);
     const masked = maskedLineAt(simulated, selection.from.line);
-    if (inlineFootnoteSpanAt(masked, selection.from.ch + 2)?.open !== selection.from.ch) {
+    if (!inlineWrapLandsIntact(masked, selection.from.ch, text.length)) {
         new Notice(ProtectedCreationNotice, 8000);
         return;
     }

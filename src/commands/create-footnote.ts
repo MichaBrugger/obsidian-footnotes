@@ -23,7 +23,7 @@ import {
     listExistingFootnoteDefinitions,
     referenceOccurrenceAtCursor,
 } from "../editor/doc-context";
-import { inlineFootnoteSpanAt } from "./inline-footnotes";
+import { inlineWrapLandsIntact } from "./inline-footnotes";
 import {
     ProtectedCreationNotice,
     safeInsertionCh,
@@ -99,8 +99,8 @@ function dispatchCellEditIfLive(
     const maskedCell = maskInlineRegions(simulatedCell);
     const live = text.startsWith("^[")
         ? // pasted content may carry its own inline code (masked inside the
-          // brackets) — the inline SPAN surviving is what matters
-          inlineFootnoteSpanAt(maskedCell, from + 2)?.open === from
+          // brackets) — the inline SPAN surviving INTACT is what matters
+          inlineWrapLandsIntact(maskedCell, from, text.length)
         : maskedCell.slice(from, from + text.length) === text;
     if (!live) {
         new Notice(ProtectedCreationNotice, 8000);

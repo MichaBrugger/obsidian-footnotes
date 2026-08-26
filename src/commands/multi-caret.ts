@@ -14,6 +14,7 @@ import { DocContext, docContext, listExistingFootnoteDefinitions } from "../edit
 import {
     inlineFootnoteSpanAt,
     sanitizeInlineFootnoteContent,
+    inlineWrapLandsIntact,
 } from "./inline-footnotes";
 import {
     ProtectedCreationNotice,
@@ -260,7 +261,7 @@ function insertSkeletonAtEveryCaret(
     const everyLive = anchors.every((anchor) => {
         const masked = maskedLineAt(simulated, anchor.line);
         return text.startsWith("^[")
-            ? inlineFootnoteSpanAt(masked, anchor.ch + 2)?.open === anchor.ch
+            ? inlineWrapLandsIntact(masked, anchor.ch, text.length)
             : masked.slice(anchor.ch, anchor.ch + text.length) === text;
     });
     if (!everyLive) {

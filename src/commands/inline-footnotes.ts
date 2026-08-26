@@ -50,6 +50,28 @@ export function sanitizeInlineFootnoteContent(raw: string): string {
 }
 
 /**
+ * Whether a freshly inserted inline-footnote wrapper at `at` survives
+ * INTACT on the masked simulated line: the span must open exactly at the
+ * wrapper's "^" AND close on the wrapper's own "]". The close check
+ * exists because an open-only check accepted a wrap whose closing
+ * bracket an emergent "$…$" pair swallowed — the bracket walk then
+ * latched onto an unrelated later "]" and the rendered line was math
+ * eating prose (hunt 2026-08-25, bug-inline-wrap-close-swallowed). The
+ * ONE landing predicate for every inline-wrap writer: caret insert,
+ * paste, multi-caret skeletons, cell writes, selection conversion.
+ */
+export function inlineWrapLandsIntact(
+    masked: string,
+    at: number,
+    wrapLength: number,
+): boolean {
+    const span = inlineFootnoteSpanAt(masked, at + 2);
+    return (
+        span !== null && span.open === at && span.close === at + wrapLength - 1
+    );
+}
+
+/**
  * The inline footnote whose brackets contain `ch` on `lineText`, as its
  * `open` ("^" index) and `close` ("]" index), or null. Bracket matching is
  * escape-aware and steps over nested balanced pairs (markdown links).

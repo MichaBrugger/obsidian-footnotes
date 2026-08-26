@@ -165,6 +165,10 @@ export function nestedFootnoteDefinitionNames(
     masked: string[],
 ): string[] {
     const names: string[] = [];
+    // one entry per NAME, case-folded like the duplicate/orphan siblings —
+    // a name defined twice with both copies nested used to report twice,
+    // inflating the notice's count (hunt 2026-08-25)
+    const seen = new Set<string>();
     for (const block of findDefinitionBlocks(lines, scan.isProtected, scan)) {
         let nested = false;
         for (let i = block.start; i <= block.end && !nested; i++) {
@@ -177,7 +181,10 @@ export function nestedFootnoteDefinitionNames(
                     (occurrence) => occurrence.start >= startAt,
                 ) || lineHasInlineFootnote(masked[i]);
         }
-        if (nested) names.push(block.name);
+        if (nested && !seen.has(block.name.toLowerCase())) {
+            seen.add(block.name.toLowerCase());
+            names.push(block.name);
+        }
     }
     return names;
 }
