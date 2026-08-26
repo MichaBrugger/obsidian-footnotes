@@ -66,8 +66,27 @@ export interface ReferenceOccurrence {
  */
 export function definitionLabelWithName(line: string, masked: string) {
     const label = definitionLabelIn(masked);
-    if (!label) return null;
-    return { label, name: line.slice(label.nameStart, label.nameEnd) };
+    if (label) return { label, name: line.slice(label.nameStart, label.nameEnd) };
+    // The masked twin can LOSE a real label: a backtick inside the NAME
+    // pairing with one in the body ("[^a`b]: c`d") masks the label's own
+    // "]:" to NULs, so DefinitionStart no longer matches — yet GFM carves
+    // the label BEFORE inline tokenizing and renders a definition named
+    // "a`b" (hunt 2026-08-25, micromark-verified;
+    // bug-code-span-name-hides-definition). Re-check the RAW line, but
+    // only when the label's own opening "[^" survived masking: a masked
+    // opener means the label starts inside a protected region (a fence
+    // line, an open math/comment run) where a definition-shaped string is
+    // plain text, not a label.
+    const raw = definitionLabelIn(line);
+    if (!raw) return null;
+    const bracketAt = raw.nameStart - 2;
+    if (
+        masked.slice(bracketAt, raw.nameStart) !==
+        line.slice(bracketAt, raw.nameStart)
+    ) {
+        return null;
+    }
+    return { label: raw, name: line.slice(raw.nameStart, raw.nameEnd) };
 }
 
 /**

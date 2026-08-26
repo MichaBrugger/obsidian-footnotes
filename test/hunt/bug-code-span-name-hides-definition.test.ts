@@ -23,7 +23,7 @@ import { listExistingFootnoteDefinitions } from "../../src/editor/doc-context";
 // must resolve the label before masking, not weaken the label check.
 
 describe("code-span-shaped names inside definition labels", () => {
-    it.fails("definitionLabelWithName finds the definition GFM sees", () => {
+    it("definitionLabelWithName finds the definition GFM sees", () => {
         const line = "[^a`b]: c`d";
         const masked = maskLineRegions(line).masked;
         const hit = definitionLabelWithName(line, masked);
@@ -31,7 +31,7 @@ describe("code-span-shaped names inside definition labels", () => {
         expect(hit?.name).toBe("a`b");
     });
 
-    it.fails("the definition listing includes it", () => {
+    it("the definition listing includes it", () => {
         const doc = fakeEditor(["ref[^a`b] here", "", "[^a`b]: c`d"], {
             wholeDoc: true,
         });
