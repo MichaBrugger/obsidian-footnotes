@@ -77,38 +77,72 @@ function offsetIn(lines: string[], pos: EditorPosition): number {
     return offset + pos.ch;
 }
 
-/** The document `changes` would produce — every change addresses the ORIGINAL text (CodeMirror transaction semantics), so they apply back-to-front. */
+// The ONE resolved, ordered view of a transaction's changes, shared by
+// simulateChanges and simulatedAnchor so the two can never disagree:
+// offsets against the ORIGINAL text (CodeMirror transaction semantics),
+// sorted by position, with zero-length INSERTS landing BEFORE a range
+// change at the same offset REGARDLESS of array order and same-position
+// inserts keeping array order — both verified empirically against
+// @codemirror/state 6.5 (hunt 2026-08-25: the old back-to-front splice
+// resolved a tied replace's `to` against the already-mutated string and
+// silently dropped a character of the tied insert). Range changes never
+// overlap; CodeMirror itself refuses overlapping spans.
+function resolveChanges(lines: string[], changes: EditorChange[]) {
+    return changes
+        .map((change, index) => ({
+            from: offsetIn(lines, change.from),
+            to: change.to
+                ? offsetIn(lines, change.to)
+                : offsetIn(lines, change.from),
+            text: change.text,
+            index,
+        }))
+        .sort(
+            (a, b) =>
+                a.from - b.from ||
+                Number(a.to > a.from) - Number(b.to > b.from) ||
+                a.index - b.index,
+        );
+}
+
+// Apply the resolved changes left-to-right against the original text,
+// recording where each change's text BEGINS in the output (indexed by
+// the change's ORIGINAL array position). Landing offsets fall out of the
+// construction itself, so the anchor arithmetic cannot drift from the
+// applied result.
+function applyResolvedChanges(
+    text: string,
+    resolved: ReturnType<typeof resolveChanges>,
+): { out: string; landing: number[] } {
+    let out = "";
+    let pos = 0;
+    const landing = new Array<number>(resolved.length);
+    for (const change of resolved) {
+        out += text.slice(pos, Math.max(pos, change.from));
+        landing[change.index] = out.length;
+        out += change.text;
+        pos = Math.max(pos, change.to);
+    }
+    return { out: out + text.slice(pos), landing };
+}
+
+/** The document `changes` would produce — every change addresses the ORIGINAL text (CodeMirror transaction semantics). */
 export function simulateChanges(
     lines: string[],
     changes: EditorChange[],
 ): string[] {
-    const text = lines.join("\n");
-    const offsetOf = (pos: EditorPosition) => offsetIn(lines, pos);
-    const resolved = changes
-        .map((change, index) => ({
-            from: offsetOf(change.from),
-            to: change.to ? offsetOf(change.to) : offsetOf(change.from),
-            text: change.text,
-            index,
-        }))
-        // back-to-front; SAME-POSITION insertions concatenate in change
-        // order (CodeMirror semantics — the reference and the EOF-append
-        // definition share an offset when the caret sits at line end), so
-        // ties apply the later change first
-        .sort((a, b) => b.from - a.from || b.index - a.index);
-    let out = text;
-    for (const change of resolved) {
-        out = out.slice(0, change.from) + change.text + out.slice(change.to);
-    }
+    const { out } = applyResolvedChanges(
+        lines.join("\n"),
+        resolveChanges(lines, changes),
+    );
     return out.split("\n");
 }
 
 /**
  * Where the text of `changes[anchorIndex]` BEGINS in the simulated
- * document. A change landing at a lower offset shifts the anchor by its
- * net length; a same-offset change shifts it only when its index is
- * LOWER (CodeMirror concatenates same-position insertions in change
- * order); a deletion reaching past the anchor clamps at the anchor. The
+ * document — read off the same construction simulateChanges applies, so
+ * it is exact by definition (the pre-2026-08-25 shift arithmetic
+ * disagreed with the applied result on same-offset ties). The
  * reference-liveness checks used to read the anchor's ORIGINAL line
  * index off the simulated document instead, falsely refusing legitimate
  * creations whenever the definition appended ABOVE the caret —
@@ -121,19 +155,11 @@ export function simulatedAnchor(
     anchorIndex: number,
     simulated: string[],
 ): EditorPosition {
-    const anchorOffset = offsetIn(lines, changes[anchorIndex].from);
-    let offset = anchorOffset;
-    for (const [index, change] of changes.entries()) {
-        if (index === anchorIndex) continue;
-        const from = offsetIn(lines, change.from);
-        if (from > anchorOffset) continue;
-        if (from === anchorOffset) {
-            if (index < anchorIndex) offset += change.text.length;
-            continue;
-        }
-        const to = change.to ? offsetIn(lines, change.to) : from;
-        offset += change.text.length - (Math.min(to, anchorOffset) - from);
-    }
+    const { landing } = applyResolvedChanges(
+        lines.join("\n"),
+        resolveChanges(lines, changes),
+    );
+    let offset = landing[anchorIndex];
     let line = 0;
     while (line < simulated.length && offset > simulated[line].length) {
         offset -= simulated[line].length + 1;

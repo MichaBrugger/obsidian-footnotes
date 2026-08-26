@@ -30,11 +30,11 @@ const TIE: EditorChange[] = [
 ];
 
 describe("same-from tie between a replace and a zero-length insert", () => {
-    it.fails("simulateChanges preserves every character, insert before replace (CM6 semantics)", () => {
+    it("simulateChanges preserves every character, insert before replace (CM6 semantics)", () => {
         expect(simulateChanges(["....."], TIE)).toEqual(["....BBBBBAAAAA"]);
     });
 
-    it.fails("simulatedAnchor reports where the insert's text actually lands", () => {
+    it("simulatedAnchor reports where the insert's text actually lands", () => {
         const simulated = simulateChanges(["....."], TIE);
         const anchor = simulatedAnchor(["....."], TIE, 1, simulated);
         // the insert's marker must be findable intact, exactly at the anchor
