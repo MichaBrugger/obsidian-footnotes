@@ -15,3 +15,4 @@ alpha bravo charlie delta echo
 - [ ] With `Insert footnote at end of word` ON, two carets in the SAME word produce ONE reference (they collapse to the word's end)
 - [ ] ATOMIC refusal: put one caret inside the `code span` here (or inside an existing footnote, or a definition body) — the press toasts and NOTHING is inserted at any caret
 - [ ] With `Lint on footnote creation` and `Reindex` ON (popup off), add a `[^5]` + `[^5]: five` to the fixture first: the NUMBERED press at several carets renumbers everything (`[^5]`→`[^1]`, the new references→`[^2]`) and lands on the new empty definition — full parity with a single-caret press (2026-08-25)
+- [ ] MIXED shape: drag-select a word, then Alt-click a second caret elsewhere, press any footnote hotkey: the press REFUSES with the one-continuous-stretch toast and nothing changes anywhere — the extra caret is never silently dropped (2026-08-25)

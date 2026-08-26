@@ -16,3 +16,4 @@ reference, and an untouched prefix placeholder [^3.] in this sentence.
 - [ ] `Delete orphaned references` ON + lint: `stray[^99]` is removed from the text, spacing healed (2026-08-10)
 - [ ] `Delete orphaned definitions` ON + lint: both orphan definitions are deleted (see L5 for the reindex interplay)
 - [ ] Hand-type a reference INSIDE a definition body (e.g. `[^used]: referenced definition citing[^lost]`) and lint: an alert names the nesting definition and says nested footnotes don't survive export — the lint never rewrites or deletes the nested content itself (2026-08-24)
+- [ ] Put a fenced code block INSIDE a definition's indented body (label line, then `    ```js`, a code line containing `[^99]`, `    ````), turn `Delete orphaned references` ON and lint: the fenced `[^99]` is code and SURVIVES untouched — orphan deletion no longer eats reference-shaped text out of definition-body fences (2026-08-25); the footnote renders its code block intact in Reading view
