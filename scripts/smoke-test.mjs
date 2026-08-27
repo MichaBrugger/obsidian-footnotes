@@ -515,6 +515,57 @@ async function main() {
         }
     });
 
+    await test("popup opens promptly despite a definition-shaped decoy in a code span", async () => {
+        // regression (reported 2026-08-26): the popup's buffer-caught-up
+        // poll searched the RAW view buffer for "[^id]:", so a code-span
+        // decoy (like A8's own "`[^name]: …`" checkbox text) matched the
+        // STALE buffer instantly, the pre-open save was skipped (buffer
+        // still equal to disk), and the popup sat invisible ~2s until
+        // Obsidian's own debounced autosave finally put the definition on
+        // disk for the embed to find
+        resetSettings({ enablePopupEditor: true });
+        // a REALISTIC note size: the buffer's catch-up lag grows with the
+        // note, and only a lag longer than the cachedRead await trips the
+        // skipped save (a one-liner syncs too fast to reproduce)
+        const filler = Array.from(
+            { length: 40 },
+            (_, i) => `Paragraph ${i + 1} lorem ipsum dolor sit amet, consectetur adipiscing elit.`,
+        ).join("\n");
+        await setupNote(`Alpha bravo charlie\n\nDecoy text: \`[^1]: fake\` stays code.\n\n${filler}`);
+        // the note must be CLEAN ON DISK before the press — that's the
+        // idle-note state the bug needs (buffer === disk skips the save)
+        action(`window.__decoySaved = false; (async () => { await (${EDITOR}).save(); window.__decoySaved = true; })();`);
+        await pollUntil("note saved to disk", `window.__decoySaved`, (v) => v === true);
+        action(
+            `window.__popupPromptness = null; const t0 = performance.now(); ` +
+            `const mo = new MutationObserver(() => { ` +
+            `const p = document.querySelector('.footnote-shortcut-popup'); ` +
+            `if (p && !p.classList.contains('footnote-shortcut-popup-loading')) { ` +
+            `window.__popupPromptness = Math.round(performance.now() - t0); mo.disconnect(); } }); ` +
+            `mo.observe(document.body, {childList: true, subtree: true, attributes: true, attributeFilter: ['class']}); ` +
+            `const v=${EDITOR}; v.editor.setCursor({line:0,ch:8}); ` +
+            `app.commands.executeCommandById('${CMD_AUTONUM}');`,
+        );
+        const delay = await pollUntil(
+            "popup visible with its open latency recorded",
+            `window.__popupPromptness`,
+            (v) => typeof v === "number",
+            8000,
+        );
+        // healthy runs measure 100-300ms; the decoy stall measures
+        // 1100-2000ms+ (down to ~1.1s when a nearby save's cache reindex
+        // happens to cut the wait short) — 700ms splits the modes cleanly
+        if (delay > 700) {
+            throw new Error(`popup took ${delay}ms to become visible (decoy stall)`);
+        }
+        // leave no popup behind for the next test
+        action(
+            `document.querySelectorAll('.footnote-shortcut-popup').forEach((el) => ` +
+            `el.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true})));`,
+        );
+        await sleep(800);
+    });
+
     await test("inline footnote inserts ^[] at end of word with cursor inside", async () => {
         resetSettings();
         await setupNote("Alpha bravo charlie");

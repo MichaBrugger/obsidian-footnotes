@@ -8,3 +8,4 @@ rapid entry).
 - [ ] Known accepted quirk (stock hover editor has it too): after typing AND undoing inside the popup, an undo in the main editor may bring the text back once; a second undo settles it
 - [ ] With lint-on-creation ON: create a footnote (popup opens), switch to Reading view with the popup up, close the popup via hotkey — the note text is NOT edited by the deferred lint (check in source view)
 - [ ] Vim users: Esc that exits insert mode inside the popup does NOT also close the popup; a second Esc closes it
+- [ ] In an idle (saved) note whose text carries a decoy like `` `[^name]: fake` `` in backticks, create a footnote with that same name (named modal, or numbered when the decoy is `` `[^1]: fake` ``): the popup appears immediately — no ~2-second invisible stall and no silent fall-back to the jump (Jason's report 2026-08-26: the pre-open buffer check matched the decoy in the stale buffer and skipped saving the new definition to disk)

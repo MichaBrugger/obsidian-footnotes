@@ -184,13 +184,20 @@ export async function openFootnotePopup(
     };
     activePopup = { close };
 
-    const definitionToken = `[^${footnoteId}]:`;
     const dataDeadline = Date.now() + 2000;
     // the data buffer usually catches up within a tick — check again almost
     // immediately before falling back to coarse 50ms polls, so the popup
-    // doesn't spend a blind 50ms on what is typically a ~1ms wait
+    // doesn't spend a blind 50ms on what is typically a ~1ms wait.
+    // EQUALITY with the editor, not the old "[^id]:" substring search:
+    // definition-shaped text in a code span (the A8 sheet's own
+    // "`[^name]: …`" checkbox line) matched the STALE buffer instantly,
+    // the save below was then skipped (stale buffer still equal to disk),
+    // and the popup sat invisible ~2s until Obsidian's debounced autosave
+    // finally wrote the new definition for the embed to find — or died to
+    // the jump fallback when the retry deadline ran out first (Jason's
+    // report 2026-08-26, ground-truthed with a live gesture watcher)
     let pollDelay = 0;
-    while (!popupClosed() && !mdView.data.includes(definitionToken) && Date.now() < dataDeadline) {
+    while (!popupClosed() && mdView.data !== editor.getValue() && Date.now() < dataDeadline) {
         await new Promise((resolve) => win.setTimeout(resolve, pollDelay));
         pollDelay = pollDelay === 0 ? 10 : 50;
     }
