@@ -9,6 +9,7 @@ import { lintAfterFootnoteCreation } from "../../src/linting/linter";
 // The popup-deferred lint-on-creation fires after a user-driven delay, and a Reading-view flip mid-popup (no active-leaf-change fires) leaves every internal gate untripped, so the deferred lint edits the hidden buffer.
 // Hunt: 2026-08-09. Lens: interactions.
 // Root cause: commit a30761f guarded the lint COMMANDS with readingViewActive but not lintAfterFootnoteCreation, whose gates (file path, popup busy, table focus) all stay untripped by a Reading-view flip.
+// Since 2026-08-27 the popup path lints synchronously BEFORE the popup opens (no deferral left), so this guard is defense-in-depth against programmatic callers — still pinned.
 
 function fakeEditor(lines: string[], cursor: EditorPosition): FakeEditor {
     return sharedFakeEditor(lines, {
@@ -66,7 +67,7 @@ describe("popup-deferred lint-on-creation vs Reading view (fixed 2026-08-10)", (
             { lintOnFootnoteCreation: true },
             "preview",
         );
-        lintAfterFootnoteCreation(plugin, true, "note.md");
+        lintAfterFootnoteCreation(plugin, true);
         expect(doc.lines).toEqual(lines);
         expect(doc.cursor).toEqual({ line: 2, ch: lines[2].length });
     });
@@ -81,7 +82,7 @@ describe("popup-deferred lint-on-creation vs Reading view (fixed 2026-08-10)", (
             { lintOnFootnoteCreation: true },
             "source",
         );
-        lintAfterFootnoteCreation(plugin, true, "note.md");
+        lintAfterFootnoteCreation(plugin, true);
         expect(doc.transactions).toBeGreaterThan(0);
     });
 });

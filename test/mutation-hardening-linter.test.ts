@@ -395,29 +395,6 @@ describe("lintAfterFootnoteCreation guards", () => {
         expect(noticeCalls).toEqual([]);
     });
 
-    // L428 ConditionalExpression (-> false): a deferred lint must not fire on
-    // whatever note the user switched to.
-    it("does not fire on a different note than the one it was armed for", () => {
-        const doc = fakeEditor(DIRTY);
-        lintAfterFootnoteCreation(pluginFor(viewFor(doc)), false, "other.md");
-        expect(doc.value).toBe(DIRTY);
-        expect(doc.appliedChanges).toEqual([]);
-    });
-
-    // L428 OptionalChaining (mdView.file?.path -> mdView.file.path): a view
-    // without a file must compare as "not the expected note", not throw.
-    it("survives an armed lint whose view has no file", () => {
-        const doc = fakeEditor(DIRTY);
-        expect(() =>
-            { lintAfterFootnoteCreation(
-                pluginFor(viewFor(doc, null)),
-                false,
-                "note.md",
-            ); },
-        ).not.toThrow();
-        expect(doc.value).toBe(DIRTY);
-    });
-
     // L430 ConditionalExpression (-> false) and LogicalOperator (|| -> &&):
     // focus inside a nested sub-editor (here one with no td/th ancestor, so
     // activeTableCellEditor is null and only nestedSubEditorOwnsFocus is
@@ -603,5 +580,41 @@ describe("relanding the cursor on the new empty definition", () => {
         );
         expect(doc.value).toBe("---\n[^x]: \n---\nAlpha,[^note] bravo\n\n[^note]: ");
         expect(doc.cursor).toEqual({ line: 5, ch: 9 });
+    });
+});
+
+// ---------- the relocated-name return (popup binding, 2026-08-27) ----------
+
+describe("the creation lint returns the relocated definition name", () => {
+    // The popup arm lints BEFORE the popup opens and binds the popup to
+    // the returned post-lint id (Jason's ask 2026-08-27) — the same
+    // relocation the caret reland uses, surfaced as the return value.
+    it("returns the renumbered name of the unique empty definition", () => {
+        const doc = fakeEditor("alpha[^5] bravo[^9]\n\n[^5]: five\n[^9]: ");
+        expect(
+            lintAfterFootnoteCreation(pluginFor(viewFor(doc)), false),
+        ).toBe("2");
+        expect(doc.value).toBe("alpha[^1] bravo[^2]\n\n[^1]: five\n[^2]: ");
+    });
+
+    it("returns null when the lint changed nothing", () => {
+        const doc = fakeEditor("alpha[^1]\n\n[^1]: ");
+        expect(
+            lintAfterFootnoteCreation(pluginFor(viewFor(doc)), false),
+        ).toBeNull();
+    });
+
+    it("returns the seeded definition's renumbered name when a body is given", () => {
+        const doc = fakeEditor("alpha[^5] bravo[^9]\n\n[^5]: five\n[^9]: moved text");
+        expect(
+            lintAfterFootnoteCreation(pluginFor(viewFor(doc)), false, "moved text"),
+        ).toBe("2");
+    });
+
+    it("returns null when several empty definitions leave the new one ambiguous", () => {
+        const doc = fakeEditor("a[^7] b[^9]\n\n[^7]: \n[^9]: ");
+        expect(
+            lintAfterFootnoteCreation(pluginFor(viewFor(doc)), false),
+        ).toBeNull();
     });
 });

@@ -469,57 +469,57 @@ function uniqueSeededDefinitionName(doc: Editor, body: string): string | null {
  * no notice at all; only an actual cleanup announces itself, and it happens
  * in the note the user is LOOKING AT, unlike the old file-change trigger.
  *
- * The creation sites call this directly on the jump-to-definition path (and
- * `relandCursor` puts the caret back on the new — possibly renumbered —
- * definition afterwards: the unique empty one, or with `seededBody` the
- * unique definition carrying exactly that body, which is how a selection
- * conversion's pre-filled footnote is found again after the lint moved or
- * renumbered it — A8 report, 2026-08-26). On the popup path they defer it through
- * runAfterNextPopupSettle instead: linting under a live popup could
- * renumber the id the popup is bound to. Table-cell creations skip the
- * trigger entirely (editing the document while a cell sub-editor owns
- * focus is the issue #28 corruption family).
+ * Every definition-backed creation runs this synchronously as part of the
+ * press: the jump arm right after landing (with `relandCursor` putting the
+ * caret back on the new — possibly renumbered — definition: the unique
+ * empty one, or with `seededBody` the unique definition carrying exactly
+ * that body, which is how a selection conversion's pre-filled footnote is
+ * found again after the lint moved or renumbered it — A8 report,
+ * 2026-08-26), and the popup arm right BEFORE the popup opens (Jason's
+ * ask 2026-08-27: the note must look linted the moment the popup appears,
+ * not after it closes — the old settle-deferred lint left the text
+ * visibly unlinted the whole time the popup was up). Linting before the
+ * popup BINDS also retires the hazard the deferral existed for: the popup
+ * opens on the post-lint id, which is why the relocated definition name is
+ * RETURNED (null = the lint changed nothing, or the new definition could
+ * not be identified unambiguously — the caller keeps its original id).
+ * Table-cell creations skip the trigger entirely (editing the document
+ * while a cell sub-editor owns focus is the issue #28 corruption family).
  */
 export function lintAfterFootnoteCreation(
     plugin: FootnotePlugin,
     relandCursor: boolean,
-    expectedFilePath?: string,
     seededBody?: string,
-) {
-    if (!plugin.settings.lintOnFootnoteCreation) return;
-    // the shared gate covers Reading view too — the popup path defers
-    // this call, so the user may have flipped modes since the footnote
-    // was created (no leaf change fires on a mode flip)
+): string | null {
+    if (!plugin.settings.lintOnFootnoteCreation) return null;
+    // the shared gate covers Reading view too — defense in depth: the
+    // creation commands are already guarded, but this keeps a
+    // programmatic caller from editing the hidden buffer
     const target = safeLintTarget(plugin);
-    if (!target) return;
+    if (!target) return null;
     const doc = target.doc;
-    // a deferred (popup-path) lint must not fire on some OTHER note the
-    // user has since switched to
-    if (expectedFilePath && target.mdView.file?.path !== expectedFilePath)
-        return;
     const before = doc.getValue();
     // silent on a blocked prefix: the insert path already explained it
-    if (lintBlockedByPrefix(before)) return;
+    if (lintBlockedByPrefix(before)) return null;
     const after = lintFootnotes(
         before,
         lintOptionsFromSettings(plugin, configuredSectionHeading(plugin), before),
     );
     if (after === before) {
         noticeLintAlerts(plugin, after);
-        return;
+        return null;
     }
     replaceMinimal(doc, before, after);
     new Notice("Footnotes linted.");
     noticeLintAlerts(plugin, after);
-    if (relandCursor) {
-        const target =
-            seededBody === undefined
-                ? uniqueEmptyDefinitionName(doc)
-                : uniqueSeededDefinitionName(doc, seededBody);
-        if (target !== null) {
-            jumpToFootnoteDefinition(target, doc.getCursor(), plugin, doc);
-        }
+    const relocated =
+        seededBody === undefined
+            ? uniqueEmptyDefinitionName(doc)
+            : uniqueSeededDefinitionName(doc, seededBody);
+    if (relandCursor && relocated !== null) {
+        jumpToFootnoteDefinition(relocated, doc.getCursor(), plugin, doc);
     }
+    return relocated;
 }
 
 // Stryker disable all: live-Obsidian integration (popup settling, active

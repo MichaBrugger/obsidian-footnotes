@@ -23,23 +23,6 @@ let activePopup: ActivePopup | null = null;
 // edit the document await this before touching anything.
 let pendingTeardown: Promise<void> | null = null;
 
-// One-shot callbacks fired after the NEXT popup teardown fully settles (its
-// definition save landed). "Lint on footnote creation" uses this: a footnote
-// created with the popup open must not be linted until the popup closes —
-// linting earlier could renumber the very id the popup is bound to.
-// A QUEUE, not a single slot: two registrations before a settle used to
-// silently drop the first (2026-08-11 review bug #14 — latent, since every
-// caller awaited the pending teardown first, but undefended).
-let afterSettleQueue: (() => void)[] = [];
-
-/** Register `callback` to run once after the next popup teardown settles. Returns a canceller (a no-op once the callback has fired). */
-export function runAfterNextPopupSettle(callback: () => void): () => void {
-    afterSettleQueue.push(callback);
-    return () => {
-        afterSettleQueue = afterSettleQueue.filter((c) => c !== callback);
-    };
-}
-
 /** Whether a popup is open or a closed one's save is still in flight — automatic edits must stay away while true. */
 export function footnotePopupBusy(): boolean {
     return activePopup !== null || pendingTeardown !== null;
@@ -403,11 +386,6 @@ export async function openFootnotePopup(
                         pendingTeardown = null;
                     }
                     settle();
-                    // after-settle work (lint-on-footnote-creation) runs
-                    // only now, when the saved definition is fully reconciled
-                    const callbacks = afterSettleQueue;
-                    afterSettleQueue = [];
-                    for (const callback of callbacks) callback();
                 }, 50);
             };
             teardown();

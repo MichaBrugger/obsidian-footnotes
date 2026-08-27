@@ -33,7 +33,6 @@ import {
     replaceInTableCell,
 } from "./create-footnote";
 import { DefinitionCreationNotice } from "./press-guards";
-import { lintAfterFootnoteCreation } from "../linting/linter";
 import { TableCellEditor } from "../editor/table-cursor";
 
 // Turning a selection into a footnote (issue #35): a creation press with a
@@ -723,17 +722,15 @@ function convertMainSelection(
             line: referenceAnchor.line,
             ch: referenceAnchor.ch + footnoteReference.length,
         },
-        // a conversion CREATES a footnote, so "Lint on footnote creation"
+        // a conversion CREATES a footnote, so the landing's creation lint
         // covers it like every other creation press (Jason's parity ask
-        // 2026-08-25). The seeded body is how the reland finds the new
-        // definition again after the lint may have renumbered and MOVED it
-        // — the empty-definition reland can't (a conversion's definition
-        // is never empty), and without a reland the caret was left on
-        // whatever the lint's minimal replacement put at its old spot
-        // (Jason's A8 report, 2026-08-26)
-        afterJump: () => {
-            lintAfterFootnoteCreation(plugin, true, undefined, body);
-        },
+        // 2026-08-25). The seeded body is how the lint re-finds the new
+        // definition after renumbering and MOVING it — the
+        // empty-definition relocation can't (a conversion's definition is
+        // never empty), and without it the caret was left on whatever the
+        // lint's minimal replacement put at its old spot (Jason's A8
+        // report, 2026-08-26)
+        seededBody: body,
     });
 }
 

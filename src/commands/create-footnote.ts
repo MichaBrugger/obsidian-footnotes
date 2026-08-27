@@ -2,7 +2,6 @@ import {
     Editor,
     EditorChange,
     EditorPosition,
-    MarkdownView,
     Notice,
 } from "obsidian";
 
@@ -13,7 +12,8 @@ import {
     idListIncludes,
     isValidFootnoteName,
 } from "../parsing/footnote-grammar";
-import { footnotePopupBusy, openFootnotePopup, popupEditingAvailable, runAfterNextPopupSettle } from "./footnote-popup";
+import { openFootnotePopup, popupEditingAvailable } from "./footnote-popup";
+import { jumpToFootnoteDefinition } from "./navigation";
 import { activeFootnotePrefix, footnotePrefixFromEditor } from "../parsing/footnote-prefix";
 import { adjustFootnotePosition, endOfWordOffset, moveCursorAndSetJumpPoint } from "../editor/cursor-motion";
 import { buildDefinitionAppend } from "./definition-append";
@@ -113,32 +113,21 @@ function dispatchCellEditIfLive(
     return true;
 }
 
-// "Lint on footnote creation", popup flavor: the lint must wait for the
-// popup that is about to open to close and settle — linting under it could
-// renumber the id it is bound to. Registered BEFORE openFootnotePopup; the
-// returned canceller is for its fallback path, where the press degrades to
-// the jump flow and the immediate trigger takes over.
-// Stryker disable all: popup-settle scheduling against the live workspace —
-// smoke-test territory, unreachable from units (coverage-verified 2026-08-11)
-function scheduleCreationLintAfterPopup(plugin: FootnotePlugin): () => void {
-    if (!plugin.settings.lintOnFootnoteCreation) return () => {};
-    const path =
-        plugin.app.workspace.getActiveViewOfType(MarkdownView)?.file?.path;
-    return runAfterNextPopupSettle(() => {
-        lintAfterFootnoteCreation(plugin, false, path);
-    });
-}
-// Stryker restore all
-
 /**
- * The shared creation tail of the autonum and named commands' popup path:
- * open the popup editor bound to the new definition. Its fallback (embed
- * registry unavailable, or a late failure) jumps to the definition
- * instead — and there a popup that failed AFTER its DOM existed is still
- * settling its teardown save, so an immediate lint would no-op behind the
- * busy gate; the settle-deferred lint registered here fires instead (E32).
- * Every definition-backed insertion reaches here through
- * landDefinitionBackedInsertion below (2026-08-25 unification).
+ * The shared creation tail of the popup path: lint FIRST, then open the
+ * popup editor bound to the new definition. The lint used to be deferred
+ * to the popup's teardown settle, which left the note visibly unlinted
+ * the whole time the popup was up (Jason's ask 2026-08-27); linting
+ * before the popup BINDS also retires the hazard the deferral existed
+ * for — a mid-popup rename of the bound id — because the popup opens on
+ * the POST-lint id (lintAfterFootnoteCreation returns the relocated
+ * name; see its contract). The fallback (embed registry unavailable, or
+ * a late failure) jumps to the definition instead — by NAME, since the
+ * pre-lint `definitionCursor` coordinates may be stale after the lint
+ * moved or renumbered the definition; the raw coordinates remain as the
+ * last resort when even the name lookup fails. Every definition-backed
+ * insertion reaches here through landDefinitionBackedInsertion below
+ * (2026-08-25 unification).
  */
 // Stryker disable all: popup handoff against the live workspace — smoke-test
 // territory, unreachable from units (coverage-verified by the 2026-08-12
@@ -149,13 +138,14 @@ function openPopupForNewDefinition(
     cursorPosition: EditorPosition,
     footnoteId: string,
     definitionCursor: EditorPosition,
+    seededBody?: string,
 ) {
-    const cancelCreationLint = scheduleCreationLintAfterPopup(plugin);
-    void openFootnotePopup(plugin, footnoteId, () => {
-        moveCursorAndSetJumpPoint(doc, cursorPosition, definitionCursor, plugin, undefined, true);
-        if (footnotePopupBusy()) return;
-        cancelCreationLint();
-        lintAfterFootnoteCreation(plugin, true);
+    const relocated = lintAfterFootnoteCreation(plugin, false, seededBody);
+    const effectiveId = relocated ?? footnoteId;
+    void openFootnotePopup(plugin, effectiveId, () => {
+        if (!jumpToFootnoteDefinition(effectiveId, cursorPosition, plugin, doc)) {
+            moveCursorAndSetJumpPoint(doc, cursorPosition, definitionCursor, plugin, undefined, true);
+        }
     });
 }
 // Stryker restore all
@@ -165,12 +155,15 @@ function openPopupForNewDefinition(
  * single caret, multi-caret, and selection conversion each cloned this
  * branch before 2026-08-25: apply `changes` and hand the new definition
  * to the user, in the popup (the caret parks just past the primary new
- * reference; openPopupForNewDefinition schedules the creation lint for
- * after the popup settles) or by jumping to `definitionCursor`.
- * `afterJump` runs only on the jump arm — every main-editor caller
- * passes the creation lint there since Jason's parity ruling
- * (2026-08-25): anything that creates a footnote lints when the setting
- * says so. Cell creations stay out (see landCellDefinitionAppend).
+ * reference; openPopupForNewDefinition lints first and binds the popup
+ * to the post-lint id) or by jumping to `definitionCursor` and linting
+ * with the caret reland. The landing owns the creation lint on BOTH
+ * arms since Jason's parity ruling (2026-08-25, made pre-popup
+ * 2026-08-27): anything that creates a footnote lints when the setting
+ * says so. `seededBody` is the conversions' exact definition body — how
+ * the lint re-finds the new footnote after renumbering or moving it
+ * (a plain insert's definition is the unique EMPTY one instead).
+ * Cell creations stay out (see landCellDefinitionAppend).
  */
 export function landDefinitionBackedInsertion(opts: {
     plugin: FootnotePlugin;
@@ -183,7 +176,8 @@ export function landDefinitionBackedInsertion(opts: {
     definitionCursor: EditorPosition;
     /** the popup arm's caret landing just past the primary new reference — omitted by the definition-only append (createMatchingFootnoteDefinition), whose caret already sits on the existing reference */
     afterReference?: EditorPosition;
-    afterJump?: () => void;
+    /** the seeded definition body a selection conversion wrote (label line onward, continuation indent included); omitted by every empty-definition press */
+    seededBody?: string;
 }): void {
     // Stryker disable next-line ConditionalExpression, BlockStatement: units run popup-off, so which arm fires is smoke territory — the full smoke suite drives both
     if (popupEditingAvailable(opts.plugin)) {
@@ -203,6 +197,7 @@ export function landDefinitionBackedInsertion(opts: {
             opts.origin,
             opts.footnoteId,
             opts.definitionCursor,
+            opts.seededBody,
         );
         // Stryker restore all
     } else {
@@ -214,7 +209,7 @@ export function landDefinitionBackedInsertion(opts: {
             opts.changes,
             true,
         );
-        opts.afterJump?.();
+        lintAfterFootnoteCreation(opts.plugin, true, opts.seededBody);
     }
 }
 
@@ -374,9 +369,6 @@ export function createAutonumFootnote(
             line: referenceAnchor.line,
             ch: referenceAnchor.ch + footnoteReference.length,
         },
-        afterJump: () => {
-            lintAfterFootnoteCreation(plugin, true);
-        },
     });
     return true;
 }
@@ -438,9 +430,6 @@ export function createMatchingFootnoteDefinition(
             // no afterReference: this press appends a definition for an
             // EXISTING reference the caret already sits on — nothing to
             // park past
-            afterJump: () => {
-                lintAfterFootnoteCreation(plugin, true);
-            },
         });
         return true;
     }

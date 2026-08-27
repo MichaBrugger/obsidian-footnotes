@@ -14,6 +14,6 @@ start messy[^20] references[^10] here
 - [ ] Inserting the footnote renumbers the whole note (`[^20]`/`[^10]` become sequential) and a "Footnotes linted." notice appears
 - [ ] The caret still lands on the NEW footnote's empty definition, even though the lint renumbered it
 - [ ] Undo, insert a footnote into an already-clean note: no notice at all (clean creations are silent)
-- [ ] With `Edit footnotes in a popup` ON: the lint waits until the popup closes, then runs
+- [ ] With `Edit footnotes in a popup` ON: the note is ALREADY linted the moment the popup appears (renumbering visible behind it, no wait for the popup to close), and the popup edits the NEW footnote under its renumbered id — its `[^n]:` label matches the renumbered definition (2026-08-27)
 - [ ] With the toggle OFF, creation leaves the mess alone
 - [ ] Switching between notes never lints anything anymore (the old trigger is gone)

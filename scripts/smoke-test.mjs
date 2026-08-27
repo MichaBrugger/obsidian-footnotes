@@ -566,6 +566,70 @@ async function main() {
         await sleep(800);
     });
 
+    await test("creation lint is applied BEFORE the popup opens (2026-08-27)", async () => {
+        // Jason's ask 2026-08-27: with the popup on, the lint used to wait
+        // until the popup CLOSED — the note looked unlinted the whole time
+        // the popup was up. It now lints right after the creation edit,
+        // before the popup appears (which also lets the popup bind to the
+        // post-lint id instead of dodging a mid-popup rename).
+        resetSettings({
+            enablePopupEditor: true,
+            lintOnFootnoteCreation: true,
+            insertAtEndOfWord: false,
+        });
+        await setupNote("Alpha, bravo");
+        setCursorAndRun(0, 5, CMD_AUTONUM); // just before the comma
+        await pollUntil(
+            "popup open",
+            `!!document.querySelector('.footnote-shortcut-popup')`,
+            (v) => v === true,
+        );
+        // the punctuation fix is already applied WHILE the popup is up
+        await expectEditorText("Alpha,[^1] bravo\n\n[^1]: ");
+        action(
+            `document.querySelectorAll('.footnote-shortcut-popup').forEach((el) => ` +
+            `el.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true})));`,
+        );
+        await sleep(800);
+        // closing changes nothing further — the lint already ran
+        await expectEditorText("Alpha,[^1] bravo\n\n[^1]: ");
+    });
+
+    await test("popup binds to the RENUMBERED id when the creation lint renames the new footnote", async () => {
+        // the reason pre-popup linting is safe at all: the popup opens on
+        // the post-lint id (lintAfterFootnoteCreation returns the
+        // relocated name), so a reindex renaming the just-created
+        // footnote can no longer strand the popup on a dead id
+        resetSettings({
+            enablePopupEditor: true,
+            lintOnFootnoteCreation: true,
+            insertAtEndOfWord: false,
+        });
+        await setupNote("zeta[^5] quick\n\n[^5]: five");
+        setCursorAndRun(0, 11, CMD_AUTONUM); // mid "quick" — mints [^6]
+        await pollUntil(
+            "popup open",
+            `!!document.querySelector('.footnote-shortcut-popup')`,
+            (v) => v === true,
+        );
+        // reindex renamed 5→1 and the new 6→2 before the popup opened...
+        await expectEditorText("zeta[^1] qu[^2]ick\n\n[^1]: five\n[^2]: ");
+        // ...and the popup is bound to the RENAMED id, not the minted one
+        const label = await pollUntil(
+            "popup label",
+            `document.querySelector('.footnote-shortcut-popup-label')?.textContent ?? null`,
+            (v) => typeof v === "string",
+        );
+        if (label !== "[^2]:") {
+            throw new Error(`popup bound to ${JSON.stringify(label)}, expected "[^2]:"`);
+        }
+        action(
+            `document.querySelectorAll('.footnote-shortcut-popup').forEach((el) => ` +
+            `el.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true})));`,
+        );
+        await sleep(800);
+    });
+
     await test("inline footnote inserts ^[] at end of word with cursor inside", async () => {
         resetSettings();
         await setupNote("Alpha bravo charlie");
@@ -1877,7 +1941,13 @@ async function main() {
 
     // LAST before cleanup: this test flips the view mode, and a failure
     // between flip and flip-back must not poison the tests after it
-    await test("deferred creation-lint stays inert after a flip to Reading view (2026-08-10 A7)", async () => {
+    await test("closing the popup in Reading view edits nothing (creation lint already ran, 2026-08-27)", async () => {
+        // historically this pinned the DEFERRED creation lint staying
+        // inert after a Reading-view flip (2026-08-10 A7); since
+        // 2026-08-27 the lint runs BEFORE the popup opens, so the pin is
+        // now: the linted text is in place while the popup is up, and
+        // closing the popup from Reading view performs no further edit
+        // on the hidden buffer
         resetSettings({
             enablePopupEditor: true,
             lintOnFootnoteCreation: true,
@@ -1890,26 +1960,24 @@ async function main() {
             `!!document.querySelector('.footnote-shortcut-popup')`,
             (v) => v === true,
         );
-        const created = "Alpha[^1], bravo\n\n[^1]: ";
+        // the punctuation fix applied at creation, before the popup
+        const created = "Alpha,[^1] bravo\n\n[^1]: ";
         await expectEditorText(created);
         // flip to Reading view WITHOUT a leaf change — the popup stays up
-        // and none of the deferred lint's other gates trip
         action(
             `(async () => { const v=${EDITOR}; ` +
             `await v.setState({...v.getState(), mode:'preview'}, {history:false}); })();`,
         );
         await pollUntil("reading view", `(${EDITOR}).getMode()`, (v) => v === "preview");
-        // the hotkey's toggle path closes the popup; its settle callback
-        // then fires the deferred lint, which must now be inert — the
-        // pending punctuation fix ("Alpha[^1]," → "Alpha,[^1]") must NOT
-        // be applied to the hidden buffer
+        // the hotkey's toggle path closes the popup; nothing may edit the
+        // hidden buffer afterwards
         action(`app.commands.executeCommandById('${CMD_AUTONUM}');`);
         await pollUntil(
             "popup closed",
             `!document.querySelector('.footnote-shortcut-popup')`,
             (v) => v === true,
         );
-        await sleep(1200); // teardown save + settle beat + would-be lint
+        await sleep(1200); // teardown save + settle beat
         const text = readJson(`(${EDITOR}).editor.getValue()`);
         // flip back BEFORE asserting so a failure can't strand Reading view
         action(
@@ -1918,7 +1986,7 @@ async function main() {
         );
         await pollUntil("editing view", `(${EDITOR}).getMode()`, (v) => v === "source");
         if (text !== created) {
-            throw new Error(`deferred lint edited the hidden buffer: ${JSON.stringify(text)}`);
+            throw new Error(`the popup close edited the hidden buffer: ${JSON.stringify(text)}`);
         }
     });
 
