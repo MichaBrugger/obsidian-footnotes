@@ -1,7 +1,14 @@
+---
+footnote-prefix: 3.
+---
+
 # L13: orphans, empty references, missing definitions
 
 Settings: all rules ON; the Orphans toggles start OFF (alerts, not
-deletions — orphans are never silent, 2026-08-10).
+deletions — orphans are never silent, 2026-08-10). For the `[^3.]`
+placeholder check: `Per-note footnote prefix` ON (the frontmatter above
+carries `3.`) with the `Apply footnote prefix` lint rule OFF, so nothing
+gets renamed.
 
 Fixture: text[^used] here, a stray[^99] with no definition, an empty [^]
 reference, and an untouched prefix placeholder [^3.] in this sentence.

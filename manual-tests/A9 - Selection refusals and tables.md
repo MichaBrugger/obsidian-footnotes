@@ -1,8 +1,8 @@
 # A9: selection conversion refusals, and tables (issue #35)
 
-Settings: defaults.
+Settings: defaults. (Plain multi-line conversion lives in A8; the block
+zoo in A13 — this sheet owns the REFUSALS and the table cases.)
 
-- [ ] Select across BOTH of these two short lines and press the numbered hotkey: they convert into ONE definition, the second line indented four spaces under the label (multi-paragraph selections, 2026-08-19); undo restores both lines
 - [ ] With Alt+DRAG (Windows; Option on macOS), make TWO separate selections and press the numbered hotkey: a toast asks for one continuous stretch, nothing changes (wording fixed 2026-08-21 — Ctrl-click was wrong; verified live via editor eval)
 - [ ] With Alt+CLICK, place extra CARETS instead (no dragged ranges): the press inserts the same footnote at every caret — that's A14's sheet
 - [ ] Select `code words` inside the span on this line: `some code words here` — the cuts-through-protected-text toast appears, nothing changes

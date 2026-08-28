@@ -9,9 +9,10 @@ Settings: defaults.
   spans two lines and should collapse to one.
 - [ ] Caret inside an EXISTING filled inline footnote + paste-inline hotkey: it hops out past the bracket instead of nesting the clipboard (fixed 2026-08-07)
 
-Hotkeys inside this inline footnote^[put the caret in here] and the reverse:
+Hotkeys inside this inline footnote^[put the caret in here], a bare
+reference[^tag] with no definition, and the reverse:
 
-- [ ] NUMBERED and NAMED hotkeys inside it hop just past the closing bracket, nothing nested
-- [ ] Insert a numbered footnote, put the caret back INSIDE its `[^1]`, press the INLINE hotkey: it navigates to the definition (or popup) — no `^[]` nested into the reference
-- [ ] Hand-type a bare `[^tag]`, caret inside, INLINE hotkey: the definition is created like the named key would
+- [ ] NUMBERED and NAMED hotkeys inside the inline footnote hop just past the closing bracket, nothing nested
+- [ ] Insert a numbered footnote, put the caret back INSIDE its reference, press the INLINE hotkey: it navigates to the definition (or popup) — no `^[]` nested into the reference
+- [ ] Caret inside the bare `[^tag]` above, INLINE hotkey: the definition is created like the named key would
 - [ ] The PASTE hotkey navigates the same way, and the clipboard stays untouched for the next real paste

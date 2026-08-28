@@ -142,8 +142,8 @@ numbered/named keys.
 - [ ] Select from "before the table" through only the table's HEADER row and
       convert: allowed (tables aren't protected) — note whether the
       leftover half-table looks acceptable, this one is judgment territory
-- [ ] Select from above the fence through its opening ``` only: cuts-through-protected toast
-- [ ] Select from inside the `$$` block to below it: same toast
+- [ ] Select from inside the `$$` block to below it: the cuts-through-protected
+      toast (the fence-cut twin is A9's check — not repeated here)
 
 ## Popup pass
 

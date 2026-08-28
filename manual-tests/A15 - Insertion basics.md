@@ -6,4 +6,5 @@ A4/A5 for section headings).
 - [ ] First footnote in this note lands its definition at the very bottom
 - [ ] A second insertion numbers sequentially and appends its definition right below the first
 - [ ] With the caret immediately AFTER an existing reference's `]`, the hotkey inserts a consecutive new footnote instead of navigating
-- [ ] A reference inserted mid-sentence before punctuation hops after the comma, like this, and after the period.
+
+(The before-punctuation end-of-word hop is A1's check — not repeated here.)

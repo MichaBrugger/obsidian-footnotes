@@ -11,4 +11,5 @@ Empty guard (QOL 2026-08-07) — get `[^]`, type NOTHING, caret inside:
 
 - [ ] The NAMED hotkey toasts "type a name between the brackets", caret stays put
 - [ ] The NUMBERED, INLINE, and PASTE hotkeys show the same toast, nothing nests
-- [ ] Click elsewhere leaving the `[^]` behind, run **Lint footnotes**: the empty-reference alert fires (see L13)
+
+(An abandoned `[^]`'s lint alert is L13's check — not repeated here.)
