@@ -12,6 +12,7 @@ import {
 } from "obsidian";
 
 import { ensureTextPropertyType, readingViewActive, VaultWithConfigEvents, viewEditor } from "./editor/obsidian-internals";
+import { undoOrphanNoticeExtension } from "./editor/undo-orphan-notice";
 import { FootnotePluginSettingTab, FootnotePluginSettings, DEFAULT_SETTINGS } from "./settings";
 import { dismissFootnotePopup } from "./commands/footnote-popup";
 import { insertAutonumFootnote, insertInlineFootnote, insertNamedFootnote, pasteInlineFootnote } from "./commands/insert-or-navigate-footnotes";
@@ -197,6 +198,10 @@ export default class FootnotePlugin extends Plugin {
     );
     // "Lint on save" wraps the core save command (restored on unload)
     installLintOnSave(this);
+    // partial-undo feedback: an undo that orphans a reference (the
+    // two-step table-cell undo, the named flow's definition press) says
+    // so instead of leaving a half-reverted note (2026-08-27)
+    this.registerEditorExtension(undoOrphanNoticeExtension());
     this.app.workspace.onLayoutReady(() => {
       installVimWriteHook(this);
       // with the prefix feature on, pin the plugin-owned footnote-prefix

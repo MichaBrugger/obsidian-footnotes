@@ -227,6 +227,32 @@ async function requireVisibleWindow() {
     );
 }
 
+// Open the table cell on `line` that contains `landmark` and put FOCUS
+// inside its sub-editor. The main caret parks on `outsideLine` (a
+// non-table line) first: focusing while the caret already sits inside the
+// table opens whatever cell HOLDS it — right after setValue that is the
+// FIRST cell, and the command then edits the wrong cell (root-caused
+// 2026-08-27). The poll also verifies the opened cell really is the
+// landmark's, kicking the selection back out when a wrong cell grabbed
+// the focus, and re-focuses the cell's own contentDOM — a td-level focus
+// makes the command's cell resolution (findFromDOM) see the MAIN view.
+async function activateTableCell(line, outsideLine, landmark) {
+    action(`(${EDITOR}).editor.setCursor({line:${outsideLine}, ch:0});`);
+    await sleep(200);
+    await pollUntil(
+        "table cell sub-editor open and focused on the target cell",
+        `(() => { const v=${EDITOR}; const t=document.querySelector('.markdown-source-view table'); ` +
+        `const cc = t && t.querySelector('.cm-content'); ` +
+        `if (cc && cc.textContent.includes(${JSON.stringify(landmark)})) { ` +
+        `if (cc.contains(document.activeElement)) return true; cc.focus(); return false; } ` +
+        `if (cc) { v.editor.setCursor({line:${outsideLine}, ch:0}); return false; } ` +
+        `v.editor.cm.contentDOM.focus(); ` +
+        `const ch=v.editor.getLine(${line}).indexOf(${JSON.stringify(landmark)})+1; ` +
+        `v.editor.setCursor({line:${line}, ch}); return false; })()`,
+        (v) => v === true,
+    );
+}
+
 async function test(name, fn) {
     if (nameFilter !== null && !name.toLowerCase().includes(nameFilter.toLowerCase())) {
         filtered++;
@@ -1203,6 +1229,8 @@ async function main() {
             "| Lorem[^1]     | Ipsum[^2]          | fdssad [^five] [^six] [^2]<br> |",
             "| ------------- | ------------------ | ------------------------------ |",
             "| Dolor[^three] | Sit[^four] [^five] () | fddad [^bobthebuilder]         |",
+            "",
+            "tail",
         ].join("\n");
         // the table widget re-normalizes column padding after load, so a
         // byte-exact setupNote wait would never match — set the content and
@@ -1219,19 +1247,10 @@ async function main() {
             `(${EDITOR}).data`,
             (v) => typeof v === "string" && v.includes("()"),
         );
-        // focusing the editor with the caret inside the table opens the
-        // cell sub-editor in live preview — the state that triggered the bug
-        action(
-            `(() => { const v=${EDITOR}; v.editor.focus(); ` +
-            `const ch=v.editor.getLine(2).indexOf('()')+1; ` +
-            `v.editor.setCursor({line:2, ch}); })();`,
-        );
-        await pollUntil(
-            "table cell sub-editor to open",
-            `(() => { const t=document.querySelector('.markdown-source-view table'); ` +
-            `return !!(t && t.querySelector('.cm-content')); })()`,
-            (v) => v === true,
-        );
+        // the shared activation opens the "()" cell with real focus inside
+        // its sub-editor (see activateTableCell — the one-shot recipe
+        // opened the FIRST cell instead, 2026-08-27)
+        await activateTableCell(2, 4, "()");
         action(`app.commands.executeCommandById('${CMD_NAMED}');`);
         await pollUntil(
             "reference inserted between the parens",
@@ -1242,6 +1261,64 @@ async function main() {
         if (line.includes("\\|")) throw new Error(`table pipe got escaped: ${line}`);
         const pipes = (line.match(/\|/g) ?? []).length;
         if (pipes !== 4) throw new Error(`table row has ${pipes} pipes, expected 4: ${line}`);
+    });
+
+    await test("undoing a table-cell footnote warns about the orphaned reference (2026-08-27)", async () => {
+        await requireVisibleWindow();
+        // creating from a cell takes TWO undo steps by construction: the
+        // reference rides the cell sub-editor's dispatch, the definition a
+        // main-editor transaction, and CodeMirror's history can never
+        // group the two. The first undo used to silently strand an
+        // orphaned reference in the table (Jason's report 2026-08-27) —
+        // the partial-undo notice now says so.
+        resetSettings();
+        const table = [
+            "| alpha | beta |",
+            "| ----- | ---- |",
+            "| word here () | x |",
+            "",
+            "tail",
+        ].join("\n");
+        await setupNote("table pending");
+        action(`(${EDITOR}).editor.setValue(${JSON.stringify(table)});`);
+        await pollUntil(
+            "table content in editor",
+            `(${EDITOR}).editor.getValue()`,
+            (v) => typeof v === "string" && v.includes("()"),
+        );
+        await pollUntil(
+            "table content in data buffer",
+            `(${EDITOR}).data`,
+            (v) => typeof v === "string" && v.includes("()"),
+        );
+        // the shared activation opens the "()" cell with real focus inside
+        // its sub-editor (see activateTableCell)
+        await activateTableCell(2, 4, "()");
+        action(`app.commands.executeCommandById('${CMD_AUTONUM}');`);
+        await pollUntil(
+            "definition appended below the table",
+            `(${EDITOR}).editor.getValue()`,
+            (v) => typeof v === "string" && v.includes("[^1]: "),
+        );
+        await sleep(600); // let the cell's sync-back settle into history
+        action(`(${EDITOR}).editor.undo();`);
+        await pollUntil(
+            "the orphaned-reference notice",
+            `[...document.querySelectorAll('.notice')].map(n => n.textContent).join('|')`,
+            (v) => typeof v === "string" && v.includes("Undo again to remove the reference too."),
+        );
+        // the state the notice describes: reference stranded, definition gone
+        const text = readJson(`(${EDITOR}).editor.getValue()`);
+        if (!text.includes("[^1]") || text.includes("[^1]: ")) {
+            throw new Error(`unexpected post-undo state: ${JSON.stringify(text)}`);
+        }
+        // the second undo removes the reference and completes the revert
+        action(`(${EDITOR}).editor.undo();`);
+        await pollUntil(
+            "reference removed by the second undo",
+            `(${EDITOR}).editor.getValue()`,
+            (v) => typeof v === "string" && !v.includes("[^1]"),
+        );
     });
 
     await test("lint with only reindex on renumbers and reorders footnotes", async () => {
