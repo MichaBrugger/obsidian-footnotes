@@ -623,10 +623,33 @@ async function main() {
         if (label !== "[^2]:") {
             throw new Error(`popup bound to ${JSON.stringify(label)}, expected "[^2]:"`);
         }
+        // ... and the caret sits just past the NEW reference, so the popup
+        // anchors there too — the lint's minimal-diff rewrite maps a caret
+        // inside its span to the span START (the FIRST footnote) unless it
+        // is re-landed semantically (Jason's report 2026-08-27)
+        const atRef = { line: 0, ch: "zeta[^1] qu[^2]".length };
+        const cursor = readJson(`(${EDITOR}).editor.getCursor()`);
+        if (!cursor || cursor.line !== atRef.line || cursor.ch !== atRef.ch) {
+            throw new Error(
+                `caret at ${JSON.stringify(cursor)} while the popup is up, expected just past [^2] at ${JSON.stringify(atRef)}`,
+            );
+        }
         action(
             `document.querySelectorAll('.footnote-shortcut-popup').forEach((el) => ` +
             `el.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true})));`,
         );
+        await pollUntil(
+            "popup closed",
+            `!document.querySelector('.footnote-shortcut-popup')`,
+            (v) => v === true,
+        );
+        // closing hands the caret back just past the new reference as well
+        const after = readJson(`(${EDITOR}).editor.getCursor()`);
+        if (!after || after.line !== atRef.line || after.ch !== atRef.ch) {
+            throw new Error(
+                `caret at ${JSON.stringify(after)} after closing, expected just past [^2] at ${JSON.stringify(atRef)}`,
+            );
+        }
         await sleep(800);
     });
 

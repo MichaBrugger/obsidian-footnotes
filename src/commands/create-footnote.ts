@@ -11,6 +11,7 @@ import {
     emptyReferenceStart,
     idListIncludes,
     isValidFootnoteName,
+    referenceOccurrences,
 } from "../parsing/footnote-grammar";
 import { openFootnotePopup, popupEditingAvailable } from "./footnote-popup";
 import { jumpToFootnoteDefinition } from "./navigation";
@@ -114,6 +115,67 @@ function dispatchCellEditIfLive(
 }
 
 /**
+ * The caret's ordinal among `footnoteId`'s reference occurrences in
+ * document order: which "[^id]" the caret sits inside or immediately
+ * after (0 = the first; also 0 when the caret touches none, falling back
+ * to the primary reference). Same-id occurrence ORDER is stable across
+ * the lint rules — they rename references in place, move only definition
+ * blocks, and swap a reference only with adjacent punctuation — so the
+ * ordinal survives a lint that the caret's raw coordinates do not (see
+ * openPopupForNewDefinition). Exported for units; masked (code-span)
+ * fakes don't count, same as every reference scan.
+ */
+export function referenceOrdinalAtCursor(
+    doc: Editor,
+    footnoteId: string,
+    cursor: EditorPosition,
+    ctx: DocContext = docContext(doc),
+): number {
+    const wanted = footnoteId.toLowerCase();
+    let ordinal = 0;
+    for (let line = 0; line <= cursor.line && line < ctx.lines.length; line++) {
+        for (const occurrence of referenceOccurrences(
+            ctx.lines[line],
+            ctx.maskedLine(line),
+        )) {
+            if (occurrence.name.toLowerCase() !== wanted) continue;
+            if (line === cursor.line) {
+                if (cursor.ch > occurrence.start && cursor.ch <= occurrence.end) {
+                    return ordinal;
+                }
+                // an occurrence past the caret is neither the caret's own
+                // nor before it
+                if (occurrence.end > cursor.ch) continue;
+            }
+            ordinal++;
+        }
+    }
+    return 0;
+}
+
+/** The position just past the `ordinal`-th (document order) reference of `footnoteId`, or null when there are fewer. The restore half of referenceOrdinalAtCursor; exported for units. */
+export function positionAfterReference(
+    doc: Editor,
+    footnoteId: string,
+    ordinal: number,
+    ctx: DocContext = docContext(doc),
+): EditorPosition | null {
+    const wanted = footnoteId.toLowerCase();
+    let seen = 0;
+    for (let line = 0; line < ctx.lines.length; line++) {
+        for (const occurrence of referenceOccurrences(
+            ctx.lines[line],
+            ctx.maskedLine(line),
+        )) {
+            if (occurrence.name.toLowerCase() !== wanted) continue;
+            if (seen === ordinal) return { line, ch: occurrence.end };
+            seen++;
+        }
+    }
+    return null;
+}
+
+/**
  * The shared creation tail of the popup path: lint FIRST, then open the
  * popup editor bound to the new definition. The lint used to be deferred
  * to the popup's teardown settle, which left the note visibly unlinted
@@ -140,8 +202,19 @@ function openPopupForNewDefinition(
     definitionCursor: EditorPosition,
     seededBody?: string,
 ) {
+    const ordinal = referenceOrdinalAtCursor(doc, footnoteId, doc.getCursor());
     const relocated = lintAfterFootnoteCreation(plugin, false, seededBody);
     const effectiveId = relocated ?? footnoteId;
+    if (relocated !== null) {
+        // the lint changed the note, and its minimal-diff rewrite maps a
+        // caret INSIDE the one changed span to the span's START — which
+        // reads as the FIRST renumbered footnote (Jason's report
+        // 2026-08-27). The popup anchors at the caret and hands it back
+        // on close, so re-land it semantically first: just past the
+        // same-ordinal occurrence of the (possibly renamed) reference.
+        const restored = positionAfterReference(doc, effectiveId, ordinal);
+        if (restored) doc.setCursor(restored);
+    }
     void openFootnotePopup(plugin, effectiveId, () => {
         if (!jumpToFootnoteDefinition(effectiveId, cursorPosition, plugin, doc)) {
             moveCursorAndSetJumpPoint(doc, cursorPosition, definitionCursor, plugin, undefined, true);
