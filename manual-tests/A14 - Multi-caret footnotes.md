@@ -9,8 +9,9 @@ Fixture, place carets after "alpha", after "charlie", and after "echo":
 alpha bravo charlie delta echo
 
 - [ ] NUMBERED hotkey: the same `[^N]` lands at every caret with ONE definition; popup (or the jump) lands on that one definition; ONE undo reverts all of it
-- [ ] NAMED hotkey: a `[^]` skeleton at every caret with a cursor inside each — type the name once, it fills all of them; a second press on one filled reference creates the single shared definition
-- [ ] INLINE hotkey: `^[]` at every caret, typing writes the same body into all of them
+- [ ] NAMED hotkey: a `[^]` skeleton at every caret with a cursor inside each — type the name once, it fills all of them; a second press with the cursors STILL INSIDE the filled references creates the single shared definition (caret lands on it, or the popup opens on it) — no "cursor inside an existing footnote" refusal (2026-08-27)
+- [ ] NAMED second press while the skeletons are still EMPTY `[^]`: the empty-reference warning shows and every cursor stays for typing (2026-08-27)
+- [ ] INLINE hotkey: `^[]` at every caret, typing writes the same body into all of them; a second press when done hops ONE cursor out, just past the LAST inline footnote — while still empty it warns and every cursor stays (2026-08-27)
 - [ ] PASTE hotkey: the same clipboard text wrapped as `^[...]` at every caret
 - [ ] With `Insert footnote at end of word` ON, two carets in the SAME word produce ONE reference (they collapse to the word's end)
 - [ ] ATOMIC refusal: put one caret inside the `code span` here (or inside an existing footnote, or a definition body) — the press toasts and NOTHING is inserted at any caret

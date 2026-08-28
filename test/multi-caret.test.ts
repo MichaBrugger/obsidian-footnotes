@@ -286,3 +286,131 @@ describe("atomic refusals — one bad caret refuses the whole press", () => {
         expect(noticed(MultiCaretFootnoteNotice)).toBe(true);
     });
 });
+
+describe("a second press with EVERY caret inside the same footnote continues it (A14 report, 2026-08-27)", () => {
+    // Jason's report: the named multi-caret flow (skeletons, type the name
+    // once) DEAD-ENDED — the second press refused with the atomic toast,
+    // and the filled inline flow could never hop back out. When every
+    // caret sits inside the SAME artifact the press is unambiguous, so it
+    // gets the single-caret continuation, aimed at the LAST artifact in
+    // document order. Mixed carets keep the atomic refusal above.
+    it("named second press creates the single shared definition", async () => {
+        const doc = fakeEditor(
+            ["alpha b[^cite] c[^cite] end"],
+            [
+                { line: 0, ch: 10 },
+                { line: 0, ch: 20 },
+            ],
+        );
+        await insertNamedFootnote(fakePlugin(doc));
+        expect(doc.lines).toEqual([
+            "alpha b[^cite] c[^cite] end",
+            "",
+            "[^cite]: ",
+        ]);
+        // the multi-cursor collapsed; the caret sits on the definition
+        expect(doc.cursor).toEqual({ line: 2, ch: "[^cite]: ".length });
+        expect(noticed(MultiCaretFootnoteNotice)).toBe(false);
+    });
+
+    it("the numbered key continues the same way (single-caret parity)", async () => {
+        const doc = fakeEditor(
+            ["alpha b[^cite] c[^cite] end"],
+            [
+                { line: 0, ch: 10 },
+                { line: 0, ch: 20 },
+            ],
+        );
+        await insertAutonumFootnote(fakePlugin(doc));
+        expect(doc.lines).toEqual([
+            "alpha b[^cite] c[^cite] end",
+            "",
+            "[^cite]: ",
+        ]);
+    });
+
+    it("filled inline footnotes: the press hops ONE cursor out after the LAST span", async () => {
+        const before = ["x^[note] y^[note] z"];
+        const doc = fakeEditor(before, [
+            { line: 0, ch: 5 },
+            { line: 0, ch: 14 },
+        ]);
+        await insertInlineFootnote(fakePlugin(doc));
+        expect(doc.lines).toEqual(before);
+        expect(doc.cursor).toEqual({ line: 0, ch: "x^[note] y^[note]".length });
+        expect(noticed(MultiCaretFootnoteNotice)).toBe(false);
+    });
+
+    it("EMPTY inline footnotes warn and stay, so typing keeps filling all of them", async () => {
+        const before = ["x^[] y^[]"];
+        const doc = fakeEditor(before, [
+            { line: 0, ch: 3 },
+            { line: 0, ch: 8 },
+        ]);
+        await insertInlineFootnote(fakePlugin(doc));
+        expect(doc.lines).toEqual(before);
+        expect(doc.cursor).toEqual({ line: 0, ch: 3 });
+        expect(
+            noticed(
+                "This inline footnote is empty. Type its text between the brackets.",
+            ),
+        ).toBe(true);
+    });
+
+    it("EMPTY [^] references warn and stay, like the single-caret guard", async () => {
+        const before = ["x[^] y[^]"];
+        const doc = fakeEditor(before, [
+            { line: 0, ch: 3 },
+            { line: 0, ch: 8 },
+        ]);
+        await insertNamedFootnote(fakePlugin(doc));
+        expect(doc.lines).toEqual(before);
+        expect(
+            noticed(
+                "This footnote reference is empty. Type a name between the brackets.",
+            ),
+        ).toBe(true);
+    });
+
+    it("untouched prefix placeholders ask for a suffix, like the single-caret guard", async () => {
+        const before = [
+            "---",
+            'footnote-prefix: "2."',
+            "---",
+            "x[^2.] y[^2.]",
+        ];
+        const doc = fakeEditor(before, [
+            { line: 3, ch: 5 },
+            { line: 3, ch: 12 },
+        ]);
+        await insertNamedFootnote(
+            fakePlugin(doc, { enableFootnotePrefix: true }),
+        );
+        expect(doc.lines).toEqual(before);
+        expect(noticed("Please add a footnote suffix after the prefix.")).toBe(
+            true,
+        );
+    });
+
+    it("carets inside DIFFERENTLY named references keep the atomic refusal", async () => {
+        const before = ["a[^one] b[^two] end"];
+        const doc = fakeEditor(before, [
+            { line: 0, ch: 4 },
+            { line: 0, ch: 12 },
+        ]);
+        await insertNamedFootnote(fakePlugin(doc));
+        expect(doc.lines).toEqual(before);
+        expect(noticed(MultiCaretFootnoteNotice)).toBe(true);
+    });
+
+    it("carets inside an already-DEFINED reference keep the atomic refusal", async () => {
+        const before = ["a[^1] b[^1]", "", "[^1]: done"];
+        const doc = fakeEditor(before, [
+            { line: 0, ch: 3 },
+            { line: 0, ch: 9 },
+        ]);
+        await insertNamedFootnote(fakePlugin(doc));
+        expect(doc.lines).toEqual(before);
+        expect(noticed(MultiCaretFootnoteNotice)).toBe(true);
+    });
+});

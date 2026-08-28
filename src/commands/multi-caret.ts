@@ -4,6 +4,8 @@ import type FootnotePlugin from "../main";
 import {
     computeNextFootnoteNumber,
     emptyReferenceStart,
+    idListIncludes,
+    isValidFootnoteName,
     occurrenceAtCursor,
     referenceOccurrences,
 } from "../parsing/footnote-grammar";
@@ -23,9 +25,14 @@ import {
     verifyLiveFootnoteInsertion,
 } from "../editor/insertion-liveness";
 import { maskedLineAt } from "../parsing/markdown-scan";
-import { landDefinitionBackedInsertion } from "./create-footnote";
 import {
+    createMatchingFootnoteDefinition,
+    landDefinitionBackedInsertion,
+} from "./create-footnote";
+import {
+    caretGuardsHandled,
     warnDefinitionCaretIfInside,
+    warnPrefilledReferenceIfInside,
     warnProtectedCaretIfInside,
 } from "./press-guards";
 import { readingViewActive } from "../editor/obsidian-internals";
@@ -47,18 +54,123 @@ export const MultiCaretFootnoteNotice =
 const posCmp = (a: EditorPosition, b: EditorPosition) =>
     a.line - b.line || a.ch - b.ch;
 
+/** What a caret sits inside, for the continuation check — the same probe trio the guard sweep refuses on. Inline wins over reference shape on purpose: an inline body can contain reference-shaped text (single-caret guard precedence). */
+type CaretArtifact =
+    | { kind: "inline"; empty: boolean }
+    | { kind: "empty" }
+    | { kind: "ref"; name: string }
+    | null;
+
+function caretArtifact(
+    doc: Editor,
+    ctx: DocContext,
+    pos: EditorPosition,
+): CaretArtifact {
+    const lineText = doc.getLine(pos.line);
+    const masked = ctx.maskedLine(pos.line);
+    const span = inlineFootnoteSpanAt(masked, pos.ch);
+    if (span !== null) {
+        return {
+            kind: "inline",
+            empty: masked.slice(span.open + 2, span.close).trim() === "",
+        };
+    }
+    if (emptyReferenceStart(masked, pos.ch) !== null) return { kind: "empty" };
+    const occurrence = occurrenceAtCursor(
+        referenceOccurrences(lineText, masked),
+        pos.ch,
+    );
+    if (occurrence !== null) return { kind: "ref", name: occurrence.name };
+    return null;
+}
+
+/**
+ * A press with EVERY caret inside the same footnote artifact is not a
+ * refusal — it is the single-caret CONTINUATION, aimed at the LAST
+ * artifact in document order (A14 report, 2026-08-27: the named
+ * multi-caret flow dead-ended on its second press, and filled inline
+ * footnotes could never hop back out). Uniform empties/placeholders warn
+ * through the shared guards WITHOUT collapsing, so typing keeps filling
+ * every skeleton; a filled-inline press hops one cursor out past the last
+ * span; same-named dangling references get their ONE shared definition
+ * (popup/jump + creation lint, via createMatchingFootnoteDefinition).
+ * Anything mixed — kinds, names, emptiness — or already working (a
+ * defined name) keeps the atomic refusal. Always consumes the press.
+ */
+function multiCaretContinuation(
+    plugin: FootnotePlugin,
+    doc: Editor,
+    ctx: DocContext,
+    carets: EditorPosition[],
+    artifacts: NonNullable<CaretArtifact>[],
+    allowDefinitionContinuation: boolean,
+): "handled" {
+    const refuse = (): "handled" => {
+        new Notice(MultiCaretFootnoteNotice, 8000);
+        return "handled";
+    };
+    const last = carets.reduce((a, b) => (posCmp(a, b) >= 0 ? a : b));
+    if (new Set(artifacts.map((a) => a.kind)).size !== 1) return refuse();
+    const kind = artifacts[0].kind;
+    if (kind === "inline") {
+        // uniformly empty or uniformly filled, or the meanings are mixed
+        if (new Set(artifacts.map((a) => a.kind === "inline" && a.empty)).size !== 1) {
+            return refuse();
+        }
+        // the shared guards do the rest at the last caret: warn while
+        // empty (every caret stays), or hop out past the last span
+        // (collapsing the multi-cursor — Jason's ask: land right after
+        // the LAST footnote)
+        caretGuardsHandled(plugin, doc, null, last);
+        return "handled";
+    }
+    if (kind === "empty") {
+        // the shared empty-"[^]" warning; every caret stays for typing
+        caretGuardsHandled(plugin, doc, null, last);
+        return "handled";
+    }
+    const names = artifacts.map((a) => (a.kind === "ref" ? a.name : ""));
+    if (new Set(names.map((n) => n.toLowerCase())).size !== 1) return refuse();
+    // an untouched "[^prefix]" placeholder asks for its suffix (all stay)
+    if (warnPrefilledReferenceIfInside(plugin, doc, null, last)) {
+        return "handled";
+    }
+    // the paste key has no definition-continuation semantics at a single
+    // caret either — its meaning is "wrap the clipboard", so same-named
+    // references keep the refusal there
+    if (!allowDefinitionContinuation) return refuse();
+    const name = names[0];
+    if (idListIncludes(listExistingFootnoteDefinitions(doc, ctx), name)) {
+        // already a working footnote — nothing to continue
+        return refuse();
+    }
+    if (!isValidFootnoteName(name)) {
+        // warns with the shared invalid-name notice, edits nothing
+        createMatchingFootnoteDefinition(doc.getLine(last.line), last, plugin, doc, ctx);
+        return "handled";
+    }
+    // collapse to the last caret first, then the single-caret continuation
+    // creates the ONE shared definition and lands (popup/jump + lint)
+    doc.setCursor(last);
+    createMatchingFootnoteDefinition(doc.getLine(last.line), last, plugin, doc, ctx);
+    return "handled";
+}
+
 /**
  * The press's insertion targets when this is a multi-caret press: every
  * caret guard-checked (a refusal toasts and returns "handled"), adjusted
  * (end-of-word/punctuation hop, like every single-caret insert), deduped,
  * and sorted to document order. Null = not a multi-caret press (fewer
  * than two carets, a real selection, or an active table cell — cells are
- * their own single-caret world); "handled" = refused, press consumed.
+ * their own single-caret world); "handled" = consumed without inserting:
+ * refused, or settled by the all-carets-inside-one-footnote continuation
+ * (see multiCaretContinuation).
  */
 function multiCaretTargets(
     plugin: FootnotePlugin,
     doc: Editor,
     ctx: DocContext,
+    allowDefinitionContinuation: boolean,
 ): EditorPosition[] | "handled" | null {
     const ranges = doc.listSelections();
     if (ranges.length < 2) return null;
@@ -68,19 +180,25 @@ function multiCaretTargets(
     if (ranges.some((range) => posCmp(range.anchor, range.head) !== 0)) {
         return null;
     }
-    for (const range of ranges) {
+    const artifacts = ranges.map((range) => caretArtifact(doc, ctx, range.head));
+    if (artifacts.every((artifact) => artifact !== null)) {
+        return multiCaretContinuation(
+            plugin,
+            doc,
+            ctx,
+            ranges.map((range) => range.head),
+            artifacts,
+            allowDefinitionContinuation,
+        );
+    }
+    for (const [index, range] of ranges.entries()) {
         const pos = range.head;
-        const lineText = doc.getLine(pos.line);
-        const masked = ctx.maskedLine(pos.line);
-        // a caret inside ANY existing footnote artifact refuses: on a
-        // single caret that press means navigate/hop/continue, and mixed
-        // meanings across carets are exactly what the atomic rule forbids
-        if (
-            emptyReferenceStart(masked, pos.ch) !== null ||
-            occurrenceAtCursor(referenceOccurrences(lineText, masked), pos.ch) !==
-                null ||
-            inlineFootnoteSpanAt(masked, pos.ch) !== null
-        ) {
+        // a caret inside an existing footnote artifact refuses when the
+        // OTHER carets sit in plain text: on a single caret that press
+        // means navigate/hop/continue, and mixed meanings across carets
+        // are exactly what the atomic rule forbids (all-inside-the-same
+        // presses continue instead — see multiCaretContinuation above)
+        if (artifacts[index] !== null) {
             new Notice(MultiCaretFootnoteNotice, 8000);
             return "handled";
         }
@@ -118,7 +236,7 @@ export function multiCaretPressHandled(
 ): boolean {
     if (cellActive) return false;
     const ctx = docContext(doc);
-    const targets = multiCaretTargets(plugin, doc, ctx);
+    const targets = multiCaretTargets(plugin, doc, ctx, true);
     if (targets === null) return false;
     if (targets === "handled") return true;
 
@@ -152,7 +270,7 @@ export async function multiCaretPastePressHandled(
 ): Promise<boolean> {
     if (cellActive) return false;
     const ctx = docContext(doc);
-    const targets = multiCaretTargets(plugin, doc, ctx);
+    const targets = multiCaretTargets(plugin, doc, ctx, false);
     if (targets === null) return false;
     if (targets === "handled") return true;
 
