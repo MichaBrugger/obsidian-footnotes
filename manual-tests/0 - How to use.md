@@ -9,6 +9,11 @@ settings it needs, carries its own fixture text, and expects an undo
   navigation, rename, tables, guards)
 - `L1-L17`: linting combos (rules solo and together, triggers, alerts,
   protected text, stability)
+- `C1-C2`: coexistence with the Better Footnote plugin (needs it
+  installed; C2 also needs Tidy Footnotes). Exploratory: "record"
+  checks characterize their behavior for the coexistence doc, and
+  only note corruption or data loss counts as a failure. Run after
+  0.2.0 stable, before the outreach to their dev.
 
 The repo's `manual-tests/` folder is the source of truth; this vault
 folder is a synced copy. Move finished sheets to "Footnote Tests used"
