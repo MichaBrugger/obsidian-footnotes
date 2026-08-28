@@ -12,8 +12,8 @@ zoo in A13 — this sheet owns the REFUSALS and the table cases.)
 - [ ] Select a stretch containing an inline footnote^[like this] and convert: same toast
 - [ ] A dead fake in code — select `` `fake [^9]` `` whole with a word each side: it CONVERTS (masked fakes aren't footnotes)
 - [ ] Select any text inside the fence below: same toast, nothing changes
-- [ ] Select from the line ABOVE the fence to just its opening ``` line (cutting the block in half): same toast, nothing changes
-- [ ] Select from the line above the fence through its closing ``` (the whole block): it converts — the fence rides into the definition indented, and renders as code inside the footnote
+- [ ] Select from the line ABOVE the fence to just its opening `` ``` `` line (cutting the block in half): same toast, nothing changes
+- [ ] Select from the line above the fence through its closing `` ``` `` line (the whole block): it converts — the fence rides into the definition indented, and renders as code inside the footnote
 
 ```
 select me in here
