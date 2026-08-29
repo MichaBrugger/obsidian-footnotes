@@ -63,3 +63,19 @@
     min-height: 1.4em;
     margin-bottom: var(--size-4-2);
 }
+
+/* Mobile: the soft keyboard overlays the webview (Android especially), so
+   a vertically centered dialog hides its lower half - the error line and
+   the CTA - behind the keyboard. The plugin's text modals anchor to the
+   top instead; ValidatedTextModal caps their height to the visual
+   viewport (what the keyboard leaves visible), and the content scrolls
+   within that cap. */
+.is-mobile .modal-container.footnote-shortcut-keyboard-aware {
+    align-items: flex-start;
+    padding-top: var(--size-4-4);
+}
+
+.is-mobile .modal-container.footnote-shortcut-keyboard-aware .modal {
+    max-height: var(--footnote-shortcut-viewport-max, 100%);
+    overflow-y: auto;
+}

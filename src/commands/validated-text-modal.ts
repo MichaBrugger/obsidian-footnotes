@@ -1,4 +1,4 @@
-import { App, Modal, Setting } from "obsidian";
+import { App, Modal, Platform, Setting } from "obsidian";
 
 // The one-validated-text-field modal every dialog in this plugin is:
 // a single Setting with a text input, an inline error line under it,
@@ -27,6 +27,7 @@ export abstract class ValidatedTextModal extends Modal {
     protected value: string;
     private errorEl!: HTMLElement;
     private ui: ValidatedTextModalUi;
+    private keyboardFit: (() => void) | null = null;
 
     constructor(app: App, ui: ValidatedTextModalUi) {
         super(app);
@@ -36,6 +37,27 @@ export abstract class ValidatedTextModal extends Modal {
 
     onOpen() {
         this.setTitle(this.ui.title);
+        // On Android the soft keyboard OVERLAYS the webview instead of
+        // resizing it, so a vertically centered modal keeps its lower
+        // half — the error line and the CTA button — hidden behind the
+        // keyboard (Jason's beta report, 2026-08-28). Anchor the modal to
+        // the TOP of the screen on mobile and cap its height to what the
+        // keyboard leaves visible: visualViewport.height shrinks when the
+        // keyboard opens and its resize event fires on open AND close.
+        if (Platform.isMobile) {
+            this.containerEl.addClass("footnote-shortcut-keyboard-aware");
+            const viewport = this.containerEl.win.visualViewport;
+            if (viewport) {
+                this.keyboardFit = () => {
+                    this.modalEl.style.setProperty(
+                        "--footnote-shortcut-viewport-max",
+                        `${viewport.height - 16}px`,
+                    );
+                };
+                this.keyboardFit();
+                viewport.addEventListener("resize", this.keyboardFit);
+            }
+        }
         const { contentEl } = this;
 
         new Setting(contentEl)
@@ -78,6 +100,13 @@ export abstract class ValidatedTextModal extends Modal {
     protected abstract submit(): void | Promise<void>;
 
     onClose() {
+        if (this.keyboardFit) {
+            this.containerEl.win.visualViewport?.removeEventListener(
+                "resize",
+                this.keyboardFit,
+            );
+            this.keyboardFit = null;
+        }
         this.contentEl.empty();
     }
 }
