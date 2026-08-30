@@ -13,7 +13,7 @@ import { inlineWrapLandsIntact } from "../../src/commands/inline-footnotes";
 // BUG (hunt 2026-08-25, contexts lens; skeptic-confirmed): every
 // inline-footnote liveness check verifies only the wrapper's OPEN
 // bracket position, never its CLOSE. Wrapping "cost $" in "^[…]" places
-// "]" right after the "$" — "$]" satisfies the math boundary rule (the
+// "]" right after the "$" - "$]" satisfies the math boundary rule (the
 // original "$ here" did not, so the up-front edge check saw nothing) and
 // pairs with the later "$y", the emergent math span swallows the
 // wrapper's real closing "]", and inlineFootnoteSpanAt latches onto the
@@ -88,7 +88,7 @@ describe("an emergent math span swallowing the inline wrapper's close bracket", 
 describe("inlineWrapLandsIntact's own contract (2026-08-25 mutation audit)", () => {
     it("a span that merely CONTAINS the probe but opens elsewhere refuses, even when its close coincides", () => {
         // span opens at 0 and closes at 4; probing at=1 with wrapLength 4
-        // makes the close test alone pass (1 + 4 - 1 === 4) — only the
+        // makes the close test alone pass (1 + 4 - 1 === 4) - only the
         // open check refuses
         expect(inlineWrapLandsIntact("^[ab]", 1, 4)).toBe(false);
     });

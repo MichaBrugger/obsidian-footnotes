@@ -29,7 +29,7 @@ export interface ReindexOptions {
     /**
      * The note's own footnote-prefix: names matching `<prefix><digits>` are
      * NUMBERED footnotes of that namespace, renumbered `<prefix>1..n` by
-     * appearance with their own counter — the same reordering behavior as
+     * appearance with their own counter - the same reordering behavior as
      * plain numbered footnotes (QOL, 2026-07-18). Other prefixes stay
      * named. Invalid prefixes (digit-ending) are ignored defensively.
      */
@@ -38,7 +38,7 @@ export interface ReindexOptions {
 
 /**
  * Distinct reference names by first appearance in the (unprotected) text,
- * folded to lowercase — footnote ids are case-insensitive in Obsidian, so
+ * folded to lowercase - footnote ids are case-insensitive in Obsidian, so
  * "[^Note]" and "[^note]" are one footnote for ordering and identity. A
  * definition's own "[^id]:" label is not a reference (footnoteReferenceMatches
  * excludes it positionally), but a reference nested in a definition body is.
@@ -50,7 +50,7 @@ function referenceAppearanceOrder(
     const order: string[] = [];
     const seen = new Set<string>();
     for (let i = 0; i < lines.length; i++) {
-        // protected lines are all-NUL in the masked twin — no matches;
+        // protected lines are all-NUL in the masked twin - no matches;
         // referenceOccurrences re-slices raw names (bug-masked-name-identity)
         for (const { name } of referenceOccurrences(lines[i], maskedLines[i])) {
             const id = name.toLowerCase();
@@ -84,7 +84,7 @@ function rewriteReferences(
  * Reindex every footnote in `markdown`: numbered footnotes become 1..n by
  * order of first reference appearance (all repeats follow), named footnotes
  * keep their names, and definition blocks are reordered into the same
- * appearance order by permuting them among their existing positions —
+ * appearance order by permuting them among their existing positions -
  * everything between them stays where it was. `options` selects the two
  * alternative policies: deleting orphaned definitions instead of keeping
  * them, and renumbering named footnotes instead of preserving them.
@@ -93,14 +93,14 @@ export function reindexFootnotes(
     markdown: string,
     options: ReindexOptions = {},
 ): string {
-    // A single pass can leave the result not-yet-stable — permuting
+    // A single pass can leave the result not-yet-stable - permuting
     // definition blocks changes the appearance order of references NESTED in
-    // their bodies, which the next pass renumbers — so re-run to a fixpoint.
+    // their bodies, which the next pass renumbers - so re-run to a fixpoint.
     // Some documents have NO fixpoint: permutation and nested renumbering
     // can chase each other in a genuine cycle (bug-reindex-cycle, period 3),
     // and with lint-on-save that rewrote the note on every save forever.
     // Detecting a repeat and returning one canonical member of the cycle
-    // (the lexicographically smallest — any fixed choice works) restores
+    // (the lexicographically smallest - any fixed choice works) restores
     // idempotence: re-running from the canon walks the same cycle and picks
     // the same canon. Orphan deletion is transitive within ONE pass (see
     // orphanedDefinitionBlocks), so it never drives the iteration. The cap
@@ -154,11 +154,11 @@ function reindexOnce(
         // the shared reference-graph deletion: transitive chains of any
         // depth die in THIS pass (the outer fixpoint used to expose one
         // link per iteration and its cap returned mid-chain on 21+-deep
-        // chains — bug-reindex-orphan-cap), while definitions referencing
+        // chains - bug-reindex-orphan-cap), while definitions referencing
         // each other in a cycle count as referenced and survive
         const orphans = orphanedDefinitionBlocks(lines, scan);
         if (orphans.length > 0) {
-            // cut the orphan blocks out, then re-derive everything — line
+            // cut the orphan blocks out, then re-derive everything - line
             // numbers shifted, and a cut can even change fence pairing
             lines = removeLineRanges(lines, orphans);
             scan = scanDocument(lines);
@@ -184,7 +184,7 @@ function reindexOnce(
 
     // numbered names → their new number, in appearance order; the prefix
     // namespace runs its own independent counter; named footnotes only
-    // consume a number when they're being renumbered too — and with an
+    // consume a number when they're being renumbered too - and with an
     // active prefix they renumber INTO its namespace (they're this note's
     // footnotes), which also keeps the lint pipeline idempotent: a plain
     // number here would be re-prefixed by the next apply-prefix pass

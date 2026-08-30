@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { ensureTextPropertyType } from "../src/editor/obsidian-internals";
 
 // Reported 2026-08-12: the vault registered footnote-prefix as a NUMBER
-// property — Obsidian infers an unassigned property's type from its
+// property - Obsidian infers an unassigned property's type from its
 // occurrences, and numeric-looking prefixes like "2." taught it wrong,
 // after which the Properties panel coerced edits numerically. The plugin
 // pins the type to "text" explicitly (modal write + layout-ready while the

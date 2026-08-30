@@ -15,7 +15,7 @@ import {
 
 // BUG (reported by Jason 2026-08-08, probed live the same day): in Reading
 // view the commands passed their checks and ran the whole cascade against
-// the HIDDEN editor buffer — one named press invisibly inserted "[^]" at
+// the HIDDEN editor buffer - one named press invisibly inserted "[^]" at
 // the end-of-word position (render and file untouched), and the next press
 // found the caret inside it and toasted about an empty reference the user
 // could not see. Text-editing commands must be inert in Reading view; the
@@ -25,7 +25,7 @@ function fakeEditor(lines: string[], cursor: EditorPosition): FakeEditor {
     return sharedFakeEditor(lines, { cursor, edits: true, wholeDoc: true });
 }
 
-// richer view (getMode) than the shared plugin fake supports — stays local
+// richer view (getMode) than the shared plugin fake supports - stays local
 function previewPlugin(doc: FakeEditor): FootnotePlugin {
     return {
         app: {

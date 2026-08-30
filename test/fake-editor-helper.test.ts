@@ -4,7 +4,7 @@ import { fakeEditor } from "./helpers/fake-editor";
 
 // The shared fake editor is infrastructure ~38 spec files stand on, so
 // its own contract gets pinned: which capabilities are opt-in (and that
-// the disabled stubs THROW naming their option — that throw is what
+// the disabled stubs THROW naming their option - that throw is what
 // keeps a capability's absence meaning "the code under test never calls
 // this"), and the transaction semantics every migrated assertion reads
 // through.

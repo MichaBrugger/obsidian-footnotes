@@ -40,8 +40,8 @@ describe("bug: definition->reference jump matches the definition's own line", ()
     it("never jumps onto itself for an orphan definition with no reference", () => {
         // the bug's other symptom: a bogus "successful" jump onto the
         // definition's own line. Since the 2026-08-07 QOL sweep the orphan
-        // press is HANDLED (true) with an explanatory notice — see
-        // test/orphan-definition-press.test.ts — but it must still never move
+        // press is HANDLED (true) with an explanatory notice - see
+        // test/orphan-definition-press.test.ts - but it must still never move
         // the cursor anywhere, least of all onto its own line.
         const doc = fakeEditor([
             "[^orphan]: text",

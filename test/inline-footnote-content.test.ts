@@ -4,7 +4,7 @@ import { sanitizeInlineFootnoteContent } from "../src/commands/inline-footnotes"
 
 // Spec for what clipboard text may become the body of an inline footnote
 // (^[...]). Inline footnotes are single-line by nature, and an unbalanced
-// bracket would end the footnote early and corrupt the note — these tests
+// bracket would end the footnote early and corrupt the note - these tests
 // ARE those decisions:
 //   - whitespace runs (including newlines) collapse to one space, trimmed
 //   - balanced brackets pass through so pasted markdown links keep working

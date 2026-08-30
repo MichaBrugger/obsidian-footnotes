@@ -23,7 +23,7 @@ import { fakeEditor as sharedFakeEditor, FakeEditor } from "./helpers/fake-edito
 import { fakePlugin as sharedFakePlugin } from "./helpers/fake-plugin";
 
 // Renaming a footnote (issue #36, Jason's calls 2026-08-12): every
-// masked-live occurrence — references and definition labels — renames
+// masked-live occurrence - references and definition labels - renames
 // case-insensitively in one planned transaction; a taken name refuses
 // (collision), invalid names refuse with the reason, and a name the
 // simulation can't keep alive refuses whole ("dead"). The modal and the
@@ -160,7 +160,7 @@ describe("planFootnoteRename", () => {
 
     it("refuses whole when the new name would kill an occurrence (comment opener)", () => {
         // "[^a<!--]" starts an HTML comment that swallows the closing
-        // bracket — the simulation sees the reference die and refuses,
+        // bracket - the simulation sees the reference die and refuses,
         // renaming NOTHING rather than corrupting one copy
         expect(
             planFootnoteRename(
@@ -203,7 +203,7 @@ describe("rename property", () => {
         "renameTargetAtCursor is total and truthful at ANY caret (the menu gate)",
         () => {
             // the right-click menu shows "Rename footnote" exactly when this
-            // resolver returns a name — so at any caret in any document it
+            // resolver returns a name - so at any caret in any document it
             // must never throw, never fire inside protected text, only name
             // footnotes the document really has, and always hand
             // planFootnoteRename something it can answer

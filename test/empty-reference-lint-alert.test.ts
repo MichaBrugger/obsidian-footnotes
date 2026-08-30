@@ -7,7 +7,7 @@ import {
 import { lintRulesAllDisabled } from "../src/linting/linter";
 
 // QOL sweep (2026-08-07): the lint paths alert on abandoned empty "[^]"
-// references — every rule is blind to them (the reference regexes require a
+// references - every rule is blind to them (the reference regexes require a
 // name) and Obsidian won't render them, so without the alert they linger
 // in the note forever. Companion pin: the "Lint footnotes" command tells
 // the user when every rule is toggled off instead of implying the note

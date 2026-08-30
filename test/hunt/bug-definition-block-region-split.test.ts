@@ -8,7 +8,7 @@ import { moveFootnoteDefinitionsToBottom } from "../../src/linting/rules/move-fo
 
 // Sol re-review bug #3 (2026-08-10): a definition's indented continuation
 // can OPEN a protected region ("    $$" or "    <!--"); the region's
-// interior is protected, and the definition-end walk stopped at it — so
+// interior is protected, and the definition-end walk stopped at it - so
 // the block ended mid-region. Move-to-bottom then relocated HALF the
 // definition, stranding the math body mid-document, and the moved
 // fragment's unclosed "$$" swallowed the note bottom on the next pass.

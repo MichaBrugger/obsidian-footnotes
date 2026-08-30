@@ -19,7 +19,7 @@ describe("bug: removing definition lines can silently create a setext heading", 
         const input = "closing words[^1]\n[^9]: orphan\n---\n\n[^1]: def";
         const out = reindexFootnotes(input, { keepOrphanedDefinitions: false });
         // cutting the orphan must not leave the paragraph sitting directly above
-        // the "---" — that turns it into an H2 heading
+        // the "---" - that turns it into an H2 heading
         expect(out).not.toContain("closing words[^1]\n---");
     });
 

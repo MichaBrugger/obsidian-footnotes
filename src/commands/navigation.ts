@@ -33,18 +33,18 @@ export function shouldJumpFromDefinitionToReference(
     // its continuation lines; if so, jump back to the footnote in the text
 
     // cheap pre-check on the raw line; the whole-document scanning below
-    // only runs when the caret sits on something definition-shaped — the
+    // only runs when the caret sits on something definition-shaped - the
     // "[^x]:" line itself, or an indented line that MIGHT be a continuation
     // (jump-to-definition deliberately parks the caret on the LAST continuation
     // line, and the hotkey there used to insert a new footnote instead of
-    // jumping back — bug reported 2026-07-17)
+    // jumping back - bug reported 2026-07-17)
     if (definitionLabelIn(lineText) === null && !/^\s+\S/.test(lineText)) return false;
 
     // #41: a "[^x]:" inside a code block is not a definition, and a reference
-    // inside code is not a jump target — resolve against protected-aware
+    // inside code is not a jump target - resolve against protected-aware
     // definition blocks and scan the masked twin
     // built only past the raw-line gate above (the gate exists because
-    // this runs on every press — perf F1/F8)
+    // this runs on every press - perf F1/F8)
     ctx ??= docContext(doc);
     const lines = ctx.lines;
     // the press's one protection scan feeds the block lookup and masking
@@ -58,7 +58,7 @@ export function shouldJumpFromDefinitionToReference(
         definitionName = block.name;
     } else {
         // a blockquoted/callout label ("> [^x]: …", C22) is a definition
-        // too, but never part of a column-0 definition BLOCK — match the
+        // too, but never part of a column-0 definition BLOCK - match the
         // caret's masked line (nameStart > 2 means a blockquote prefix
         // precedes the label)
         const hit = definitionLabelWithName(
@@ -71,13 +71,13 @@ export function shouldJumpFromDefinitionToReference(
     }
     if (definitionName !== null) {
         // ids are case-insensitive, so the reference may differ in casing from
-        // the definition's label ("[^Note]" ↔ "[^note]:") — fold both to compare
+        // the definition's label ("[^Note]" ↔ "[^note]:") - fold both to compare
         const name = definitionName.toLowerCase();
         const masked = ctx.maskedLines();
 
         // find the FIRST reference use of this footnote. footnoteReferenceMatches
         // skips a definition's own column-0 label; blockquoted labels read
-        // as mid-line references, so they are skipped here — a label
+        // as mid-line references, so they are skipped here - a label
         // ANYWHERE defines, it doesn't reference, and jumping to a
         // blockquoted duplicate's label was a phantom target
         // (parallel-review probe, 2026-08-10)
@@ -93,7 +93,7 @@ export function shouldJumpFromDefinitionToReference(
                 return true;
             }
         }
-        // an ORPHANED definition — no reference anywhere. Falling through used
+        // an ORPHANED definition - no reference anywhere. Falling through used
         // to insert a brand-new footnote INTO the definitions area, when the
         // user almost certainly pressed the key to jump to the reference they
         // have since deleted; explain and stand still instead (QOL sweep,
@@ -115,7 +115,7 @@ export function jumpToFootnoteDefinition(
     doc: Editor,
     ctx: DocContext = docContext(doc),
 ): boolean {
-    // find the LAST line with this definition label — with duplicate
+    // find the LAST line with this definition label - with duplicate
     // definitions Obsidian renders only the last one (ground-truthed
     // 2026-08-12), so jumping to an earlier one would land on dead text.
     // Matching runs on the masked twin so definition-shaped lines inside
@@ -134,7 +134,7 @@ export function jumpToFootnoteDefinition(
     if (labelLine !== -1) {
         // land at the END of the definition (indented lines belong to
         // it) so the user can backspace/type without arrow keys. The
-        // block's reach comes from findDefinitionBlocks itself — a
+        // block's reach comes from findDefinitionBlocks itself - a
         // hand-rolled walk here stopped at blank runs and at region
         // interiors the block walk absorbs, landing the caret
         // mid-definition (2026-08-11 review bug #12). A blockquoted
@@ -164,7 +164,7 @@ export function shouldJumpFromReferenceToDefinition(
     // Jump cursor TO definition reference: find the reference whose
     // brackets contain the cursor on this line, then place the cursor at
     // that footnote's definition line. The shared lookup raw-gates before
-    // masking — this runs on every keypress of both commands, and the
+    // masking - this runs on every keypress of both commands, and the
     // whole-document scan is measurable on large notes (perf F1, #41
     // masked re-check, NUL-safe name re-slice; see
     // referenceOccurrenceAtCursor).
@@ -181,7 +181,7 @@ export function shouldJumpFromReferenceToDefinition(
 
     if (popupEditingAvailable(plugin)) {
         // the popup's close callback runs LATER, after its save may
-        // have edited the document — it must build a FRESH context
+        // have edited the document - it must build a FRESH context
         void openFootnotePopup(plugin, footnoteName, () => {
             jumpToFootnoteDefinition(footnoteName, cursorPosition, plugin, doc);
         });

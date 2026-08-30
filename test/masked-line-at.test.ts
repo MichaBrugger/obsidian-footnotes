@@ -79,7 +79,7 @@ describe("maskLineRegions", () => {
 });
 
 // REVERSED 2026-08-10: Jason verified live that "$" inside a footnote
-// reference is id text, not math — nearby dollar-signed ids never pair
+// reference is id text, not math - nearby dollar-signed ids never pair
 describe("dollars inside references vs math", () => {
     it("two dollar-signed ids on one line never pair into math", () => {
         const line = "b[^a$9] a[^a$4] end";

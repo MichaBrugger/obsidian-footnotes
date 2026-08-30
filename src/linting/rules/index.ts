@@ -4,7 +4,7 @@
 // gather definitions at the bottom, delete orphaned references against the
 // settled layout, apply the note prefix, then renumber and reorder.
 // The registry itself is the Linter-shaped, self-describing view of the rule
-// set — ids, names, ignoreTypes, and worked examples (executed by
+// set - ids, names, ignoreTypes, and worked examples (executed by
 // test/rule-examples.test.ts).
 
 import { FootnoteRule } from "../rule";

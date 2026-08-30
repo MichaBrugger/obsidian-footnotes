@@ -8,7 +8,7 @@ export interface FootnotePluginSettings {
     /** Marks saved data whose one-time migrations have run (see loadSettings). Not shown in the settings tab. */
     settingsVersion: number;
     insertAtEndOfWord: boolean;
-    /** Selection-to-footnote conversions include cut-off words whole, the end normalized to word end + one trailing punctuation mark — the end-of-word insert's selection twin (2026-08-29). */
+    /** Selection-to-footnote conversions include cut-off words whole, the end normalized to word end + one trailing punctuation mark - the end-of-word insert's selection twin (2026-08-29). */
     expandSelectionToWholeWords: boolean;
     enablePopupEditor: boolean;
     enableFootnotePrefix: boolean;
@@ -78,7 +78,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
             },
             {
                 name: "Expand selections to whole words",
-                desc: "When a selection is turned into a footnote, cut-off words at either end are included whole, and the end takes any trailing punctuation — like inserting at the end of word.",
+                desc: "When a selection is turned into a footnote, cut-off words at either end are included whole, and the end takes any trailing punctuation, like inserting at the end of word.",
                 control: { type: "toggle", key: "expandSelectionToWholeWords" },
             },
             {
@@ -125,7 +125,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                 items: [
                     {
                         // control-less row: renders as plain information text.
-                        // Shown only while the Linter plugin is enabled —
+                        // Shown only while the Linter plugin is enabled -
                         // Jason verified (2026-08-08) that the two plugins
                         // coexist fine EXCEPT when Linter's own footnote
                         // rules also rewrite the same footnotes.
@@ -175,7 +175,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                         // orphans and duplicates get their own section
                         // (Jason, 2026-08-10 + 2026-08-12): the toggles
                         // mirror each other, and while one is off linting
-                        // ALERTS about that problem kind instead — they are
+                        // ALERTS about that problem kind instead - they are
                         // never silent
                         type: "group",
                         heading: "Orphans and duplicates",

@@ -5,13 +5,13 @@ import FootnotePlugin from "../../src/main";
 // BUG (found in the 2026-08-07 QOL/perf audit, CONFIRMED LIVE 2026-08-08,
 // FIXED same day): loadSettings' pre-0.2.0 section-heading migration used
 // to pattern-match the SAVED value on every load, prepending "# " to
-// anything that doesn't look like a heading or divider — silently mangling
+// anything that doesn't look like a heading or divider - silently mangling
 // a deliberately saved markdown value like "**Footnotes**" on the next
 // restart. The migrations now run exactly once, gated by settingsVersion:
 // saveSettings stamps the current version, so any value saved by a current
 // build survives every later load untouched. Pre-flag data (no version
-// key) still migrates once — indistinguishable from true legacy data by
-// construction — and all migrations share a single save.
+// key) still migrates once - indistinguishable from true legacy data by
+// construction - and all migrations share a single save.
 
 // the real Plugin constructor wants (app, manifest); these tests only
 // exercise loadSettings, so construct without them
@@ -48,7 +48,7 @@ describe("one-shot settings migration (heading-mangle bug fix)", () => {
     });
 
     it("a version bump never re-runs an earlier shape-based rewrite", async () => {
-        // v1 data upgrading to v2: only the v2 block may run — the heading
+        // v1 data upgrading to v2: only the v2 block may run - the heading
         // rewrite belongs to the <1 block and must not touch this value
         const { plugin, saves } = pluginWithSavedData({
             footnoteSectionHeading: "**Footnotes**",

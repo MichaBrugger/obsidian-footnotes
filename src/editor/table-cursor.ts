@@ -5,7 +5,7 @@ import { EditorWithCm } from "./obsidian-internals";
 // A table cell being edited runs in its own CodeMirror sub-editor, and the
 // main editor's getCursor() does NOT track its caret: clicking around inside
 // a cell leaves the main selection wherever it last was. Commands that trust
-// getCursor() then insert text at a stale position — displacing the row's
+// getCursor() then insert text at a stale position - displacing the row's
 // pipes and shredding the table. When focus is in a cell sub-editor, recover
 // the true document position from the sub-editor itself.
 
@@ -19,7 +19,7 @@ import { EditorWithCm } from "./obsidian-internals";
 export interface TableCellEditor {
     state: {
         doc: { toString(): string };
-        // anchor ≠ head is a live selection inside the cell — the
+        // anchor ≠ head is a live selection inside the cell - the
         // selection-to-footnote conversion (issue #35) replaces that range
         selection: { main: { head: number; anchor: number } };
     };
@@ -32,8 +32,8 @@ export interface TableCellEditor {
 /**
  * Whether a sub-editor NESTED inside the main editor's contentDOM owns
  * focus (an actively edited table cell, or any similar widget editor).
- * Document edits in that state race the sub-editor's sync-back — the
- * issue-#28 corruption family — so callers either defer, re-route, or
+ * Document edits in that state race the sub-editor's sync-back - the
+ * issue-#28 corruption family - so callers either defer, re-route, or
  * skip. One shared predicate; it used to be pasted in three places (E9).
  */
 export function nestedSubEditorOwnsFocus(editor: Editor): boolean {
@@ -49,13 +49,13 @@ export function nestedSubEditorOwnsFocus(editor: Editor): boolean {
 
 // Fallback for the rare state where focus sits in a nested sub-editor whose
 // EditorView isn't reachable (activeTableCellEditor returned null): editing
-// the document while a sub-editor owns focus races its sync-back on blur —
+// the document while a sub-editor owns focus races its sync-back on blur -
 // the sub-editor rewrites its region from pre-edit state, which at best
 // swallows the inserted footnote and at worst displaces a table row's pipes
 // (regression reported 2026-07-14; same family as issue #28). Hand focus
 // back to the main editor and only edit once the sync-back has settled.
 // The primary table-cell path dispatches through the cell's own editor
-// instead — see createAutonumFootnote / createFootnoteReference.
+// instead - see createAutonumFootnote / createFootnoteReference.
 export function runOutsideTableCell(
     doc: Editor,
     run: (cursorPosition: EditorPosition) => void,
@@ -68,7 +68,7 @@ export function runOutsideTableCell(
     }
     cm.focus();
     // rAF stalls entirely while the window is hidden (same reason the popup
-    // teardown uses a timeout), which would swallow the command outright —
+    // teardown uses a timeout), which would swallow the command outright -
     // whichever of the two fires first runs the edit. Timers come from the
     // editor's OWN window, so a note popped out into a separate window
     // isn't scheduled on the main one (E37)
@@ -89,7 +89,7 @@ export function runOutsideTableCell(
  *
  * Obsidian attaches no plugin-visible handle to the cell sub-editor's DOM
  * (older builds exposed `cmView` on the content element; current ones do
- * not — verified 2026-07-15), so the cell view is recovered through CM6's
+ * not - verified 2026-07-15), so the cell view is recovered through CM6's
  * own registry: `EditorView.findFromDOM` returns the innermost EditorView
  * owning an element, and the main view's constructor IS the app's
  * EditorView class, so no @codemirror import is needed.
@@ -113,7 +113,7 @@ export function activeTableCellEditor(editor: Editor): TableCellEditor | null {
 /** Cell spans of a table row line, aware of `\|` escapes. */
 export function tableRowCellSpans(lineText: string): { from: number; to: number }[] {
     const spans: { from: number; to: number }[] = [];
-    // the leading pipe is optional in GFM ("A | B" is a valid row) — without
+    // the leading pipe is optional in GFM ("A | B" is a valid row) - without
     // one the first cell starts at column 0 instead of after a "|"
     const leadingPipe = lineText.match(/^\s*\|/);
     let start = leadingPipe ? leadingPipe[0].length : 0;
@@ -128,7 +128,7 @@ export function tableRowCellSpans(lineText: string): { from: number; to: number 
             start = i + 1;
         }
     }
-    // a line with no unescaped pipe at all isn't a table row — no cells
+    // a line with no unescaped pipe at all isn't a table row - no cells
     if (!sawPipe) return [];
     if (start < lineText.length) {
         spans.push({ from: start, to: lineText.length });
@@ -169,7 +169,7 @@ export function resolveTableCellCursor(editor: Editor): EditorPosition | null {
     if (line > editor.lastLine()) return null;
 
     const lineText = editor.getLine(line);
-    // a rendered column can outrun the source row's cells — bounds-check
+    // a rendered column can outrun the source row's cells - bounds-check
     // instead of trusting the index
     const spans = tableRowCellSpans(lineText);
     const cellIndex = (td as HTMLTableCellElement).cellIndex;
@@ -180,7 +180,7 @@ export function resolveTableCellCursor(editor: Editor): EditorPosition | null {
     // inside the raw cell, then walk the sub-editor's caret offset through
     // the raw text. The walk is escape-aware: the cell editor shows "\|"
     // as a bare "|", so each escape byte before the caret consumes a
-    // source column but no cell-editor column — plain addition resolved
+    // source column but no cell-editor column - plain addition resolved
     // one column short per escape and read a caret just inside a reference
     // as OUTSIDE it, nesting a new reference (bug-table-escape-offset).
     const rawCell = lineText.slice(span.from, span.to);

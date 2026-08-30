@@ -5,7 +5,7 @@ import { maskLineRegions } from "../../src/parsing/markdown-scan";
 
 // Bug (2026-08-11 review, Kimi): dollarInsideReference walked the RAW line
 // backwards, so a "[^" fragment already masked away as code (or comment)
-// still claimed every "$" after it as reference-id text — suppressing math
+// still claimed every "$" after it as reference-id text - suppressing math
 // masking for the rest of the line. The walk must read the masked-so-far
 // characters: a NUL means the bracket run is broken by a construct that
 // already claimed it, so the dollar is free to open (or close) math.

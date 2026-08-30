@@ -14,7 +14,7 @@ import { fakePlugin as sharedFakePlugin } from "../helpers/fake-plugin";
 
 // Found by the command-press property suite on its FIRST run (2026-08-12,
 // shrunk counterexample ["[^1]: alpha"], caret 0:0, paste): the inline and
-// paste commands inserted their "^[…]" straight into a definition LABEL —
+// paste commands inserted their "^[…]" straight into a definition LABEL -
 // at column 0 that shoves "[^1]:" off the line start, DESTROYING the
 // definition and orphaning every reference it served. The numbered/named
 // cascade was immune (its jump-from-definition step runs first); the
@@ -106,7 +106,7 @@ describe("inline presses inside a definition label (bug-inline-press-breaks-defi
             ch: 0,
         });
         await insertInlineFootnote(fakePlugin(doc));
-        // no label navigation AND no insertion — the protected-text guard
+        // no label navigation AND no insertion - the protected-text guard
         // owns this caret; the point pinned here is no false label-jump
         expect(doc.appliedChanges).toEqual([]);
         expect(doc.cursor).toEqual({ line: 1, ch: 0 });

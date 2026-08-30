@@ -32,7 +32,7 @@ describe("fixed 2026-08-10: multi-line comment boundary lines keep live text liv
         () => {
             const input = "x[^9] <!-- hidden\n--> y[^8]\n\n[^8]: eight\n[^9]: nine";
             // the definitions also REORDER to appearance order ([^9] is
-            // used first), matching reindex's pinned policy — the hunt's
+            // used first), matching reindex's pinned policy - the hunt's
             // original expectation kept them in place, which contradicted it
             const expected =
                 "x[^1] <!-- hidden\n--> y[^2]\n\n[^1]: nine\n[^2]: eight";

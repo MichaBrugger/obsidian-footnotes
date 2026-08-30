@@ -17,7 +17,7 @@ import { FootnoteRule } from "../rule";
 
 // Orphaned DEFINITION deletion as its own rule (2026-08-10): it used to live
 // inside reindex (the keepOrphanedDefinitions option, which reindexFootnotes
-// still honors for direct callers), but the lint pipeline runs this instead —
+// still honors for direct callers), but the lint pipeline runs this instead -
 // the "Delete orphaned definitions" toggle works with reindexing off, and the
 // two orphan settings mirror each other. Deletion is transitive over a
 // reference graph, so a chain of definitions each kept alive only by the
@@ -44,8 +44,8 @@ function scanReferences(
     const maskedLines = maskProtectedLines(lines, scan);
 
     // C22 follow-through (parallel-review probe, 2026-08-10): a
-    // blockquoted/callout label ("> [^x]: …") is a LIVE definition — as a
-    // single-line block, since blockquoted continuations aren't a thing —
+    // blockquoted/callout label ("> [^x]: …") is a LIVE definition - as a
+    // single-line block, since blockquoted continuations aren't a thing -
     // and NO definition label of either shape counts as a reference (a
     // label defines; treating it as a reference kept orphans alive)
     const labelStartAt = new Array<number>(lines.length).fill(-1);
@@ -79,7 +79,7 @@ function scanReferences(
             maskedLines[i],
         )) {
             // column-0 labels are excluded by footnoteReferenceMatches;
-            // blockquoted ones read as mid-line references — skip them here
+            // blockquoted ones read as mid-line references - skip them here
             if (start === labelStartAt[i]) continue;
             const name = raw.toLowerCase();
             if (blockAtLine[i] === -1) {
@@ -125,7 +125,7 @@ function orphanedBlocks(referenceScan: ReferenceScan): DefinitionBlock[] {
 
 /**
  * Distinct names of definitions nothing references (each in its own
- * casing, definition order) — the alert's list. Single-level on purpose: a
+ * casing, definition order) - the alert's list. Single-level on purpose: a
  * definition referenced only from an orphan's body is still "referenced",
  * matching the message's wording; fixing the listed orphan surfaces it on
  * the next lint.
@@ -136,7 +136,7 @@ export function orphanedFootnoteDefinitionNames(
     // alert helpers (2026-08-11 review perf item); direct callers omit it
     precomputed?: { lines: string[]; scan: DocumentScan },
 ): string[] {
-    // no "[^" anywhere means no definitions (and no orphans) — this alert
+    // no "[^" anywhere means no definitions (and no orphans) - this alert
     // scan runs on every lint (perf F4)
     if (!markdown.includes("[^")) return [];
     const lines = precomputed?.lines ?? normalizeEol(markdown).text.split("\n");
@@ -159,7 +159,7 @@ export function orphanedFootnoteDefinitionNames(
     return names;
 }
 
-/** The definition blocks the reference graph can't keep alive (transitive — see module note). Shared with reindex's keepOrphanedDefinitions:false path, so both deletion routes agree at any chain depth. */
+/** The definition blocks the reference graph can't keep alive (transitive - see module note). Shared with reindex's keepOrphanedDefinitions:false path, so both deletion routes agree at any chain depth. */
 export function orphanedDefinitionBlocks(
     lines: string[],
     scan: DocumentScan,
@@ -167,7 +167,7 @@ export function orphanedDefinitionBlocks(
     return orphanedBlocks(scanReferences(lines, scan));
 }
 
-/** Every unreferenced definition block removed (transitively — see module note). Protected regions and everything referenced stay put. */
+/** Every unreferenced definition block removed (transitively - see module note). Protected regions and everything referenced stay put. */
 export function removeOrphanedFootnoteDefinitions(markdown: string): string {
     const { text, eol } = normalizeEol(markdown);
     const lines = text.split("\n");

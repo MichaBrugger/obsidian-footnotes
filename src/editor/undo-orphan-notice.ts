@@ -8,11 +8,11 @@ import {
 import { maskProtectedLines } from "../parsing/markdown-scan";
 
 // Feedback for a PARTIAL undo (Jason's report 2026-08-27, notice always
-// on — his call): creating a footnote from a table cell takes TWO undo
+// on - his call): creating a footnote from a table cell takes TWO undo
 // steps, because the reference is dispatched through the cell's own
 // sub-editor (writing the row via the main editor while a cell owns focus
 // is the issue #28 corruption family) while the definition rides a main-
-// editor transaction — and CodeMirror's history only groups adjacent
+// editor transaction - and CodeMirror's history only groups adjacent
 // changes from one dispatch, so the two can never share an undo step. The
 // first undo silently stranded an orphaned reference in the table; this
 // listener says so. It speaks up for every partial-undo orphan, not just
@@ -20,8 +20,8 @@ import { maskProtectedLines } from "../parsing/markdown-scan";
 // reference behind the same way, and the guidance is identical.
 
 /**
- * The names this undo orphaned — defined before it, not defined after it,
- * yet still referenced afterwards — in the definitions' own casing.
+ * The names this undo orphaned - defined before it, not defined after it,
+ * yet still referenced afterwards - in the definitions' own casing.
  * Masked-aware on both sides (code-span decoys neither trigger nor
  * suppress, the A20 decoy lesson) and case-insensitive like every id
  * compare. Pure; exported for units.
@@ -59,11 +59,11 @@ function definedNames(lines: string[]): Map<string, string> {
 }
 
 // Stryker disable all: CodeMirror update-listener plumbing against the
-// live editor — smoke-test territory, unreachable from units (the pure
+// live editor - smoke-test territory, unreachable from units (the pure
 // decision above is what units pin)
 /**
  * The editor extension (registered app-wide in main.ts): on an UNDO
- * transaction that orphaned footnote references, say so — the note looks
+ * transaction that orphaned footnote references, say so - the note looks
  * half-reverted, and without the notice the leftover reference reads as
  * a bug. Gated hard: doc must have changed, the transaction must be a
  * history undo, and the removed text must even contain "]:", before any

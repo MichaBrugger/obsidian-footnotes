@@ -23,14 +23,14 @@ import {
 // hand-picked cases, every property is asserted over RANDOMLY GENERATED
 // documents and option combos; failures shrink to a minimal repro
 // automatically. These are the invariants the hunt sessions kept pinning
-// one counterexample at a time — idempotence, protected-region
-// preservation, and conservation — made permanent.
+// one counterexample at a time - idempotence, protected-region
+// preservation, and conservation - made permanent.
 //
 // Runs per property default to 200; crank it for a deep soak:
 //   $env:FC_NUM_RUNS = "5000"; npx vitest run test/properties.test.ts
 fc.configureGlobal({ numRuns: Number(process.env.FC_NUM_RUNS ?? 200) });
 
-// soaks legitimately run for minutes — vitest's 5s default timeout is for
+// soaks legitimately run for minutes - vitest's 5s default timeout is for
 // hangs, not for 5000 double-parses (the oracle "failed" a soak purely by
 // exceeding it); scale the ceiling with the run count
 const SOAK_TIMEOUT = Math.max(30_000, Number(process.env.FC_NUM_RUNS ?? 200) * 60);
@@ -55,13 +55,13 @@ const optionsArb: fc.Arbitrary<LintOptions> = fc.record({
     sectionHeading: fc.constantFrom("", "# Footnotes", "---\n## Footnotes"),
 });
 
-// options with every deletion pathway off — the conservation properties
+// options with every deletion pathway off - the conservation properties
 const keepingOptionsArb: fc.Arbitrary<LintOptions> = optionsArb.map(
     (options) => ({
         ...options,
         removeOrphanedReferences: false,
         removeOrphanedDefinitions: false,
-        // merging collapses duplicate definitions into one — a deliberate
+        // merging collapses duplicate definitions into one - a deliberate
         // structure change the conservation/oracle properties must not see
         mergeDuplicateDefinitions: false,
         reindexOptions: {
@@ -71,7 +71,7 @@ const keepingOptionsArb: fc.Arbitrary<LintOptions> = optionsArb.map(
     }),
 );
 
-// options with only DEFINITION deletion off — since definition blocks span
+// options with only DEFINITION deletion off - since definition blocks span
 // regions their continuations open (Sol bug #3 fix), deleting an orphaned
 // definition legitimately deletes its embedded protected math/comment
 // lines; reference deletion never touches protected lines, so it stays on
@@ -110,7 +110,7 @@ function referenceCount(text: string): number {
 // GFM-footnote and math extensions parses the document before and after
 // lint, and the footnote structure it sees must match. Comparing
 // before-vs-after under the SAME parser cancels out parser-vs-plugin
-// opinion differences — any change in what remark sees was introduced by
+// opinion differences - any change in what remark sees was introduced by
 // lint itself.
 
 interface OracleNode {
@@ -157,8 +157,8 @@ function footnoteShape(markdown: string): FootnoteShape {
 
 // The one KNOWN parser disagreement, found by this very property on its
 // first run (2026-08-10): micromark's math extension lets a "$" inside a
-// reference name open a math span — in "[^a$1] x[^ch-2]. $m$" the two
-// dollars pair up and swallow the [^ch-2] reference — while Obsidian keeps
+// reference name open a math span - in "[^a$1] x[^ch-2]. $m$" the two
+// dollars pair up and swallow the [^ch-2] reference - while Obsidian keeps
 // such names as footnotes (verified live; dollarInsideReference implements
 // that). Renaming [^a$1] during reindex then changes what remark sees for
 // reasons that are micromark's opinion, not a lint bug. The oracle recuses
@@ -167,7 +167,7 @@ function footnoteShape(markdown: string): FootnoteShape {
 // The SECOND known disagreement (found by a 500k overnight soak at run
 // 277k, 2026-08-13): a "---" head block reads as YAML frontmatter to
 // Obsidian even when its body is prose (metadataCache: section type
-// "yaml", frontmatter null — verified live), so reference-shaped text
+// "yaml", frontmatter null - verified live), so reference-shaped text
 // inside it is DEAD, and reindex may legitimately renumber an orphaned
 // definition into that dead name. micromark can't referee those documents
 // from EITHER side: frontmatter-blind, it reads the fences as thematic
@@ -175,7 +175,7 @@ function footnoteShape(markdown: string): FootnoteShape {
 // only once its definition exists, so the rename "mints" a resolving
 // pair); with micromark-extension-frontmatter loaded, a FAILED frontmatter
 // open at line 0 poisons GFM footnote-definition tokenization for the
-// whole document ("[^1]: alpha" parses as a plain link definition —
+// whole document ("[^1]: alpha" parses as a plain link definition -
 // upstream interop bug, probed 2026-08-13). So the oracle recuses itself
 // from documents carrying reference-shaped text inside a closed head
 // block; the lint behavior there is pinned deterministically below.
@@ -192,7 +192,7 @@ describe("differential oracle over random documents", () => {
         // the 500k-soak counterexample of 2026-08-13, pinned: "alpha[^2]."
         // sits inside the yaml head block (dead text to Obsidian), and
         // reindex legitimately renumbers the orphaned [^42] definition to
-        // [^2] — correct by the live ground truth, unjudgeable by
+        // [^2] - correct by the live ground truth, unjudgeable by
         // micromark (see headBlockWithReference above)
         const doc =
             "---\n\nalpha[^2].\n\n---\n\nLorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua[^1].\n\n[^42]: alpha";

@@ -12,7 +12,7 @@ import { fakeEditor } from "./helpers/fake-editor";
 //
 // fakeEditor is built WITHOUT `wholeDoc` here on purpose: it disables
 // getValue(), so this suite proves footnotePrefixFromEditor never falls back
-// to reading the whole document — the exact perf contract this helper
+// to reading the whole document - the exact perf contract this helper
 // exists to enforce.
 
 describe("footnotePrefixFromEditor", () => {

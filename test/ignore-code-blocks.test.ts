@@ -8,8 +8,8 @@ import { maskProtectedLines } from "../src/parsing/markdown-scan";
 import { fakeEditor } from "./helpers/fake-editor";
 import { fakePlugin as sharedFakePlugin } from "./helpers/fake-plugin";
 
-// Issue #41: [^x]-shaped text inside code — fenced blocks, inline code, or
-// frontmatter — must be invisible to every scan the insert/navigate
+// Issue #41: [^x]-shaped text inside code - fenced blocks, inline code, or
+// frontmatter - must be invisible to every scan the insert/navigate
 // commands make. Before the fix, a code sample containing "[^7]" skewed
 // autonumbering, suppressed the section heading (a fenced "[^x]:" counted
 // as an existing definition), and hijacked the hotkey on that line.
@@ -46,7 +46,7 @@ describe("listExistingFootnoteDefinitions ignores code", () => {
 });
 
 // reference listing composed from the primitives the cascade uses (the old
-// dedicated lister died production-dead — 2026-08-11 review cleanliness)
+// dedicated lister died production-dead - 2026-08-11 review cleanliness)
 function referenceLocations(lines: string[]) {
     const masked = maskProtectedLines(lines);
     const references: { footnote: string; lineNum: number; startIndex: number }[] = [];
@@ -79,7 +79,7 @@ describe("reference occurrences ignore code", () => {
 describe("shouldJumpFromReferenceToDefinition ignores code", () => {
     it("does not navigate from a reference inside a fenced code block", () => {
         const doc = fakeEditor(["```", "fake[^1]", "```", "[^1]: real"]);
-        // caret inside the fenced "[^1]" — plain text, so the press must
+        // caret inside the fenced "[^1]" - plain text, so the press must
         // fall through to insertion instead of navigating
         const handled = shouldJumpFromReferenceToDefinition(
             "fake[^1]",
@@ -145,7 +145,7 @@ describe("shouldJumpFromDefinitionToReference ignores code", () => {
             doc,
         );
         expect(handled).toBe(true);
-        // the first REAL occurrence is on line 3 — not the fenced line 1
+        // the first REAL occurrence is on line 3 - not the fenced line 1
         expect(doc.moves).toEqual([{ line: 3, ch: 8 }]);
     });
 });
@@ -164,7 +164,7 @@ describe("fence delimiters respect their container", () => {
         expect(computeNextFootnoteNumber("> ```\n> code[^9]\nlive[^7]")).toBe(8);
     });
 
-    it("a blank line ends the quote — and its fence", () => {
+    it("a blank line ends the quote - and its fence", () => {
         expect(computeNextFootnoteNumber("> ```\n> code[^9]\n\nlive[^7]")).toBe(8);
     });
 

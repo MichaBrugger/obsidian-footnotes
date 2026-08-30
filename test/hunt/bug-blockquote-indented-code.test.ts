@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { scanDocument } from "../../src/parsing/markdown-scan";
 
 // Bug #4 (2026-08-11 review, Opus): indented code INSIDE a blockquote was
-// never protected — indent was measured on the raw line, where the "> "
+// never protected - indent was measured on the raw line, where the "> "
 // prefix pins it to column 0. Quote-relative indent ≥ 4 is code when it
 // opens at a boundary within the quote (the quote's start, or after a
 // blank ">" line), but stays LIVE as a lazy paragraph continuation or a
@@ -16,7 +16,7 @@ describe("indented code inside blockquotes (bug-blockquote-indented-code)", () =
         expect(scan.isProtected[0]).toBe(true);
     });
 
-    it("indent 4 directly after a quoted paragraph line is a lazy continuation — live", () => {
+    it("indent 4 directly after a quoted paragraph line is a lazy continuation - live", () => {
         const scan = scanDocument(["> para", ">     cont[^9]"]);
         expect(scan.isProtected).toEqual([false, false]);
     });

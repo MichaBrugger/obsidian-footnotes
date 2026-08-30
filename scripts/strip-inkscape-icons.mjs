@@ -11,7 +11,7 @@
 // (the viewBox rules). Inline style="" declarations become presentation
 // attributes with Inkscape's defaults dropped, black strokes/fills become
 // currentColor (Inkscape exports #000 and the icons must follow the theme
-// — long-standing gotcha, see main.ts), sub-0.01px translate garbage is
+// - long-standing gotcha, see main.ts), sub-0.01px translate garbage is
 // deleted, path numbers round to 3 decimals, and attribute-less <g>
 // wrappers left over from layers are unwrapped.
 

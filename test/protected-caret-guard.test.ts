@@ -16,12 +16,12 @@ import {
 } from "./helpers/fake-editor";
 import { fakePlugin as sharedFakePlugin } from "./helpers/fake-plugin";
 
-// Jason's rule (2026-08-12, always on — no toggle, inline spans included):
+// Jason's rule (2026-08-12, always on - no toggle, inline spans included):
 // footnote CREATION is blocked when the caret sits inside code, math, a
 // comment, or frontmatter. A reference minted there is dead text Obsidian
-// never renders, and the next lint's orphan handling then deletes it — so
+// never renders, and the next lint's orphan handling then deletes it - so
 // every creation path warns and stands still instead. Navigation is
-// untouched (it never reaches protected text — the masked gates fall
+// untouched (it never reaches protected text - the masked gates fall
 // through).
 
 function fakeEditor(lines: string[], cursor: EditorPosition): FakeEditor {
@@ -160,7 +160,7 @@ describe("footnote creation is blocked inside protected text", () => {
 
     it("a named placeholder that would COMPLETE an inline-math pair and be swallowed", async () => {
         // "$5 or [^]$6" satisfies the non-space-edge rule the moment the
-        // placeholder lands — the name-entry flow would be stranded in math
+        // placeholder lands - the name-entry flow would be stranded in math
         await expectBlocked(insertNamedFootnote, ["$5 or $6 tail"], {
             line: 0,
             ch: 6,
@@ -178,7 +178,7 @@ describe("footnote creation is blocked inside protected text", () => {
 
     it("a reference that would COMPLETE an inline-math pair and be swallowed by it", async () => {
         // found by the command-press property suite (2026-08-12): "$5 or "
-        // ends with a space, so the dollars are prose — until "[^2]"
+        // ends with a space, so the dollars are prose - until "[^2]"
         // lands before the second one and "$5 or [^2]$" satisfies the
         // non-space-edge rule, masking the fresh reference into math
         await expectBlocked(insertAutonumFootnote, ["$5 or $6 [^1]"], {
@@ -190,7 +190,7 @@ describe("footnote creation is blocked inside protected text", () => {
     it("a reference that would DEMOTE a quote and strand its own definition", async () => {
         // found by the command-press property suite (2026-08-12): "[^1]"
         // at column 0 of "> $$" breaks the blockquote, the now doc-level
-        // "$$" swallows everything below — including the definition the
+        // "$$" swallows everything below - including the definition the
         // same transaction appends. The simulate-and-verify refusal
         // catches it before any edit.
         await expectBlocked(

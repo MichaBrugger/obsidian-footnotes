@@ -1,6 +1,6 @@
 // Smoke tests: drive the REAL plugin inside a running Obsidian instance via
 // the Obsidian CLI and assert on actual note contents. This is the
-// integration layer — unit tests (vitest, test/) cover pure logic.
+// integration layer - unit tests (vitest, test/) cover pure logic.
 //
 // Requirements:
 //   - Obsidian is running with the Obsidian-Plugin-Sandbox vault focused
@@ -109,7 +109,7 @@ async function setupNote(content) {
         ob("open", `file=${NOTE}`);
         // the suite REQUIRES live preview: raw source mode renders no
         // table widgets (the cell tests just time out), and the leaf
-        // inherits whatever mode its previous note used — force the mode
+        // inherits whatever mode its previous note used - force the mode
         // instead of depending on it (repeatability, 2026-08-10)
         action(
             `(async () => { const v=${EDITOR}; ` +
@@ -195,7 +195,7 @@ let filtered = 0;
 let ran = 0;
 
 // --filter <substring> runs only the tests whose name contains the
-// substring (case-insensitive) — the suite is 70+ sequential tests
+// substring (case-insensitive) - the suite is 70+ sequential tests
 // against the live app, so iterating on one new test shouldn't cost a
 // full run every time. Deploy, settings backup/restore, and the scratch
 // note still happen; only the test bodies are skipped.
@@ -210,7 +210,7 @@ if (filterFlagIdx !== -1 && !nameFilter) {
 class SkipTest extends Error {}
 
 // The table widget only opens its cell sub-editor from a FOCUSED window's
-// render loop — hidden stalls it entirely, and merely-visible-but-unfocused
+// render loop - hidden stalls it entirely, and merely-visible-but-unfocused
 // leaves the editor focus() a no-op (observed 2026-08-10: showInactive made
 // the tests FAIL instead of skip). Tests that need the cell editor call
 // this; it grabs focus once when necessary (the suite is run deliberately,
@@ -227,18 +227,18 @@ async function requireVisibleWindow() {
     await sleep(500);
     if (usable()) return;
     throw new SkipTest(
-        "Obsidian window is hidden or cannot take focus — table cell editing can't render",
+        "Obsidian window is hidden or cannot take focus - table cell editing can't render",
     );
 }
 
 // Open the table cell on `line` that contains `landmark` and put FOCUS
 // inside its sub-editor. The main caret parks on `outsideLine` (a
 // non-table line) first: focusing while the caret already sits inside the
-// table opens whatever cell HOLDS it — right after setValue that is the
+// table opens whatever cell HOLDS it - right after setValue that is the
 // FIRST cell, and the command then edits the wrong cell (root-caused
 // 2026-08-27). The poll also verifies the opened cell really is the
 // landmark's, kicking the selection back out when a wrong cell grabbed
-// the focus, and re-focuses the cell's own contentDOM — a td-level focus
+// the focus, and re-focuses the cell's own contentDOM - a td-level focus
 // makes the command's cell resolution (findFromDOM) see the MAIN view.
 async function activateTableCell(line, outsideLine, landmark) {
     action(`(${EDITOR}).editor.setCursor({line:${outsideLine}, ch:0});`);
@@ -287,8 +287,8 @@ async function expectEditorText(expected) {
 
 // ---------- settings safety net ----------
 // The suite patches the live plugin settings per test. Restoration must
-// survive EVERY exit path — a failed assertion, a thrown poll timeout,
-// Ctrl+C — or Jason has to re-edit his settings by hand after each run
+// survive EVERY exit path - a failed assertion, a thrown poll timeout,
+// Ctrl+C - or Jason has to re-edit his settings by hand after each run
 // (observed 2026-08-10, when aborted runs left lint-on-save + a section
 // heading behind). The pre-run snapshot also lands in a sidecar file, so
 // even a hard-killed run heals on the NEXT invocation.
@@ -306,7 +306,7 @@ function restoreState(reason) {
     try {
         ob("delete", `path=${NOTE}.md`);
     } catch {
-        // the note may never have been created — nothing to delete
+        // the note may never have been created - nothing to delete
     }
     if (!savedSettings) return;
     try {
@@ -317,12 +317,12 @@ function restoreState(reason) {
             console.log(`settings restored (${reason})`);
         } else {
             console.error(
-                `settings restore could not be verified (${reason}) — backup kept at ${SETTINGS_BACKUP}`,
+                `settings restore could not be verified (${reason}) - backup kept at ${SETTINGS_BACKUP}`,
             );
         }
     } catch (e) {
         console.error(
-            `settings restore failed (${reason}): ${e.message} — backup kept at ${SETTINGS_BACKUP}`,
+            `settings restore failed (${reason}): ${e.message} - backup kept at ${SETTINGS_BACKUP}`,
         );
     }
 }
@@ -340,7 +340,7 @@ async function main() {
     // sanity: right vault, plugin loaded
     const vault = read("app.vault.getName()");
     if (!vault.includes("Sandbox")) {
-        throw new Error(`refusing to run against vault "${vault}" — smoke tests mutate notes`);
+        throw new Error(`refusing to run against vault "${vault}" - smoke tests mutate notes`);
     }
     if (readJson(`!!app.plugins.plugins['${PLUGIN_ID}']`) !== true) {
         throw new Error(`plugin ${PLUGIN_ID} is not loaded`);
@@ -359,7 +359,7 @@ async function main() {
             if (existsSync(src) && resolve(src) !== resolve(dest)) copyFileSync(src, dest);
         }
         console.log(`deployed build to ${pluginDir}; waiting for hot-reload...`);
-        // let hot-reload's own cycle finish first — then reload explicitly
+        // let hot-reload's own cycle finish first - then reload explicitly
         // anyway: hot-reload has repeatedly left a STALE or DEAD instance
         // behind after a deploy (whole-suite failures, 2026-08-05), and an
         // explicit disable/enable cycle re-evaluates main.js from disk
@@ -368,7 +368,7 @@ async function main() {
         // enablePluginAndSave PERSISTS the enablement: plain enablePlugin
         // is session-only, and since the plugin isn't in the vault's saved
         // community-plugins.json by default, an Obsidian restart after a
-        // session-only enable brought the vault up with the plugin OFF —
+        // session-only enable brought the vault up with the plugin OFF -
         // every hotkey silently dead (Jason hit this 2026-08-21, reported
         // as "footnote hotkeys do nothing")
         action(
@@ -384,12 +384,12 @@ async function main() {
         await sleep(300);
     }
 
-    // snapshot the settings — or, when a sidecar backup survived a killed
+    // snapshot the settings - or, when a sidecar backup survived a killed
     // run, treat THAT as the true pre-smoke state and heal it first
     if (existsSync(SETTINGS_BACKUP)) {
         savedSettings = JSON.parse(readFileSync(SETTINGS_BACKUP, "utf8"));
         console.log(
-            "found settings backup from an interrupted run — restoring it before starting",
+            "found settings backup from an interrupted run - restoring it before starting",
         );
         setSettings(savedSettings);
     } else {
@@ -400,7 +400,7 @@ async function main() {
     }
 
     // an occluded/minimized window stalls the render loop (table cells,
-    // toasts, data-buffer sync) and wedges the suite — nudge it visible
+    // toasts, data-buffer sync) and wedges the suite - nudge it visible
     // without stealing focus, and say so when that wasn't enough
     action(
         `(() => { try { const w = require('electron').remote?.getCurrentWindow?.(); ` +
@@ -409,7 +409,7 @@ async function main() {
     await sleep(300);
     if (readJson("document.hidden") === true) {
         console.log(
-            "NOTE: the Obsidian window is still hidden/occluded — table-cell tests will skip, and toast-dependent tests may be unreliable",
+            "NOTE: the Obsidian window is still hidden/occluded - table-cell tests will skip, and toast-dependent tests may be unreliable",
         );
     }
 
@@ -459,7 +459,7 @@ async function main() {
 
     await test("jumping between reference and definition centers the cursor in view", async () => {
         // regression (reported 2026-07-16): Obsidian's minimal scrolling
-        // parked the cursor at the very edge of the viewport after a jump —
+        // parked the cursor at the very edge of the viewport after a jump -
         // on mobile, nearly off screen. Jumps should land centered.
         resetSettings();
         const lines = Array.from({ length: 120 }, (_, i) => `Paragraph ${i + 1} lorem ipsum.`);
@@ -562,7 +562,7 @@ async function main() {
             (_, i) => `Paragraph ${i + 1} lorem ipsum dolor sit amet, consectetur adipiscing elit.`,
         ).join("\n");
         await setupNote(`Alpha bravo charlie\n\nDecoy text: \`[^1]: fake\` stays code.\n\n${filler}`);
-        // the note must be CLEAN ON DISK before the press — that's the
+        // the note must be CLEAN ON DISK before the press - that's the
         // idle-note state the bug needs (buffer === disk skips the save)
         action(`window.__decoySaved = false; (async () => { await (${EDITOR}).save(); window.__decoySaved = true; })();`);
         await pollUntil("note saved to disk", `window.__decoySaved`, (v) => v === true);
@@ -584,7 +584,7 @@ async function main() {
         );
         // healthy runs measure 100-300ms; the decoy stall measures
         // 1100-2000ms+ (down to ~1.1s when a nearby save's cache reindex
-        // happens to cut the wait short) — 700ms splits the modes cleanly
+        // happens to cut the wait short) - 700ms splits the modes cleanly
         if (delay > 700) {
             throw new Error(`popup took ${delay}ms to become visible (decoy stall)`);
         }
@@ -598,7 +598,7 @@ async function main() {
 
     await test("creation lint is applied BEFORE the popup opens (2026-08-27)", async () => {
         // Jason's ask 2026-08-27: with the popup on, the lint used to wait
-        // until the popup CLOSED — the note looked unlinted the whole time
+        // until the popup CLOSED - the note looked unlinted the whole time
         // the popup was up. It now lints right after the creation edit,
         // before the popup appears (which also lets the popup bind to the
         // post-lint id instead of dodging a mid-popup rename).
@@ -621,7 +621,7 @@ async function main() {
             `el.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true})));`,
         );
         await sleep(800);
-        // closing changes nothing further — the lint already ran
+        // closing changes nothing further - the lint already ran
         await expectEditorText("Alpha,[^1] bravo\n\n[^1]: ");
     });
 
@@ -636,7 +636,7 @@ async function main() {
             insertAtEndOfWord: false,
         });
         await setupNote("zeta[^5] quick\n\n[^5]: five");
-        setCursorAndRun(0, 11, CMD_AUTONUM); // mid "quick" — mints [^6]
+        setCursorAndRun(0, 11, CMD_AUTONUM); // mid "quick" - mints [^6]
         await pollUntil(
             "popup open",
             `!!document.querySelector('.footnote-shortcut-popup')`,
@@ -654,7 +654,7 @@ async function main() {
             throw new Error(`popup bound to ${JSON.stringify(label)}, expected "[^2]:"`);
         }
         // ... and the caret sits just past the NEW reference, so the popup
-        // anchors there too — the lint's minimal-diff rewrite maps a caret
+        // anchors there too - the lint's minimal-diff rewrite maps a caret
         // inside its span to the span START (the FIRST footnote) unless it
         // is re-landed semantically (Jason's report 2026-08-27)
         const atRef = { line: 0, ch: "zeta[^1] qu[^2]".length };
@@ -693,14 +693,14 @@ async function main() {
             `(${EDITOR}).editor.getCursor()`,
             (c) => c && c.line === 0,
         );
-        // "Alpha bravo^[" is 13 chars — the caret belongs between the brackets
+        // "Alpha bravo^[" is 13 chars - the caret belongs between the brackets
         if (cursor.ch !== 13) throw new Error(`cursor at ch ${cursor.ch}, expected 13 (inside ^[])`);
     });
 
     await test("second inline press warns while empty, hops once filled", async () => {
         // empty half (Jason, 2026-08-08): the second press used to hop the
         // caret out of the untouched ^[], stranding an empty inline
-        // footnote — it now warns like the empty [^] reference and stays put
+        // footnote - it now warns like the empty [^] reference and stays put
         resetSettings();
         await setupNote("Alpha bravo charlie");
         setCursorAndRun(0, 8, CMD_INLINE); // creates ^[] with cursor inside
@@ -736,7 +736,7 @@ async function main() {
         await setupNote("Alpha bravo charlie");
         // the real OS clipboard can't be driven headlessly (navigator.clipboard
         // requires document focus, and Electron's clipboard module is inert in
-        // Obsidian's renderer), so stub the read at the platform boundary —
+        // Obsidian's renderer), so stub the read at the platform boundary -
         // the command path from clipboard text to editor is still exercised.
         // The stub content needs sanitizing (newline) to prove that runs too.
         // Stub + command run in ONE eval: something on this machine restores
@@ -765,7 +765,7 @@ async function main() {
     await test("rapid double press creates one footnote and toggles its popup", async () => {
         // regression (reported 2026-07-16): the popup handle used to be
         // registered only after async setup, so a second press during that
-        // window opened a SECOND popup instead of toggle-closing the first —
+        // window opened a SECOND popup instead of toggle-closing the first -
         // and the two popups' save machinery raced, eating later footnotes
         resetSettings({ enablePopupEditor: true });
         await setupNote("Alpha bravo charlie");
@@ -796,7 +796,7 @@ async function main() {
         // regression (reported 2026-07-16, sequence captured live): the
         // popup embed marks itself dirty just from rendering, so a closed
         // untouched popup's debounced save wrote its STALE file snapshot
-        // over footnotes added after it loaded — the external-change reload
+        // over footnotes added after it loaded - the external-change reload
         // then dumped the cursor at the top of the note
         resetSettings({ enablePopupEditor: true });
         await setupNote("Alpha bravo charlie delta");
@@ -824,7 +824,7 @@ async function main() {
 
     await test("typed popup definition survives an immediately-following footnote", async () => {
         // regression (reported 2026-07-16, third round): the user's real flow
-        // — type a definition in the popup, close, immediately insert the next
+        // - type a definition in the popup, close, immediately insert the next
         // footnote. The popup's (legitimate) debounced save wrote the file
         // WITHOUT the just-inserted next footnote, clobbering it; the
         // conflict reload then dumped the cursor at the top.
@@ -864,7 +864,7 @@ async function main() {
 
     await test("rapid typed popups keep their texts apart and never crash the save chain", async () => {
         // regression (reported 2026-08-13, root-caused live): the teardown's
-        // save flush called embed.save() with NO ARGUMENTS — current
+        // save flush called embed.save() with NO ARGUMENTS - current
         // Obsidian's save(t, n) feeds t straight into set(), so
         // set(undefined) threw deep in the save chain AND poisoned
         // embed.text, making the embed's own debounced saves crash uncaught
@@ -912,7 +912,7 @@ async function main() {
     await test("right-click on a footnote offers Rename footnote, prose does not", async () => {
         // the editor-menu hook (Jason's ask 2026-08-13): parity with the
         // native "Rename this heading" on heading lines. Triggered
-        // programmatically with a recording menu stub — the caret stands in
+        // programmatically with a recording menu stub - the caret stands in
         // for the click point, which Obsidian resolves before the event.
         resetSettings({});
         await setupNote("Alpha bravo[^x] charlie\n\n[^x]: def");
@@ -938,7 +938,7 @@ async function main() {
 
     await test("Escape closes the popup (regression 2026-08-13)", async () => {
         // the embedded editor preventDefaults every Escape, so the old
-        // defaultPrevented-based close never fired — caught by Jason's A3
+        // defaultPrevented-based close never fired - caught by Jason's A3
         // manual pass; the fix reads the vim state directly in capture phase
         resetSettings({ enablePopupEditor: true });
         await setupNote("Alpha bravo charlie");
@@ -1006,7 +1006,7 @@ async function main() {
             `(() => { const input = document.querySelector('.modal-container input'); ` +
             `input.value = 'cmd'; input.dispatchEvent(new Event('input')); })();`,
         );
-        // the REAL keyboard path — a modal's scope owns the keyboard, so
+        // the REAL keyboard path - a modal's scope owns the keyboard, so
         // executeCommandById proving the registry is NOT enough (Jason's
         // 2026-08-22 report: the first ship passed that way while actual
         // keypresses were swallowed). Synthesize the assigned hotkey; when
@@ -1059,8 +1059,8 @@ async function main() {
             `(${EDITOR}).editor.getValue()`,
             (v) =>
                 v ===
-                // the body's paragraph separator is an INDENTED blank —
-                // "    " — flush with the continuations (Jason, 2026-08-21)
+                // the body's paragraph separator is an INDENTED blank -
+                // "    " - flush with the continuations (Jason, 2026-08-21)
                 "Intro line.\n[^1]\nOutro line.\n\n[^1]: First para body\n    \n    Second para body",
             8000,
         );
@@ -1073,7 +1073,7 @@ async function main() {
 
     await test("TWO Alt-dragged selections toast and change nothing (Jason's report 2026-08-21)", async () => {
         // the report itself was environmental (plugin left session-enabled
-        // only — see the deploy step), but this pins the real multi-range
+        // only - see the deploy step), but this pins the real multi-range
         // path end to end: refusal toast, document untouched
         resetSettings({ enablePopupEditor: false });
         await setupNote("alpha bravo\ncharlie delta");
@@ -1128,7 +1128,7 @@ async function main() {
             (v) => v === "alpha[^] bravo\ncharlie[^] delta",
             8000,
         );
-        // replaceSelection writes at EVERY cursor — the same mechanism
+        // replaceSelection writes at EVERY cursor - the same mechanism
         // real multi-cursor typing uses
         action(`(${EDITOR}).editor.replaceSelection('src');`);
         await pollUntil(
@@ -1171,7 +1171,7 @@ async function main() {
         );
         action(`document.execCommand('insertText', false, 'live text');`);
         // the debounced save must reach the main editor WHILE the popup is
-        // still open — that is the whole point of the stock-parity model
+        // still open - that is the whole point of the stock-parity model
         await pollUntil(
             "typed definition visible in the main editor mid-session",
             `(${EDITOR}).editor.getValue()`,
@@ -1225,7 +1225,7 @@ async function main() {
     await test("footnote lands at the caret inside an actively edited table cell", async () => {
         await requireVisibleWindow();
         // regression (reported 2026-07-14): running the command while a
-        // table cell sub-editor owned focus raced the cell's sync-back —
+        // table cell sub-editor owned focus raced the cell's sync-back -
         // the insert was swallowed or the row's pipes were displaced and
         // escaped, shredding the table
         resetSettings();
@@ -1237,7 +1237,7 @@ async function main() {
             "tail",
         ].join("\n");
         // the table widget re-normalizes column padding after load, so a
-        // byte-exact setupNote wait would never match — set the content and
+        // byte-exact setupNote wait would never match - set the content and
         // wait for the "()" landmark on both the editor and the data buffer
         await setupNote("table pending");
         action(`(${EDITOR}).editor.setValue(${JSON.stringify(table)});`);
@@ -1252,7 +1252,7 @@ async function main() {
             (v) => typeof v === "string" && v.includes("()"),
         );
         // the shared activation opens the "()" cell with real focus inside
-        // its sub-editor (see activateTableCell — the one-shot recipe
+        // its sub-editor (see activateTableCell - the one-shot recipe
         // opened the FIRST cell instead, 2026-08-27)
         await activateTableCell(2, 4, "()");
         action(`app.commands.executeCommandById('${CMD_NAMED}');`);
@@ -1273,7 +1273,7 @@ async function main() {
         // reference rides the cell sub-editor's dispatch, the definition a
         // main-editor transaction, and CodeMirror's history can never
         // group the two. The first undo used to silently strand an
-        // orphaned reference in the table (Jason's report 2026-08-27) —
+        // orphaned reference in the table (Jason's report 2026-08-27) -
         // the partial-undo notice now says so.
         resetSettings();
         const table = [
@@ -1477,7 +1477,7 @@ async function main() {
         });
         await setupNote("Text[^2].\n\n[^2]: used\n[^9]: orphan");
         setCursorAndRun(0, 0, CMD_LINT);
-        // no renumbering (reindex off) — just the orphan gone
+        // no renumbering (reindex off) - just the orphan gone
         await expectEditorText("Text[^2].\n\n[^2]: used");
     });
 
@@ -1515,7 +1515,7 @@ async function main() {
             (v) => typeof v === "string" && v.includes("()"),
         );
         // the table widget renders from the data buffer, which lags the
-        // editor by a tick — the cell sub-editor can't open before that
+        // editor by a tick - the cell sub-editor can't open before that
         await pollUntil(
             "table content in data buffer",
             `(${EDITOR}).data`,
@@ -1523,7 +1523,7 @@ async function main() {
         );
         // editor.focus() can silently no-op when nothing in the editor had
         // DOM focus (same quirk the popup-close path works around), and
-        // without real focus the cell editor never opens — focus the CM
+        // without real focus the cell editor never opens - focus the CM
         // contentDOM directly and jiggle the cursor until the widget bites
         await pollUntil(
             "table cell sub-editor to open",
@@ -1582,7 +1582,7 @@ async function main() {
     });
 
     await test("vim :w routes through the save command and lints (Linter parity)", async () => {
-        // vim does not exist on mobile — under Obsidian's mobile emulation
+        // vim does not exist on mobile - under Obsidian's mobile emulation
         // (app.emulateMobile) the CM5 shim never attaches and this test
         // can only fail confusingly (burned 2026-08-13: an evening chasing
         // "broken vim" that was just the emulator being on)
@@ -1592,7 +1592,7 @@ async function main() {
         }
         resetSettings({ lintOnSave: true });
         // enabling vim loads the CM5 adapter; the plugin's leaf-change hook
-        // then redefines :w — reopening the note fires that hook
+        // then redefines :w - reopening the note fires that hook
         action(`app.vault.setConfig('vimMode', true);`);
         await sleep(600);
         await setupNote("Beta[^2] alpha[^1] end\n\n[^1]: one\n[^2]: two");
@@ -1625,7 +1625,7 @@ async function main() {
     await test("creating a footnote lints the note when enabled", async () => {
         resetSettings({ lintOnFootnoteCreation: true });
         // inserting mid "alpha" puts the new reference BEFORE [^1] in reading
-        // order — the creation-time lint renumbers everything and the
+        // order - the creation-time lint renumbers everything and the
         // caret still lands on the (renamed) new empty definition
         await setupNote("alpha bravo[^1] end.\n\n[^1]: one");
         setCursorAndRun(0, 3, CMD_AUTONUM); // mid "alpha"
@@ -1670,7 +1670,7 @@ async function main() {
         });
         await setupNote("Alpha bravo\n\n# Footnotes\n\ntail here");
         setCursorAndRun(0, 8, CMD_AUTONUM); // mid "bravo"
-        // a blank line separates the definition from "tail here" — otherwise
+        // a blank line separates the definition from "tail here" - otherwise
         // Obsidian lazily pulls the prose into the footnote (A4 bug)
         await expectEditorText(
             "Alpha bravo[^1]\n\n# Footnotes\n\n[^1]: \n\ntail here",
@@ -1820,7 +1820,7 @@ async function main() {
 
     await test("lint applies the note's footnote prefix to plain footnotes (QOL)", async () => {
         // plain strays adopt the prefix AND the whole namespace renumbers
-        // by reading order — the pre-existing [^3=5] is a numbered
+        // by reading order - the pre-existing [^3=5] is a numbered
         // footnote of the namespace, not a named one; named footnotes
         // keep their name behind the prefix (A6 bug)
         resetSettings({ enableFootnotePrefix: true });
@@ -1905,7 +1905,7 @@ async function main() {
     await test("caret after an escaped pipe still counts as inside a reference (2026-08-10 A9)", async () => {
         await requireVisibleWindow();
         // the cell editor shows "\|" as "|", so the caret used to resolve
-        // one source column short — read as OUTSIDE the reference, the named
+        // one source column short - read as OUTSIDE the reference, the named
         // command nested a fresh "[^]" into it instead of continuing it
         resetSettings();
         const table = [
@@ -1925,7 +1925,7 @@ async function main() {
             `(${EDITOR}).data`,
             (v) => typeof v === "string" && v.includes("[^note]"),
         );
-        // caret between "[" and "^" — strictly inside, and past the escape
+        // caret between "[" and "^" - strictly inside, and past the escape
         action(
             `(() => { const v=${EDITOR}; v.editor.focus(); ` +
             `const ch=v.editor.getLine(2).indexOf('[^note]')+1; ` +
@@ -1962,7 +1962,7 @@ async function main() {
                 v.includes("no definition") &&
                 v.includes("[^stray]"),
         );
-        // alert only — the reference itself stays in the text
+        // alert only - the reference itself stays in the text
         const text = readJson(`(${EDITOR}).editor.getValue()`);
         if (!text.includes("[^stray]")) {
             throw new Error(`alert mode removed the reference: ${JSON.stringify(text)}`);
@@ -2016,7 +2016,7 @@ async function main() {
         // press below saw no live text and autonumbering counted [^9]
         resetSettings();
         await setupNote("> ```\n> fake[^9]\nAlpha done");
-        setCursorAndRun(2, 8, CMD_AUTONUM); // mid "done" — LIVE text
+        setCursorAndRun(2, 8, CMD_AUTONUM); // mid "done" - LIVE text
         await expectEditorText("> ```\n> fake[^9]\nAlpha done[^1]\n\n[^1]: ");
     });
 
@@ -2024,7 +2024,7 @@ async function main() {
         resetSettings();
         const note = "> [!note]\n> body[^1] here\n> [^1]: def";
         await setupNote(note);
-        setCursorAndRun(1, 8, CMD_AUTONUM); // inside [^1] — must navigate
+        setCursorAndRun(1, 8, CMD_AUTONUM); // inside [^1] - must navigate
         await pollUntil(
             "cursor on the callout definition line",
             `(${EDITOR}).editor.getCursor()`,
@@ -2067,7 +2067,7 @@ async function main() {
         // the punctuation fix applied at creation, before the popup
         const created = "Alpha,[^1] bravo\n\n[^1]: ";
         await expectEditorText(created);
-        // flip to Reading view WITHOUT a leaf change — the popup stays up
+        // flip to Reading view WITHOUT a leaf change - the popup stays up
         action(
             `(async () => { const v=${EDITOR}; ` +
             `await v.setState({...v.getState(), mode:'preview'}, {history:false}); })();`,
@@ -2101,7 +2101,7 @@ async function main() {
         console.error(`\n--filter "${nameFilter}" matched no test names`);
         process.exit(2);
     }
-    const skipNote = skips > 0 ? ` (${skips} skipped — rerun with the Obsidian window visible)` : "";
+    const skipNote = skips > 0 ? ` (${skips} skipped - rerun with the Obsidian window visible)` : "";
     const filterNote =
         nameFilter !== null
             ? ` (--filter "${nameFilter}": ${filtered} test(s) not run)`

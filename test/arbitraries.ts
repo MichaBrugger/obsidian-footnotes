@@ -2,14 +2,14 @@ import fc from "fast-check";
 
 // ---------- document generator ----------
 // Structured, not byte-random: the pieces are the plugin's whole attack
-// surface — references (plain/named/cased/$/escaped/inline), definitions
+// surface - references (plain/named/cased/$/escaped/inline), definitions
 // with continuations, fences (bare/quoted/listed), math, comments,
 // indented code, blockquoted definitions, dividers, frontmatter, and
 // every EOL flavor.
 //
-// Lives in its own module (not properties.test.ts) so non-test tooling —
+// Lives in its own module (not properties.test.ts) so non-test tooling -
 // e.g. the sample-corpus script that renders generated docs in Obsidian
-// for human review — can consume the same generator the properties use.
+// for human review - can consume the same generator the properties use.
 
 const NAMES = ["1", "2", "9", "42", "note", "Note", "a$1", "ch-2", "x"];
 const WORDS = ["alpha", "bravo", "charlie", "中文", "word"];
@@ -24,7 +24,7 @@ const inlinePieceArb = fc.constantFrom(
     "$m[^79]$",
     "\\[^80]",
     "$5 or $6",
-    // punctuation directly after excluded reference shapes — the class the
+    // punctuation directly after excluded reference shapes - the class the
     // punctuation rule's regex bypass corrupted (2026-08-11 review bug #1)
     "\\[^81].",
     "^[^shadow]?!",
@@ -47,7 +47,7 @@ const proseLineArb = fc
     .map((pieces) => pieces.join(" "));
 
 // filler paragraphs between the footnote-bearing blocks (Jason's corpus
-// review, 2026-08-12: real notes are mostly prose) — Latin lorem ipsum and
+// review, 2026-08-12: real notes are mostly prose) - Latin lorem ipsum and
 // the Thousand Character Classic as its CJK counterpart. A paragraph may
 // carry one reference, before OR after its final punctuation mark (the
 // punctuation rule's whole job).
@@ -82,7 +82,7 @@ const fillerParagraphArb = fc
 // definition bodies may carry NESTED references or inline footnotes:
 // hand-typed nesting the plugin refuses to CREATE but must always survive
 // (Jason's ruling + lint report, 2026-08-13). The generator was blind to
-// this whole class before — no soak could have caught a nested-footnote
+// this whole class before - no soak could have caught a nested-footnote
 // lint bug.
 const definitionBodyPieceArb = fc.oneof(
     { weight: 4, arbitrary: fc.constantFrom(...WORDS) },

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { reindexFootnotes } from "../../src/linting/rules/re-index-footnotes";
 
-// With keepOrphanedDefinitions:false, a 21-deep chain of definitions each referencing the next is NOT fully deleted in one call — deletion resumes on the next call (non-idempotent).
+// With keepOrphanedDefinitions:false, a 21-deep chain of definitions each referencing the next is NOT fully deleted in one call - deletion resumes on the next call (non-idempotent).
 // Hunt: 2026-08-09. Lens: properties.
 // Root cause: the reindexOnce fixpoint loop caps at 20 iterations, and a transitive-orphan chain exposes only one new orphan per pass, so depth 21+ never converges in a single call.
 

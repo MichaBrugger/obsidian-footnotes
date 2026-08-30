@@ -16,14 +16,14 @@ type ActivePopup = {
 let activePopup: ActivePopup | null = null;
 
 // Resolves once no closed popup still has file work in flight. A closed
-// popup legitimately saves the user's typed definition on a debounce — but that
+// popup legitimately saves the user's typed definition on a debounce - but that
 // save writes the file as the EMBED knew it, so any document edit made
 // before it lands gets clobbered, and the conflict reload dumps the cursor
 // at the top of the note (regression, reported 2026-07-16). Commands that
 // edit the document await this before touching anything.
 let pendingTeardown: Promise<void> | null = null;
 
-/** Whether a popup is open or a closed one's save is still in flight — automatic edits must stay away while true. */
+/** Whether a popup is open or a closed one's save is still in flight - automatic edits must stay away while true. */
 export function footnotePopupBusy(): boolean {
     return activePopup !== null || pendingTeardown !== null;
 }
@@ -32,7 +32,7 @@ export function footnotePopupBusy(): boolean {
  * Await any pending teardown, plus user feedback: when the wait is long
  * enough to feel like a dropped keypress, a notice explains what's
  * happening and clears the moment the command proceeds. The keypress is
- * never discarded — it runs as soon as the pending save has landed.
+ * never discarded - it runs as soon as the pending save has landed.
  */
 export async function settleFootnotePopupWithFeedback(): Promise<void> {
     if (!pendingTeardown) return;
@@ -109,7 +109,7 @@ export async function openFootnotePopup(
     // the buildEmbed closure
     const file = mdView.file;
 
-    // a just-inserted definition is only indexed once the file saves — but
+    // a just-inserted definition is only indexed once the file saves - but
     // mdView.data lags a tick behind editor API changes, so saving too early
     // would write pre-insertion content to disk; wait for the buffer to
     // catch up first. Finishing the save (and its fold-state event) before
@@ -120,11 +120,11 @@ export async function openFootnotePopup(
 
     // Register the popup handle BEFORE the first await: a hotkey press
     // during this async setup must toggle-close THIS pending popup, not
-    // start a second one whose file saves race this one's — rapid
+    // start a second one whose file saves race this one's - rapid
     // consecutive footnotes used to lose the later references exactly that
     // way (regression, reported 2026-07-16). Until the DOM exists, closing
     // just abandons the setup. `close` flips the flag from event handlers
-    // during the awaits below, which the checker's narrowing can't see —
+    // during the awaits below, which the checker's narrowing can't see -
     // so every re-check reads through popupClosed() (call results are
     // never narrowed).
     let closed = false;
@@ -168,7 +168,7 @@ export async function openFootnotePopup(
     activePopup = { close };
 
     const dataDeadline = Date.now() + 2000;
-    // the data buffer usually catches up within a tick — check again almost
+    // the data buffer usually catches up within a tick - check again almost
     // immediately before falling back to coarse 50ms polls, so the popup
     // doesn't spend a blind 50ms on what is typically a ~1ms wait.
     // EQUALITY with the editor, not the old "[^id]:" substring search:
@@ -176,7 +176,7 @@ export async function openFootnotePopup(
     // "`[^name]: …`" checkbox line) matched the STALE buffer instantly,
     // the save below was then skipped (stale buffer still equal to disk),
     // and the popup sat invisible ~2s until Obsidian's debounced autosave
-    // finally wrote the new definition for the embed to find — or died to
+    // finally wrote the new definition for the embed to find - or died to
     // the jump fallback when the retry deadline ran out first (Jason's
     // report 2026-08-26, ground-truthed with a live gesture watcher)
     let pollDelay = 0;
@@ -186,7 +186,7 @@ export async function openFootnotePopup(
     }
     if (popupClosed()) return;
     // the embed reads the FILE, so unsaved view changes must be written
-    // first — but only when the view actually differs from disk; a
+    // first - but only when the view actually differs from disk; a
     // per-popup unconditional save is disk latency plus Syncthing churn
     if (mdView.data !== (await plugin.app.vault.cachedRead(file))) {
         await mdView.save();
@@ -195,8 +195,8 @@ export async function openFootnotePopup(
 
     // anchor just below the cursor, flipping above it near the window bottom.
     // When focus is in a sub-editor (a table cell being edited), the main
-    // editor's coordsAtPos only knows the table widget's edge — which pins
-    // the popup to the screen border — while the sub-editor's DOM selection
+    // editor's coordsAtPos only knows the table widget's edge - which pins
+    // the popup to the screen border - while the sub-editor's DOM selection
     // tracks the real caret. With the main editor focused, coordsAtPos is
     // the reliable one (the DOM selection can lag the editor API).
     const cm = (editor as EditorWithCm).cm;
@@ -230,7 +230,7 @@ export async function openFootnotePopup(
 
     // keep the popup tight against the caret: just below it, or just above
     // when there isn't room underneath. The real height is only known once
-    // the embed renders — and changes as the user types — so re-anchor on
+    // the embed renders - and changes as the user types - so re-anchor on
     // every size change instead of reserving worst-case space up front
     // (which used to strand the popup far above a caret near the bottom).
     // When flipped above, the bottom edge stays pinned so growth goes up.
@@ -257,7 +257,7 @@ export async function openFootnotePopup(
     const embedEl = containerEl.createDiv("footnote-shortcut-popup-embed");
 
     // footnote labels are case-insensitive markdown, and the metadata cache
-    // stores their ids lowercased — a subpath in the reference's original
+    // stores their ids lowercased - a subpath in the reference's original
     // casing (e.g. "[^arXiv:…]") resolves to nothing (issue #50's popup
     // half: the popup silently degraded to the legacy jump)
     const subpath = `#[^${footnoteId.toLowerCase()}]`;
@@ -290,7 +290,7 @@ export async function openFootnotePopup(
 
     // CAPTURE phase, reading the vim state directly: the embedded editor
     // preventDefaults EVERY Escape (not just vim's), so the old bubble-
-    // phase defaultPrevented check never closed the popup at all —
+    // phase defaultPrevented check never closed the popup at all -
     // regression from the E28 cleanup, caught by the A3 manual pass
     // (2026-08-13). E28's actual rule survives by asking vim itself: an
     // editor still in INSERT mode keeps the key (leaving insert must not
@@ -315,10 +315,10 @@ export async function openFootnotePopup(
         // OUT of the document immediately, not just hidden: the embed's
         // inline editor stays live while its save settles (up to ~5s), and
         // keystrokes from someone already typing the NEXT footnote landed
-        // in it — appending to the WRONG definition and re-arming the
+        // in it - appending to the WRONG definition and re-arming the
         // embed's debounced save, which then fired against the unloaded
         // embed's cleared state ("Cannot read properties of undefined
-        // (reading 'split')" — reported and repro'd 2026-08-13). The
+        // (reading 'split')" - reported and repro'd 2026-08-13). The
         // detached embed still saves fine; only input reachability changes.
         containerEl.remove();
         if (focusEditor) {
@@ -335,7 +335,7 @@ export async function openFootnotePopup(
         pendingTeardown = teardownPromise;
         void (async () => {
             // the embed saves edits on its own DEBOUNCE (1-2s); flush the
-            // save NOW and await its exact completion — this wait gates the
+            // save NOW and await its exact completion - this wait gates the
             // next footnote command, so every millisecond here is felt when
             // creating consecutive footnotes rapidly. The flush passes the
             // inline editor's CURRENT text and write=true (see the save
@@ -349,7 +349,7 @@ export async function openFootnotePopup(
                     if (typeof text === "string") await embed.save?.(text, true);
                 }
             } catch {
-                // fall through — the polling below is the safety net
+                // fall through - the polling below is the safety net
             }
             // safety net for saves the flush didn't cover (saveAgain, a
             // save already in flight); usually clears on the first check.
@@ -363,14 +363,14 @@ export async function openFootnotePopup(
                 try {
                     // a debounce timer armed by the final keystrokes would
                     // fire AFTER the unload below and read the cleared
-                    // embed state (the rapid-succession crash) — everything
+                    // embed state (the rapid-succession crash) - everything
                     // dirty has been flushed above, so the timers carry
                     // nothing
                     embed.requestSave?.cancel?.();
                     embed.requestSaveFolds?.cancel?.();
                     embed.unload();
                 } catch {
-                    // private API — a throw here must not skip the settle
+                    // private API - a throw here must not skip the settle
                     // below, or every later footnote command would wait on
                     // pendingTeardown forever (E29)
                 }
@@ -379,7 +379,7 @@ export async function openFootnotePopup(
                 // purpose: rAF stalls entirely while the window is hidden)
                 win.setTimeout(() => {
                     // clear the slot only if a LATER teardown hasn't
-                    // replaced it — nulling a successor's promise would
+                    // replaced it - nulling a successor's promise would
                     // drop the busy gate while its save is still in flight
                     // (2026-08-11 review bug #14)
                     if (pendingTeardown === teardownPromise) {
@@ -395,7 +395,7 @@ export async function openFootnotePopup(
     const tryShow = async (): Promise<boolean> => {
         await embed.loadFile();
         // a rapid second press toggle-closes the popup while loadFile is
-        // still in flight — teardown has already UNLOADED the embed, and
+        // still in flight - teardown has already UNLOADED the embed, and
         // showing the editor on an unloaded embed leaves a live inline
         // editor whose save chain later fires against the cleared embed
         // state ("Cannot read properties of undefined (reading 'split')",

@@ -4,7 +4,7 @@ import { protectedLines } from "../../src/parsing/markdown-scan";
 
 // Sol re-review bug #5 (2026-08-10), ground truth verified against
 // Obsidian's metadataCache ("heading:0-0, code:1-1"): lazy continuation
-// only applies to PARAGRAPHS — after an ATX heading, a closed fence, or a
+// only applies to PARAGRAPHS - after an ATX heading, a closed fence, or a
 // thematic break, an immediately following 4-space chunk IS indented code
 // even with no blank line between. The scanner's block-boundary flag was
 // blank-line-only, so lint rewrote inside what Obsidian renders as code.

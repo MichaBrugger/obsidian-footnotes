@@ -4,7 +4,7 @@ import { computeNextFootnoteNumber } from "../../src/parsing/footnote-grammar";
 
 // BUG: backtick handling in the protected-region scanner ignores CommonMark
 // fine print, and the mistakes swallow real references.
-// (a) A line like "```[^7]``` inline" is NOT a fence opener — a backtick fence
+// (a) A line like "```[^7]``` inline" is NOT a fence opener - a backtick fence
 //     info string may not contain backticks, so this is a paragraph with an
 //     inline code span. protectedLines opens a fence anyway; with no bare
 //     closing fence it runs unclosed to EOF and nulls out the rest of the

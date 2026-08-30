@@ -16,7 +16,7 @@ import {
 } from "../parsing/footnote-grammar";
 
 // One press's shared read-only view of the document. Depends only on
-// markdown-scan + Obsidian types — split out of the all-in-one commands
+// markdown-scan + Obsidian types - split out of the all-in-one commands
 // file 2026-08-11.
 
 // Scans run against the document's masked twin (code and frontmatter
@@ -33,11 +33,11 @@ export function docLines(doc: Editor): string[] {
 /**
  * One press's shared read-only view of the document (perf F1): the cascade
  * steps used to each re-materialize the lines and re-walk the protection
- * scan — 3–5 full-document passes per press. Every step takes an optional
+ * scan - 3–5 full-document passes per press. Every step takes an optional
  * DocContext (defaulting to a fresh one, so direct/unit callers are
  * unchanged) and the command entry points build ONE per press. Masking is
  * lazy: per line on demand, whole-twin memoized on first full need. Built
- * strictly BEFORE any edit of the press — creation steps edit last, so the
+ * strictly BEFORE any edit of the press - creation steps edit last, so the
  * context never goes stale within a press.
  */
 export interface DocContext {
@@ -56,8 +56,8 @@ export function listExistingFootnoteDefinitions(
 ) {
     const definitionNames: string[] = [];
 
-    //search each line for footnote definitions — column-0 labels and
-    //blockquote/callout ones ("> [^x]: …", C22) — and list their names
+    //search each line for footnote definitions - column-0 labels and
+    //blockquote/callout ones ("> [^x]: …", C22) - and list their names
     const lines = ctx.lines;
     const masked = ctx.maskedLines();
     for (let i = 0; i < lines.length; i++) {
@@ -98,16 +98,16 @@ export function docContext(doc: Editor): DocContext {
 }
 
 /**
- * The shared "is the caret on a LIVE reference?" lookup — cascade steps
+ * The shared "is the caret on a LIVE reference?" lookup - cascade steps
  * 2–3 and the inline commands all start with it (three byte-identical
  * copies before 2026-08-25). The RAW line gates first: this runs on
  * every press, masking needs the whole document, and most presses sit
  * on plain text (perf F1). Only past that gate is the DocContext built
- * and the masked twin consulted — a "[^x]" inside a fence or inline
+ * and the masked twin consulted - a "[^x]" inside a fence or inline
  * code is plain text, so the press falls through to insertion (#41).
  * referenceOccurrences re-slices each name from the raw line, so a code
  * span inside the name can't leak NULs (bug-masked-name-identity).
- * Returns the occurrence together with the context that judged it —
+ * Returns the occurrence together with the context that judged it -
  * pass that ctx onward so the press keeps its one-scan budget.
  */
 export function referenceOccurrenceAtCursor(
@@ -120,7 +120,7 @@ export function referenceOccurrenceAtCursor(
         footnote: match[0],
         startIndex: match.index ?? 0,
     }));
-    // Stryker disable next-line ConditionalExpression, BlockStatement, LogicalOperator: units can't tell the arms apart cheaply, but this gate is NOT just perf — masking can only EXTEND a "[^…]" match (NUL satisfies the name class), so on lines like "[^a`]:`x]" the masked twin fabricates a phantom reference where the raw line correctly reads a definition label; the raw gate is what keeps the phantom out (hunt 2026-08-25, probe-error adjudication, micromark-verified)
+    // Stryker disable next-line ConditionalExpression, BlockStatement, LogicalOperator: units can't tell the arms apart cheaply, but this gate is NOT just perf - masking can only EXTEND a "[^…]" match (NUL satisfies the name class), so on lines like "[^a`]:`x]" the masked twin fabricates a phantom reference where the raw line correctly reads a definition label; the raw gate is what keeps the phantom out (hunt 2026-08-25, probe-error adjudication, micromark-verified)
     if (referenceAtCursor(rawReferences, cursorPosition.ch) === null) {
         return null;
     }

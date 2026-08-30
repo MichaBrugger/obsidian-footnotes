@@ -6,7 +6,7 @@ import { inlineFootnoteExitCh } from "../src/commands/inline-footnotes";
 // is inside a ^[...] the command moves it just past the closing bracket
 // instead of inserting another footnote. This function is the pure core:
 // the exit position, or null when the cursor isn't inside an inline
-// footnote (including unclosed ones — nothing to exit past).
+// footnote (including unclosed ones - nothing to exit past).
 
 describe("inlineFootnoteExitCh", () => {
     //             0123456789012345

@@ -17,7 +17,7 @@ import { orphanedFootnoteDefinitionNames } from "./rules/remove-orphaned-definit
 import { orphanedFootnoteReferenceNames } from "./rules/remove-orphaned-references";
 
 // The post-lint alert tail: every lint entry point reports what the rules
-// could not (or were not allowed to) fix — empty "[^]" placeholders,
+// could not (or were not allowed to) fix - empty "[^]" placeholders,
 // orphans while their delete toggles are off, duplicates while merging is
 // off. Alerts are reporting, not lint RULES; the rules-stay-independent
 // mandate (2026-08-07) is about the transform pipeline, which lives in
@@ -25,12 +25,12 @@ import { orphanedFootnoteReferenceNames } from "./rules/remove-orphaned-referenc
 
 /**
  * Occurrences of unnamed footnote references outside code and frontmatter: the
- * abandoned empty "[^]", plus — when `prefix` is given — its prefix-era twin,
+ * abandoned empty "[^]", plus - when `prefix` is given - its prefix-era twin,
  * the untouched bare-prefix placeholder ("[^3.]" under prefix "3."). Both
  * are footnotes the user started and never named; the rules can't fix them
  * ("[^]" is invisible to the reference regexes, and a bare prefix is
  * indistinguishable from a deliberate name), so the lint paths alert
- * instead — the user should name or delete the fragment ASAP.
+ * instead - the user should name or delete the fragment ASAP.
  */
 export function countEmptyFootnoteReferences(
     markdown: string,
@@ -41,7 +41,7 @@ export function countEmptyFootnoteReferences(
 ): number {
     const needles = prefix ? ["[^]", `[^${prefix}]`] : ["[^]"];
     // masking only ever REMOVES needle occurrences, so a raw miss is
-    // definitive — this runs on every lint, and most notes have no "[^]"
+    // definitive - this runs on every lint, and most notes have no "[^]"
     // (perf F4: skip the whole-document masking pass)
     if (!needles.some((needle) => markdown.includes(needle))) return 0;
     let count = 0;
@@ -88,14 +88,14 @@ function noticeEmptyReferences(
     );
 }
 
-/** "[^a], [^b], …" — at most three names spelled out, an ellipsis for the rest. */
+/** "[^a], [^b], …" - at most three names spelled out, an ellipsis for the rest. */
 function referenceList(names: string[]): string {
     const shown = names.slice(0, 3).map((name) => `[^${name}]`).join(", ");
     return names.length > 3 ? `${shown}, …` : shown;
 }
 
 // the alert half of "Delete orphaned references": while the toggle is off,
-// linting reports them instead — orphans are never silent
+// linting reports them instead - orphans are never silent
 function noticeOrphanedReferences(
     plugin: FootnotePlugin,
     markdown: string,
@@ -113,7 +113,7 @@ function noticeOrphanedReferences(
     );
 }
 
-// kept orphaned definitions alert too (Jason, 2026-08-10) — every orphan
+// kept orphaned definitions alert too (Jason, 2026-08-10) - every orphan
 // kind is either deleted or surfaced, never silently preserved
 function noticeOrphanedDefinitions(
     plugin: FootnotePlugin,
@@ -132,7 +132,7 @@ function noticeOrphanedDefinitions(
 }
 
 // the alert half of "Merge duplicate definitions": while the toggle is off,
-// linting reports duplicates instead — like orphans, they are never silent
+// linting reports duplicates instead - like orphans, they are never silent
 // (Jason's policy 2026-08-12; Obsidian renders only the LAST definition)
 function noticeDuplicateDefinitions(
     plugin: FootnotePlugin,
@@ -151,12 +151,12 @@ function noticeDuplicateDefinitions(
 }
 
 /**
- * Names of definitions that carry a footnote INSIDE their block — a live
+ * Names of definitions that carry a footnote INSIDE their block - a live
  * reference or inline footnote on the label line (after the label) or a
  * continuation line. Nesting is prevented at creation plugin-wide
  * (Jason's ruling 2026-08-24, Discord-confirmed nobody wants it), but
  * hand-typed and pre-existing nesting can't be fixed automatically
- * without losing content, so the lint ALERTS — the never-silent policy
+ * without losing content, so the lint ALERTS - the never-silent policy
  * orphans and duplicates already follow. Masked fakes don't count.
  */
 export function nestedFootnoteDefinitionNames(
@@ -165,7 +165,7 @@ export function nestedFootnoteDefinitionNames(
     masked: string[],
 ): string[] {
     const names: string[] = [];
-    // one entry per NAME, case-folded like the duplicate/orphan siblings —
+    // one entry per NAME, case-folded like the duplicate/orphan siblings -
     // a name defined twice with both copies nested used to report twice,
     // inflating the notice's count (hunt 2026-08-25)
     const seen = new Set<string>();
@@ -209,8 +209,8 @@ function noticeNestedFootnotes(
     if (names.length === 0) return;
     new Notice(
         names.length === 1
-            ? `This note has a footnote nested inside another footnote's definition (${referenceList(names)}). Nested footnotes don't survive export and most tools can't read them — move it into the text.`
-            : `This note has footnotes nested inside ${names.length} footnote definitions (${referenceList(names)}). Nested footnotes don't survive export and most tools can't read them — move them into the text.`,
+            ? `This note has a footnote nested inside another footnote's definition (${referenceList(names)}). Nested footnotes don't survive export and most tools can't read them. Move it into the text.`
+            : `This note has footnotes nested inside ${names.length} footnote definitions (${referenceList(names)}). Nested footnotes don't survive export and most tools can't read them. Move them into the text.`,
         8000,
     );
 }
@@ -218,7 +218,7 @@ function noticeNestedFootnotes(
 // every lint entry point calls this with the POST-lint text, so the alerts
 // fire whether or not the rules changed anything. ONE normalize/scan/mask
 // is shared by all the alerts (2026-08-11 review perf item: the alerts
-// each re-derived it — ~40% of a lint's wall time, felt on every creation
+// each re-derived it - ~40% of a lint's wall time, felt on every creation
 // with lint-on-footnote-creation enabled).
 export function noticeLintAlerts(plugin: FootnotePlugin, markdown: string) {
     // every alert's own raw gate requires a "[^" (all its needles carry one)

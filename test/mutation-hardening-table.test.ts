@@ -217,7 +217,7 @@ describe("tableRowCellSpans (mutation hardening)", () => {
     });
 
     // line 83 col 25, EqualityOperator (i < lineText.length -> i <=
-    // lineText.length): NOT tested here — see the equivalence note below.
+    // lineText.length): NOT tested here - see the equivalence note below.
 });
 
 describe("resolveTableCellCursor (mutation hardening)", () => {
@@ -299,14 +299,14 @@ describe("resolveTableCellCursor (mutation hardening)", () => {
     });
 
     // line 113 col 20 (active === cm.contentDOM forced false) is NOT
-    // independently testable here — see the equivalence note below.
+    // independently testable here - see the equivalence note below.
 
     // line 120 (all four mutants: both ConditionalExpression -> false
     // duplicates, and both LogicalOperator variants): a td/tr that resolve
     // fine but a MISSING table ancestor must return null. activeTableCellEditor
     // doesn't re-check `table`, so a genuine cell view is found and, if the
     // guard is bypassed, execution reaches `table.rows` on a null table and
-    // throws — diverging from the clean null every one of the four mutants
+    // throws - diverging from the clean null every one of the four mutants
     // should have produced.
     it("returns null (not a throw) when there is no table ancestor", () => {
         const td = { cellIndex: 0 };
@@ -624,7 +624,7 @@ describe("resolveTableCellCursor (mutation hardening)", () => {
     });
 
     // line 157 col 33 (ConditionalExpression -> true, and EqualityOperator
-    // raw < rawCell.length -> raw <= rawCell.length): NOT tested here — see
+    // raw < rawCell.length -> raw <= rawCell.length): NOT tested here - see
     // the equivalence note below.
 
     // line 158 col 13 (LogicalOperator && -> ||, ConditionalExpression ->
@@ -736,7 +736,7 @@ describe("resolveTableCellCursor (mutation hardening)", () => {
 //   lineText.length": the one extra iteration this permits reads
 //   lineText[lineText.length], which is always `undefined` and matches
 //   neither the escape branch ("\\") nor the pipe branch ("|"), so it is a
-//   provable no-op — unkillable by any input.
+//   provable no-op - unkillable by any input.
 //
 // - line 113 col 20, ConditionalExpression -> false (the `active ===
 //   cm.contentDOM` disjunct in resolveTableCellCursor's own focus guard):
@@ -754,5 +754,5 @@ describe("resolveTableCellCursor (mutation hardening)", () => {
 //   far `raw` overshoots rawCell.length once the walk runs past the cell's
 //   real content. The final position is always computed as
 //   `Math.min(span.from + raw, span.to)`, and span.to - span.from is exactly
-//   rawCell.length by construction, so any such overshoot is clamped away —
+//   rawCell.length by construction, so any such overshoot is clamped away -
 //   unobservable through resolveTableCellCursor's return value.

@@ -7,7 +7,7 @@ import FootnotePlugin from "../../src/main";
 import { createMatchingFootnoteDefinition } from "../../src/commands/create-footnote";
 import { reindexFootnotes } from "../../src/linting/rules/re-index-footnotes";
 
-// BUG: Obsidian footnote labels are case-insensitive — "[^Note]" and "[^note]:"
+// BUG: Obsidian footnote labels are case-insensitive - "[^Note]" and "[^note]:"
 // are the SAME footnote, and the metadata cache lowercases ids. The plugin's own
 // popup code already relies on this (footnote-popup.ts lowercases the id, issue
 // #50), but every other comparison keys on the raw match and is case-sensitive.
@@ -15,7 +15,7 @@ import { reindexFootnotes } from "../../src/linting/rules/re-index-footnotes";
 //  1. Data loss on reindex: keepOrphanedDefinitions:false classifies "[^note]:"
 //     as an orphan of "[^Note]" ("note" !== "Note") and DELETES the definition.
 //  2. Split pair: renumberNamedFootnotes:true numbers the reference [^1] and its
-//     definition [^2] — one footnote torn into a broken pair.
+//     definition [^2] - one footnote torn into a broken pair.
 //  3. Duplicate creation: with the caret in "[^Note]" and a "[^note]:" definition
 //     already present, the named command creates a second definition instead of
 //     navigating to the existing one.

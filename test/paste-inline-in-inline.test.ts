@@ -8,7 +8,7 @@ import { pasteInlineFootnote } from "../src/commands/insert-or-navigate-footnote
 
 // Bug (QOL sweep, 2026-08-07): the paste-inline-footnote command skipped the
 // inside-an-inline-footnote guard the other insert commands share, so pasting
-// with the caret inside "^[...]" nested a second "^[...]" into it — ending
+// with the caret inside "^[...]" nested a second "^[...]" into it - ending
 // the outer footnote early and corrupting it ("^[in ^[clip]line]"). The
 // press must hop the caret past the closing bracket instead, exactly like
 // insertInlineFootnote's second press.

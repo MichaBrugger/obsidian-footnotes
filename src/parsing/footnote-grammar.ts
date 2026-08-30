@@ -2,20 +2,20 @@ import { definitionLabelIn, maskProtectedLines } from "./markdown-scan";
 
 // The reference GRAMMAR: what counts as a "[^name]" reference, how names
 // are compared, and the autonumbering scan. Pure text functions with no
-// editor or plugin dependencies — a LEAF module (only markdown-scan below
+// editor or plugin dependencies - a LEAF module (only markdown-scan below
 // it), so the lint rules and the command cascade can both import it
 // without the import cycles the old all-in-one file forced (split
 // 2026-08-11, see .claude/plans/split-insert-or-navigate.md).
 
-/** Every footnote reference SHAPE (numbered or named); the definition-label exclusion is positional — see footnoteReferenceMatches. /g: read with matchAll, never test/exec (lastIndex is stateful). */
+/** Every footnote reference SHAPE (numbered or named); the definition-label exclusion is positional - see footnoteReferenceMatches. /g: read with matchAll, never test/exec (lastIndex is stateful). */
 export const AllReferences = /\[\^([^[\]]+)\]/g;
-/** Numbered references AND numbered definitions — both reserve their number for autonumbering. */
+/** Numbered references AND numbered definitions - both reserve their number for autonumbering. */
 const AllNumberedReferences = /\[\^(\d+)\]/g;
 /** Pulls the name out of a single reference string; the name is match[2]. */
 export const ExtractNameFromFootnote = /(\[\^)([^[\]]+)(?=\])/;
 
 /**
- * Reference occurrences on a single line — every "[^id]" EXCEPT a definition's
+ * Reference occurrences on a single line - every "[^id]" EXCEPT a definition's
  * own "[^id]:" label at column 0. A "[^id]:" appearing MID-line is a live
  * reference followed by a literal colon (exactly how Obsidian renders it),
  * so it counts as a reference; only a column-0 label is a definition. Excluding
@@ -23,19 +23,19 @@ export const ExtractNameFromFootnote = /(\[\^)([^[\]]+)(?=\])/;
  * also dropped genuine mid-line references sitting before a colon) is the
  * whole point. Pass the line already code-masked when code must be ignored.
  * Footnote ids are case-insensitive in Obsidian, but casing is preserved
- * here — callers fold case only when comparing identities.
+ * here - callers fold case only when comparing identities.
  */
 export function footnoteReferenceMatches(line: string): RegExpMatchArray[] {
     const matches: RegExpMatchArray[] = [];
     for (const match of line.matchAll(AllReferences)) {
         const start = match.index;
         if (start === 0 && line[match[0].length] === ":") continue;
-        // a backslash-escaped "[" is literal text per CommonMark — the
+        // a backslash-escaped "[" is literal text per CommonMark - the
         // "reference" is prose the user typed on purpose (bug-escaped-marker)
         if (escapedAt(line, start)) continue;
         // "^[" opens an INLINE footnote, so the bracket belongs to it:
         // "^[^literal]" is inline-footnote content, not a reference
-        // (bug-inline-footnote-double-parse) — unless the caret itself is
+        // (bug-inline-footnote-double-parse) - unless the caret itself is
         // escaped ("\^[^x]" is a literal caret followed by a real reference)
         if (line[start - 1] === "^" && !escapedAt(line, start - 1)) continue;
         matches.push(match);
@@ -45,7 +45,7 @@ export function footnoteReferenceMatches(line: string): RegExpMatchArray[] {
 
 /** One reference occurrence from referenceOccurrences: the raw name plus the span of the whole "[^name]". */
 export interface ReferenceOccurrence {
-    /** The name exactly as typed — casing preserved; fold to compare identities. */
+    /** The name exactly as typed - casing preserved; fold to compare identities. */
     name: string;
     /** Index of the opening "[". */
     start: number;
@@ -55,7 +55,7 @@ export interface ReferenceOccurrence {
 
 /**
  * The definition label on `line`, matched against its MASKED twin but
- * with the name re-sliced from the RAW line — the label-side twin of
+ * with the name re-sliced from the RAW line - the label-side twin of
  * referenceOccurrences below, carrying the same bug-masked-name-identity
  * invariant: a code span inside the name masks to NULs, and a NUL-bearing
  * name can never equal the raw reference it must pair with. The label's
@@ -66,11 +66,11 @@ export interface ReferenceOccurrence {
  */
 export function definitionLabelWithName(line: string, masked: string) {
     const label = definitionLabelIn(masked);
-    // Stryker disable next-line ConditionalExpression: a label visible on the masked twin is always visible at the SAME positions on the raw line (masking only writes NULs, and NULs can't spell "[^" or "]:"), so forcing the fallback is behavior-identical — the fast path is perf
+    // Stryker disable next-line ConditionalExpression: a label visible on the masked twin is always visible at the SAME positions on the raw line (masking only writes NULs, and NULs can't spell "[^" or "]:"), so forcing the fallback is behavior-identical - the fast path is perf
     if (label) return { label, name: line.slice(label.nameStart, label.nameEnd) };
     // The masked twin can LOSE a real label: a backtick inside the NAME
     // pairing with one in the body ("[^a`b]: c`d") masks the label's own
-    // "]:" to NULs, so DefinitionStart no longer matches — yet GFM carves
+    // "]:" to NULs, so DefinitionStart no longer matches - yet GFM carves
     // the label BEFORE inline tokenizing and renders a definition named
     // "a`b" (hunt 2026-08-25, micromark-verified;
     // bug-code-span-name-hides-definition). Re-check the RAW line, but
@@ -95,7 +95,7 @@ export function definitionLabelWithName(line: string, masked: string) {
  * each name re-sliced from the RAW line: a code span inside a name masks
  * to NULs, and a NUL-bearing name can never equal the raw definition label
  * it must pair with (bug-masked-name-identity). This is the ONE home of
- * that invariant — every scan and rewrite iterates through here instead of
+ * that invariant - every scan and rewrite iterates through here instead of
  * hand-rolling the match-then-re-slice dance it used to clone.
  */
 export function referenceOccurrences(
@@ -112,7 +112,7 @@ export function referenceOccurrences(
 }
 
 /**
- * The occurrence whose brackets strictly contain `ch`, or null — the same
+ * The occurrence whose brackets strictly contain `ch`, or null - the same
  * "inside" rule as referenceAtCursor, for callers already holding
  * referenceOccurrences (the masked-match→raw-name pairing). The cascade's
  * masked re-checks used to clone the match-then-re-slice dance instead
@@ -128,7 +128,7 @@ export function occurrenceAtCursor(
     return null;
 }
 
-/** Whether the character at `index` is backslash-escaped: an ODD run of backslashes directly before it. Exported for the insertion-position adjuster — text INSERTED at an escaped position would itself be escaped (bug-insert-after-backslash). */
+/** Whether the character at `index` is backslash-escaped: an ODD run of backslashes directly before it. Exported for the insertion-position adjuster - text INSERTED at an escaped position would itself be escaped (bug-insert-after-backslash). */
 export function escapedAt(line: string, index: number): boolean {
     let backslashes = 0;
     for (let j = index - 1; j >= 0 && line[j] === "\\"; j--) backslashes++;
@@ -145,7 +145,7 @@ export function idListIncludes(ids: string[], id: string): boolean {
 // backticks (Jason's call, 2026-08-10: such names are disallowed outright
 // rather than supported), and an empty name isn't a footnote at all; the
 // reference regexes stay permissive so such names can be caught and warned
-// about instead of silently misbehaving. Dollar signs are FINE — Jason
+// about instead of silently misbehaving. Dollar signs are FINE - Jason
 // verified live that "[^a$1]" renders as a footnote (the scanner keeps
 // in-reference dollars out of math pairing for the same reason).
 export function isValidFootnoteName(name: string): boolean {
@@ -153,7 +153,7 @@ export function isValidFootnoteName(name: string): boolean {
 }
 
 /**
- * The reference whose brackets contain `ch`, or null. Strictly INSIDE only —
+ * The reference whose brackets contain `ch`, or null. Strictly INSIDE only -
  * same rule as inline footnotes: a caret immediately after the closing
  * bracket (or before the opening one) is outside, so the hotkey there
  * inserts a consecutive footnote instead of navigating (issue #49).
@@ -173,7 +173,7 @@ export function referenceAtCursor(
 // The start index of a placeholder `reference` occurrence whose brackets
 // strictly contain `ch`, or null. For the empty "[^]": the reference regexes
 // require a non-empty name, so the placeholder a first press just inserted
-// is invisible to every earlier cascade step — this is the only guard
+// is invisible to every earlier cascade step - this is the only guard
 // between a second press and a nested "[^[^]]". The prefilled "[^7-]"
 // placeholder reuses the same containment scan via warnPrefilledReferenceIfInside.
 export function emptyReferenceStart(
@@ -196,13 +196,13 @@ export function computeNextFootnoteNumber(
     markdownText: string,
     prefix = "",
     // callers holding the document's masked twin already (a press context
-    // or a lint rule) pass it to skip the re-mask — it must correspond to
+    // or a lint rule) pass it to skip the re-mask - it must correspond to
     // `markdownText` (perf F1)
     masked: string = maskProtectedLines(markdownText.split("\n")).join("\n"),
 ): number {
     const escaped = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     // /i: footnote ids are case-insensitive in Obsidian, so "[^P.1]" lives
-    // in prefix "p."'s namespace and must reserve its number — a
+    // in prefix "p."'s namespace and must reserve its number - a
     // case-sensitive scan let the next insert mint a colliding id
     const numberedReferences = prefix
         ? new RegExp(`\\[\\^${escaped}(\\d+)\\]`, "gi")
@@ -218,10 +218,10 @@ export function computeNextFootnoteNumber(
             continue;
         }
         const value = Number(match[1]);
-        // a digit run that can't round-trip through Number — or whose
+        // a digit run that can't round-trip through Number - or whose
         // SUCCESSOR can't (MAX_SAFE_INTEGER: minting value+1 would create
         // an id this very scan then skips, so the id after it would repeat
-        // — bug-autonumber-unsafe-integer) — is treated as named, not
+        // - bug-autonumber-unsafe-integer) - is treated as named, not
         // numbered
         if (!Number.isSafeInteger(value) || !Number.isSafeInteger(value + 1)) {
             continue;

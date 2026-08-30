@@ -1,6 +1,6 @@
 // Plugin entry point: registers the hotkey commands (auto-numbered and
-// named footnotes — each one "insert OR navigate", see
-// insert-or-navigate-footnotes.ts for the decision cascade — the two
+// named footnotes - each one "insert OR navigate", see
+// insert-or-navigate-footnotes.ts for the decision cascade - the two
 // inline-footnote inserts, and the whole-document cleanups from
 // src/linting/), the settings tab, and the popup-dismissal hook.
 // Also owns settings load/save plus one-time migrations of legacy values.
@@ -38,12 +38,12 @@ export default class FootnotePlugin extends Plugin {
 
   // The active markdown view, but only when its text can actually be
   // edited on screen: the text-editing commands disappear from the palette
-  // in Reading view, where the editor API would edit the HIDDEN buffer —
+  // in Reading view, where the editor API would edit the HIDDEN buffer -
   // invisible insertions and toasts about references the user can't see
   // (reported 2026-08-08). "Set footnote prefix" deliberately stays
   // available there; a frontmatter edit is legitimate in Reading view.
 
-  /** Full ids ("plugin:command") of every editor command, recorded at registration — the name modal's keyboard scope speaks exactly these commands' hotkeys. */
+  /** Full ids ("plugin:command") of every editor command, recorded at registration - the name modal's keyboard scope speaks exactly these commands' hotkeys. */
   editorCommandIds: string[] = [];
 
   editableMarkdownView(): MarkdownView | null {
@@ -53,15 +53,15 @@ export default class FootnotePlugin extends Plugin {
 
   async onload() {
     // Jason's hand-drawn "action style" icon family (icons/action style/):
-    // the action is the main glyph — hash (numbered), I-beam text cursor
+    // the action is the main glyph - hash (numbered), I-beam text cursor
     // (named / inline write), clipboard (paste), alert triangle (lint),
-    // left arrow into a dashed divider (prefix), pencil (rename) — and the
+    // left arrow into a dashed divider (prefix), pencil (rename) - and the
     // small mark gives the footnote type: down ARROW (jump to the note
     // bottom) for regular footnotes, up chevron (the ^ of ^[...]) for
     // inline ones. The arrows sit one step lower since 2026-08-13 (Jason's
     // rebalance). Sources in icons/action style/ are raw Inkscape saves;
     // scripts/strip-inkscape-icons.mjs strips the editor metadata and
-    // swaps Inkscape's stroke="#000" to currentColor for theming — paste
+    // swaps Inkscape's stroke="#000" to currentColor for theming - paste
     // its icons/optimized/ output here.
     addIcon("footnote-numbered", `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><g transform="translate(0,1)" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><g transform="translate(-3,-1)"><path d="M 5,9 H 19" /><path d="M 5,15 H 16" /><line x1="10" x2="8" y1="3" y2="21" /><path d="M 16,3 14,21" /></g><path d="m 22,17 -3,3 -3,-3" /><path d="M 19,19 V 12" /></g></svg>`);
     addIcon("footnote-named", `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><g transform="translate(24,-62)" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><g transform="translate(-24,27)"><path d="m12 53v-12c0-2.209 1.791-4 4-4h1" /><path d="m7 57h1a4 4 0 0 0 4-4" /><path d="m7 37h1a4 4 0 0 1 4 4" /></g><path d="m -2,80 -3,3 -3,-3" /><path d="M -5,82 V 75" /></g></svg>`);
@@ -119,7 +119,7 @@ export default class FootnotePlugin extends Plugin {
           void command.run(this);
         },
       });
-      // every editor command's FULL id, recorded as it registers — the
+      // every editor command's FULL id, recorded as it registers - the
       // name-the-footnote modal maps these to hotkey combos on its own
       // keyboard scope, so the list can never drift from what's registered
       this.editorCommandIds.push(`${this.manifest.id}:${command.id}`);
@@ -145,7 +145,7 @@ export default class FootnotePlugin extends Plugin {
         const mdView = this.app.workspace.getActiveViewOfType(MarkdownView);
         if (checking) return !!mdView?.file;
         if (!mdView?.file) return;
-        // prefill with the note's current prefix so editing is one step —
+        // prefill with the note's current prefix so editing is one step -
         // read only the frontmatter block, not getValue()'s whole document
         // (2026-08-11 review perf item)
         const editor = viewEditor(mdView);
@@ -158,7 +158,7 @@ export default class FootnotePlugin extends Plugin {
     });
   
     // The ONE whole-document cleanup command, like Linter's (the individual
-    // rules are settings toggles, not separate commands — palette stays
+    // rules are settings toggles, not separate commands - palette stays
     // uncluttered).
     this.addCommand({
       id: "lint-footnotes",
@@ -166,7 +166,7 @@ export default class FootnotePlugin extends Plugin {
       icon: "footnote-lint",
       checkCallback: (checking: boolean) => {
         if (checking) return !!this.editableMarkdownView();
-        // with every rule toggled off the pipeline is a no-op — say that,
+        // with every rule toggled off the pipeline is a no-op - say that,
         // instead of a misleading "No linting needed."
         if (lintRulesAllDisabled(this)) {
           new Notice(
@@ -192,7 +192,7 @@ export default class FootnotePlugin extends Plugin {
       this.app.workspace.on("active-leaf-change", () => {
         dismissFootnotePopup();
         // vim mode can be switched on at any time, and its ":w" bypasses
-        // the save command until hooked — re-check on every leaf change
+        // the save command until hooked - re-check on every leaf change
         installVimWriteHook(this);
       })
     );
@@ -214,7 +214,7 @@ export default class FootnotePlugin extends Plugin {
       }
     });
     // enabling vim mode mid-session loads the adapter without any leaf
-    // change — config-changed catches that moment
+    // change - config-changed catches that moment
     this.registerEvent(
       (this.app.vault as unknown as VaultWithConfigEvents).on(
         "config-changed",
@@ -237,7 +237,7 @@ export default class FootnotePlugin extends Plugin {
 
     // One-shot legacy migrations, gated by settingsVersion: some of them
     // rewrite saved values by SHAPE, so re-running them on every load can
-    // mangle a deliberate new-style value — a saved "**Footnotes**" heading
+    // mangle a deliberate new-style value - a saved "**Footnotes**" heading
     // used to gain "# " on each restart (bug confirmed live 2026-08-08,
     // pinned in test/hunt/). Version 0 is data from before the flag
     // existed, or a fresh install (where everything below no-ops). All
@@ -266,7 +266,7 @@ export default class FootnotePlugin extends Plugin {
 // ---- one-time settings migrations, one function per version bump ----
 // (gated in loadSettings on the version being upgraded FROM)
 
-/** v1: the 0.1.x → 0.2.0-beta shape — PascalCase heading key, implied-H1 heading text, the removed autosuggest toggle, and the beta.5/6 tidy* → lint* renames. */
+/** v1: the 0.1.x → 0.2.0-beta shape - PascalCase heading key, implied-H1 heading text, the removed autosuggest toggle, and the beta.5/6 tidy* → lint* renames. */
 function migrateSettingsToV1(
   settings: FootnotePluginSettings,
   saved: Partial<FootnotePluginSettings> | null,
@@ -277,7 +277,7 @@ function migrateSettingsToV1(
     enableAutoSuggest?: boolean;
   };
   // when the saved data SOMEHOW carries both keys (a downgrade or a
-  // data.json sync merge — no real upgrade path produces it), the
+  // data.json sync merge - no real upgrade path produces it), the
   // newer camelCase value wins (decided 2026-08-10)
   if (
     typeof legacySettings.FootnoteSectionHeading === "string" &&
@@ -301,7 +301,7 @@ function migrateSettingsToV1(
   // the linting settings shipped under tidy* keys in beta.5/6: copy
   // each saved tidy* value onto its lint* name and drop the old key,
   // so beta testers keep their toggle choices. Spelled out per key
-  // (rather than a rename map) so each move is statically typed —
+  // (rather than a rename map) so each move is statically typed -
   // withTidyKeys is the same object as `settings`, so writing here
   // sets the real lint* setting
   const withTidyKeys = settings as FootnotePluginSettings & {
@@ -329,7 +329,7 @@ function migrateSettingsToV1(
     delete withTidyKeys.tidyOnSave;
   }
   // the lint-on-focused-file-change trigger was replaced by lint on
-  // footnote creation (2026-08-05) — its saved keys are dropped rather
+  // footnote creation (2026-08-05) - its saved keys are dropped rather
   // than carried over, since the semantics are different
   delete withTidyKeys.lintOnFileChange;
   delete withTidyKeys.tidyOnFileChange;

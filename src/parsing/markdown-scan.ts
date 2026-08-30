@@ -1,17 +1,17 @@
 // Pure scanning primitives shared by the whole-document footnote
 // transforms (reindex, move-to-bottom, after-punctuation). Nothing here
-// touches an Editor — everything is lines in, facts out.
+// touches an Editor - everything is lines in, facts out.
 
 /** A footnote definition at the start of a line ("[^x]: …"). */
 export const DefinitionStart = /^\[\^([^[\]]+)\]:/;
 
 /**
- * The trailing punctuation the insert commands hop over — the same class
+ * The trailing punctuation the insert commands hop over - the same class
  * the footnote-after-punctuation lint reorders, so the two features can't
  * disagree about where a reference belongs. ASCII plus the CJK fullwidth
  * forms 。，、；：！？ (Jason, 2026-08-10). Lives here because this leaf
  * is the one module BOTH consumers (cursor-motion and the lint rule)
- * already sit above — the pre-split cycle that once forced this home is
+ * already sit above - the pre-split cycle that once forced this home is
  * gone, but no better shared home exists.
  */
 export const TrailingPunctuationChars = ".,;:!?。，、；：！？";
@@ -28,7 +28,7 @@ export interface DefinitionBlock {
 /**
  * A trailing "\r" stripped from each line so a CRLF document split on "\n"
  * satisfies the same exact-string line checks ("---", fence delimiters) as an
- * LF one — the array's length and indices are unchanged. Windows/synced notes
+ * LF one - the array's length and indices are unchanged. Windows/synced notes
  * arrive as CRLF, and without this the frontmatter/fence scans silently miss.
  */
 function stripCr(lines: string[]): string[] {
@@ -40,7 +40,7 @@ function stripCr(lines: string[]): string[] {
 /**
  * `text` with CRLF newlines flattened to LF, plus the EOL to restore. The
  * whole-document transforms work in LF and put the note's original endings
- * back on the way out — Obsidian edits notes in place, so we must not
+ * back on the way out - Obsidian edits notes in place, so we must not
  * silently flip a synced CRLF file to LF the way a strip-and-forget would.
  */
 export function normalizeEol(text: string): {
@@ -60,7 +60,7 @@ export function restoreEol(text: string, eol: "\n" | "\r\n"): string {
 // A leading blockquote/callout prefix ("> ", "> > ", …): a fenced code block
 // can sit inside a blockquote/callout, and its delimiters carry that prefix.
 // Each ">" marker owns one optional trailing space, and the NEXT marker may
-// sit up to 3 spaces further in — the same walk blockquoteDepth does. The
+// sit up to 3 spaces further in - the same walk blockquoteDepth does. The
 // old /^(?: {0,3}>)+ ?/ didn't consume the per-marker space, so a legal
 // ">    > [^1]: x" (4 gap = marker space + 3 indent) lost its second marker
 // and the label behind it went invisible (2026-08-11 review bug #5).
@@ -69,7 +69,7 @@ const BlockquotePrefix = /^(?: {0,3}> ?)+/;
 /**
  * The line's blockquote nesting depth (number of leading ">" markers, each
  * allowed 0–3 spaces before it and one space after, per CommonMark) and the
- * text after the markers. A fence lives in the container that opened it —
+ * text after the markers. A fence lives in the container that opened it -
  * depth is how the fence scan knows which container that is.
  */
 function blockquoteDepth(line: string): { depth: number; rest: string } {
@@ -92,8 +92,8 @@ function blockquoteDepth(line: string): { depth: number; rest: string } {
 }
 
 /**
- * The footnote definition label on `line` — at column 0, or behind a
- * blockquote/callout prefix ("> [^x]: …" — Jason's ruling 2026-08-10:
+ * The footnote definition label on `line` - at column 0, or behind a
+ * blockquote/callout prefix ("> [^x]: …" - Jason's ruling 2026-08-10:
  * footnote creation, navigation, and linting work inside
  * blockquotes/callouts). Positions index into the SAME line passed in, so
  * callers can re-slice the raw line when they matched the masked twin (a
@@ -115,10 +115,10 @@ export function definitionLabelIn(
 
 /**
  * The first exact, fully unprotected occurrence of `runLines` in `lines`,
- * as the index of the run's LAST line — or -1. The section-heading setting
+ * as the index of the run's LAST line - or -1. The section-heading setting
  * is markdown that can span multiple lines ("---\n## Footnotes"), so both
  * the insert flow (buildDefinitionAppend's heading slot) and the
- * move-to-bottom rule anchor on the whole run through THIS function — two
+ * move-to-bottom rule anchor on the whole run through THIS function - two
  * hand-rolled copies would let the fixed-point guarantee drift
  * (2026-08-11 review cleanliness).
  */
@@ -139,8 +139,8 @@ export function findLineRunEnd(
 /**
  * Whether a line already known to start with a fence delimiter actually opens
  * a fence. Per CommonMark a backtick fence's info string may not contain a
- * backtick — "```[^1]``` x" is an inline code span in a paragraph, not a
- * fence — so opening one there would run unclosed to EOF. Tilde fences have
+ * backtick - "```[^1]``` x" is an inline code span in a paragraph, not a
+ * fence - so opening one there would run unclosed to EOF. Tilde fences have
  * no such rule.
  */
 function isFenceOpener(bareLine: string, delim: string): boolean {
@@ -152,13 +152,13 @@ function isFenceOpener(bareLine: string, delim: string): boolean {
 /**
  * Whether the "$" at `i` sits inside a footnote-reference shape ("[^…]").
  * Jason verified live (2026-08-10): Obsidian tokenizes the bracket construct
- * first, so a dollar inside a reference renders as part of the footnote id —
+ * first, so a dollar inside a reference renders as part of the footnote id -
  * it never opens or closes a math span. Nearest bracket wins: a "[" with a
  * "^" behind it and no "]" in between means we're inside a reference.
  * The walk reads the MASKED-SO-FAR characters, not the raw line: a "[^"
  * fragment already claimed by a code span or comment is not a live bracket,
  * and used to falsely suppress math masking for the rest of the line
- * (bug-dollar-inside-masked-bracket) — a NUL therefore ends the walk.
+ * (bug-dollar-inside-masked-bracket) - a NUL therefore ends the walk.
  */
 function dollarInsideReference(chars: readonly string[], i: number): boolean {
     for (let j = i - 1; j >= 0; j--) {
@@ -172,14 +172,14 @@ function dollarInsideReference(chars: readonly string[], i: number): boolean {
 /**
  * One left-to-right scan of a line for inline code spans, HTML comments,
  * and math ($…$ / $$…$$), NULing all three, CommonMark-style: whichever
- * construct opens first claims its content — backticks inside a comment
+ * construct opens first claims its content - backticks inside a comment
  * are literal, "<!--" inside a code span is code (bug-comment-mask-order /
  * bug-backticked-comment-opener), "$" inside either is just a dollar.
  * Backslash-escaped openers of every kind are literal text
  * (bug-escaped-comment-opener), and the abbreviated comments "<!-->" and
  * "<!--->" are complete per CommonMark §6.6 (bug-short-form-comment).
  * Inline math needs a non-empty content that neither starts nor ends with
- * a space (Obsidian's rule — "$5 and $10" stays prose). `startInComment` /
+ * a space (Obsidian's rule - "$5 and $10" stays prose). `startInComment` /
  * `startInMath` continue a multi-line region from the previous line;
  * `endsInComment` / `endsInMath` report one left open at EOL (its opener
  * masked through the end of the line). Math protection is Jason's 2026-08-10
@@ -187,7 +187,7 @@ function dollarInsideReference(chars: readonly string[], i: number): boolean {
  */
 export function maskLineRegions(
     line: string,
-    // named state instead of two positional booleans — call sites like
+    // named state instead of two positional booleans - call sites like
     // `maskLineRegions(line, { math: true })` say which region continues
     startsIn: { comment?: boolean; math?: boolean } = {},
 ): { masked: string; endsInComment: boolean; endsInMath: boolean } {
@@ -211,7 +211,7 @@ export function maskLineRegions(
     let i = 0;
 
     if (startInComment) {
-        // comment content is literal — the first "-->" closes, full stop
+        // comment content is literal - the first "-->" closes, full stop
         const close = line.indexOf("-->");
         if (close === -1) {
             return {
@@ -223,7 +223,7 @@ export function maskLineRegions(
         blot(0, close + 3);
         i = close + 3;
     } else if (startInMath) {
-        // display-math content is literal — the first "$$" closes it
+        // display-math content is literal - the first "$$" closes it
         const close = line.indexOf("$$");
         if (close === -1) {
             return {
@@ -248,7 +248,7 @@ export function maskLineRegions(
             const runLength = i - runStart;
             // find the next backtick run of exactly the same length.
             // Backslashes are literal inside a code span, so the closing
-            // search does NOT skip escapes — only the opener is unescaped.
+            // search does NOT skip escapes - only the opener is unescaped.
             let close = -1;
             for (let j = i; j < line.length; ) {
                 if (line[j] !== "`") {
@@ -314,7 +314,7 @@ export function maskLineRegions(
                 continue;
             }
             // inline math: closing "$" with non-empty content that neither
-            // starts nor ends with a space — otherwise the dollar is prose.
+            // starts nor ends with a space - otherwise the dollar is prose.
             // Dollars inside "[^…]" can't close either (see the opener guard)
             let close = -1;
             for (let j = i + 1; j < line.length; j++) {
@@ -333,7 +333,7 @@ export function maskLineRegions(
                 line[i + 1] === " " ||
                 line[close - 1] === " "
             ) {
-                i++; // not math — the closing candidate may open its own
+                i++; // not math - the closing candidate may open its own
                 continue;
             }
             blot(i, close + 1);
@@ -347,15 +347,15 @@ export function maskLineRegions(
 
 /** The per-line facts the whole-document walk produces. */
 export interface DocumentScan {
-    /** Whole-line protected: YAML frontmatter, fenced code (delimiters included), standalone indented code, and multi-line comment/math INTERIOR lines. Boundary lines are NOT here — their live portions stay scannable, with the comment/math part masked (bug-comment-boundary-lines). */
+    /** Whole-line protected: YAML frontmatter, fenced code (delimiters included), standalone indented code, and multi-line comment/math INTERIOR lines. Boundary lines are NOT here - their live portions stay scannable, with the comment/math part masked (bug-comment-boundary-lines). */
     isProtected: boolean[];
     /** Line `i` begins inside a multi-line HTML comment (it is a closer or interior line). */
     startsInComment: boolean[];
     /** Line `i` begins inside a multi-line $$ math block (closer or interior line). */
     startsInMath: boolean[];
-    /** Line `i` begins inside an open fenced code block (interior or closer line, at any blockquote depth — the flag the selection edge-cut checks need, since a QUOTED fence is invisible to `endsProtected`). The opener line is NOT here, and neither is a line that killed a quoted fence by ending its quote. */
+    /** Line `i` begins inside an open fenced code block (interior or closer line, at any blockquote depth - the flag the selection edge-cut checks need, since a QUOTED fence is invisible to `endsProtected`). The opener line is NOT here, and neither is a line that killed a quoted fence by ending its quote. */
     startsInFence: boolean[];
-    /** A line appended at EOF would itself be protected: an unclosed comment, math block, or DOCUMENT-LEVEL fence runs to EOF (a blockquoted fence dies at the append point — the appended line ends its quote). Replaces move-to-bottom's probe re-scan (perf F6). */
+    /** A line appended at EOF would itself be protected: an unclosed comment, math block, or DOCUMENT-LEVEL fence runs to EOF (a blockquoted fence dies at the append point - the appended line ends its quote). Replaces move-to-bottom's probe re-scan (perf F6). */
     endsProtected: boolean;
 }
 
@@ -373,9 +373,9 @@ function leadingIndentWidth(line: string): number {
 /**
  * The whole-document protection walk: YAML frontmatter, fenced code blocks
  * (both delimiter lines included, including fences nested in
- * blockquotes/callouts), multi-line HTML comments — whose state is tracked
+ * blockquotes/callouts), multi-line HTML comments - whose state is tracked
  * by the same escape- and code-span-aware scanner that does the masking, so
- * the two can't disagree — and STANDALONE indented code blocks (Jason's
+ * the two can't disagree - and STANDALONE indented code blocks (Jason's
  * ruling 2026-08-10: linting never touches code). "Standalone" is the
  * definition-aware part: an indented line continuing a footnote definition
  * (or lazily continuing a paragraph) is live markdown; only a 4-space/tab
@@ -399,7 +399,7 @@ export function scanDocument(lines: string[]): DocumentScan {
         }
     }
 
-    // contentIndent: the column the fence's CONTAINER content starts at —
+    // contentIndent: the column the fence's CONTAINER content starts at -
     // 0 for a document-level fence, the list item's content column when
     // the opener rode a list-marker line ("10. ```"). A closer may be
     // indented up to contentIndent + 3 (Sol bug #1: the old absolute
@@ -413,24 +413,24 @@ export function scanDocument(lines: string[]): DocumentScan {
     } | null = null;
     // comment/math regions live in the CONTAINER that opened them, like
     // fences (Sol bug #4, verified against metadataCache): regionDepth is
-    // the blockquote depth at the opener — a line whose depth drops below
+    // the blockquote depth at the opener - a line whose depth drops below
     // it ends the quote and the region with it
     let inComment = false;
     let inMath = false;
     let regionDepth = 0;
     // indented-code state (C21): `blockBoundary` marks a place indented
-    // code may OPEN — doc start, blank lines, and (Sol bug #5: lazy
+    // code may OPEN - doc start, blank lines, and (Sol bug #5: lazy
     // continuation is paragraph-only) right after an ATX heading, a
     // closed fence, a bare region closer, or a thematic break.
-    // `inDefinition` mirrors findDefinitionBlocks' reach — a "[^x]:" line
-    // plus its indented continuations and the blank runs between them —
+    // `inDefinition` mirrors findDefinitionBlocks' reach - a "[^x]:" line
+    // plus its indented continuations and the blank runs between them -
     // and `inIndentedCode` is an open indented chunk.
     let inIndentedCode = false;
     let inDefinition = false;
     let blockBoundary = true;
     // open list items' CONTENT indents, innermost last (Sol bug #2,
     // 2026-08-10, verified against metadataCache): a loose list's indented
-    // continuation ("- a", blank, "    details") is LIVE list content —
+    // continuation ("- a", blank, "    details") is LIVE list content -
     // indented code inside an item starts 4 columns past the item's
     // content indent, not at column 4 of the document. Doc-level only;
     // quoted lists ride their quote's existing rules.
@@ -438,7 +438,7 @@ export function scanDocument(lines: string[]): DocumentScan {
     // quote-relative indented code (2026-08-11 review bug #4, ground-
     // truthed in the live reading view): quote content indented ≥ 4 columns
     // past the innermost ">" marker is code when it opens at a boundary
-    // INSIDE the quote — the quote's start or a blank ">" line — but stays
+    // INSIDE the quote - the quote's start or a blank ">" line - but stays
     // LIVE as a lazy paragraph continuation or a definition continuation.
     // Innermost-quote state only; a depth change re-enters at a boundary.
     let quote: {
@@ -449,12 +449,12 @@ export function scanDocument(lines: string[]): DocumentScan {
     } | null = null;
     for (; i < src.length; i++) {
         // the blockquote nesting where this line's container constructs
-        // count — fences and comment/math regions live in the container
+        // count - fences and comment/math regions live in the container
         // that opened them
         const { depth, rest } = blockquoteDepth(src[i]);
         if ((inComment || inMath) && depth < regionDepth) {
             // the region's blockquote ended, taking it along (a blank or
-            // shallower line ends the quote) — this line is normal text
+            // shallower line ends the quote) - this line is normal text
             // and gets the full treatment below
             inComment = false;
             inMath = false;
@@ -470,16 +470,16 @@ export function scanDocument(lines: string[]): DocumentScan {
                 isProtected[i] = true; // interior: nothing live on it
                 continue;
             }
-            // the closer line keeps its live suffix — and that suffix can
+            // the closer line keeps its live suffix - and that suffix can
             // itself open code, another comment, math, even a NEW
             // multi-line region of either kind
             const closed = maskLineRegions(src[i], { comment: true });
             inComment = closed.endsInComment;
             inMath = closed.endsInMath;
-            // the closer's live suffix can open a NEW region — at this
+            // the closer's live suffix can open a NEW region - at this
             // line's own container depth
             if (inComment || inMath) regionDepth = depth;
-            // a bare closer (no live suffix) ends a BLOCK — an indented
+            // a bare closer (no live suffix) ends a BLOCK - an indented
             // chunk may open right below (Sol bug #5)
             if (
                 !inComment &&
@@ -493,7 +493,7 @@ export function scanDocument(lines: string[]): DocumentScan {
         if (inMath) {
             startsInMath[i] = true;
             inIndentedCode = false;
-            // inDefinition survives — same rationale as the comment branch
+            // inDefinition survives - same rationale as the comment branch
             blockBoundary = false;
             if (!src[i].includes("$$")) {
                 isProtected[i] = true; // interior: nothing live on it
@@ -518,14 +518,14 @@ export function scanDocument(lines: string[]): DocumentScan {
         // a fence lives in the CONTAINER that opened it (CommonMark)
         if (fence && depth < fence.depth) {
             // the fence's blockquote ended, taking the fence with it
-            // (bug-blockquote-fence-outlives-quote) — this line is normal
+            // (bug-blockquote-fence-outlives-quote) - this line is normal
             // text and gets the full treatment below, so a bare "```" here
             // OPENS a new fence (bug-bare-fence-after-blockquote-fence)
             fence = null;
         }
         if (fence) {
             inIndentedCode = false;
-            // inDefinition survives a fence interior — same rationale as
+            // inDefinition survives a fence interior - same rationale as
             // the comment/math branches: a definition-content fence
             // ("    ```" at the continuation indent, 2026-08-25) is PART
             // of its definition. Every other fence's opener already reset
@@ -536,7 +536,7 @@ export function scanDocument(lines: string[]): DocumentScan {
             isProtected[i] = true;
             startsInFence[i] = true;
             // a closer counts only at the fence's own depth: "> ```" can't
-            // close a document-level fence (it is code content there —
+            // close a document-level fence (it is code content there -
             // bug-blockquote-closes-bare-fence), and a doc-level "```"
             // can't close a blockquoted one (handled above by ending it)
             if (depth === fence.depth) {
@@ -554,7 +554,7 @@ export function scanDocument(lines: string[]): DocumentScan {
                     close[1].length >= fence.length
                 ) {
                     fence = null;
-                    // a closed fence ends its block — an indented chunk
+                    // a closed fence ends its block - an indented chunk
                     // may open on the very next line (Sol bug #5)
                     blockBoundary = true;
                 }
@@ -564,7 +564,7 @@ export function scanDocument(lines: string[]): DocumentScan {
         // ---- indented code (C21), definition-aware ----
         if (src[i].trim() === "") {
             // a blank is a block boundary, but it ENDS neither an open
-            // definition (blank runs can lead to more continuation —
+            // definition (blank runs can lead to more continuation -
             // findDefinitionBlocks) nor an indented chunk (code blocks
             // continue across blanks when more indented lines follow)
             blockBoundary = true;
@@ -598,7 +598,7 @@ export function scanDocument(lines: string[]): DocumentScan {
                     continue;
                 }
                 // live: a lazy paragraph continuation or a definition
-                // continuation — an open quoted definition stays open
+                // continuation - an open quoted definition stays open
                 quote.boundary = false;
             } else {
                 quote.inCode = false;
@@ -629,7 +629,7 @@ export function scanDocument(lines: string[]): DocumentScan {
         if (indented && !inDefinition && blockBoundary) {
             // a chunk indented past the code threshold, opening at a block
             // boundary outside any definition, is CommonMark indented code
-            // — inert to Obsidian, so the transforms must not count or
+            // - inert to Obsidian, so the transforms must not count or
             // rewrite it
             inIndentedCode = true;
             isProtected[i] = true;
@@ -637,7 +637,7 @@ export function scanDocument(lines: string[]): DocumentScan {
             continue;
         }
         // a code-indented line here is a definition continuation or a lazy
-        // paragraph continuation — live markdown, and it keeps an open
+        // paragraph continuation - live markdown, and it keeps an open
         // definition open; a shallower line re-decides both states
         const thematicBreak =
             depth === 0 && /^ {0,3}([-*_])( *\1){2,} *$/.test(rest);
@@ -676,7 +676,7 @@ export function scanDocument(lines: string[]): DocumentScan {
             thematicBreak ||
             (depth === 0 && /^ {0,3}#{1,6}(?: |$)/.test(rest));
 
-        // a fence can also open on a LIST ITEM line ("- ```", "1. ~~~") —
+        // a fence can also open on a LIST ITEM line ("- ```", "1. ~~~") -
         // the list marker is a container prefix like the blockquote one;
         // its closer arrives indented into the item, which the {0,3}
         // closer pattern already accepts (bug-list-item-fence)
@@ -695,7 +695,7 @@ export function scanDocument(lines: string[]): DocumentScan {
         // inside a list item, fence indent measures from the ITEM's content
         // column, not the document margin (2026-08-11 review bug #3,
         // ground-truthed in the live reading view): "    ```" under "- a"
-        // sits at relative indent 2 — a real fence, whose closer aligns to
+        // sits at relative indent 2 - a real fence, whose closer aligns to
         // the item's content column
         let listFenceContentIndent: number | null = null;
         if (!open && depth === 0 && listStack.length > 0) {
@@ -708,12 +708,12 @@ export function scanDocument(lines: string[]): DocumentScan {
             }
         }
         // ...and inside an open DEFINITION, whose continuations sit at
-        // content column 4 — a "    ```" there is a real fence, exactly
+        // content column 4 - a "    ```" there is a real fence, exactly
         // like the list case above (GFM gives footnote definitions the
         // same container treatment; the comment/math openers were already
         // indentation-insensitive here while fences were not, and the
         // delete-orphaned-references rule ATE code text out of the
-        // unprotected interior — hunt 2026-08-25,
+        // unprotected interior - hunt 2026-08-25,
         // bug-definition-continuation-fence-unprotected)
         if (!open && depth === 0 && inDefinition) {
             const wide = rest.match(/^( *)(`{3,}|~{3,})/);
@@ -738,7 +738,7 @@ export function scanDocument(lines: string[]): DocumentScan {
             continue;
         }
         // a multi-line HTML comment (an unescaped opener outside code with
-        // no closer) hides everything through its closing line — a "[^x]:"
+        // no closer) hides everything through its closing line - a "[^x]:"
         // inside it is commented-out text, not a live definition. Same for
         // an unclosed "$$" opening a display-math block. The opener line
         // itself stays live before the opener.
@@ -754,7 +754,7 @@ export function scanDocument(lines: string[]): DocumentScan {
         startsInComment,
         startsInMath,
         startsInFence,
-        // a quoted unclosed region can't reach an EOF append — the
+        // a quoted unclosed region can't reach an EOF append - the
         // appended line ends its quote, same as a blockquoted fence
         endsProtected:
             ((inComment || inMath) && regionDepth === 0) ||
@@ -763,7 +763,7 @@ export function scanDocument(lines: string[]): DocumentScan {
 }
 
 /**
- * Lines the transforms must not read or touch AT ALL — see DocumentScan.
+ * Lines the transforms must not read or touch AT ALL - see DocumentScan.
  * Callers that also scan line content should use maskProtectedLines, which
  * additionally masks the comment portions of boundary lines.
  */
@@ -771,7 +771,7 @@ export function protectedLines(lines: string[]): boolean[] {
     return scanDocument(lines).isProtected;
 }
 
-/** Inline code spans and complete HTML comments blotted out, indices preserved. Single-line contexts only (table cell text) — document lines need maskProtectedLines, which knows about multi-line comment state. */
+/** Inline code spans and complete HTML comments blotted out, indices preserved. Single-line contexts only (table cell text) - document lines need maskProtectedLines, which knows about multi-line comment state. */
 export function maskInlineRegions(line: string): string {
     return maskLineRegions(line).masked;
 }
@@ -846,9 +846,9 @@ export function removeLineRanges(
             continue; // still merging until a non-blank line arrives
         }
         // a cut must not drop a paragraph directly onto a "---"/"===" line
-        // (blockquoted "> ---" included — bug-blockquote-setext-residue):
+        // (blockquoted "> ---" included - bug-blockquote-setext-residue):
         // that would turn the stranded text into a setext heading. Only when
-        // the adjacency is new (mergeBlanks — no blank line survived the cut
+        // the adjacency is new (mergeBlanks - no blank line survived the cut
         // between them) do we reinstate a blank separator.
         if (
             mergeBlanks &&
@@ -860,7 +860,7 @@ export function removeLineRanges(
         }
         // nor may a cut promote a "---" to DOCUMENT START: there it parses
         // as a frontmatter opener and swallows live prose up to the next
-        // divider — and drop-orphans reindex then deletes the definitions
+        // divider - and drop-orphans reindex then deletes the definitions
         // whose references it hid (bug-stranded-frontmatter). A leading
         // blank line keeps it an ordinary divider.
         if (mergeBlanks && out.length === 0 && lines[i] === "---") {
@@ -885,12 +885,12 @@ export function findDefinitionBlocks(
     // interior/closer of a comment, math, or fence region whose opener
     // was a continuation already absorbed into this block (a region open
     // BEFORE the definition would have protected the label line itself),
-    // or a protected line AT THE CONTINUATION INDENT (four-plus spaces) —
+    // or a protected line AT THE CONTINUATION INDENT (four-plus spaces) -
     // a definition-content construct's own opener, like the "    ```"
     // fence riding the continuation indent (hunt 2026-08-25). The indent
     // floor matters: a DOC-level fence opener with incidental leading
     // spaces (" ```") is protected and indented too, but it ends the
-    // block — only the {0,3}-cap-defying four-space column marks a
+    // block - only the {0,3}-cap-defying four-space column marks a
     // construct the definition owns.
     const absorbable = (j: number) =>
         isProtected[j] &&

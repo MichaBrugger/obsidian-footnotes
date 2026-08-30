@@ -10,7 +10,7 @@ import { shouldJumpFromDefinitionToReference } from "../src/commands/navigation"
 // QOL sweep (2026-08-07): pressing a footnote hotkey with the caret on an
 // ORPHANED definition ("[^x]: …" with no reference anywhere) used to fall
 // through the whole cascade and insert a brand-new footnote right into the
-// definitions area — the user almost certainly pressed the key to jump to
+// definitions area - the user almost certainly pressed the key to jump to
 // the (deleted) reference. The press is now handled with an explanatory
 // notice: cascade step 1 claims it and changes nothing.
 

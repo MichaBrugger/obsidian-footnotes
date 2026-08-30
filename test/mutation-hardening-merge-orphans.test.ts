@@ -16,7 +16,7 @@ import {
 // 2026-08-12: merge-duplicate-definitions 72%, remove-orphaned-references
 // 83%). The pinned scenarios in merge-duplicate-definitions.test.ts and
 // orphaned-references.test.ts cover the happy shapes; what survived is the
-// arithmetic AROUND them — the trailing-blank bookkeeping at the end of a
+// arithmetic AROUND them - the trailing-blank bookkeeping at the end of a
 // merge, the exact width of the seam a deleted reference leaves behind, the
 // direction ids fold in, and the byte-identity promise on a mixed-EOL
 // no-op. These probe those boundaries directly.
@@ -35,7 +35,7 @@ describe("merging never changes the note's trailing blank lines", () => {
 
     it("never mints MORE trailing blank lines than the note had", () => {
         // cutting a duplicate that closed the note strands the blank lines
-        // that used to separate it — BOTH of them: trailingAfter must be
+        // that used to separate it - BOTH of them: trailingAfter must be
         // counted past the first blank, or one stranded blank survives a
         // note that ended on text
         expect(
@@ -45,7 +45,7 @@ describe("merging never changes the note's trailing blank lines", () => {
 });
 
 describe("duplicate names fold DOWN, not up", () => {
-    // "ß".toLowerCase() is "ß" but "ß".toUpperCase() is "SS" — folding the
+    // "ß".toLowerCase() is "ß" but "ß".toUpperCase() is "SS" - folding the
     // wrong way makes [^ß] and [^SS] the same footnote and merges two
     // unrelated definitions into one
     const sharpS = "see[^ß] and[^SS]\n\n[^ß]: sharp\n\n[^SS]: caps";
@@ -68,7 +68,7 @@ describe("duplicateFootnoteDefinitionNames early out", () => {
 });
 
 describe("the seam a deleted orphan leaves", () => {
-    it("swallows a following SPACE only — never the next character", () => {
+    it("swallows a following SPACE only - never the next character", () => {
         expect(removeOrphanedFootnoteReferences("start [^9]end")).toBe("start end");
         expect(removeOrphanedFootnoteReferences("[^9]end")).toBe("end");
         expect(removeOrphanedFootnoteReferences("a [^9]! b")).toBe("a ! b");
@@ -144,7 +144,7 @@ describe("the rule descriptors (the settings-facing surface)", () => {
     });
 
     it("passes the note's safe prefix through to the transform", () => {
-        // the option must reach the transform intact — a lost prefix
+        // the option must reach the transform intact - a lost prefix
         // deletes the placeholder the user is mid-way through naming
         expect(
             removeOrphanedReferencesRule.apply("mid [^3.] naming", {

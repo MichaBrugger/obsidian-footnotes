@@ -37,7 +37,7 @@ import {
 // editor, at randomly generated caret positions and settings. What the
 // transform properties are to the rules, these are to the press cascade.
 // Out of scope by construction (smoke territory): the popup editor, table
-// cell sub-editors, and Reading view — the fake has no `cm` and no modes.
+// cell sub-editors, and Reading view - the fake has no `cm` and no modes.
 
 fc.configureGlobal({ numRuns: Number(process.env.FC_NUM_RUNS ?? 200) });
 const SOAK_TIMEOUT = Math.max(30_000, Number(process.env.FC_NUM_RUNS ?? 200) * 60);
@@ -52,7 +52,7 @@ interface PressDoc extends Editor {
 }
 
 // every change in one transaction addresses the ORIGINAL document
-// (CodeMirror semantics — the commands rely on this for the
+// (CodeMirror semantics - the commands rely on this for the
 // reference+definition+prepend bundles), so apply back-to-front
 function applyChanges(lines: string[], changes: EditorChange[]): string[] {
     const text = lines.join("\n");
@@ -100,7 +100,7 @@ function pressEditor(
         setCursor(pos: EditorPosition) {
             doc.cursor = pos;
         },
-        // the end-of-word setting reads Editor.wordAt — a word-char run
+        // the end-of-word setting reads Editor.wordAt - a word-char run
         // around the caret, or null (unit harnesses kept the setting off
         // and never needed it; the press generator varies it)
         wordAt(pos: EditorPosition) {
@@ -179,7 +179,7 @@ const pressArb = fc
         settingsArb,
     )
     .map(([doc, linePick, chPick, command, settings]) => {
-        // the editor layer is always LF — EOL round-tripping belongs to the
+        // the editor layer is always LF - EOL round-tripping belongs to the
         // file layer the transform properties cover
         const lines = normalizeEol(doc).text.split("\n");
         const line = linePick % lines.length;
@@ -204,7 +204,7 @@ async function press(
 // context-free: a press can legitimately RECLASSIFY surrounding markdown
 // exactly like typing would (inserting at a heading's column 0 demotes it,
 // filling the blank line above an indented chunk makes the chunk a lazy
-// continuation), so masked counts can jump in ways no contract can bound —
+// continuation), so masked counts can jump in ways no contract can bound -
 // but the raw shapes the press physically ADDS to the text are exact.
 const RawReferenceShape = /\[\^[^[\]\n]+\]/g;
 
@@ -212,7 +212,7 @@ function rawShapeCount(lines: string[]): number {
     return lines.join("\n").match(RawReferenceShape)?.length ?? 0;
 }
 
-/** Every reference-shaped name in the raw text, folded — live, masked, escaped, or label. */
+/** Every reference-shaped name in the raw text, folded - live, masked, escaped, or label. */
 function rawNamesFolded(lines: string[]): Set<string> {
     const names = new Set<string>();
     for (const match of lines.join("\n").matchAll(RawReferenceShape)) {
@@ -223,7 +223,7 @@ function rawNamesFolded(lines: string[]): Set<string> {
 
 // raw shapes each command's cascade may physically add: nothing (guard/
 // toast/hop/navigation), a definition label for a definition-less
-// reference (every command via its navigate step), or — autonum only — a
+// reference (every command via its navigate step), or - autonum only - a
 // reference AND its label together
 const ALLOWED_SHAPE_DELTAS: Record<CommandName, number[]> = {
     autonum: [0, 1, 2],
@@ -232,7 +232,7 @@ const ALLOWED_SHAPE_DELTAS: Record<CommandName, number[]> = {
     paste: [0, 1],
 };
 
-// the paste command reads THIS on every press — the invariant properties
+// the paste command reads THIS on every press - the invariant properties
 // keep the benign default so their contracts stay tight, and the dedicated
 // hostile-clipboard property swaps in generated strings per run
 let clipboardText = "generated clipboard text";
@@ -247,7 +247,7 @@ afterAll(() => {
 
 // ---------- typed content (Jason's ask 2026-08-12: fuzz the INSIDES) ----------
 
-/** Splice `text` at the caret, exactly like typing — the caret rides to the end of it. */
+/** Splice `text` at the caret, exactly like typing - the caret rides to the end of it. */
 function typeText(doc: PressDoc, text: string) {
     const { line, ch } = doc.cursor;
     const current = doc.lines[line];
@@ -275,7 +275,7 @@ function definitionNamesFolded(lines: string[]): Set<string> {
 // names a user might type into the "[^]" placeholder: pool names that
 // collide with the generator's own definitions (case variants included),
 // fresh names the document has never seen, deliberately INVALID names
-// (spaces, backticks — warned about, never created), and random word-ish
+// (spaces, backticks - warned about, never created), and random word-ish
 // strings
 const typedNameArb = fc.oneof(
     fc.constantFrom("note", "Note", "9", "a$1", "ch-2", "x"),
@@ -287,7 +287,7 @@ const typedNameArb = fc.oneof(
         .filter((s) => s.length > 0),
 );
 
-// bodies a user might type after the label / between inline brackets —
+// bodies a user might type after the label / between inline brackets -
 // bracketless random text plus a few deliberate balanced-bracket shapes
 // (dollars and backslashes excluded here: a stray "$" pairing with later
 // line text or a trailing "\" changes the SURROUNDING structure, which is
@@ -348,7 +348,7 @@ describe("creation-command invariants over random documents", () => {
                 const shapesBefore = rawShapeCount(lines);
                 // a caret strictly inside an existing raw shape (an escaped
                 // "\[^80]" is lifeless text no guard owns) lets the
-                // insertion SPLIT that shape — one extra allowed -1
+                // insertion SPLIT that shape - one extra allowed -1
                 let insideShape = false;
                 for (const match of lines[cursor.line].matchAll(RawReferenceShape)) {
                     const start = match.index;
@@ -374,7 +374,7 @@ describe("creation-command invariants over random documents", () => {
 
     soakIt("a press never mints an orphan of ITS OWN making", async () => {
         // reclassifying pre-existing text is a text editor's reality (see
-        // rawShapeCount) — but any orphaned reference or definition whose
+        // rawShapeCount) - but any orphaned reference or definition whose
         // name did not exist ANYWHERE in the raw before-text must have been
         // created dead by the press itself (the escaped-"[^N]" and
         // "^"-swallowed insertion bugs this suite caught)
@@ -409,7 +409,7 @@ describe("creation-command invariants over random documents", () => {
                     const doc = pressEditor(lines, cursor);
                     const plugin = fakePlugin(doc, settings);
                     await insertNamedFootnote(plugin);
-                    // the press may have warned/hopped/navigated instead —
+                    // the press may have warned/hopped/navigated instead -
                     // only a planted "[^]" starts the typing flow
                     if (!plantedPlaceholder(doc, "[^]")) return;
 
@@ -428,14 +428,14 @@ describe("creation-command invariants over random documents", () => {
                     }
                     if (definitionsBefore.has(folded)) {
                         // an existing definition (any casing) means the
-                        // second press NAVIGATES — no duplicate is created
+                        // second press NAVIGATES - no duplicate is created
                         expect([...definitionsAfter].sort()).toEqual(
                             [...definitionsBefore].sort(),
                         );
                         return;
                     }
                     // fresh valid name: its definition now exists, and the
-                    // caret sits at the label's end — type the body there
+                    // caret sits at the label's end - type the body there
                     expect(definitionsAfter.has(folded)).toBe(true);
                     typeText(doc, body);
                     const after = doc.lines.join("\n");
@@ -469,7 +469,7 @@ describe("creation-command invariants over random documents", () => {
                     const afterTyping = doc.lines.join("\n");
                     const caretAfterTyping = { ...doc.cursor };
                     await insertInlineFootnote(plugin);
-                    // the second press never edits — it hops (filled) or
+                    // the second press never edits - it hops (filled) or
                     // warns and stays (empty)
                     expect(doc.lines.join("\n")).toBe(afterTyping);
                     if (body === "") {
@@ -508,7 +508,7 @@ describe("creation-command invariants over random documents", () => {
                             text.split(inserted).length - 1;
                         if (content !== "" && count(after) === count(before) + 1) {
                             // the pasted inline footnote must CLOSE where the
-                            // sanitizer promised — an unbalanced clipboard
+                            // sanitizer promised - an unbalanced clipboard
                             // that escaped sanitizing would run away here
                             const line = doc.lines.find(
                                 (l, i) => l !== lines[i] && l.includes(inserted),
@@ -625,7 +625,7 @@ describe("creation-command invariants over random documents", () => {
                         doc.lines.join("\n") === lines.join("\n");
                     // the inline key never converts a line-spanning
                     // selection (Jason's revert of the flatten, 2026-08-20)
-                    // — it refuses with its own notice and edits nothing
+                    // - it refuses with its own notice and edits nothing
                     if (
                         command === "inline" &&
                         trimmed !== null &&
@@ -645,7 +645,7 @@ describe("creation-command invariants over random documents", () => {
                     // protected lines the selection contained WHOLE into
                     // the definition body, four-space-indented (2026-08-19).
                     // (The inline key is single-line-only, so it can never
-                    // legitimately move a protected line — a regression
+                    // legitimately move a protected line - a regression
                     // would fail the exact-conservation branch.)
                     const strictlyInside = (i: number) =>
                         trimmed !== null &&
@@ -684,7 +684,7 @@ describe("creation-command invariants over random documents", () => {
                         counts.set(lines[i], left - 1);
                     }
                     // an empty/whitespace-only selection falls through to
-                    // the caret cascade — the other properties own that
+                    // the caret cascade - the other properties own that
                     if (trimmed === null) return;
                     if (unchanged) {
                         // a refusal always explains itself
@@ -696,7 +696,7 @@ describe("creation-command invariants over random documents", () => {
                     // span became the footnote. Lines inserted ABOVE the
                     // selection (a definition appended after a mid-document
                     // block, the phantom-frontmatter prepend) shift the
-                    // converted line down — search the whole possible shift
+                    // converted line down - search the whole possible shift
                     // window, and require the middle to PARSE as the
                     // conversion (an empty prefix+suffix would otherwise
                     // let any line match).
@@ -725,7 +725,7 @@ describe("creation-command invariants over random documents", () => {
                         return /^\[\^([^\]]+)\]$/.test(middle) ? middle : null;
                     };
                     // a candidate line only counts when its OWN definition
-                    // carries the seeded body — with an empty prefix and
+                    // carries the seeded body - with an empty prefix and
                     // suffix, a pre-existing bare "[^1]" line sliding into
                     // the window would otherwise satisfy the shape check
                     // (30k-soak oracle bug, 2026-08-20)
@@ -755,7 +755,7 @@ describe("creation-command invariants over random documents", () => {
         );
     });
 
-    soakIt("on a selection, paste REDIRECTS and named DEFERS to its modal — neither edits", async () => {
+    soakIt("on a selection, paste REDIRECTS and named DEFERS to its modal - neither edits", async () => {
         await fc.assert(
             fc.asyncProperty(
                 selectionPressArb,
@@ -769,7 +769,7 @@ describe("creation-command invariants over random documents", () => {
                     await COMMANDS[command](fakePlugin(doc, settings));
                     // the press itself never edits: paste explains itself,
                     // named hands off to the name modal (whose submit is
-                    // covered by the deterministic pins — units can't
+                    // covered by the deterministic pins - units can't
                     // render it)
                     expect(doc.lines.join("\n")).toBe(lines.join("\n"));
                     if (command === "paste") {
@@ -797,7 +797,7 @@ describe("creation-command invariants over random documents", () => {
                 fc.nat(1000),
                 fc.nat(1000),
                 async ({ lines, cursor, command, settings }, linePick, chPick) => {
-                    // two disjoint non-empty ranges — a stray multi-cursor:
+                    // two disjoint non-empty ranges - a stray multi-cursor:
                     // one footnote can't stand in for both, whatever the key
                     const line = linePick % lines.length;
                     const lineText = lines[line];
@@ -832,7 +832,7 @@ describe("creation-command invariants over random documents", () => {
                     const cleanBefore = !lines.join("\n").includes("[^[^");
                     const doc = await press(lines, cursor, command, settings);
                     // the second press continues from wherever the first
-                    // left the caret — the rapid-double-press shape that
+                    // left the caret - the rapid-double-press shape that
                     // produced "[^[^]]" nesting historically
                     await COMMANDS[secondCommand](fakePlugin(doc, settings));
                     if (cleanBefore) {

@@ -1,7 +1,7 @@
 // The shared plugin double, owning the one `as unknown as` cast the
 // per-file copies each repeated. Settings stay PARTIAL on purpose: the
 // code under test reads specific keys and a missing key reads as
-// undefined = feature off, exactly like the old hand-rolled fakes — do
+// undefined = feature off, exactly like the old hand-rolled fakes - do
 // NOT spread DEFAULT_SETTINGS here, or every fake would silently turn
 // on insert-at-end-of-word (default true) and start calling wordAt()
 // on editors built without it.

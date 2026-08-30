@@ -31,7 +31,7 @@ describe("tableRowCellSpans", () => {
     });
 
     // spec changed 2026-07-17 (hunt): the leading pipe is optional in GFM,
-    // so text before the first pipe IS the first cell — the old behavior
+    // so text before the first pipe IS the first cell - the old behavior
     // dropped it and every later cellIndex resolved to the wrong span
     it("treats text before the first pipe as the first cell", () => {
         expect(tableRowCellSpans("x | y |")).toEqual([

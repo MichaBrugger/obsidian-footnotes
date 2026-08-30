@@ -5,7 +5,7 @@ import { applyFootnotePrefix } from "../../src/linting/rules/apply-footnote-pref
 
 // Scenario: a case-variant prefixed footnote ([^P.1] under prefix "p.") doesn't
 // reserve its number, so the next autonumber / applyFootnotePrefix rename mints
-// an id that already exists case-folded — silently merging two footnotes.
+// an id that already exists case-folded - silently merging two footnotes.
 // Hunt: 2026-08-09. Lens: grammar.
 // Root cause: computeNextFootnoteNumber's dynamic prefix regex
 // (src/insert-or-navigate-footnotes.ts:683) lacks the /i flag, though Obsidian
@@ -14,7 +14,7 @@ import { applyFootnotePrefix } from "../../src/linting/rules/apply-footnote-pref
 
 describe("prefix-namespace number scanning folds id case (fixed 2026-08-10)", () => {
     it("a case-variant prefixed reference reserves its number", () => {
-        // [^P.1] IS footnote "p.1" (Obsidian folds ids) — the next number
+        // [^P.1] IS footnote "p.1" (Obsidian folds ids) - the next number
         // under prefix "p." must be 2, not a colliding 1
         expect(computeNextFootnoteNumber("text[^P.1]", "p.")).toBe(2);
     });

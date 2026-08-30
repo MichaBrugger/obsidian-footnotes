@@ -38,10 +38,10 @@ import { TableCellEditor } from "../src/editor/table-cursor";
 // named/paste redirect instead of converting). The auto-numbered key moves
 // the selected text into a new definition's body; the inline key wraps it
 // as "^[…]" in place. The generative twin lives in
-// command-properties.test.ts — these pin the concrete contracts.
+// command-properties.test.ts - these pin the concrete contracts.
 
 // with `selection` undefined, the shared fake's listSelections falls back
-// to a live collapsed range at the current cursor — the same behavior the
+// to a live collapsed range at the current cursor - the same behavior the
 // old local fake's `selection ? [selection] : [...cursor...]` gave.
 function fakeEditor(
     lines: string[],
@@ -202,7 +202,7 @@ describe("lint-on-footnote-creation covers selection conversions (parity, Jason'
             }),
         );
         // the conversion minted [^6] with a seeded definition; the creation
-        // lint then renumbered 5→1, 6→2 — exactly what a plain caret
+        // lint then renumbered 5→1, 6→2 - exactly what a plain caret
         // insert with the same settings produces
         expect(doc.lines).toEqual([
             "alpha[^1] [^2] fox",
@@ -245,7 +245,7 @@ describe("lint-on-footnote-creation covers selection conversions (parity, Jason'
 describe("the creation lint relands the caret on the seeded definition (A8 report, 2026-08-26)", () => {
     // Jason's A8 manual pass: with lint-on-creation + reindex on (popup
     // off), converting a selection while [^5]/[^5]: five sit ABOVE the
-    // paragraph left the caret on the WRONG footnote — the lint moves and
+    // paragraph left the caret on the WRONG footnote - the lint moves and
     // renumbers the seeded definition, and the empty-definition reland
     // can't find it (a conversion's definition is never empty), so the
     // caret was left wherever the lint's minimal replacement dropped it.
@@ -334,7 +334,7 @@ describe("the creation lint relands the caret on the seeded definition (A8 repor
 });
 
 describe("the named key converts a selection through its modal (2026-08-13)", () => {
-    // the modal is thin wiring over convertSelectionToNamed — these drive
+    // the modal is thin wiring over convertSelectionToNamed - these drive
     // the exported conversion the way its submit does
     it("replaces the selection with [^name] and seeds the definition", () => {
         const doc = fakeEditor(["The quick fox jumps"], { line: 0, ch: 4 });
@@ -649,7 +649,7 @@ describe("selections that refuse", () => {
     });
 
     it("multiple CARETS now insert the SAME footnote at every one (2026-08-22)", async () => {
-        // superseded behavior: extras used to be ignored (2026-08-21) —
+        // superseded behavior: extras used to be ignored (2026-08-21) -
         // Jason's ask upgraded this to same-reference-everywhere; the full
         // multi-caret contract lives in test/multi-caret.test.ts
         const doc = fakeEditor(["alpha bravo", "charlie delta"], {
@@ -729,7 +729,7 @@ describe("selections that refuse", () => {
 
     it("selecting part of a fence DELIMITER refuses (found by the conversion property)", async () => {
         // wrapping the opener's first backtick as "^[`]" would un-fence
-        // everything below it — the simulated RESULT looks live precisely
+        // everything below it - the simulated RESULT looks live precisely
         // because the construct got destroyed, so the up-front protected
         // check must own this, not the born-dead simulation
         const before = ["```", "fake[^1]", "```"];
@@ -755,7 +755,7 @@ describe("selections that refuse", () => {
 
     it("a replacement that would demote a quote and strand its own definition refuses", async () => {
         // replacing the ">" leaves "$$" doc-level, swallowing everything
-        // below — including the definition the same transaction appends
+        // below - including the definition the same transaction appends
         // (the quote-demotion class the press property suite found)
         const before = ["> $$", "> quoted math[^75]"];
         const doc = fakeEditor(before, { line: 0, ch: 0 }, {
@@ -822,7 +822,7 @@ describe("selections that refuse", () => {
     });
 
     it("selecting exactly a quoted fence's CLOSER line refuses", async () => {
-        // the closer's protection also comes from above — consuming it
+        // the closer's protection also comes from above - consuming it
         // would leave the fence unclosed
         const before = ["> ```", "> code", "> ```"];
         const doc = fakeEditor(before, { line: 2, ch: 0 }, {
@@ -866,7 +866,7 @@ describe("selections that refuse", () => {
     });
 
     it("a selection overlapping YAML frontmatter refuses", async () => {
-        // properties are note metadata, not prose — even swallowed whole
+        // properties are note metadata, not prose - even swallowed whole
         // they don't belong in a footnote body
         const before = ["---", "title: x", "---", "prose here"];
         const doc = fakeEditor(before, { line: 0, ch: 0 }, {
@@ -906,12 +906,12 @@ describe("selections expand to whole words when the toggle is on (Jason's ask 20
     // at either end join the footnote whole, and the END normalizes to
     // word end + one trailing punctuation mark with FULL insert-key
     // parity (Jason's call: even an exact word-end selection gains the
-    // mark). The start side has no punctuation analog — it only walks to
+    // mark). The start side has no punctuation analog - it only walks to
     // the word's start, and only when the selection begins mid-word.
     const sentence = "Bob loves Bill. Lorem ipsum dolor sit. Abbie likes Maddie.";
 
     it("includes the cut-off words at both ends, plus the trailing punctuation", async () => {
-        // "rem ipsum dolor s" selected — Jason's example
+        // "rem ipsum dolor s" selected - Jason's example
         const doc = fakeEditor(
             [sentence],
             { line: 0, ch: 18 },
@@ -1022,7 +1022,7 @@ describe("selections expand to whole words when the toggle is on (Jason's ask 20
             "autonum",
             { line: 0, ch: 8 },
         );
-        // "ord her" expands to "word here." — words whole, punctuation taken
+        // "ord her" expands to "word here." - words whole, punctuation taken
         expect(dispatched[0]?.changes).toEqual({
             from: 6,
             to: 16,
@@ -1089,7 +1089,7 @@ describe("selections inside an actively edited table cell", () => {
         expect(doc.lines[doc.lines.length - 1]).toBe("[^1]: word");
     });
 
-    it("an empty cell selection is no claim — the caret cascade owns the press", () => {
+    it("an empty cell selection is no claim - the caret cascade owns the press", () => {
         const { cell, dispatched } = fakeCell("plain word here", 7, 7);
         const doc = fakeEditor(["| plain word here |"], { line: 0, ch: 8 });
         expect(
@@ -1145,7 +1145,7 @@ describe("selections inside an actively edited table cell", () => {
 
 // ---------------------------------------------------------------------------
 // the block zoo (2026-08-19): every block construct Obsidian speaks, selected
-// WHOLE inside a conversion — these pin the exact seeded definition so the
+// WHOLE inside a conversion - these pin the exact seeded definition so the
 // manual combo sheet (A13) can promise what the note will hold. Rendering
 // inside the footnote/popup is A13's eyeball territory; the text shape is
 // pinned here.
@@ -1231,7 +1231,7 @@ describe("the block zoo converts (2026-08-19)", () => {
     });
 
     it("the inline key flattens a SINGLE-line image link without escaping its brackets", async () => {
-        // balanced brackets pass the sanitizer untouched — the embed keeps
+        // balanced brackets pass the sanitizer untouched - the embed keeps
         // working inside the inline footnote
         const doc = fakeEditor(
             ["see ![alt](https://x.org/p.png) here"],
@@ -1285,7 +1285,7 @@ describe("quote-relative indented code refuses at the edges (second 30k-soak fin
         // the found counterexample, minimized: quote-relative indented
         // code is protected but carries no region flag, and its quote
         // marker at ch 0 is where the whitespace trim can't shield the
-        // edge — converting it consumed protected text
+        // edge - converting it consumed protected text
         const before = ["", ">     > gap code[^88]", "", "alpha[^1]."];
         for (const command of [insertInlineFootnote, insertAutonumFootnote]) {
             noticeCalls.length = 0;
@@ -1384,7 +1384,7 @@ describe("commandHotkeys reads the hotkey registry defensively (2026-08-22)", ()
 describe("nested footnotes are prevented in selections (2026-08-24)", () => {
     // Jason's ruling after the Obsidian Academia Discord confirmed nobody
     // nests footnotes: a selection touching a LIVE reference, "[^]"
-    // placeholder, or inline footnote refuses — full containment would
+    // placeholder, or inline footnote refuses - full containment would
     // nest it, partial overlap would corrupt it
     it("a selection CONTAINING a reference refuses, note untouched", async () => {
         const before = ["alpha cite[^1] omega", "", "[^1]: one"];
@@ -1400,7 +1400,7 @@ describe("nested footnotes are prevented in selections (2026-08-24)", () => {
     it("a selection CUTTING a reference in half refuses (corruption guard)", async () => {
         const before = ["alpha cite[^1] omega", "", "[^1]: one"];
         const doc = fakeEditor(before, { line: 0, ch: 0 }, {
-            // "alpha cite[^" — grabs the opening of the reference only
+            // "alpha cite[^" - grabs the opening of the reference only
             anchor: { line: 0, ch: 0 },
             head: { line: 0, ch: 12 },
         });

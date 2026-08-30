@@ -5,7 +5,7 @@ import { removeOrphanedFootnoteReferences } from "../../src/linting/rules/remove
 
 // Bug #5 (2026-08-11 review, Kimi): BlockquotePrefix didn't consume each
 // ">" marker's optional trailing space between iterations, so ">    > x"
-// (4 spaces: one marker space + 3 indent — a legal depth-2 quote) parsed
+// (4 spaces: one marker space + 3 indent - a legal depth-2 quote) parsed
 // as depth 1 for definitionLabelIn while blockquoteDepth said depth 2.
 // Definitions behind such prefixes were invisible to navigation and
 // orphan handling. Ground-truthed in the live reading view 2026-08-11
@@ -21,7 +21,7 @@ describe("wide-gap nested quote markers (bug-wide-gap-quote-markers)", () => {
         });
     });
 
-    it("a 5-space gap is not a nested quote — no label", () => {
+    it("a 5-space gap is not a nested quote - no label", () => {
         expect(definitionLabelIn(">     > [^1]: x")).toBeNull();
     });
 

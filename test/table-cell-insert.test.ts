@@ -5,8 +5,8 @@ import type FootnotePlugin from "../src/main";
 import type { TableCellEditor } from "../src/editor/table-cursor";
 
 // Regression companion to the table-corruption smoke test (2026-07-15).
-// The contract with Obsidian itself — that a cell sub-editor can be FOUND
-// and that its dispatch syncs back to the document — can only be verified
+// The contract with Obsidian itself - that a cell sub-editor can be FOUND
+// and that its dispatch syncs back to the document - can only be verified
 // by the smoke layer against the real app. What CAN be pinned here is the
 // deterministic half: given a found cell editor, the dispatched edit must
 // target the right offset and land the caret in the right place.

@@ -8,12 +8,12 @@ import { moveFootnoteDefinitionsToBottom } from "../../src/linting/rules/move-fo
 
 // Found by the remark differential oracle on its first soak (2026-08-10),
 // ground truth verified against Obsidian's metadataCache: a note whose
-// FIRST line is a bare unclosed "---" is a THEMATIC BREAK — but the moment
+// FIRST line is a bare unclosed "---" is a THEMATIC BREAK - but the moment
 // an edit introduces a column-0 "---" further down (the "---\n## Footnotes"
 // section-heading divider), Obsidian re-reads the entire head as a YAML
 // frontmatter block. The prose in it (with its references) silently leaves
 // the note body, and reindex then renumbered an orphaned definition onto
-// the swallowed reference's name — minting a footnote pairing that never
+// the swallowed reference's name - minting a footnote pairing that never
 // existed. Fix: when a rebuild/insert would flip that interpretation, a
 // blank line is prepended (renders identically; frontmatter can only open
 // on the very first line).
@@ -29,7 +29,7 @@ describe("phantom frontmatter from a leading thematic break", () => {
     });
 
     it("move-to-bottom leaves real frontmatter and ----free headings alone", () => {
-        // real frontmatter: line 0 already protected — no prepend
+        // real frontmatter: line 0 already protected - no prepend
         expect(
             moveFootnoteDefinitionsToBottom(
                 "---\ntitle: t\n---\n\nalpha[^1].\n\n[^1]: one",
@@ -57,7 +57,7 @@ describe("phantom frontmatter from a leading thematic break", () => {
             applyNotePrefix: false,
             sectionHeading: HEADING,
         });
-        // the orphaned definition takes [^2] — NOT the orphaned
+        // the orphaned definition takes [^2] - NOT the orphaned
         // reference's [^1], which still points nowhere on purpose
         expect(out).toBe(
             "\n---\n\nalpha[^1]. alpha\n\n---\n## Footnotes\n\n[^2]: alpha",

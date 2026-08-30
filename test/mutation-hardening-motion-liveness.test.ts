@@ -93,7 +93,7 @@ function motionPlugin(vimMode = false): FootnotePlugin {
     return {
         app: {
             vault: {
-                // only the real key reports vim mode — a mutated key literal
+                // only the real key reports vim mode - a mutated key literal
                 // reads as "off"
                 getConfig: (key: string) => key === "vimMode" && vimMode,
             },
@@ -279,7 +279,7 @@ describe("endOfWordOffset: the code point touching the offset from the left", ()
     const LINEAR_B = String.fromCodePoint(0x10000); // "𐀀"
     const MATH_NINE = String.fromCodePoint(0x1d7ff); // "𝟿"
 
-    // line 90: "prev >= 0xd800" -> "prev > 0xd800" — an offset sitting
+    // line 90: "prev >= 0xd800" -> "prev > 0xd800" - an offset sitting
     // mid-pair of a word whose high surrogate is exactly 0xd800 would stop
     // recognizing itself as inside a word at all, returning the raw offset
     // instead of walking to the word's end.
@@ -293,14 +293,14 @@ describe("endOfWordOffset: the code point touching the offset from the left", ()
     // the pair's own code point.
     // line 93 (same input): "prev >= 0xdc00" -> "<" / ">", "prev <= 0xdfff"
     // -> ">", "i >= 2" -> ">" / "<", the emptied block, "-> false", and
-    // line 94's "i - 2" -> "i + 2" — every one of them loses the astral
+    // line 94's "i - 2" -> "i + 2" - every one of them loses the astral
     // word sitting just left of the offset, so the trailing "." is never
     // consumed.
     it("sees the astral word left of the offset and hops its trailing punctuation", () => {
         expect(endOfWordOffset(LINEAR_B + ".", 2)).toBe(3);
     });
 
-    // line 93: "prev <= 0xdfff" -> "prev < 0xdfff" — the top of the low
+    // line 93: "prev <= 0xdfff" -> "prev < 0xdfff" - the top of the low
     // surrogate range, reached only by a code point whose low half is
     // exactly 0xdfff.
     it("recognizes a word whose low surrogate is exactly 0xdfff", () => {
@@ -332,7 +332,7 @@ describe("endOfWordOffset: the code point touching the offset from the left", ()
 describe("endOfWordOffset: offsets no word touches", () => {
     // line 98 BlockStatement -> {} and ConditionalExpression -> false: with
     // the early return gone, an offset sitting on trailing punctuation with
-    // no word anywhere near it would still hop that punctuation — inserting
+    // no word anywhere near it would still hop that punctuation - inserting
     // a reference on the far side of a stray period.
     it("leaves an offset on lone punctuation exactly where it is", () => {
         expect(endOfWordOffset(" . ", 1)).toBe(1);
@@ -342,7 +342,7 @@ describe("endOfWordOffset: offsets no word touches", () => {
 describe("endOfWordOffset: mid-pair snapping before the walk", () => {
     const MATH_NINE = String.fromCodePoint(0x1d7ff); // low half 0xdfff
 
-    // line 106: "unitAtEnd <= 0xdfff" -> "< 0xdfff" — an offset landing
+    // line 106: "unitAtEnd <= 0xdfff" -> "< 0xdfff" - an offset landing
     // mid-pair of a 0xdfff-tailed code point would fail to snap back, so
     // the walk starts on a lone surrogate, breaks immediately, and returns
     // a caret INSIDE the pair.
@@ -352,7 +352,7 @@ describe("endOfWordOffset: mid-pair snapping before the walk", () => {
 
     // line 106 UpdateOperator "end--" -> "end++": snapping must go LEFT to
     // the code point boundary. A stray lone low surrogate between two words
-    // exposes the direction — stepping right would walk into and consume
+    // exposes the direction - stepping right would walk into and consume
     // the NEXT word ("b"), which the caret was never touching.
     it("snaps left, not right, at a lone low surrogate between two words", () => {
         expect(endOfWordOffset("a\udfffb", 1)).toBe(1);
@@ -465,7 +465,7 @@ describe("safeInsertionCh", () => {
         expect(safeInsertionCh("a^", 2)).toBe(1);
     });
 
-    it("stays put after an ESCAPED caret — it opens nothing", () => {
+    it("stays put after an ESCAPED caret - it opens nothing", () => {
         expect(safeInsertionCh("a\\^", 3)).toBe(3);
     });
 
@@ -474,7 +474,7 @@ describe("safeInsertionCh", () => {
     });
 
     it("walks left past a backslash and the caret behind it, in one call", () => {
-        // "a^\" — the backslash escapes the insertion, and the "^" it lands
+        // "a^\" - the backslash escapes the insertion, and the "^" it lands
         // on would swallow it in turn
         expect(safeInsertionCh("a^\\", 3)).toBe(1);
     });
@@ -588,14 +588,14 @@ describe("caretInsideMaskedSpan", () => {
         expect(caretInsideMaskedSpan(SPAN, 4, false, false)).toBe(false);
     });
 
-    // line 109: "ch > 0" -> true / ">= 0" — at column 0 there is no
+    // line 109: "ch > 0" -> true / ">= 0" - at column 0 there is no
     // character to the left, so the off-line neighbor stands in for it.
     it("column 0 consults openAtStart for the left side", () => {
         expect(caretInsideMaskedSpan("\0\0cd", 0, true, false)).toBe(true);
         expect(caretInsideMaskedSpan("\0\0cd", 0, false, false)).toBe(false);
     });
 
-    // line 110: "ch < masked.length" -> true / ">=" / "<=" — at end of
+    // line 110: "ch < masked.length" -> true / ">=" / "<=" - at end of
     // line the right-hand neighbor is off-line too.
     it("end of line consults openAtEnd for the right side", () => {
         expect(caretInsideMaskedSpan("ab\0\0", 4, false, true)).toBe(true);
@@ -610,7 +610,7 @@ describe("caretInsideMaskedSpan", () => {
 //
 // - line 90 EqualityOperator "prev <= 0xdbff" -> "prev < 0xdbff": the only
 //   value that separates them is a high surrogate of exactly 0xdbff, whose
-//   pairs are the code points U+10FC00–U+10FFFF — all of plane 16 is
+//   pairs are the code points U+10FC00–U+10FFFF - all of plane 16 is
 //   Private Use (category Co), so neither the pair's code point nor the
 //   lone surrogate the mutant returns instead is a word character.
 //   cpBefore's result is consumed ONLY through isWordCp, so the two answers
@@ -626,7 +626,7 @@ describe("caretInsideMaskedSpan", () => {
 // - line 93 ConditionalExpression "prev >= 0xdc00 && prev <= 0xdfff &&
 //   true" (dropping "i >= 2"): reaching this branch with i < 2 means i is
 //   exactly 1 (i <= 0 returned earlier), and text.codePointAt(-1) is always
-//   undefined — non-word, exactly like the lone low surrogate the original
+//   undefined - non-word, exactly like the lone low surrogate the original
 //   returns instead. Again only word-ness is observable.
 //
 // - line 110 EqualityOperator "(cp as number) > 0xffff" -> ">= 0xffff":

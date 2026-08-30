@@ -5,7 +5,7 @@ import { referenceAtCursor } from "../src/parsing/footnote-grammar";
 // The "inside a reference" rule shared by both navigation checks, aligned
 // with the inline-footnote definition (issue #49): the caret counts as on
 // a reference only strictly INSIDE its brackets. A caret immediately after
-// the closing bracket — or immediately before the opening one — is
+// the closing bracket - or immediately before the opening one - is
 // outside, so the hotkey inserts a consecutive footnote there instead of
 // jumping to the existing footnote's definition.
 

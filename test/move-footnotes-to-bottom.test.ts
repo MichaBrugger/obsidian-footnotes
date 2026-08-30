@@ -5,7 +5,7 @@ import { moveFootnoteDefinitionsToBottom } from "../src/linting/rules/move-footn
 // Linter's "move footnotes to the bottom", integrated with this plugin's
 // section-heading setting. Policy pinned here:
 //   - definition blocks (with their continuations) relocate to the end of
-//     the note, keeping their relative order — ordering is reindex's job
+//     the note, keeping their relative order - ordering is reindex's job
 //   - the layout matches what the plugin's own insert flow produces, so a
 //     note the plugin built is already a fixed point: heading directly
 //     after the body (dividers get a blank line first), blank line before

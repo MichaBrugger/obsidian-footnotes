@@ -14,7 +14,7 @@ import { reindexFootnotes } from "../src/linting/rules/re-index-footnotes";
 //   - anything inside fenced code blocks, inline code, or frontmatter
 //     neither counts nor gets rewritten
 //   - a definition owns its indented continuation lines (including blank
-//     lines followed by indented content) — they move with it
+//     lines followed by indented content) - they move with it
 
 describe("reindexFootnotes", () => {
     it("returns a document with no footnotes unchanged", () => {
@@ -339,7 +339,7 @@ describe("reindexFootnotes with renumberNamedFootnotes: true", () => {
 
 describe("reindexFootnotes and single-line HTML comments", () => {
     // found live 2026-07-17: a one-line <!-- [^66]: ... --> was renumbered
-    // and its colon swapped — only MULTI-line comments were protected
+    // and its colon swapped - only MULTI-line comments were protected
     it("ignores references inside a single-line HTML comment", () => {
         const input = "text[^5]\n<!-- [^2]: commented out -->\n\n[^5]: five";
         const expected =

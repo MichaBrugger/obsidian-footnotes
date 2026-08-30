@@ -12,8 +12,8 @@ import { shouldJumpFromDefinitionToReference } from "../../src/commands/navigati
 // Hunt: 2026-08-09. Lens: grammar.
 // The cascade's definition-block-membership check runs FIRST and claims the
 // press (jumping to [^a]'s first reference), so the reference→definition path for [^b]
-// never runs. The order is deliberate — the 2026-07-17 jump-back fix depends
-// on it — but the navigation target can surprise a user who aimed at [^b].
+// never runs. The order is deliberate - the 2026-07-17 jump-back fix depends
+// on it - but the navigation target can surprise a user who aimed at [^b].
 
 function fakePlugin(): FootnotePlugin {
     return sharedFakePlugin({
@@ -28,7 +28,7 @@ function fakePlugin(): FootnotePlugin {
 }
 
 // DECIDED (Jason, 2026-08-10): footnote references nested in another
-// footnote's definition body are unsupported — the definition-block jump
+// footnote's definition body are unsupported - the definition-block jump
 // (back to the OUTER footnote's first reference) deliberately wins the
 // press, exactly as the 2026-07-17 jump-back fix established.
 describe("decided: the definition-block jump owns presses inside a continuation line", () => {

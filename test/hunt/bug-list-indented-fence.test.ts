@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { scanDocument } from "../../src/parsing/markdown-scan";
 
 // Bug #3 (2026-08-11 review, Kimi): a fence indented 4+ under a list item
-// was invisible to the scanner — fence indent is measured from the ITEM'S
+// was invisible to the scanner - fence indent is measured from the ITEM'S
 // CONTENT COLUMN, not the document margin. "- a" has content indent 2, so
 // a "    ```" below it sits at relative indent 2: a REAL fence per
 // CommonMark. Ground-truthed in the live reading view 2026-08-11 (probe
@@ -23,7 +23,7 @@ describe("fences indented inside a list item (bug-list-indented-fence)", () => {
         expect(scan.endsProtected).toBe(false);
     });
 
-    it("relative indent 6 is indented code, not a fence — the backticks are literal", () => {
+    it("relative indent 6 is indented code, not a fence - the backticks are literal", () => {
         // "        ```" under content indent 2 sits at relative 6: an
         // indented code chunk whose text HAPPENS to be backticks; the
         // chunk keeps going and never swallows lines as a fence would

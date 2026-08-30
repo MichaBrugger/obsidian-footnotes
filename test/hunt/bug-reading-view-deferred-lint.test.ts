@@ -9,7 +9,7 @@ import { lintAfterFootnoteCreation } from "../../src/linting/linter";
 // The popup-deferred lint-on-creation fires after a user-driven delay, and a Reading-view flip mid-popup (no active-leaf-change fires) leaves every internal gate untripped, so the deferred lint edits the hidden buffer.
 // Hunt: 2026-08-09. Lens: interactions.
 // Root cause: commit a30761f guarded the lint COMMANDS with readingViewActive but not lintAfterFootnoteCreation, whose gates (file path, popup busy, table focus) all stay untripped by a Reading-view flip.
-// Since 2026-08-27 the popup path lints synchronously BEFORE the popup opens (no deferral left), so this guard is defense-in-depth against programmatic callers — still pinned.
+// Since 2026-08-27 the popup path lints synchronously BEFORE the popup opens (no deferral left), so this guard is defense-in-depth against programmatic callers - still pinned.
 
 function fakeEditor(lines: string[], cursor: EditorPosition): FakeEditor {
     return sharedFakeEditor(lines, {
@@ -73,7 +73,7 @@ describe("popup-deferred lint-on-creation vs Reading view (fixed 2026-08-10)", (
     });
 
     it("the same lint still runs when the note stayed in editing view", () => {
-        // guards the fix against over-gating: identical setup, source mode —
+        // guards the fix against over-gating: identical setup, source mode -
         // the punctuation rule has real work ("Alpha[^2]," → "Alpha,[^2]")
         const lines = ["Alpha[^2], bravo", "", "[^2]: "];
         const doc = fakeEditor(lines, { line: 2, ch: lines[2].length });

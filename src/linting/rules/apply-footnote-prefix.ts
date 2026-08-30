@@ -12,12 +12,12 @@ import { IgnoreType } from "../ignore-types";
 import { FootnoteRule } from "../rule";
 
 // QOL rule (2026-07-18): footnotes written before the note got its
-// footnote-prefix property stay unprefixed — this renames them to carry
+// footnote-prefix property stay unprefixed - this renames them to carry
 // the prefix. Plain numbered footnotes convert in first-appearance order
 // (references first, then orphaned definitions), numbered AFTER the highest
 // existing prefixed footnote so nothing collides. Named footnotes keep
 // their name behind the prefix ("[^note]" → "[^2.note]", A6 bug
-// 2026-07-20) — except when the prefixed name already exists as another
+// 2026-07-20) - except when the prefixed name already exists as another
 // footnote, which the rename would silently merge. Already-prefixed
 // footnotes are untouched; definition ordering is reindex's job, so blocks
 // stay where they are. Runs BEFORE reindex in the pipeline, so converted
@@ -55,7 +55,7 @@ export function applyFootnotePrefix(markdown: string, prefix: string): string {
     };
     for (let i = 0; i < lines.length; i++) {
         if (isProtected[i]) continue;
-        // referenceOccurrences re-slices raw names — the rewrite below
+        // referenceOccurrences re-slices raw names - the rewrite below
         // compares original ids (bug-masked-name-identity)
         for (const { name } of referenceOccurrences(lines[i], maskedLines[i])) {
             record(name);
@@ -66,7 +66,7 @@ export function applyFootnotePrefix(markdown: string, prefix: string): string {
     }
 
     // plain numbers continue after the highest footnote already carrying
-    // the prefix (the masked twin is already in hand — no re-mask, perf F1)
+    // the prefix (the masked twin is already in hand - no re-mask, perf F1)
     let nextNumber = computeNextFootnoteNumber(
         text,
         prefix,
@@ -78,7 +78,7 @@ export function applyFootnotePrefix(markdown: string, prefix: string): string {
     }
 
     // the new id for `id`, or null to leave it alone. Named ids keep each
-    // occurrence's own casing — ids are case-insensitive, so "[^Note]" and
+    // occurrence's own casing - ids are case-insensitive, so "[^Note]" and
     // "[^note]:" still name one footnote after both gain the prefix.
     const renameFor = (id: string): string | null => {
         const numbered = numberedRenames.get(id);

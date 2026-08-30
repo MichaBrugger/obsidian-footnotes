@@ -9,7 +9,7 @@ import {
 
 // The popup arm's semantic caret re-land (Jason's report 2026-08-27): the
 // pre-popup creation lint's minimal-diff rewrite maps a caret inside its
-// changed span to the span's START — the first renumbered footnote — so
+// changed span to the span's START - the first renumbered footnote - so
 // the caret's identity is captured as an occurrence ORDINAL before the
 // lint and restored on the (possibly renamed) id afterwards. Same-id
 // occurrence order is stable across the lint rules, which is what makes
@@ -67,12 +67,12 @@ describe("positionAfterReference", () => {
 
     it("never lands on the definition label (it is not a reference)", () => {
         const doc = fakeEditor(["only[^9] one", "", "[^9]: body"]);
-        // ordinal 1 would have to be the "[^9]:" label — there is no such occurrence
+        // ordinal 1 would have to be the "[^9]:" label - there is no such occurrence
         expect(positionAfterReference(doc, "9", 1)).toBeNull();
     });
 
     it("round-trips an ordinal across a lint-style rename", () => {
-        // pre-lint: caret after the new [^6], second occurrence of nothing —
+        // pre-lint: caret after the new [^6], second occurrence of nothing -
         // the only [^6]; post-lint the id is [^2] and everything renumbered
         const before = fakeEditor(["zeta[^5] qu[^6]ick", "", "[^5]: five", "[^6]: "]);
         const ordinal = referenceOrdinalAtCursor(before, "6", {

@@ -33,7 +33,7 @@ import { TableCellEditor } from "../src/editor/table-cursor";
 
 // Mutation hardening for the creation trio (Stryker re-baseline 2026-08-12:
 // create-footnote 50%, rename-footnote 58%, selection-footnote 72%). The
-// existing suites pin the happy paths; what survived were the GATES — the
+// existing suites pin the happy paths; what survived were the GATES - the
 // cell writer's born-dead branches, the isFirstFootnote/prefix/masking
 // conditions, the trim-loop boundaries of the selection claim, and the
 // rename planner's shift arithmetic and collision scan. Each test below is
@@ -41,7 +41,7 @@ import { TableCellEditor } from "../src/editor/table-cursor";
 // block lists the ones deliberately left alone (popup-only and equivalent).
 
 // the fake's `transactions` is a COUNT here (shared fake), not the raw
-// spec list the old local fake kept — assertions below compare against
+// spec list the old local fake kept - assertions below compare against
 // numbers accordingly. `scrolls` has no shared-fake equivalent (its
 // scrollIntoView is a fixed no-op), so this thin wrapper counts scroll
 // calls itself on top of the shared editor.
@@ -60,7 +60,7 @@ function fakeEditor(
         words: true,
     }) as FakeDoc;
     doc.scrolls = 0;
-    // the shared fake's scrollIntoView is already a no-op — just count calls
+    // the shared fake's scrollIntoView is already a no-op - just count calls
     doc.scrollIntoView = () => {
         doc.scrolls++;
     };
@@ -135,7 +135,7 @@ describe("the table-cell writer's born-dead refusal", () => {
     // L99 MethodExpression, `startsWith("^[")` -> `endsWith("^[")`, and
     // L102 ConditionalExpression -> true: a pasted inline footnote whose BODY
     // carries inline code masks to NULs, so the plain-slice branch would
-    // refuse it — only the inline-SPAN check accepts it.
+    // refuse it - only the inline-SPAN check accepts it.
     it("accepts an inline footnote whose body carries backticked code", () => {
         const { cell, dispatched } = fakeCell("plain here", 6);
         const text = "^[a `b` c]";
@@ -223,7 +223,7 @@ describe("createAutonumFootnote", () => {
     // L198 ConditionalExpression, `isFirstFootnote` -> true: a blockquote
     // definition ("> [^q]: …", C22) is a definition for the id list but not a
     // top-level block, so the note has definitions while the append still
-    // takes the no-blocks path — the one place isFirstFootnote is visible.
+    // takes the no-blocks path - the one place isFirstFootnote is visible.
     it("counts a blockquote definition as an existing footnote", () => {
         const doc = fakeEditor(["> [^q]: quoted def", "prose"], { line: 1, ch: 5 });
         createAutonumFootnote("prose", { line: 1, ch: 5 }, fakePlugin(doc), doc);
@@ -311,7 +311,7 @@ describe("createAutonumFootnote inside an actively edited table cell", () => {
     });
 
     // L207 ConditionalExpression -> false and L209 BooleanLiteral: the
-    // refused-cell contract — a born-dead cell insertion must leave NO
+    // refused-cell contract - a born-dead cell insertion must leave NO
     // orphaned definition behind on the main editor.
     it("appends no definition when the cell insertion is refused", () => {
         const before = ["| a $b $c |", "| --- |", "| x |"];
@@ -395,7 +395,7 @@ describe("createMatchingFootnoteDefinition", () => {
     });
 
     // L336 ConditionalExpression, `list.length === 0` -> true: same blockquote
-    // definition trick as the autonum command — the note already has one, so
+    // definition trick as the autonum command - the note already has one, so
     // no blank separator is added.
     it("counts a blockquote definition when placing the matching definition", () => {
         const doc = fakeEditor(["> [^q]: d", "see [^tag] x"], { line: 1, ch: 7 });
@@ -479,7 +479,7 @@ describe("createFootnoteReference in a table cell", () => {
 
     // L389 LogicalOperator (`&&` -> `||`) and L389/L390 ConditionalExpression
     // -> true: a "[^]"-shaped fragment inside the cell's inline code is plain
-    // text (#41), so there is nothing to hop out of — the protected guard
+    // text (#41), so there is nothing to hop out of - the protected guard
     // owns the press instead.
     it("does not hop out of a code-spanned placeholder shape", () => {
         const { cell, dispatched } = fakeCell("a `[^]` b", 4);
@@ -499,7 +499,7 @@ describe("createFootnoteReference in a table cell", () => {
 
     // L399 ConditionalExpression -> false (and its BlockStatement sibling):
     // the protected guard runs BEFORE the prefix resolution, so a protected
-    // caret in a note with an invalid prefix gets the protected toast — never
+    // caret in a note with an invalid prefix gets the protected toast - never
     // the prefix one.
     it("blocks a protected cell caret before it ever reads the prefix", () => {
         const { cell, dispatched } = fakeCell("a `code` b", 5);
@@ -591,7 +591,7 @@ describe("createFootnoteReference in the main editor", () => {
     });
 
     // L417 ConditionalExpression -> true: with no placeholder under the caret
-    // the hop must NOT fire — the press creates a placeholder instead.
+    // the hop must NOT fire - the press creates a placeholder instead.
     it("creates a placeholder when there is nothing to hop out of", () => {
         const doc = fakeEditor(["Alpha"], { line: 0, ch: 5 });
         expect(
@@ -704,7 +704,7 @@ describe("the cell selection claim", () => {
 
     // L71 (`from <= to`, `while (true && …)`), L72 (`to >= from`,
     // `while (true && …)`) and L73 (`if (false)`, `return true`): a
-    // whitespace-only cell selection is no selection at all — the boundary
+    // whitespace-only cell selection is no selection at all - the boundary
     // mutants all walk an index past its partner and convert anyway.
     it("treats a whitespace-only cell selection as no claim", () => {
         //                                     012345
@@ -745,7 +745,7 @@ describe("the cell selection claim", () => {
     });
 
     // the caretInsideMaskedSpan edge pair (ConditionalExpression -> false,
-    // `||` -> `&&`): a cell selection CUTTING a math span refuses up front —
+    // `||` -> `&&`): a cell selection CUTTING a math span refuses up front -
     // the simulated result would survive precisely because the construct
     // got destroyed. Both edges must be checked: the from-cut and the
     // to-cut each catch a mutant the other leaves alive.
@@ -772,7 +772,7 @@ describe("the cell selection claim", () => {
     });
 
     // the containment flip (Jason's ruling 2026-08-19): a span selected
-    // WHOLE travels into the footnote — a mutant that refuses on any
+    // WHOLE travels into the footnote - a mutant that refuses on any
     // masked character in the span (the pre-2026-08-19 rule) dies here.
     it("converts a cell selection that swallows a whole math span", () => {
         //                                     0123456
@@ -807,7 +807,7 @@ describe("the main-editor selection claim", () => {
 
     // the main-editor edge-cut twins: strictly-inside edges refuse up front
     // (the simulated result would survive because the construct got
-    // destroyed), while a span selected WHOLE converts — killing both the
+    // destroyed), while a span selected WHOLE converts - killing both the
     // dropped-edge-check mutants and any regression to the pre-2026-08-19
     // any-masked-character rule.
     it("refuses a selection whose FROM edge cuts a math span", () => {
@@ -884,7 +884,7 @@ describe("the main-editor selection claim", () => {
 
     // the trimSelectionEdges line-walk mutants (the `fromCh >= length` hop
     // -> `>`, the `toCh === 0` hop -> `!== 0`, either while -> false): a
-    // drag ending at ch 0 two lines down sheds the whole blank tail —
+    // drag ending at ch 0 two lines down sheds the whole blank tail -
     // converting exactly the first line's core, not a body with trailing
     // blank paragraphs (and never a whitespace text that would throw the
     // conversion off).
@@ -937,7 +937,7 @@ describe("the main-editor selection claim", () => {
 describe("the inline selection conversion", () => {
     // L190 OptionalChaining (`?.open` -> `.open`) and ConditionalExpression
     // -> false: a wrapper planted directly after an escaping backslash is
-    // swallowed — the span scanner steps over the escaped caret, so there is
+    // swallowed - the span scanner steps over the escaped caret, so there is
     // no span at all to compare.
     it("refuses (without throwing) a wrapper an escape would swallow", () => {
         const before = ["x\\abc"];
@@ -1015,7 +1015,7 @@ describe("the auto-numbered selection conversion", () => {
 
 describe("the auto-numbered cell selection conversion", () => {
     // L286 ConditionalExpression, `if (prefix === null) return` -> false: the
-    // cell twin of the invalid-prefix block — and nothing is written to the
+    // cell twin of the invalid-prefix block - and nothing is written to the
     // cell either.
     it("blocks the conversion on an invalid prefix", () => {
         const before = ["---", "footnote-prefix: 10", "---", "| plain word |"];
@@ -1148,7 +1148,7 @@ describe("planFootnoteRename's refusals", () => {
     });
 
     // L101 (ArrowFunction, ConditionalExpression -> false, `toUpperCase`) and
-    // L101 LogicalOperator (`||` -> `&&`): a DEFINITION-only collision — no
+    // L101 LogicalOperator (`||` -> `&&`): a DEFINITION-only collision - no
     // reference anywhere carries the new name, so only the block scan can see it.
     it("refuses a name taken by a definition with no reference", () => {
         expect(
@@ -1163,7 +1163,7 @@ describe("planFootnoteRename's refusals", () => {
     // L102 MethodExpression (`some` -> `every`), L103 ArrowFunction, L104
     // ConditionalExpression -> false, L106 ArrowFunction, L107
     // (ConditionalExpression -> false, `toUpperCase`): a REFERENCE-only
-    // collision — no definition carries the new name, so only the line scan
+    // collision - no definition carries the new name, so only the line scan
     // can see it.
     it("refuses a name taken by a reference with no definition", () => {
         expect(
@@ -1197,7 +1197,7 @@ describe("planFootnoteRename's change set", () => {
     // (`occurrence.start - shift`), L174 (ConditionalExpression -> true /
     // false, AssignmentOperator `shift -=`): the survival check's shift model
     // needs a LENGTH-CHANGING rename with a non-target occurrence sandwiched
-    // between two target ones — that is the only shape where every one of
+    // between two target ones - that is the only shape where every one of
     // those mutants predicts a different expected position.
     it("survives a lengthening rename with occurrences on both sides of another", () => {
         const lines = ["a[^x] b[^y] c[^x]", "", "[^x]: d", "[^y]: e"];
@@ -1214,7 +1214,7 @@ describe("planFootnoteRename's change set", () => {
 
     // L164 BlockStatement -> {} (the whole reference-survival loop emptied):
     // renaming to a comment opener kills the REFERENCE two lines down while
-    // the definition blocks still line up perfectly — only the reference loop
+    // the definition blocks still line up perfectly - only the reference loop
     // can catch this one.
     it("refuses whole when only the references die", () => {
         expect(
@@ -1229,7 +1229,7 @@ describe("planFootnoteRename's change set", () => {
     // L196 ConditionalExpression, `blocksAfter.length !== blocksBefore.length`
     // -> false, and its BooleanLiteral sibling: two ORPHAN definitions (no
     // references at all, so the reference loop never runs) where the new name
-    // opens a comment that swallows the second block — the block-count check
+    // opens a comment that swallows the second block - the block-count check
     // is the only thing that can catch this.
     it("refuses whole when a definition block disappears, with no references in play", () => {
         expect(
@@ -1240,7 +1240,7 @@ describe("planFootnoteRename's change set", () => {
     // L197 ConditionalExpression / BlockStatement, L199 ConditionalExpression
     // (`blocksBefore[i].name === oldFolded` -> true), L203 (ConditionalExpression
     // -> false, LogicalOperator `||` -> `&&`): the block comparison must map
-    // ONLY the target's name — a bystander definition keeps its own.
+    // ONLY the target's name - a bystander definition keeps its own.
     it("keeps a bystander definition's name in the survival check", () => {
         const lines = ["a[^x] b[^y]", "", "[^x]: d", "[^y]: e"];
         const plan = planFootnoteRename(renameDoc(lines), "x", "w");
@@ -1249,6 +1249,6 @@ describe("planFootnoteRename's change set", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Popup-only and equivalent mutants deliberately not targeted above — see the
+// Popup-only and equivalent mutants deliberately not targeted above - see the
 // report accompanying this file for the full list with diffs.
 // ---------------------------------------------------------------------------

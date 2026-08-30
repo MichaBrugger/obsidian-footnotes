@@ -5,13 +5,13 @@ import { removeOrphanedFootnoteReferences } from "../../src/linting/rules/remove
 
 // BUG, data loss (hunt 2026-08-25, contexts lens; skeptic-confirmed with
 // micromark ground truth): a fenced code block inside a footnote
-// definition's 4-space-indented continuation is NOT protected — the
+// definition's 4-space-indented continuation is NOT protected - the
 // fence-opener regex caps leading spaces at 0-3 ABSOLUTE, and unlike
 // list items (which get a content-indent stack) definitions have no
 // relative-indent concept. GFM parses the region as a code block (no
 // footnoteCall inside), yet the scanner leaves it live, so the
 // delete-orphaned-references rule EATS a "[^9]"-shaped string out of
-// code — exactly the user text docs/adr/0002-never-silent-lint.md
+// code - exactly the user text docs/adr/0002-never-silent-lint.md
 // promises never to lose. The comment/math openers are
 // indentation-INSENSITIVE in the same position (deliberately, Sol bug
 // #3), which is the same root gap observed at classification level:

@@ -7,10 +7,10 @@ import { fakePlugin as sharedFakePlugin } from "./helpers/fake-plugin";
 
 // The optional heading inserted above the first footnote definition. A blank
 // line ALWAYS separates the heading from the content above it (markdown
-// block convention, requested 2026-07-20) — which also keeps a heading
+// block convention, requested 2026-07-20) - which also keeps a heading
 // starting with a divider (---/***/___) from turning the last text line
 // into a setext heading. The live insertion is covered by the smoke suite.
-// Asserted through buildDefinitionAppend, the one production consumer —
+// Asserted through buildDefinitionAppend, the one production consumer -
 // the helper itself went unexported (2026-08-11 review cleanliness).
 
 function fakePlugin(enabled: boolean, heading: string) {

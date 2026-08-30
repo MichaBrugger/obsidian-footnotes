@@ -11,12 +11,12 @@ import {
 // the LOWER-index change is a replace (to > from) while a HIGHER-index
 // change there is a zero-length insert, simulateChanges resolves the
 // replace's stale `to` against the already-mutated string and slices
-// into the just-inserted text — one character of the insert is dropped
+// into the just-inserted text - one character of the insert is dropped
 // and one character of the replaced range survives. CM6 ground truth
 // (verified empirically, both array orders): NO text is ever lost, and
 // the zero-length insert's text lands BEFORE the replacement text.
 // Blast radius: real doc.transaction goes to real CM6 (shipped
-// documents are NOT corrupted — the hunt's command-level "corruption"
+// documents are NOT corrupted - the hunt's command-level "corruption"
 // repro was a fake-editor artifact, since the shared fake deliberately
 // applies edits through this very function), but the born-dead verdict
 // and the cursor/afterReference landings ARE computed from the corrupt
@@ -45,7 +45,7 @@ describe("same-from tie between a replace and a zero-length insert", () => {
 });
 
 describe("same-from tie between two zero-length inserts", () => {
-    // array order is the CM6 contract for stacked inserts — pins the
+    // array order is the CM6 contract for stacked inserts - pins the
     // resolveChanges index tiebreak (2026-08-25 mutation audit: the
     // a.index - b.index term had no direct pin)
     it("concatenates in array order", () => {

@@ -19,7 +19,7 @@ import { DefinitionCreationNotice } from "../src/commands/press-guards";
 
 // Jason's ruling (2026-08-13, from manual testing): Obsidian technically
 // renders footnotes nested inside footnote definitions, but that's wildly
-// nonstandard markdown and the plugin must not CREATE it — the inline key
+// nonstandard markdown and the plugin must not CREATE it - the inline key
 // used to happily plant "^[]" into a definition body. Every creation path
 // now refuses anywhere inside a definition block (body after the label,
 // continuation lines); label-line navigation and the definition-creation
@@ -72,7 +72,7 @@ const noticed = () =>
 
 describe("the inline pair NAVIGATES from inside a definition (ruling refined 2026-08-13)", () => {
     // first ruling: refuse with a toast. Refined the same day: jump back
-    // to the reference EXACTLY like the numbered/named keys — same
+    // to the reference EXACTLY like the numbered/named keys - same
     // shouldJumpFromDefinitionToReference step, wired at the entries
     it("inline key in the definition body jumps to the reference", async () => {
         const doc = fakeEditor(LINES, { line: 2, ch: 15 });
@@ -111,14 +111,14 @@ describe("the inline pair NAVIGATES from inside a definition (ruling refined 202
         const fenced = ["```", "[^x]: t", "```", "prose"];
         const doc = fakeEditor(fenced, { line: 1, ch: 3 });
         await insertInlineFootnote(fakePlugin(doc));
-        // no jump AND no insert — the protected-caret guard owns it
+        // no jump AND no insert - the protected-caret guard owns it
         expect(doc.lines).toEqual(fenced);
         expect(doc.cursor).toEqual({ line: 1, ch: 3 });
     });
 
     it("a name only masking could see is no definition at all", async () => {
         // raw "[^a`[`b]: c" has "[" in the name, so no label; the masked
-        // twin would parse as one — the press falls through and inserts
+        // twin would parse as one - the press falls through and inserts
         const doc = fakeEditor(["[^a`[`b]: c"], { line: 0, ch: 10 });
         await insertInlineFootnote(fakePlugin(doc));
         expect(doc.lines[0]).toContain("^[]");
@@ -126,7 +126,7 @@ describe("the inline pair NAVIGATES from inside a definition (ruling refined 202
 
     it("autonum key on a continuation line NAVIGATES instead of creating", async () => {
         // the numbered/named cascade's jump step claims definition-block
-        // presses (multiline-definition-jump) before creation could nest —
+        // presses (multiline-definition-jump) before creation could nest -
         // the new guard is their backstop, and the working refusal for the
         // inline pair below
         const doc = fakeEditor(LINES, { line: 3, ch: 10 });

@@ -5,7 +5,7 @@ import { DEFAULT_SETTINGS, FootnotePluginSettingTab } from "../src/settings";
 
 // Item 9 of the QOL audit (Jason's hand-test, 2026-08-08): this plugin's
 // lint-on-save and the Linter plugin coexist fine UNLESS Linter's own
-// footnote rules are enabled too — then both rewrite the same footnotes.
+// footnote rules are enabled too - then both rewrite the same footnotes.
 // The Linting settings page therefore leads with a warning row telling
 // Linter users to turn those rules off, visible only while the Linter
 // plugin is actually enabled.

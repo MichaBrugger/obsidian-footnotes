@@ -8,7 +8,7 @@ import {
     createMatchingFootnoteDefinition,
 } from "../src/commands/create-footnote";
 import { warnPrefilledReferenceIfInside } from "../src/commands/press-guards";
-// the stub Notice records into noticeCalls — vi.mock("obsidian") does not
+// the stub Notice records into noticeCalls - vi.mock("obsidian") does not
 // survive `isolate: false` (see the note in test/mocks/obsidian.ts)
 import { noticeCalls } from "./mocks/obsidian";
 import {
@@ -19,7 +19,7 @@ import { fakePlugin as sharedFakePlugin } from "./helpers/fake-plugin";
 
 // Prefix-at-bracket-creation (requested 2026-07-20, replacing the
 // definition-time rename): with an active footnote-prefix the named command
-// creates "[^7-]" with the caret right after the prefix — the user SEES
+// creates "[^7-]" with the caret right after the prefix - the user SEES
 // the namespace while typing the name. A press inside the untouched
 // placeholder keeps the caret where it is and asks for a suffix instead
 // (2026-08-05; it used to hop out, which was harder to understand).
@@ -147,7 +147,7 @@ describe("warnPrefilledReferenceIfInside (the [^7-] placeholder toast)", () => {
         expect(warnPrefilledReferenceIfInside(fakePlugin(true), doc, null)).toBe(
             true,
         );
-        // the caret does NOT move — the toast is the whole response
+        // the caret does NOT move - the toast is the whole response
         expect(doc.cursor).toEqual({ line: 3, ch: 9 });
         expect(doc.appliedChanges).toEqual([]);
         expect(noticeCalls).toContainEqual([

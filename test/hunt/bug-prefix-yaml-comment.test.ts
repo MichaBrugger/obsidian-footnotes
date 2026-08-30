@@ -9,18 +9,18 @@ import { lintBlockedByPrefix } from "../../src/linting/linter";
 // actually have (js-yaml-verified divergence from Obsidian's real YAML parse).
 // Hunt: 2026-08-09. Lens: grammar.
 // Root cause: footnotePrefix's hand-rolled frontmatter reader grabs the whole
-// rest of the line instead of parsing YAML — comments (and the colon-space
+// rest of the line instead of parsing YAML - comments (and the colon-space
 // rule) are not honored.
 
 describe("fixed 2026-08-10: footnote-prefix frontmatter reader keeps YAML comments", () => {
     it("a trailing YAML comment is not part of the prefix value", () => {
-        // YAML: value is "2." — "# later chapters" is a comment
+        // YAML: value is "2." - "# later chapters" is a comment
         const md = "---\nfootnote-prefix: 2. # later chapters\n---\nbody";
         expect(footnotePrefix(md)).toBe("2.");
     });
 
     it("a comment-only value is an empty value, not a prefix of '#…'", () => {
-        // YAML: null value (only a comment) — Obsidian shows no prefix
+        // YAML: null value (only a comment) - Obsidian shows no prefix
         const md = "---\nfootnote-prefix: #chapter\n---\nbody";
         expect(footnotePrefix(md)).toBe("");
     });

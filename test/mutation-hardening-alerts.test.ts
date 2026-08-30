@@ -10,7 +10,7 @@ import {
 } from "../src/linting/lint-alerts";
 
 // Mutation hardening for the post-lint alert tail (Stryker re-baseline
-// 2026-08-12: lint-alerts scored 19.79% — the merge-duplicates work pinned
+// 2026-08-12: lint-alerts scored 19.79% - the merge-duplicates work pinned
 // the NAME lists but nobody asserted the notices themselves, so every
 // gating condition and message literal survived). These pin the exact
 // texts and the exact conditions each alert fires under.
@@ -53,7 +53,7 @@ describe("countEmptyFootnoteReferences", () => {
     });
 
     it("has no secret default needle", () => {
-        // the prefix default is "" — a mutated default would count this
+        // the prefix default is "" - a mutated default would count this
         expect(countEmptyFootnoteReferences("a [^Stryker was here!] b")).toBe(0);
     });
 });

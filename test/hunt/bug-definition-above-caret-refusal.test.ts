@@ -15,7 +15,7 @@ import { ProtectedCreationNotice } from "../../src/editor/insertion-liveness";
 // BUG (found by the entry corpus, 2026-08-12): when the note's last
 // definition block sits ABOVE the caret (definitions under a mid-document
 // heading, prose after them), the new definition is inserted above the
-// caret line — shifting every later line down. The simulate-verify then
+// caret line - shifting every later line down. The simulate-verify then
 // read the reference's ORIGINAL line index off the SIMULATED document,
 // found no reference there, and refused a perfectly legitimate creation
 // with the protected-text toast. Selection conversion (issue #35)

@@ -57,7 +57,7 @@ describe("computeNextFootnoteNumber", () => {
 });
 
 // the prefixed namespace: ids are case-insensitive in Obsidian, so casing
-// must not split a namespace — and prefixes come in all separator shapes,
+// must not split a namespace - and prefixes come in all separator shapes,
 // including regex-special ones
 describe("computeNextFootnoteNumber with a prefix", () => {
     it("counts only references carrying the prefix", () => {

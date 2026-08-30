@@ -7,7 +7,7 @@ import { reindexFootnotes } from "../../src/linting/rules/re-index-footnotes";
 // Hunt: 2026-08-09. Lens: contexts.
 // restoreEol rewrites lone LF lines to CRLF when the note contained ANY CRLF,
 // so a no-op reindex/lint on a mixed-EOL note reports "Footnotes linted." and
-// rewrites the file — a one-time normalization. The documented contract only
+// rewrites the file - a one-time normalization. The documented contract only
 // promises CRLF isn't flipped to LF; the LF→CRLF direction is undocumented.
 
 describe("decided 2026-08-10: a no-op transform is byte-identical on mixed EOL", () => {

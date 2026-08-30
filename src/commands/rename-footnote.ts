@@ -22,8 +22,8 @@ import { withEditableEditor } from "./insert-or-navigate-footnotes";
 // Renaming a footnote (issue #36, Jason's calls 2026-08-12): with the
 // caret on a "[^name]" reference or a definition label, the Rename
 // footnote command opens a modal prefilled with the current name and
-// rewrites every masked-LIVE occurrence — references and definition
-// labels, case-insensitively (Obsidian folds ids) — in one transaction.
+// rewrites every masked-LIVE occurrence - references and definition
+// labels, case-insensitively (Obsidian folds ids) - in one transaction.
 // Copies inside code/math/comments are plain text and stay untouched. A
 // name already in use refuses (merging two footnotes is the
 // merge-duplicate-definitions lint's job, not a rename side effect), and
@@ -35,9 +35,9 @@ export const RenameTargetNotice =
     "Place the cursor on a footnote reference or definition to rename it.";
 
 /**
- * The footnote name under the caret — a live reference's name (definition
+ * The footnote name under the caret - a live reference's name (definition
  * BODIES count: a reference inside one is renameable), or the name of the
- * definition label the caret sits inside — or null. Same raw-gate-then-
+ * definition label the caret sits inside - or null. Same raw-gate-then-
  * masked-confirm shape as the navigation guards.
  */
 export function renameTargetAtCursor(
@@ -52,7 +52,7 @@ export function renameTargetAtCursor(
         cursorPosition.ch,
     );
     if (occurrence !== null) return occurrence.name;
-    // a definition label at column 0 — the caret anywhere before the end
+    // a definition label at column 0 - the caret anywhere before the end
     // of its ":" targets the definition's name
     const label = definitionLabelIn(lineText);
     if (!label || cursorPosition.ch >= label.labelEnd) return null;
@@ -70,7 +70,7 @@ export type RenamePlan =
 
 /**
  * The rename decision for `oldName` → `newName`: the changes to apply, or
- * why not. Pure planning — nothing is dispatched here.
+ * why not. Pure planning - nothing is dispatched here.
  */
 export function planFootnoteRename(
     doc: Editor,
@@ -81,7 +81,7 @@ export function planFootnoteRename(
         /**
          * The note's footnote-prefix when the Apply-footnote-prefix
          * sweep is ARMED (prefix feature on + that lint rule on + a
-         * valid prefix) — an out-of-namespace new name then refuses
+         * valid prefix) - an out-of-namespace new name then refuses
          * with the prefix to type instead of being silently renamed
          * back by the very next lint (hunt 2026-08-25,
          * bug-rename-swept-back-by-apply-prefix). Callers with the
@@ -119,7 +119,7 @@ export function planFootnoteRename(
     const blocks = findDefinitionBlocks(ctx.lines, ctx.scan.isProtected, ctx.scan);
 
     // collision: the new name already names ANOTHER footnote (any casing).
-    // A case-only rename of the SAME footnote is fine — that's cosmetics.
+    // A case-only rename of the SAME footnote is fine - that's cosmetics.
     if (newFolded !== oldFolded) {
         const taken =
             blocks.some((block) => block.name.toLowerCase() === newFolded) ||
@@ -175,7 +175,7 @@ export function planFootnoteRename(
 // occurrence list (positions shift-adjusted for the length change) must
 // match, and the definition blocks must keep their start lines and mapped
 // names. Anything else means the new name reclassified text around an
-// occurrence — refuse the whole rename rather than corrupt one copy.
+// occurrence - refuse the whole rename rather than corrupt one copy.
 function renameSurvives(
     ctx: DocContext,
     changes: EditorChange[],
@@ -236,7 +236,7 @@ function renameSurvives(
 /**
  * Add "Rename footnote" to the editor's right-click (and mobile
  * long-press) menu when the click landed on a reference or a definition
- * label — the same pattern as Obsidian's own "Rename this heading" on
+ * label - the same pattern as Obsidian's own "Rename this heading" on
  * heading lines (Jason's ask, 2026-08-13). Obsidian moves the caret to
  * the click point before firing editor-menu, so the caret resolution is
  * the command's own.
@@ -280,9 +280,9 @@ export async function renameFootnote(plugin: FootnotePlugin) {
 
 // One text input prefilled with the current name; Enter (or the Rename
 // button) applies. Invalid names, collisions, and names the simulation
-// refuses show their reason inline and keep the modal open — same shape
+// refuses show their reason inline and keep the modal open - same shape
 // as the Set-footnote-prefix modal.
-// Stryker disable all: modal DOM against the live app — smoke-test
+// Stryker disable all: modal DOM against the live app - smoke-test
 // territory, unreachable from units (the whole prefix modal's FILE is
 // excluded for the same reason; this one shares a file with the pure
 // planners, so the exemption is scoped here). Coverage-verified by the
@@ -305,7 +305,7 @@ class RenameFootnoteModal extends ValidatedTextModal {
         this.oldName = oldName;
     }
 
-    /** The note's prefix when the Apply-footnote-prefix sweep is armed and would re-prefix a bare rename on the very next lint — read at submit time, like the plan itself (the frontmatter may have changed while the modal was open). Invalid prefixes don't arm: lint refuses to run under one (lintBlockedByPrefix). */
+    /** The note's prefix when the Apply-footnote-prefix sweep is armed and would re-prefix a bare rename on the very next lint - read at submit time, like the plan itself (the frontmatter may have changed while the modal was open). Invalid prefixes don't arm: lint refuses to run under one (lintBlockedByPrefix). */
     private armedSweepPrefix(): string | undefined {
         if (
             !this.plugin.settings.enableFootnotePrefix ||
@@ -320,7 +320,7 @@ class RenameFootnoteModal extends ValidatedTextModal {
 
     protected submit() {
         const newName = this.value.trim();
-        // planned against the CURRENT document — the note may have changed
+        // planned against the CURRENT document - the note may have changed
         // while the modal was open
         const plan = planFootnoteRename(this.doc, this.oldName, newName, undefined, {
             sweepPrefix: this.armedSweepPrefix(),

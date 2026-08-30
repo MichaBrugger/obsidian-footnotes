@@ -13,7 +13,7 @@ function addFootnoteSectionHeader(plugin: FootnotePlugin): string {
     //if so, return the "Footnote Section Heading"
     // else, return ""
 
-    // a cleared-out heading value counts as no heading — the lint path
+    // a cleared-out heading value counts as no heading - the lint path
     // already treats "" that way, and "\n\n" + "" would otherwise strand
     // stray blank lines above the first footnote
     if (
@@ -22,7 +22,7 @@ function addFootnoteSectionHeader(plugin: FootnotePlugin): string {
     ) {
         // the setting holds literal markdown (legacy plain-text values are
         // migrated on load); a blank line ALWAYS separates the heading from
-        // the content above it — markdown block convention (requested
+        // the content above it - markdown block convention (requested
         // 2026-07-20), and it keeps a heading starting with a divider from
         // turning the line above into a setext heading
         return `\n\n${plugin.settings.footnoteSectionHeading}`;
@@ -32,9 +32,9 @@ function addFootnoteSectionHeader(plugin: FootnotePlugin): string {
 
 // Build (don't apply) the edit that appends `[^id]: ` to the note's
 // footnote definitions: right after the last existing definition block
-// when there is one (issue #55 — the definitions may live under a
+// when there is one (issue #55 - the definitions may live under a
 // mid-document heading with more content below), otherwise after the last
-// non-blank line — trimming trailing blank lines if enabled, and adding a
+// non-blank line - trimming trailing blank lines if enabled, and adding a
 // blank separator plus the optional section heading before the first
 // footnote. Returned as data so the caller can bundle it with the reference
 // insertion into a single transaction (see moveCursorAndSetJumpPoint).
@@ -49,7 +49,7 @@ export function buildDefinitionAppend(
     const isProtected = ctx.scan.isProtected;
     const blocks = findDefinitionBlocks(lines, isProtected, ctx.scan);
     // a non-blank line directly below the new definition would be pulled INTO
-    // it — Obsidian lazily continues a definition into the next line — so
+    // it - Obsidian lazily continues a definition into the next line - so
     // insertions with content below them add a trailing blank separator
     // (A4 bug, 2026-07-20). The cursor still lands on the definition line.
     const needsSeparator = (insertLine: number) =>
@@ -68,7 +68,7 @@ export function buildDefinitionAppend(
         };
     }
 
-    // no definitions yet — but an existing section heading in the note
+    // no definitions yet - but an existing section heading in the note
     // claims the first footnote (QOL follow-up to issue #55): slot the
     // definition under it instead of appending a second heading at the end.
     // The setting is markdown that can span multiple lines, so match runs.
@@ -77,7 +77,7 @@ export function buildDefinitionAppend(
         plugin.settings.footnoteSectionHeading
     ) {
         // findLineRunEnd is the ONE anchor matcher shared with the
-        // move-to-bottom rule — the fixed-point guarantee needs both to
+        // move-to-bottom rule - the fixed-point guarantee needs both to
         // agree on what counts as the existing heading
         const anchorEnd = findLineRunEnd(
             lines,
@@ -114,10 +114,10 @@ export function buildDefinitionAppend(
     if (ctx.scan.endsProtected) {
         // the note ends inside an UNCLOSED fence/comment/math (2026-08-11
         // review bug #10): a definition appended at EOF would be born as
-        // inert code — and the next lint would then delete its live
+        // inert code - and the next lint would then delete its live
         // reference as an orphan. Land it above the unclosed region: walk
         // up to the last prefix a definition can live after, then past
-        // blank lines. Trailing-blank trimming must not fire here — its
+        // blank lines. Trailing-blank trimming must not fire here - its
         // `to` spans to EOF and would delete the region itself.
         while (
             fromLine >= 0 &&
@@ -127,7 +127,7 @@ export function buildDefinitionAppend(
         }
         while (fromLine >= 0 && lines[fromLine].trim() === "") fromLine--;
         if (fromLine < 0) {
-            // the unclosed region starts at line 0 — plant the definition
+            // the unclosed region starts at line 0 - plant the definition
             // on top, blank-separated from whatever follows
             const topText =
                 `[^${footnoteId}]: \n` + (lines[0].trim() === "" ? "" : "\n");
@@ -164,7 +164,7 @@ export function buildDefinitionAppend(
 
     // with the insertion sitting mid-document (above an unclosed region),
     // a non-blank line directly below it would be pulled INTO the new
-    // definition — same A4 hazard as the other insertion points
+    // definition - same A4 hazard as the other insertion points
     if (ctx.scan.endsProtected && needsSeparator(fromLine)) text += "\n";
 
     // The first footnote's section heading can carry a column-0 "---"
@@ -172,7 +172,7 @@ export function buildDefinitionAppend(
     // thematic break), inserting that divider makes Obsidian re-read the
     // whole head as YAML frontmatter, swallowing the prose in it (same
     // hazard as preserveLeadingThematicBreak in
-    // move-footnotes-to-the-bottom — verified against metadataCache,
+    // move-footnotes-to-the-bottom - verified against metadataCache,
     // 2026-08-10). A blank line prepended in the same transaction pins
     // line 0 as content; it renders identically.
     let prepend: EditorChange | undefined;
@@ -188,11 +188,11 @@ export function buildDefinitionAppend(
 
 /**
  * `buildDefinitionAppend`'s edit with `body` seeded after the definition
- * label — the selection-to-footnote conversion (issue #35) creates its
+ * label - the selection-to-footnote conversion (issue #35) creates its
  * definition pre-filled with the selected text. The label is the LAST
  * occurrence in the change text (an optional section heading could carry a
- * label-shaped line above it), and the returned cursor — already at the
- * label's end — slides to the end of the body, before any trailing
+ * label-shaped line above it), and the returned cursor - already at the
+ * label's end - slides to the end of the body, before any trailing
  * separator newline. A multi-line body (a multi-paragraph selection,
  * 2026-08-19, already carrying its continuation indent) lands the cursor
  * at the end of its LAST line.

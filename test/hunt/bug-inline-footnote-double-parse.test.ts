@@ -6,7 +6,7 @@ import { reindexFootnotes } from "../../src/linting/rules/re-index-footnotes";
 
 // Scenario: "inline ^[^literal]" is ONE inline footnote with content
 // "^literal" per the repo's own inlineFootnoteSpanAt, but
-// footnoteReferenceMatches matches the inner [^literal] as a regular reference —
+// footnoteReferenceMatches matches the inner [^literal] as a regular reference -
 // reindex and applyFootnotePrefix rewrite inline-footnote content.
 // Hunt: 2026-08-09. Lens: grammar.
 // Root cause: the regular-reference regex double-parses the interior of an

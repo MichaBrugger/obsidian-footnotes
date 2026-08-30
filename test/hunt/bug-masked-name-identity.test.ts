@@ -13,7 +13,7 @@ import { fakePlugin as sharedFakePlugin } from "../helpers/fake-plugin";
 
 // Scenario: a footnote whose name contains an inline-code span ("[^x`c`y]")
 // gets a NUL-masked identity on reference-scanning paths but its raw identity on
-// definition-listing paths — reference→definition jumps fail, created definition lines
+// definition-listing paths - reference→definition jumps fail, created definition lines
 // are stuffed with literal NUL bytes, and reindex severs the pair or deletes
 // a still-referenced definition.
 // Hunt: 2026-08-09. Lens: offsets.
@@ -60,7 +60,7 @@ describe("press-jump (reference → definition) with a code-span-named footnote 
 describe("press-create with a code-span-named footnote (fixed 2026-08-10)", () => {
     it("refuses to create a definition for a backticked name (disallowed, Jason 2026-08-10)", () => {
         // backticked names don't render in Obsidian, so instead of creating
-        // a definition (with or without NUL bytes) the press warns and stops —
+        // a definition (with or without NUL bytes) the press warns and stops -
         // the same treatment as spaced names
         const MARKER_LINE = "ref [^x`c`y] end";
         const doc = fakeEditor([MARKER_LINE, ""], { line: 0, ch: 8 });

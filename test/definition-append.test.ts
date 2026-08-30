@@ -9,7 +9,7 @@ import { buildDefinitionAppend } from "../src/commands/definition-append";
 
 // Where a new footnote definition lands. Issue #55: when definitions already
 // exist, the new definition belongs right after the LAST existing definition
-// block — not at the end of the file, where it strands the footnotes away
+// block - not at the end of the file, where it strands the footnotes away
 // from the section (e.g. "#### Citations") the user keeps them under.
 // Only the very first footnote starts a new section at the end of the note.
 
@@ -30,7 +30,7 @@ describe("buildDefinitionAppend", () => {
         const { change, cursor } = buildDefinitionAppend(doc, "1", true, fakePlugin());
         expect(change).toEqual({
             from: { line: 0, ch: 5 },
-            // with trimming enabled, `to` always spans to the note's end —
+            // with trimming enabled, `to` always spans to the note's end -
             // a no-op range here since there is nothing to trim
             to: { line: 0, ch: 5 },
             text: "\n\n[^1]: ",
@@ -133,7 +133,7 @@ describe("buildDefinitionAppend", () => {
 });
 
 // Bug (A4, reported 2026-07-20): a definition inserted directly above prose gets
-// that prose pulled INTO the footnote — Obsidian lazily continues a
+// that prose pulled INTO the footnote - Obsidian lazily continues a
 // definition into the next non-blank line. Every insertion point that can
 // have content below it must keep a blank line between the definition and it.
 describe("blank line between the new definition and following content", () => {
@@ -201,7 +201,7 @@ describe("blank line between the new definition and following content", () => {
 
 // Bug #10 (2026-08-11 review, Opus): with the note ending inside an
 // UNCLOSED fence / comment / math block, the EOF append minted the new
-// definition INSIDE that region — born as inert code, and the next lint
+// definition INSIDE that region - born as inert code, and the next lint
 // then deleted its live reference as an orphan (the same endsProtected
 // hazard move-footnotes-to-the-bottom refuses). The definition must land
 // above the unclosed region instead, and the trailing-blank trimming must

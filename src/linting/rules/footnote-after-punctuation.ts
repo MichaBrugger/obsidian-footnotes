@@ -23,7 +23,7 @@ const PunctuationClass = TrailingPunctuationChars.replace(
 const SinglePunctuation = new RegExp(`[${PunctuationClass}]`);
 
 // Swap every reference-run/punctuation-run pair in one segment of a line.
-// References come from referenceOccurrences — the grammar's exclusions
+// References come from referenceOccurrences - the grammar's exclusions
 // (escaped "\[^1]" is literal prose, "^[…]" brackets belong to their
 // inline footnote) apply here too: a hand-rolled regex used to swap those,
 // turning text the user typed on purpose into a live reference
@@ -36,7 +36,7 @@ function swapInSegment(original: string, masked: string): string {
     let copied = 0;
     let k = 0;
     while (k < occurrences.length) {
-        // a run of back-to-back references swaps as one unit — an excluded
+        // a run of back-to-back references swaps as one unit - an excluded
         // shape between two references breaks the run
         let last = k;
         while (
@@ -58,7 +58,7 @@ function swapInSegment(original: string, masked: string): string {
             punctuationEnd++;
         }
         if (punctuationEnd === end) continue;
-        // a reference run already sitting AFTER punctuation is settled — the
+        // a reference run already sitting AFTER punctuation is settled - the
         // punctuation following it belongs to the next clause, and swapping
         // again would drift it away from its text (idempotence)
         if (start > 0 && SinglePunctuation.test(masked[start - 1])) continue;
@@ -90,7 +90,7 @@ export function footnoteAfterPunctuation(markdown: string): string {
         if (scan.isProtected[i]) return line;
         const masked = maskedLines[i];
         // a definition's own "[^x]:" prefix must not be treated as a
-        // reference-before-colon — skip past it. Blockquoted/callout labels
+        // reference-before-colon - skip past it. Blockquoted/callout labels
         // ("> [^1]: def.") are definitions too (C22): the swap used to
         // mangle them into "> :[^1] def."
         const prefixLength = definitionLabelIn(line)?.labelEnd ?? 0;
@@ -134,7 +134,7 @@ export const footnoteAfterPunctuationRule: FootnoteRule = {
         },
         {
             description:
-                "An escaped literal \\[^1] is prose, not a reference — never moved",
+                "An escaped literal \\[^1] is prose, not a reference - never moved",
             before: "prose \\[^1]. tail",
             after: "prose \\[^1]. tail",
         },

@@ -20,7 +20,7 @@ import {
 const NUL = (n: number) => "\0".repeat(n);
 
 describe("normalizeEol / restoreEol", () => {
-    // line 51: the LF branch's eol tag must be exactly "\n" — a mutant that
+    // line 51: the LF branch's eol tag must be exactly "\n" - a mutant that
     // blanks it would make restoreEol a no-op forever, silently keeping
     // stray CRLF fragments that should have round-tripped.
     it("tags an LF-only document with eol \"\\n\", not empty", () => {
@@ -42,13 +42,13 @@ describe("normalizeEol / restoreEol", () => {
 
 describe("blockquoteDepth (via scanDocument's container-depth reach)", () => {
     // lines 75-77: the marker scan may skip 0-3 leading spaces before a
-    // ">" — a 4th space is one too many and the ">" stays literal text
+    // ">" - a 4th space is one too many and the ">" stays literal text
     // instead of opening a nested quote. Proven through a fence: a nested
     // quote's fence at depth 2 must protect its body; text that fails to
     // nest never opens that fence.
     it("three leading spaces still let a nested quote marker open a fence", () => {
         // "> " (marker+optional space) then exactly 3 more spaces then the
-        // nested ">" — the legal CommonMark maximum
+        // nested ">" - the legal CommonMark maximum
         const doc = [">    > ```", "> > body", "> > ```", "after"].join("\n");
         expect(protectedLines(doc.split("\n"))).toEqual([
             true,
@@ -61,7 +61,7 @@ describe("blockquoteDepth (via scanDocument's container-depth reach)", () => {
     it("a fourth leading space keeps the nested \">\" as literal text, not a marker", () => {
         const doc = [">     > ```", "after"].join("\n");
         // depth stays 1; rest is "    > ```" (leading spaces + literal ">"),
-        // which never opens a fence — since bug-blockquote-indented-code
+        // which never opens a fence - since bug-blockquote-indented-code
         // (2026-08-11, ground-truth probe P10) it is quote-relative
         // INDENTED CODE instead, so the line is protected as code and the
         // next line is live (a fence would have swallowed it)
@@ -69,7 +69,7 @@ describe("blockquoteDepth (via scanDocument's container-depth reach)", () => {
     });
 
     // line 81: the ONE optional space after a ">" marker belongs to the
-    // marker and must not appear in `rest` — proven via fence-opener
+    // marker and must not appear in `rest` - proven via fence-opener
     // detection, which is sensitive to leading whitespace inside `rest`.
     it("a marker with no trailing space consumes nothing extra past the \">\"", () => {
         // no space between ">" and the fence delimiter: correct code takes
@@ -82,7 +82,7 @@ describe("blockquoteDepth (via scanDocument's container-depth reach)", () => {
     it("a marker's single trailing space is swallowed by the marker, not left in rest", () => {
         const doc = ["> ```", "> content", ">     ```", "> next"].join("\n");
         // closer is indented 4 columns past the marker's own content
-        // column (contentIndent 0 + 3 max == 3) — it must NOT close, so
+        // column (contentIndent 0 + 3 max == 3) - it must NOT close, so
         // everything through "> next" stays inside the open fence
         expect(protectedLines(doc.split("\n"))).toEqual([
             true,
@@ -94,7 +94,7 @@ describe("blockquoteDepth (via scanDocument's container-depth reach)", () => {
 });
 
 describe("definitionLabelIn", () => {
-    // line 106: nameEnd is prefix + 2 + the captured name's length — a
+    // line 106: nameEnd is prefix + 2 + the captured name's length - a
     // mutant that subtracts the label length instead of adding it would
     // make nameEnd walk backward for any name longer than 2 chars.
     it("nameEnd advances past a multi-character name, not backward", () => {
@@ -119,7 +119,7 @@ describe("definitionLabelIn", () => {
 
 describe("isFenceOpener", () => {
     // line 118: a backtick fence's info string may not itself contain a
-    // backtick (CommonMark) — such a line is an inline code span in a
+    // backtick (CommonMark) - such a line is an inline code span in a
     // paragraph, not a fence opener, so it must NOT protect the lines
     // after it. A tilde fence has no such restriction.
     it("a backtick fence whose info string contains a backtick never opens", () => {
@@ -138,7 +138,7 @@ describe("isFenceOpener", () => {
 // observable through the public API.
 describe("dollarInsideReference (observed through maskLineRegions)", () => {
     // line 147: the backward scan uses "j >= 0", so it must still inspect
-    // index 0 itself — a mutant stopping at "j > 0" would skip the very
+    // index 0 itself - a mutant stopping at "j > 0" would skip the very
     // first character and miss a "[^" that starts the line, wrongly
     // treating BOTH id-internal dollars below as math openers/closers.
     it("recognizes a reference bracket that starts the line (index 0)", () => {
@@ -148,7 +148,7 @@ describe("dollarInsideReference (observed through maskLineRegions)", () => {
     });
 
     // line 150: a "[" found while walking back only counts as a reference
-    // opener when immediately followed by "^" — a mutant that returns
+    // opener when immediately followed by "^" - a mutant that returns
     // `true` unconditionally would treat this plain "[...]" bracket as a
     // reference too, suppressing a math span that should otherwise mask.
     it("a bracket without a caret does not suppress math scanning", () => {
@@ -172,7 +172,7 @@ describe("maskLineRegions: multi-line comment continuation (startInComment)", ()
         expect(endsInMath).toBe(false);
     });
 
-    // line 188: `i` must resume scanning exactly AFTER the "-->" closer —
+    // line 188: `i` must resume scanning exactly AFTER the "-->" closer -
     // resuming 6 chars too early re-exposes an already-blotted opener
     // region to a fresh code-span scan, changing the final mask.
     it("resumes scanning exactly after the comment closer, not before it", () => {
@@ -206,7 +206,7 @@ describe("maskLineRegions: multi-line math continuation (startInMath)", () => {
 });
 
 describe("maskLineRegions: main scan loop bounds and escapes", () => {
-    // line 203: the while loop's bound is `i < line.length` — an off-by-one
+    // line 203: the while loop's bound is `i < line.length` - an off-by-one
     // that allows i === line.length would read past the string (undefined
     // char) instead of stopping; the escape-skip below proves the loop
     // still terminates cleanly right at the boundary.
@@ -222,7 +222,7 @@ describe("maskLineRegions: main scan loop bounds and escapes", () => {
     });
 
     // line 224: the closing run must match the OPENING run's exact length
-    // — a mutant that always accepts (ConditionalExpression true) would
+    // - a mutant that always accepts (ConditionalExpression true) would
     // close a double-backtick span on the first single backtick it meets.
     it("a double-backtick opener is not closed by a lone single backtick", () => {
         const line = "``a`b``";
@@ -237,7 +237,7 @@ describe("maskLineRegions: main scan loop bounds and escapes", () => {
     });
 
     // line 230: after a successful match, scanning resumes at
-    // close + runLength — a mutant that subtracts instead would rewind
+    // close + runLength - a mutant that subtracts instead would rewind
     // into the JUST-CLOSED span, letting the scanner re-open a phantom
     // span there. Proven with two adjacent spans: the separating space
     // must survive as literal prose, not get swallowed into a
@@ -250,7 +250,7 @@ describe("maskLineRegions: main scan loop bounds and escapes", () => {
 
 describe("maskLineRegions: short-form HTML comments", () => {
     // line 236: "<!-->" is a complete 5-character comment (CommonMark
-    // §6.6) — advancing i by anything other than +5 would either re-scan
+    // §6.6) - advancing i by anything other than +5 would either re-scan
     // part of it or skip live content after it.
     it("consumes exactly the 5 characters of \"<!-->\" and resumes right after", () => {
         const { masked, endsInComment } = maskLineRegions("a<!-->`b`");
@@ -274,7 +274,7 @@ describe("maskLineRegions: short-form HTML comments", () => {
     });
 
     // line 252: the unclosed-comment branch's endsInMath must report
-    // false — a BooleanLiteral mutant flipping it to true would make a
+    // false - a BooleanLiteral mutant flipping it to true would make a
     // plain unclosed HTML comment masquerade as an open math block on the
     // NEXT line (wrong continuation branch entirely).
     it("an unclosed comment does not also claim to be an open math block", () => {
@@ -284,7 +284,7 @@ describe("maskLineRegions: short-form HTML comments", () => {
 });
 
 describe("maskLineRegions: dollar / math scanning", () => {
-    // line 259: the "$" branch's own conditional gate — flipping it to
+    // line 259: the "$" branch's own conditional gate - flipping it to
     // "true" wouldn't change $-handling directly, but skipping it (dead
     // code around it) is exercised implicitly by every math test below;
     // pin the base case where a dollar opens ordinary inline math.
@@ -294,7 +294,7 @@ describe("maskLineRegions: dollar / math scanning", () => {
     });
 
     // line 261: a dollar inside a footnote reference must be skipped
-    // (i++, continue) rather than treated as an opener — an empty
+    // (i++, continue) rather than treated as an opener - an empty
     // BlockStatement mutant would fall through to the opener logic below
     // instead, and the ConditionalExpression "false" mutant would never
     // take this branch even when the guard is true.
@@ -307,7 +307,7 @@ describe("maskLineRegions: dollar / math scanning", () => {
     });
 
     // line 267: display math "$$...$$" with no closer blots to EOL and
-    // reports endsInMath — mirrors the comment case at line 245.
+    // reports endsInMath - mirrors the comment case at line 245.
     it("an unclosed display-math opener blots to end of line", () => {
         const { masked, endsInMath, endsInComment } = maskLineRegions(
             "x $$ open",
@@ -334,7 +334,7 @@ describe("maskLineRegions: dollar / math scanning", () => {
         expect(masked).toBe(NUL(line.length));
     });
 
-    // line 295-299: the four-way guard that REJECTS a "$...$" candidate —
+    // line 295-299: the four-way guard that REJECTS a "$...$" candidate -
     // no closer found, empty content, leading space, or trailing space.
     // Each must independently veto math; only when none apply does it
     // mask. Reordering the guard as a chained AND/OR (LogicalOperator
@@ -344,7 +344,7 @@ describe("maskLineRegions: dollar / math scanning", () => {
         expect(maskLineRegions("a $b c").masked).toBe("a $b c");
     });
     // NOTE: "close === i + 1" (empty inline-math content) is unreachable in
-    // practice — two adjacent unescaped dollars are always caught by the
+    // practice - two adjacent unescaped dollars are always caught by the
     // "$$" display-math branch above this check first, so `close` can
     // never come back equal to `i + 1` here. The 296:17 (drop this OR
     // clause) and 296:27 (i+1 -> i-1) mutants are therefore equivalent:
@@ -363,7 +363,7 @@ describe("maskLineRegions: dollar / math scanning", () => {
     });
 
     // line 304: on a successful inline-math match, `i` resumes exactly
-    // after the closing "$" (close+1) — off by one either re-scans the
+    // after the closing "$" (close+1) - off by one either re-scans the
     // dollar or skips the character right after it.
     it("resumes scanning exactly after the closing dollar of inline math", () => {
         const line = "$a$`b`";
@@ -373,7 +373,7 @@ describe("maskLineRegions: dollar / math scanning", () => {
 });
 
 describe("scanDocument: YAML frontmatter", () => {
-    // line 354: the closing-scan loop bound `j < src.length` — an off-by-
+    // line 354: the closing-scan loop bound `j < src.length` - an off-by-
     // one would either miss the last line as a possible closer or read
     // past the array.
     it("a closing \"---\" on the very last line still closes frontmatter", () => {
@@ -382,7 +382,7 @@ describe("scanDocument: YAML frontmatter", () => {
     });
 
     // line 355: the closer regex accepts "---" or "..." with only
-    // trailing whitespace — anchoring differently (no "^", or requiring
+    // trailing whitespace - anchoring differently (no "^", or requiring
     // nothing but the delimiter with \S*) changes which lines close it.
     it("a bare \"...\" line closes frontmatter, matching YAML's document-end marker", () => {
         const doc = "---\nkey: 1\n...\nafter[^1]";
@@ -413,7 +413,7 @@ describe("scanDocument: YAML frontmatter", () => {
     });
 
     // line 357: every line from 0 through the closer (inclusive) is
-    // protected — `k <= j`, not `k < j`, so the closer line itself is
+    // protected - `k <= j`, not `k < j`, so the closer line itself is
     // included.
     it("protects every line through the closing delimiter, inclusive", () => {
         const doc = "---\na: 1\nb: 2\n---";
@@ -428,7 +428,7 @@ describe("scanDocument: YAML frontmatter", () => {
 
 describe("scanDocument: comment/math region container depth", () => {
     // line 413/417: `startsInComment[i]`/`startsInMath[i]` must be set
-    // true for every interior line of an OPEN region — a BooleanLiteral
+    // true for every interior line of an OPEN region - a BooleanLiteral
     // "true" mutant on the else-branch initial value would falsely mark
     // ordinary lines as region-interior too, but since these arrays start
     // false by default we pin the positive case directly per region.
@@ -444,7 +444,7 @@ describe("scanDocument: comment/math region container depth", () => {
     });
 
     // line 430: the closer-line's live suffix can reopen EITHER kind of
-    // region — pin that a comment closer whose suffix opens MATH is
+    // region - pin that a comment closer whose suffix opens MATH is
     // tracked as math, not comment (rules out the "&&"/bare-inMath
     // mutants that garble which flag gets set).
     it("a comment closer's live suffix can open a NEW math region", () => {
@@ -458,7 +458,7 @@ describe("scanDocument: comment/math region container depth", () => {
     });
 
     // line 434/436: a BARE closer (nothing live left after trimming NULs)
-    // ends a BLOCK — an indented chunk may open on the very next line.
+    // ends a BLOCK - an indented chunk may open on the very next line.
     // A mutant that never sets blockBoundary here would treat the next
     // indented line as a paragraph continuation instead of code.
     it("a bare comment closer ends its block, letting indented code open right after", () => {
@@ -482,7 +482,7 @@ describe("scanDocument: comment/math region container depth", () => {
         expect(scan.isProtected).toEqual([false, true, false]);
     });
 
-    // line 456: mirrors 430 — a math closer's live suffix can reopen a
+    // line 456: mirrors 430 - a math closer's live suffix can reopen a
     // COMMENT region.
     it("a math closer's live suffix can open a NEW comment region", () => {
         const doc = "$$\nx\n$$ <!--\nstill comment\n-->\nafter[^1]";
@@ -506,7 +506,7 @@ describe("scanDocument: comment/math region container depth", () => {
     });
 
     // line 459/461: same bare-closer block-boundary shape as 434/436, for
-    // the math branch — including the trim/replace mechanics that decide
+    // the math branch - including the trim/replace mechanics that decide
     // "bare" (461's MethodExpression/StringLiteral mutants would judge
     // bareness on the wrong string).
     it("a bare math closer ends its block, letting indented code open right after", () => {
@@ -524,14 +524,14 @@ describe("scanDocument: comment/math region container depth", () => {
     // container depth, not the depth the original region opened at. Pin
     // this with a depth CHANGE across the reopen: comment opens at depth
     // 1, its closer reopens math one level DEEPER (depth 2). A shallower
-    // depth-1 line right after must then end the (new) region — which
+    // depth-1 line right after must then end the (new) region - which
     // only happens if regionDepth was updated to 2, not left at 1.
     it("a comment-to-math reopen at a deeper depth updates regionDepth to the new depth", () => {
         const doc = "> <!--\n> > --> $$\n> after\nplain";
         const scan = scanDocument(doc.split("\n"));
         // "> after" (depth 1) is shallower than the reopened region's
         // depth (2), so the math region has already ended by the time we
-        // reach it — it is ordinary live quoted text, not math interior
+        // reach it - it is ordinary live quoted text, not math interior
         expect(scan.isProtected).toEqual([false, false, false, false]);
     });
 
@@ -545,7 +545,7 @@ describe("scanDocument: comment/math region container depth", () => {
 });
 
 describe("scanDocument: fence container depth and closer indent", () => {
-    // line 476/478: a fence dies when its blockquote ends — pin via a
+    // line 476/478: a fence dies when its blockquote ends - pin via a
     // subsequent SAME-depth line staying live (proves inIndentedCode and
     // inDefinition both got reset, not just one of them).
     it("a blockquoted fence's death resets both indented-code and definition state", () => {
@@ -564,7 +564,7 @@ describe("scanDocument: fence container depth and closer indent", () => {
 
     // line 488/490: the closer's indent is measured against the fence's
     // OWN container (`rest`, after stripping blockquote markers) up to
-    // contentIndent+3 — pin the exact boundary for a document-level fence
+    // contentIndent+3 - pin the exact boundary for a document-level fence
     // (contentIndent 0): 3 spaces closes, 4 does not.
     it("a document-level fence closes with exactly 3 leading spaces", () => {
         const doc = "```\ncode\n   ```\nafter";
@@ -586,7 +586,7 @@ describe("scanDocument: fence container depth and closer indent", () => {
     });
 
     // line 491: the closer regex requires 3-or-more of the SAME fence
-    // character, anchored, with only trailing whitespace after — pin
+    // character, anchored, with only trailing whitespace after - pin
     // both the character-run-length requirement and that trailing prose
     // after the delimiter disqualifies it as a closer.
     it("a two-character run does not close a three-character fence", () => {
@@ -613,7 +613,7 @@ describe("scanDocument: fence container depth and closer indent", () => {
     });
 
     // line 495/496: the closer must match the SAME fence character and be
-    // at least as long as the opener — a "~~~" never closes a "```" fence
+    // at least as long as the opener - a "~~~" never closes a "```" fence
     // (even though both count as valid fence syntax), and a shorter run
     // of the SAME character never closes a longer opener.
     it("a tilde run never closes a backtick fence", () => {
@@ -642,7 +642,7 @@ describe("scanDocument: fence container depth and closer indent", () => {
 
 describe("scanDocument: indented code vs. definition/list continuation", () => {
     // line 540/542: an indented chunk continuing an ALREADY-open indented
-    // code block stays protected and blockBoundary stays false — proven
+    // code block stays protected and blockBoundary stays false - proven
     // by a THIRD consecutive indented-code line staying protected too
     // (only the second line's branch is exercised by a 2-line block).
     it("a third consecutive indented-code line is still protected", () => {
@@ -656,7 +656,7 @@ describe("scanDocument: indented code vs. definition/list continuation", () => {
         ]);
     });
 
-    // line 565/566: the list stack pop loop — items are popped only while
+    // line 565/566: the list stack pop loop - items are popped only while
     // shallower than the current line's indent; the boundary is
     // STRICTLY-less-than on BOTH the length guard and the indent compare.
     it("a line indented exactly to the list item's content column keeps the item open", () => {
@@ -688,12 +688,12 @@ describe("scanDocument: indented code vs. definition/list continuation", () => {
         ]);
     });
 
-    // line 571: the gap-width rule — 0 or 5+ spaces after the marker
+    // line 571: the gap-width rule - 0 or 5+ spaces after the marker
     // count as a gap of 1 (not the literal count); 1-4 spaces count as
     // their literal width. Pin both edges: a huge gap collapses to 1,
     // and a normal 1-space gap is NOT force-collapsed to something else.
     it("five or more spaces after the marker collapse the content indent to marker+1", () => {
-        // "-     item" : marker "-" (1 char) + 5 spaces + "item" — content
+        // "-     item" : marker "-" (1 char) + 5 spaces + "item" - content
         // indent collapses to 1+1=2, so a 6-space line is code (2+4)
         const doc = "-     item\n\n      code";
         expect(protectedLines(doc.split("\n"))).toEqual([false, false, true]);
@@ -712,7 +712,7 @@ describe("scanDocument: indented code vs. definition/list continuation", () => {
 
 describe("scanDocument: fence opener detection on list-item lines", () => {
     // line 598: the fence-open regex, tried a second time against the
-    // text AFTER a stripped list marker — anchoring must still require
+    // text AFTER a stripped list marker - anchoring must still require
     // the delimiter at the very start of what remains, and both fence
     // characters must still be accepted (not narrowed to "~" alone).
     it("a fence opens after a list marker is stripped, for both fence characters", () => {
@@ -733,7 +733,7 @@ describe("scanDocument: fence opener detection on list-item lines", () => {
     });
 
     // line 608: contentIndent for a list-marker-hosted fence is the
-    // marker's own width PLUS the opener's leading spaces — pin the exact
+    // marker's own width PLUS the opener's leading spaces - pin the exact
     // closer boundary this produces (marker width 2 → contentIndent 2,
     // closer accepted up to column 5, rejected at column 6).
     it("a list-item fence's contentIndent accepts a closer up to its content column + 3", () => {
@@ -759,7 +759,7 @@ describe("scanDocument: fence opener detection on list-item lines", () => {
 
 describe("scanDocument: region opener trigger and endsProtected", () => {
     // line 622: an opener line's OWN scan for "<!--"/"$$" must run for
-    // BOTH constructs, independently — pin that a math opener alone
+    // BOTH constructs, independently - pin that a math opener alone
     // (no "<!--" present) still starts a region.
     it("a display-math opener with no comment token still opens a region", () => {
         const doc = "$$\nbody\n$$";
@@ -768,7 +768,7 @@ describe("scanDocument: region opener trigger and endsProtected", () => {
     });
 
     // line 633: endsProtected is true for a document-level unclosed
-    // fence too, not only comment/math — pin the fence half of that OR.
+    // fence too, not only comment/math - pin the fence half of that OR.
     it("an unclosed document-level fence makes an EOF append protected", () => {
         const scan = scanDocument("```\ncode".split("\n"));
         expect(scan.endsProtected).toBe(true);
@@ -781,7 +781,7 @@ describe("scanDocument: region opener trigger and endsProtected", () => {
 
 describe("maskedLineAt: out-of-range guard", () => {
     // line 680: the range check must reject i >= lines.length, not accept
-    // it — a ConditionalExpression "false" mutant would fall through to
+    // it - a ConditionalExpression "false" mutant would fall through to
     // read lines[i] (undefined) instead of returning "".
     it("returns empty string for an index exactly at lines.length", () => {
         expect(maskedLineAt(["only"], 1)).toBe("");
@@ -791,7 +791,7 @@ describe("maskedLineAt: out-of-range guard", () => {
 describe("removeLineRanges", () => {
     // line 711: a blank line arriving right after a cut is swallowed when
     // `out` is still empty (document start) OR its last line is already
-    // blank — a mutant flipping "out.length === 0" to "!== 0" would stop
+    // blank - a mutant flipping "out.length === 0" to "!== 0" would stop
     // swallowing the blank exactly when out IS empty, leaving a stray
     // leading blank line that should have merged away to nothing.
     it("swallows a leading blank line after a cut at document start", () => {
@@ -801,13 +801,13 @@ describe("removeLineRanges", () => {
     });
 
     // line 722/723: the setext-residue guard fires only when `out` is
-    // NON-empty and its last line is non-blank — pin the exact case
+    // NON-empty and its last line is non-blank - pin the exact case
     // (out empty, "---" survives text) that must NOT get a guard blank,
     // versus the case that must.
     it("does not guard against a stranded \"---\" when it is the very first output line", () => {
         const lines = ["cut1", "---"];
         const out = removeLineRanges(lines, [{ start: 0, end: 0 }]);
-        // out is empty when "---" arrives — the setext guard (722/723) is
+        // out is empty when "---" arrives - the setext guard (722/723) is
         // for non-empty out; the SEPARATE start-of-document rule (733)
         // handles this case by inserting a leading blank instead
         expect(out).toEqual(["", "---"]);
@@ -818,7 +818,7 @@ describe("removeLineRanges", () => {
         expect(out).toEqual(["para", "", "---"]);
     });
 
-    // line 724: the setext-residue regex — anchored both ends, allows
+    // line 724: the setext-residue regex - anchored both ends, allows
     // 0-3 leading spaces, and the underline is ALL "-" or ALL "=" (mixed
     // characters, or a non-underline trailing character, must NOT match).
     it("a stray dash-string that is not a valid setext underline is not guarded", () => {
@@ -833,7 +833,7 @@ describe("removeLineRanges", () => {
     });
 
     // line 733/734: a cut landing "---" at document start (out still
-    // empty) must not let it parse as a frontmatter opener — a leading
+    // empty) must not let it parse as a frontmatter opener - a leading
     // blank line is inserted instead.
     it("promotes a document-start \"---\" survivor with a leading blank guard", () => {
         const lines = ["cut1", "---", "body"];
@@ -850,7 +850,7 @@ describe("removeLineRanges", () => {
 describe("findDefinitionBlocks", () => {
     // line 757: a protected line that does NOT start a comment/math region
     // (ordinary fenced/indented-code protection) must BREAK the block, not
-    // be silently absorbed — an empty-BlockStatement mutant on the
+    // be silently absorbed - an empty-BlockStatement mutant on the
     // absorption branch wouldn't affect this at all, but a
     // ConditionalExpression "true" mutant on the guard would wrongly
     // absorb it.
@@ -864,7 +864,7 @@ describe("findDefinitionBlocks", () => {
     });
 
     // line 763: absorption requires the scan object AND one of its two
-    // flags — pin that with NO scan argument at all, a protected
+    // flags - pin that with NO scan argument at all, a protected
     // continuation still correctly breaks the block (the caller-optional
     // path), proving the function doesn't crash or wrongly absorb without
     // scan data.
@@ -878,7 +878,7 @@ describe("findDefinitionBlocks", () => {
     });
 
     // line 773: a blank run continues the block only when it's followed
-    // by indented content — pin that IndentedContent is tested against
+    // by indented content - pin that IndentedContent is tested against
     // `lines[k]` (the line AFTER the blank run), not the blank line
     // itself (which would never match \s+\S and always break).
     it("a blank run followed by indented content continues the block", () => {
@@ -900,7 +900,7 @@ describe("findDefinitionBlocks", () => {
 
     // line 777/779: the inner "how far does the blank run extend" walk,
     // and the guard that the line found after it is both unprotected AND
-    // indented — pin a PROTECTED indented line after the blank (fenced
+    // indented - pin a PROTECTED indented line after the blank (fenced
     // code) does NOT continue the block.
     it("indented content after a blank run does not continue the block when it is protected code", () => {
         const doc = "[^1]: a\n\n```\n    fenced\n```";
@@ -930,14 +930,14 @@ describe("findDefinitionBlocks", () => {
 
 describe("round 2", () => {
     describe("dollarInsideReference: reference-internal dollar must not leak into math scanning", () => {
-        // line 261: the guard that skips a "$" sitting inside "[^…]" — both
+        // line 261: the guard that skips a "$" sitting inside "[^…]" - both
         // the BlockStatement "{}" mutant (empties the skip body) and the
         // ConditionalExpression "false" mutant (never takes the skip branch)
         // let that "$" fall into the ordinary math-opener logic instead.
         // With a footnote reference immediately followed (no separator) by
         // a real math span, the reference's internal "$" then pairs with
         // the LATER "]$" as a bogus closer before the scanner ever reaches
-        // the genuine "$y$" — a completely different mask than leaving the
+        // the genuine "$y$" - a completely different mask than leaving the
         // reference alone and masking only "$y$".
         it("a dollar immediately after a reference is not treated as a math opener", () => {
             const line = "[^a$b]$y$";
@@ -947,7 +947,7 @@ describe("round 2", () => {
 
     describe("maskLineRegions: display math close-not-found guard", () => {
         // line 267: forcing "close === -1" to always true makes a CLOSED
-        // "$$...$$" span on one line get treated as unclosed — blotting to
+        // "$$...$$" span on one line get treated as unclosed - blotting to
         // end of line and wrongly reporting endsInMath, instead of closing
         // normally and leaving the trailing prose live.
         it("a closed display-math span on one line does not blot past its closer", () => {
@@ -959,7 +959,7 @@ describe("round 2", () => {
 
     describe("maskLineRegions: inline math closer resume cursor", () => {
         // line 304: after a successful inline-math match, "i" must resume
-        // at "close + 1" — the ArithmeticOperator mutant "close - 1" rewinds
+        // at "close + 1" - the ArithmeticOperator mutant "close - 1" rewinds
         // INTO the just-matched span's last content character, letting it
         // reopen as a fresh code-span/math scan and blot a different (wider,
         // in this case: also swallowing "` `" after the math) region than
@@ -971,7 +971,7 @@ describe("round 2", () => {
     });
 
     describe("scanDocument: YAML frontmatter closer regex and resume index", () => {
-        // line 355: the closer regex must be anchored at the start ("^") —
+        // line 355: the closer regex must be anchored at the start ("^") -
         // dropping the anchor lets a line that merely ENDS with "---"
         // (e.g. arbitrary prose) falsely close the frontmatter early,
         // before the real "---" delimiter is reached.
@@ -987,7 +987,7 @@ describe("round 2", () => {
         });
 
         // line 357: after closing frontmatter, the main scan must resume at
-        // "j + 1" (right after the closer) — the ArithmeticOperator mutant
+        // "j + 1" (right after the closer) - the ArithmeticOperator mutant
         // "j - 1" rewinds the main scan into the frontmatter body itself,
         // re-processing a line that happens to look like a fence opener and
         // letting that bogus fence swallow the real closer and everything
@@ -1007,7 +1007,7 @@ describe("round 2", () => {
 
     describe("scanDocument: comment/math closer's own block-boundary decision", () => {
         // line 434: the bare-closer-ends-a-block check's full condition
-        // (ConditionalExpression "true") — forcing it true makes EVERY
+        // (ConditionalExpression "true") - forcing it true makes EVERY
         // comment closer end a block, even one with live trailing text
         // still on the line, wrongly opening fresh indented code right
         // after it.
@@ -1019,7 +1019,7 @@ describe("round 2", () => {
 
         // line 434: the LogicalOperator mutant ("&&" -> "||" between the
         // two negated flags) only diverges when the closer's suffix
-        // reopens EXACTLY ONE of comment/math — this iteration's wrongly
+        // reopens EXACTLY ONE of comment/math - this iteration's wrongly
         // forced blockBoundary=true is normally overwritten before it can
         // matter (the very next line re-enters the interior branch, which
         // resets it), UNLESS that next line's blockquote depth is shallow
@@ -1047,7 +1047,7 @@ describe("round 2", () => {
     });
 
     describe("scanDocument: fence closer indent while-loop", () => {
-        // line 488: the leading-space-count while-loop's condition —
+        // line 488: the leading-space-count while-loop's condition -
         // forcing it to "true" drops the "rest[lead] === ' '" check
         // entirely, so the loop never terminates (lead climbs forever
         // with no bound). Any fence-closer check reaches this loop, so a
@@ -1067,7 +1067,7 @@ describe("round 2", () => {
     describe("scanDocument: fence closer regex anchoring and character run", () => {
         // line 491: dropping the "^" anchor lets text BEFORE the closing
         // run (e.g. leftover content on a content line) satisfy the
-        // closer pattern as long as it ENDS with a valid delimiter run —
+        // closer pattern as long as it ENDS with a valid delimiter run -
         // a content line like "xyz```" must NOT close the fence.
         it("a content line that merely ends with backticks does not close the fence", () => {
             const doc = "```\ncode\nxyz```\nafter";
@@ -1095,7 +1095,7 @@ describe("round 2", () => {
 
     describe("scanDocument: indented-code branches' own blockBoundary write", () => {
         // line 542: the branch that OPENS a fresh indented-code block sets
-        // blockBoundary=false — forcing it "true" (BooleanLiteral) leaks a
+        // blockBoundary=false - forcing it "true" (BooleanLiteral) leaks a
         // false block-boundary signal into the very next line's list-stack
         // pop decision (line 519), which can wrongly pop a list item that
         // is still open, lowering the code-indent threshold for a later
@@ -1137,7 +1137,7 @@ describe("round 2", () => {
         // before it. The stale wide entry stays buried under the new
         // marker's own (immediately-matching) push, invisible until a
         // later query pops back down THROUGH the new top and re-exposes
-        // it — at which point a code-indent threshold survives that
+        // it - at which point a code-indent threshold survives that
         // should have been cleared.
         it("a narrower sibling list marker correctly pops away a wider marker that preceded it", () => {
             const doc = "- a\n123456789. b\n\n     d";
@@ -1150,7 +1150,7 @@ describe("round 2", () => {
         });
 
         // line 565: forcing the condition to "true" turns the loop into
-        // "while (true) listStack.pop();" — an unconditional infinite
+        // "while (true) listStack.pop();" - an unconditional infinite
         // loop the instant any list marker is seen at all, since pop() on
         // an empty array is a silent no-op that never breaks it.
         it("does not hang when a list marker line is scanned (565 while-true guard)", () => {
@@ -1160,7 +1160,7 @@ describe("round 2", () => {
 
         // line 566: the EqualityOperator mutant "indentWidth <= top"
         // (instead of "<") also pops when a NESTED marker's indent lands
-        // EXACTLY ON its parent's content column — which should nest
+        // EXACTLY ON its parent's content column - which should nest
         // INSIDE the parent, not replace it. The same doubly-nested +
         // reveal shape as above (526's arithmetic sibling: pop the shared
         // top, see what is left underneath) exposes the wrongly-cleared
@@ -1189,7 +1189,7 @@ describe("round 2", () => {
         // line 571: a marker with NOTHING after it (matched via the "$"
         // alternative in the marker regex) captures an EMPTY gap group.
         // The ConditionalExpression "false" mutant (never collapses,
-        // always uses the literal — here 0) and the EqualityOperator
+        // always uses the literal - here 0) and the EqualityOperator
         // mutant "length !== 0" (collapses on any NON-zero length instead
         // of on zero) both mishandle this zero-length case, giving the
         // bare marker the wrong content indent.
@@ -1203,7 +1203,7 @@ describe("round 2", () => {
         });
 
         // line 571: a gap of EXACTLY 4 spaces must use its LITERAL width
-        // (CommonMark: only 5+ collapses to 1) — the ConditionalExpression
+        // (CommonMark: only 5+ collapses to 1) - the ConditionalExpression
         // "true" mutant (always collapses to 1) and the EqualityOperator
         // mutant "length >= 4" (collapses starting at 4, not 5) both
         // wrongly collapse this boundary case.
@@ -1245,7 +1245,7 @@ describe("round 2", () => {
 
     describe("scanDocument: list-item fence contentIndent arithmetic", () => {
         // line 608: contentIndent must ADD the fence opener's own leading
-        // spaces to the stripped-prefix length — the ArithmeticOperator
+        // spaces to the stripped-prefix length - the ArithmeticOperator
         // mutant subtracts them instead, which goes negative whenever the
         // opener itself is indented (no list marker involved: the
         // "stripped-prefix length" term is 0, isolating the sign flip).
@@ -1276,7 +1276,7 @@ describe("round 2", () => {
     describe("maskedLineAt: negative index guard", () => {
         // line 680: forcing the range guard to "false" means a NEGATIVE
         // index also falls through to "lines[i]" (undefined) instead of
-        // returning "" — round 1 only pinned the upper bound (i ===
+        // returning "" - round 1 only pinned the upper bound (i ===
         // lines.length); this pins the lower bound, which crashes instead
         // of just returning a wrong value.
         it("returns empty string for a negative index instead of crashing", () => {
@@ -1287,7 +1287,7 @@ describe("round 2", () => {
     describe("removeLineRanges: blank-swallow guard's third clause", () => {
         // line 711: forcing the "out is empty OR ends in a blank" clause
         // to "true" swallows a blank line after a cut even when the
-        // surviving output so far is non-blank — a blank that legitimately
+        // surviving output so far is non-blank - a blank that legitimately
         // separates two paragraphs must survive the cut, not vanish.
         it("does not swallow a blank line that legitimately separates two surviving paragraphs", () => {
             const out = removeLineRanges(
@@ -1301,7 +1301,7 @@ describe("round 2", () => {
     describe("removeLineRanges: setext-residue guard's own gating clauses", () => {
         // line 722/723: the guard must require BOTH out.length > 0 AND the
         // last output line to be non-blank. The EqualityOperator mutant
-        // "length >= 0" (always true — length is never negative) drops the
+        // "length >= 0" (always true - length is never negative) drops the
         // length gate; proven with an EMPTY out where the survivor is
         // "===" (a valid setext underline but not literally "---", so the
         // separate doc-start rule at line 733 does not also fire and mask
@@ -1318,7 +1318,7 @@ describe("round 2", () => {
         // ConditionalExpression "true", the ArithmeticOperator
         // "length + 1" (reads one past the array, always undefined, always
         // "!== \"\""), and the StringLiteral swap to a string the array
-        // will never contain (also always "!== " that string) — all three
+        // will never contain (also always "!== " that string) - all three
         // make this clause unconditionally true.
         it("does not add a redundant setext guard blank when the last output line is already blank", () => {
             const out = removeLineRanges(
@@ -1332,7 +1332,7 @@ describe("round 2", () => {
     describe("removeLineRanges: setext-residue regex shape", () => {
         // line 724: swapping the leading "\s{0,3}" for "\S{0,3}" rejects a
         // setext underline that has 1-3 leading spaces (CommonMark allows
-        // up to 3) — the class-swap only matters when there IS leading
+        // up to 3) - the class-swap only matters when there IS leading
         // whitespace to consume, since "{0,3}" is satisfied trivially by
         // zero characters either way.
         it("a setext underline with leading whitespace (within CommonMark's 3-space limit) is still guarded", () => {
@@ -1371,7 +1371,7 @@ describe("round 2", () => {
         // line 757: the BlockStatement "{}" mutant (empties the whole
         // isProtected-handling branch) and the ConditionalExpression
         // "false" mutant (never enters it) both have the SAME externally
-        // visible effect — a protected line falls through to the
+        // visible effect - a protected line falls through to the
         // IndentedContent/blank-run checks below instead of being
         // absorbed-or-broken by its own logic. An indented comment-region
         // OPENER line (itself unprotected, absorbed normally by the
@@ -1395,7 +1395,7 @@ describe("round 2", () => {
         // line 777: the MethodExpression mutant drops ".trim()" from the
         // blank-run walk's own condition, so a WHITESPACE-ONLY line (not
         // truly empty, but blank in effect) stops the walk instead of
-        // being swept over — the walk must treat it exactly like an empty
+        // being swept over - the walk must treat it exactly like an empty
         // line.
         it("a whitespace-only line within a blank run is swept over like an empty line", () => {
             const doc = ["[^1]: a", "   ", "    more"];
@@ -1407,7 +1407,7 @@ describe("round 2", () => {
 
         // line 777: the EqualityOperator mutant "k <= lines.length" lets
         // the walk step one past the array when a blank run reaches
-        // EXACTLY end-of-document, reading "lines[lines.length].trim()" —
+        // EXACTLY end-of-document, reading "lines[lines.length].trim()" -
         // "undefined" has no ".trim" method, so this crashes instead of
         // the walk cleanly stopping at the document boundary.
         it("a blank run reaching exactly end-of-document does not overrun the array", () => {
@@ -1423,7 +1423,7 @@ describe("round 2", () => {
         // line 779: the LogicalOperator mutant ("&&" -> "||" on the first
         // two clauses) and both ConditionalExpression "true" mutants make
         // this guard ignore isProtected once "k < lines.length" alone is
-        // satisfied — a blank run landing exactly on a PROTECTED fence
+        // satisfied - a blank run landing exactly on a PROTECTED fence
         // opener (itself indented, so it still matches IndentedContent)
         // then gets wrongly absorbed into the definition block instead of
         // correctly ending it.
@@ -1438,7 +1438,7 @@ describe("round 2", () => {
 
     describe("findDefinitionBlocks: non-blank break check", () => {
         // line 773: the MethodExpression mutant drops ".trim()" here too
-        // (the OUTER non-blank check, distinct from the 777 walk above) —
+        // (the OUTER non-blank check, distinct from the 777 walk above) -
         // reusing the same whitespace-only-line shape: without ".trim()",
         // "   " !== "" is true, breaking the block one line before the
         // real indented continuation is ever reached.
@@ -1470,8 +1470,8 @@ describe("round 2", () => {
  *     undefined, which fails every "===" character check in the loop body
  *     (undefined !== "`", !== "$", startsWith(..., i) is false past the
  *     end), so the extra iteration takes the fallback "just advance i"
- *     path and calls `blot` zero times — output identical.
- *   - 284 (inline-math closer search): same shape — `line[j]` undefined
+ *     path and calls `blot` zero times - output identical.
+ *   - 284 (inline-math closer search): same shape - `line[j]` undefined
  *     fails both the backslash-escape check and the "$" check, so the
  *     loop body is a no-op for that iteration.
  *   - 354 (frontmatter closer search): `/^(---|\.\.\.)\s*$/.test(undefined)`
@@ -1489,21 +1489,21 @@ describe("round 2", () => {
  * "content starting with a space" describe block above): two adjacent
  * unescaped dollars are always caught by the "$$" display-math branch
  * before reaching this single-dollar code path, so `close` can never come
- * back equal to `i + 1` here — the clause is dead in every reachable
+ * back equal to `i + 1` here - the clause is dead in every reachable
  * state. Re-confirmed for round 2: since `close` is otherwise always -1 or
  * >= i + 1 (found by a forward search starting at i + 1), and the
  * ArithmeticOperator variant's "close === i - 1" can only be true when
  * i === 0 and close === -1 (the only i for which i - 1 could equal a
  * legal close value), that same state already satisfies the FIRST clause
- * "close === -1" — so the OR's overall result is identical whether or not
+ * "close === -1" - so the OR's overall result is identical whether or not
  * this dead clause is mutated.
  *
  * --- regionDepth's own guard: 430:17, 456:17, 622:17 (all
  * "if (inComment || inMath) regionDepth = depth" forced to "true") ---
  * regionDepth is read exactly once, at line 404, and every read is itself
  * gated by "(inComment || inMath)". Every place inComment/inMath can
- * transition to (or remain) true — the comment-closer reopen (430), the
- * math-closer reopen (456), and a fresh opener (622) — immediately writes
+ * transition to (or remain) true - the comment-closer reopen (430), the
+ * math-closer reopen (456), and a fresh opener (622) - immediately writes
  * regionDepth in that SAME statement in the unmutated code. So: when the
  * guard would have been true anyway, the mutant changes nothing; when the
  * guard is false (no region is actually open), the stale write is inert
@@ -1523,7 +1523,7 @@ describe("round 2", () => {
  * already-real character (space or otherwise) untouched by the replace.
  * Substituting NUL with " " or with "" changes only how many whitespace
  * characters are present, never whether a NON-whitespace character exists
- * — and `.trim() === ""` depends only on the latter. So both substitutions
+ * - and `.trim() === ""` depends only on the latter. So both substitutions
  * agree on every input. Verified empirically with mixed NUL/real-space
  * masked strings.
  *
@@ -1541,7 +1541,7 @@ describe("round 2", () => {
  *   - inIndentedCode: right after a fence closes, `!inDefinition` is
  *     ALWAYS true (line 477 forces `inDefinition = false` on every fenced
  *     line, so it cannot be stale-true) and `blockBoundary` is ALWAYS true
- *     (per the point above) — so the very next line's own branch-535 check
+ *     (per the point above) - so the very next line's own branch-535 check
  *     ("indented && !inDefinition && blockBoundary") reduces to just
  *     "indented" and independently reaches the identical isProtected
  *     verdict that a wrongly-true inIndentedCode would have produced via
@@ -1554,14 +1554,14 @@ describe("round 2", () => {
  * Same "harmless read-one-past-the-end" shape as the 203/217/284/354
  * group above: at `lead === rest.length`, `rest[lead]` is undefined, which
  * fails the loop's own second clause ("=== ' '"), so the extra iteration
- * the mutant allows is immediately rejected by the AND's second half —
+ * the mutant allows is immediately rejected by the AND's second half -
  * `lead`'s final value is identical either way. Verified empirically,
  * including with a rest string that is ENTIRELY spaces (the case most
  * likely to expose an off-by-one).
  *
  * --- 565:25 EqualityOperator ("listStack.length > 0" -> ">= 0") ---
  * Array length is never negative, so "length >= 0" is unconditionally
- * true — but so is the ORIGINAL clause whenever length actually is > 0,
+ * true - but so is the ORIGINAL clause whenever length actually is > 0,
  * and the ONLY case they'd disagree (length === 0) is already covered by
  * the loop's own second clause: `listStack[listStack.length - 1]` on an
  * empty array is `listStack[-1]` = undefined, and `indentWidth <
@@ -1588,7 +1588,7 @@ describe("round 2", () => {
  * direct break, execution falls into the blank-run walk immediately below:
  * since `lines[j]` is non-blank, the walk's own while-loop (777) does not
  * advance (k stays at j), and the walk's absorb guard (779) re-tests the
- * IDENTICAL `IndentedContent.test(lines[j])` that already failed — so it
+ * IDENTICAL `IndentedContent.test(lines[j])` that already failed - so it
  * takes the `else { break; }` branch at line 786, the same outcome the
  * direct break would have produced. Verified empirically with both a
  * whitespace-only line and an ordinary non-indented, non-blank line

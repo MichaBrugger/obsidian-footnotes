@@ -8,7 +8,7 @@ import { applyFootnotePrefix } from "../src/linting/rules/apply-footnote-prefix"
 import { reindexFootnotes } from "../src/linting/rules/re-index-footnotes";
 
 // Standing test convention (Jason, 2026-08-08): prefixes are not always
-// "2." — exercise other logical separators too. The dot is the friendly
+// "2." - exercise other logical separators too. The dot is the friendly
 // case; dashes, tildes, equals, underscores, and especially regex-special
 // characters (*, +, $) stress the escaping and string-matching paths that
 // "2." never touches. Every core prefix behavior runs across the whole

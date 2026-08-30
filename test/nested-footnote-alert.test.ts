@@ -5,7 +5,7 @@ import { maskProtectedLines, scanDocument } from "../src/parsing/markdown-scan";
 
 // The nested-footnote lint alert (2026-08-24): nesting is prevented at
 // creation plugin-wide, and hand-typed nesting can't be auto-fixed
-// without losing content — so the lint names the definitions that carry a
+// without losing content - so the lint names the definitions that carry a
 // footnote inside their block, following the never-silent policy orphans
 // and duplicates already have. The lint TRANSFORMS still leave nested
 // notes intact and stable (test/nested-footnote-lint.test.ts).
@@ -21,7 +21,7 @@ function names(doc: string): string[] {
 }
 
 describe("nestedFootnoteDefinitionNames", () => {
-    it("a clean definition reports nothing — the label itself is not a nested reference", () => {
+    it("a clean definition reports nothing - the label itself is not a nested reference", () => {
         expect(names("a[^1].\n\n[^1]: plain body")).toEqual([]);
     });
 

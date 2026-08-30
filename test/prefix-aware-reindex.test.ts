@@ -4,7 +4,7 @@ import { reindexFootnotes } from "../src/linting/rules/re-index-footnotes";
 import { lintFootnotes } from "../src/linting/linter";
 
 // QOL (2026-07-18): footnotes carrying the note's own footnote-prefix are
-// NUMBERED footnotes, not named ones — reindexing renumbers and reorders
+// NUMBERED footnotes, not named ones - reindexing renumbers and reorders
 // them within the prefix namespace exactly like plain numbered footnotes.
 // Only names matching <prefix><digits> count; other prefixes stay named.
 
@@ -83,10 +83,10 @@ describe("reindexFootnotes with a prefix namespace", () => {
     });
 });
 
-describe("lintFootnotes prefix awareness (applyNotePrefix — one flag drives both the apply step and namespace-aware reindexing since 2026-08-11)", () => {
+describe("lintFootnotes prefix awareness (applyNotePrefix - one flag drives both the apply step and namespace-aware reindexing since 2026-08-11)", () => {
     it("unifies plain and prefixed footnotes into one reading-order sequence", () => {
         // the L11 scenario: plain strays adopt the prefix, then the WHOLE
-        // namespace renumbers by appearance — including the pre-existing
+        // namespace renumbers by appearance - including the pre-existing
         // [^2.5], which is a numbered footnote now, not a named one
         const input =
             "---\nfootnote-prefix: 2.\n---\nb[^2] a[^1] pre[^2.5] end\n\n[^1]: one\n[^2]: two\n[^2.5]: already prefixed";
@@ -135,7 +135,7 @@ describe("lintFootnotes prefix awareness (applyNotePrefix — one flag drives bo
 
     it("is idempotent with renumberNamedFootnotes on as well", () => {
         // named strays adopt the prefix, then reindex renumbers them INTO
-        // the namespace — one lint converges, a second changes nothing
+        // the namespace - one lint converges, a second changes nothing
         const messy =
             "---\nfootnote-prefix: 2.\n---\na[^note] b[^1] c[^2.7]\n\n[^note]: n\n[^1]: one\n[^2.7]: pre";
         const options = {

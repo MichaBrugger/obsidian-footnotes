@@ -10,7 +10,7 @@ import { reindexFootnotes } from "../../src/linting/rules/re-index-footnotes";
 //    it as a live definition at the bottom.
 //  - reindex({ keepOrphanedDefinitions: false }) sees it as an orphan (its
 //    "[^9]:" never counts as a reference thanks to AllReferences' (?!:)) and
-//    permanently DELETES the commented-out text — silent content loss.
+//    permanently DELETES the commented-out text - silent content loss.
 // Scenario: a footnote definition inside an HTML comment is relocated / deleted.
 // fixed 2026-07-17: protectedLines treats a multi-line <!-- --> comment as a
 // protected region, so findDefinitionBlocks never sees the commented def.

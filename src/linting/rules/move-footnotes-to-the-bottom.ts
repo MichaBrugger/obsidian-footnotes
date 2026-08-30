@@ -18,11 +18,11 @@ import { FootnoteRule } from "../rule";
 
 /**
  * A document whose FIRST line is a bare unclosed "---" reads as a thematic
- * break — until an edit introduces a column-0 "---"/"..." further down, at
+ * break - until an edit introduces a column-0 "---"/"..." further down, at
  * which point Obsidian re-reads the whole head as a YAML frontmatter block
  * and every line in it (prose, references) silently leaves the note body
  * (verified against metadataCache section types, 2026-08-10; found by the
- * remark differential oracle — gathering definitions under a "---\n##
+ * remark differential oracle - gathering definitions under a "---\n##
  * Footnotes" heading closed the phantom block and reindex then renumbered
  * an orphaned definition onto the swallowed reference's name). When a
  * rebuild would flip that interpretation, one blank line is prepended: it
@@ -43,7 +43,7 @@ function preserveLeadingThematicBreak(
  * keeping the blocks' relative order (reordering is reindexFootnotes' job).
  * When `sectionHeading` is given (the raw setting value) and an exact
  * unprotected copy exists in the note, its FIRST occurrence anchors the
- * section: definitions gather directly under it, WHEREVER it is — linting
+ * section: definitions gather directly under it, WHEREVER it is - linting
  * must obey the user's chosen section location instead of dragging the
  * section to the bottom (issue #55 follow-up, reported 2026-08-05).
  * Without an anchor, definitions move to the end of the note and the
@@ -72,7 +72,7 @@ export function moveFootnoteDefinitionsToBottom(
     if (blocks.length === 0) return markdown;
 
     // a line appended at EOF would itself be protected (an unclosed fence
-    // or comment runs to EOF) — relocating definitions into such a region
+    // or comment runs to EOF) - relocating definitions into such a region
     // would sever them from their references
     if (scan.endsProtected) return markdown;
 
@@ -86,7 +86,7 @@ export function moveFootnoteDefinitionsToBottom(
     while (body.length > 0 && body[body.length - 1] === "") body.pop();
 
     // the setting is markdown that can span MULTIPLE lines
-    // ("---\n## Footnotes"), so matching compares line runs — single-line
+    // ("---\n## Footnotes"), so matching compares line runs - single-line
     // comparison kept re-adding multi-line headings on every lint (bug
     // reported 2026-07-17). findLineRunEnd is the ONE anchor matcher
     // shared with buildDefinitionAppend's heading slot (fixed-point
@@ -105,7 +105,7 @@ export function moveFootnoteDefinitionsToBottom(
     if (anchorEnd !== -1) {
         const out: string[] = [];
         for (let i = 0; i <= anchorEnd; i++) {
-            // normalize the blank line above the heading run's start —
+            // normalize the blank line above the heading run's start -
             // same markdown block convention as everywhere else
             const headingStart = anchorEnd - sectionHeading.split("\n").length + 1;
             if (

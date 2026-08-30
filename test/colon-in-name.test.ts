@@ -7,7 +7,7 @@ import { fakeEditor } from "./helpers/fake-editor";
 import { fakePlugin as sharedFakePlugin } from "./helpers/fake-plugin";
 
 // Issue #50: jumping between the reference and definition of a named footnote
-// whose name contains ":" (e.g. [^arXiv:1234.5678]) used to fail — the
+// whose name contains ":" (e.g. [^arXiv:1234.5678]) used to fail - the
 // plugin created a new footnote instead. The fixture below is the exact
 // document from the report.
 

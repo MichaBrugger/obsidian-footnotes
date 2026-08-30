@@ -13,7 +13,7 @@ import { TableCellEditor } from "../editor/table-cursor";
  * footnotes are single-line, so whitespace runs (including newlines)
  * collapse to one space and the result is trimmed. Balanced brackets pass
  * through (pasted markdown links keep working); if any bracket is
- * unbalanced — which would end the ^[...] early and corrupt the note —
+ * unbalanced - which would end the ^[...] early and corrupt the note -
  * every bare bracket is escaped instead (pre-escaped \[ and \] keep their
  * meaning). A dangling trailing backslash would escape the wrapper's own
  * closing "]", so it is doubled into a literal one. Empty/whitespace
@@ -41,7 +41,7 @@ export function sanitizeInlineFootnoteContent(raw: string): string {
         );
     }
     // an odd trailing backslash run leaves one backslash escaping the
-    // wrapper's closing "]" — double it so it renders literally instead
+    // wrapper's closing "]" - double it so it renders literally instead
     const trailing = /\\*$/.exec(text);
     if (trailing && trailing[0].length % 2 === 1) {
         text += "\\";
@@ -54,7 +54,7 @@ export function sanitizeInlineFootnoteContent(raw: string): string {
  * INTACT on the masked simulated line: the span must open exactly at the
  * wrapper's "^" AND close on the wrapper's own "]". The close check
  * exists because an open-only check accepted a wrap whose closing
- * bracket an emergent "$…$" pair swallowed — the bracket walk then
+ * bracket an emergent "$…$" pair swallowed - the bracket walk then
  * latched onto an unrelated later "]" and the rendered line was math
  * eating prose (hunt 2026-08-25, bug-inline-wrap-close-swallowed). The
  * ONE landing predicate for every inline-wrap writer: caret insert,
@@ -105,12 +105,12 @@ export function inlineFootnoteSpanAt(
                 }
             }
         }
-        // this candidate never closes, so it isn't an inline footnote — a
+        // this candidate never closes, so it isn't an inline footnote - a
         // LATER "^[" on the line may still close (its opening "[" was
         // counted as nesting above), so keep scanning instead of bailing
         if (close === -1) continue;
         if (ch > i && ch <= close) return { open: i, close };
-        i = close; // cursor isn't in this one — keep scanning after it
+        i = close; // cursor isn't in this one - keep scanning after it
     }
     return null;
 }
@@ -128,7 +128,7 @@ export function inlineFootnoteExitCh(lineText: string, ch: number): number | nul
  * like the empty "[^]" reference guard (manual combo-test feedback,
  * 2026-08-08): a second press used to silently hop the caret out,
  * stranding an inline footnote with nothing in it. A FILLED inline
- * footnote is not this guard's business — there the press falls through
+ * footnote is not this guard's business - there the press falls through
  * to exitInlineFootnoteIfInside, the deliberate "done typing" hop.
  */
 export function warnEmptyInlineFootnoteIfInside(
@@ -154,7 +154,7 @@ export function warnEmptyInlineFootnoteIfInside(
  * "^[…]"-shaped fragment inside a fence, inline code, or a comment is
  * plain text, and treating it as an inline footnote made every command
  * inert there with a wrong toast (2026-08-11 review bug #7). A cheap raw
- * scan gates the whole-document masking off the every-press hot path —
+ * scan gates the whole-document masking off the every-press hot path -
  * masked indices match raw indices, so the span positions stay valid.
  */
 function maskedInlineFootnoteSpan(

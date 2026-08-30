@@ -6,11 +6,11 @@ import { isValidFootnoteName } from "./footnote-grammar";
 // The note's `footnote-prefix` frontmatter property: parsing (a hand-rolled
 // YAML subset matching what Obsidian shows as a property), validity rules,
 // and the settings-aware resolver the insert commands share. Depends only
-// on footnote-grammar (+ the FootnotePlugin TYPE, erased at runtime) —
+// on footnote-grammar (+ the FootnotePlugin TYPE, erased at runtime) -
 // split out of the all-in-one commands file 2026-08-11.
 
 // strip a trailing "\r" so CRLF notes match the exact "---" fence and the
-// "$"-anchored property regex (a "\r" defeats both otherwise) — the ONE
+// "$"-anchored property regex (a "\r" defeats both otherwise) - the ONE
 // copy both readers share (2026-08-11 review cleanliness)
 const stripCrLine = (line: string): string =>
     line.endsWith("\r") ? line.slice(0, -1) : line;
@@ -20,7 +20,7 @@ function parsePrefixValue(captured: string | undefined): string {
     let value = (captured ?? "").trim();
     // a value that IS a comment is an empty value
     if (value.startsWith("#")) return "";
-    // quotes end the value — anything after the closing quote
+    // quotes end the value - anything after the closing quote
     // (typically a comment) is not part of it
     const quoted = value.match(/^(["'])(.*?)\1/);
     if (quoted) return quoted[2];
@@ -34,16 +34,16 @@ function parsePrefixValue(captured: string | undefined): string {
 /**
  * The note's `footnote-prefix` frontmatter value, or "" when absent. Chapter
  * notes of a combined document set this (e.g. "2.") so the autonumbered
- * command creates "[^2.1]", "[^2.2]", … — unique across the merged export
+ * command creates "[^2.1]", "[^2.2]", … - unique across the merged export
  * (issue #31). Walks the head line-by-line WITHOUT splitting the whole
- * document — this runs several times per lint on the full note text
+ * document - this runs several times per lint on the full note text
  * (2026-08-11 review perf item).
  */
 export function footnotePrefix(markdownText: string): string {
     let lineStart = 0;
     let first = true;
     // the FIRST property line wins; its value only becomes real once the
-    // block CLOSES — Obsidian surfaces NO properties from an unclosed
+    // block CLOSES - Obsidian surfaces NO properties from an unclosed
     // "---" block (2026-08-11 review bug #11, ground-truthed via
     // metadataCache), and a prefix there would namespace footnotes from a
     // setting the user cannot see
@@ -58,11 +58,11 @@ export function footnotePrefix(markdownText: string): string {
         } else if (/^(---|\.\.\.)\s*$/.test(line)) {
             return value ?? "";
         } else if (value === null) {
-            // YAML needs whitespace after the colon — "footnote-prefix:2."
+            // YAML needs whitespace after the colon - "footnote-prefix:2."
             // is a plain scalar Obsidian doesn't show as a property, not a
             // mapping (bug-prefix-yaml-comment)
             const match = line.match(/^footnote-prefix:(?:\s+(.*))?$/);
-            // the "(?:\s+(.*))?" group is genuinely optional — undefined
+            // the "(?:\s+(.*))?" group is genuinely optional - undefined
             // when the property has no value at all
             if (match) value = parsePrefixValue(match[1]);
         }
@@ -93,7 +93,7 @@ export function footnotePrefixFromEditor(doc: Editor): string {
  * Why `prefix` can't be used as a footnote prefix, or null when it can.
  * Shared by the Set-footnote-prefix modal, the insert path, and the lint
  * guard. Digit-ending prefixes are the dangerous case: with prefix "10"
- * the first footnote is [^101] — indistinguishable from a plain numbered
+ * the first footnote is [^101] - indistinguishable from a plain numbered
  * footnote, which reindexing then renumbers, collapsing the namespace the
  * prefix exists to preserve.
  */
@@ -109,11 +109,11 @@ export function footnotePrefixProblem(prefix: string): string | null {
 }
 
 // the feature is enabled in settings, and a prefix that can't work BLOCKS
-// the insert (null) with an explanation — falling back to an unprefixed
+// the insert (null) with an explanation - falling back to an unprefixed
 // footnote just left the user something to delete (reported 2026-08-07).
 // Takes the already-extracted prefix so callers pick the cheap read:
 // footnotePrefixFromEditor per press, footnotePrefix when the full text is
-// already in hand (F1 — no whole-document materialization per keypress)
+// already in hand (F1 - no whole-document materialization per keypress)
 export function activeFootnotePrefix(
     plugin: FootnotePlugin,
     prefix: string,

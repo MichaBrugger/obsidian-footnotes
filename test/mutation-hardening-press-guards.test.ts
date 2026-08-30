@@ -20,7 +20,7 @@ import { fakePlugin as sharedFakePlugin } from "./helpers/fake-plugin";
 // press-guards scored 60%). The guards are driven DIRECTLY here, not through
 // the command entry points: the commands wrap them in simulate-and-verify
 // defense in depth that reaches the same refusal by another route, so a
-// command-level test passes even with a guard's condition broken — which is
+// command-level test passes even with a guard's condition broken - which is
 // why the edge conditions below survived. Each test pins one decision the
 // guard alone owns.
 
@@ -108,7 +108,7 @@ describe("the protected-caret guard at a line's edges", () => {
 
     it("refuses ch 0 of a line a comment region is open across", () => {
         // "still --> tail" closes the region mid-line, so the line itself is
-        // not wholly protected — ch 0 is inside only because the region
+        // not wholly protected - ch 0 is inside only because the region
         // crosses the line START
         expect(
             guard(
@@ -133,7 +133,7 @@ describe("the protected-caret guard at a line's edges", () => {
 
     it("refuses end of a line whose tail opens MATH the next line continues", () => {
         // the comment twin above passes even when the guard reads only
-        // startsInComment — this one needs startsInMath of the SAME next line
+        // startsInComment - this one needs startsInMath of the SAME next line
         expect(
             guard(["text $$", "E = mc^2", "$$", "after"], {
                 line: 0,

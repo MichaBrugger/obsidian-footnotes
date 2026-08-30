@@ -8,8 +8,8 @@ import FootnotePlugin from "../../src/main";
 // Hunt: 2026-08-09. Lens: regressions.
 // The migration copies the legacy value OVER the newer camelCase one and then
 // re-mangles it with "# ". Git archaeology says real upgrade paths can't
-// produce this state (0c54a45 deleted the old key on every load) — only a
-// downgrade or a sync merge could — so the newer setting silently loses in a
+// produce this state (0c54a45 deleted the old key on every load) - only a
+// downgrade or a sync merge could - so the newer setting silently loses in a
 // scenario that may be unreachable.
 
 function bareFootnotePlugin(): FootnotePlugin {

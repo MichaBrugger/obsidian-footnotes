@@ -4,7 +4,7 @@ import { protectedLines, scanDocument } from "../../src/parsing/markdown-scan";
 
 // Sol re-review bug #4 (2026-08-10), ground truth verified against
 // Obsidian's metadataCache ("blockquote:0-1, paragraph:3-3"): an unclosed
-// "$$" or "<!--" opened INSIDE a blockquote dies with its quote — but the
+// "$$" or "<!--" opened INSIDE a blockquote dies with its quote - but the
 // scanner's comment/math state had no container tracking (fences got it
 // in f84e96b), so everything after the quote was protected to EOF and
 // invisible to every scan. Comment/math regions now record the blockquote
@@ -34,7 +34,7 @@ describe("unclosed comment/math regions die with their blockquote", () => {
     });
 
     it("an unquoted lazy line also ends the quoted region", () => {
-        // CommonMark: lazy continuation is for paragraphs only — an
+        // CommonMark: lazy continuation is for paragraphs only - an
         // unprefixed line ends the quote, and the region with it
         const doc = "> $$\nlazy[^1]";
         expect(protectedLines(doc.split("\n"))).toEqual([false, false]);

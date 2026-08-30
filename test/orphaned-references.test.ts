@@ -12,7 +12,7 @@ import {
 
 // The symmetric orphan handling (requested 2026-08-10): references with no
 // definition and definitions with no reference each get a delete toggle, and
-// while a toggle is off linting alerts about that orphan kind instead —
+// while a toggle is off linting alerts about that orphan kind instead -
 // orphans are never silent.
 
 describe("orphanedFootnoteReferenceNames (the alert's list)", () => {
@@ -36,9 +36,9 @@ describe("orphanedFootnoteReferenceNames (the alert's list)", () => {
 
     it("the note's bare-prefix placeholder is not an orphan", () => {
         expect(orphanedFootnoteReferenceNames("mid [^ch~] naming", "ch~")).toEqual([]);
-        // case-variant placeholder too — ids fold
+        // case-variant placeholder too - ids fold
         expect(orphanedFootnoteReferenceNames("mid [^CH~] naming", "ch~")).toEqual([]);
-        // …but only the exact placeholder — a named orphan still counts
+        // …but only the exact placeholder - a named orphan still counts
         expect(orphanedFootnoteReferenceNames("mid [^2.] x[^stray]", "2.")).toEqual([
             "stray",
         ]);

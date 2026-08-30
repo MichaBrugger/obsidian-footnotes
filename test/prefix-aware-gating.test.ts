@@ -5,11 +5,11 @@ import { lintFootnotes, lintOptionsFromSettings } from "../src/linting/linter";
 
 // Manual combo-test feedback (Jason, 2026-08-08): with the prefix FEATURE
 // on but the "Apply the note's footnote prefix" rule OFF, linting still
-// renumbered prefixed footnotes within their namespace — weirdly
+// renumbered prefixed footnotes within their namespace - weirdly
 // inconsistent, since nothing else was being prefixed. Prefix-aware
 // reindexing is gated on the apply rule too: while it is off, footnotes
 // carrying the prefix are treated as NAMED footnotes and keep their ids.
-// Since 2026-08-11 the gating is structural — ONE applyNotePrefix flag
+// Since 2026-08-11 the gating is structural - ONE applyNotePrefix flag
 // drives both the apply step and the namespace-aware reindex, so the
 // inconsistent combination can no longer be expressed at all.
 

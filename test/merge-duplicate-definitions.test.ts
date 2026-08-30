@@ -10,7 +10,7 @@ import {
 // the LAST definition of a name (ground-truthed live, case-insensitively),
 // so earlier ones are dead text. With "Merge duplicate definitions" on, the
 // later bodies merge INTO the first block in document order as indented
-// continuation lines — indentation on purpose: a lazy unindented
+// continuation lines - indentation on purpose: a lazy unindented
 // continuation renders the same but is not part of the definition block,
 // so move-to-bottom would strand it. With the toggle off, lint alerts
 // (duplicates are never silent, like orphans).

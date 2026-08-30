@@ -22,7 +22,7 @@ export function moveCursorAndSetJumpPoint(
     changes?: EditorChange[],
     center = false,
 ): void {
-    // when focus sits in a sub-editor (a table cell being edited — its
+    // when focus sits in a sub-editor (a table cell being edited - its
     // contentDOM is nested inside the main editor's), return it to the main
     // editor BEFORE moving the cursor: a jump out of the table would
     // otherwise leave keystrokes going to the abandoned cell editor, while
@@ -44,7 +44,7 @@ export function moveCursorAndSetJumpPoint(
     }
 
     // jumps land CENTERED: Obsidian's minimal scrolling would park the
-    // cursor at the viewport edge — on mobile, nearly off screen. Local
+    // cursor at the viewport edge - on mobile, nearly off screen. Local
     // inserts pass center=false so the view doesn't shift underfoot.
     if (center) {
         doc.scrollIntoView({ from: newCursorPos, to: newCursorPos }, true);
@@ -61,13 +61,13 @@ export function moveCursorAndSetJumpPoint(
     }
 }
 
-/** Whether `c` is trailing punctuation (TrailingPunctuationChars in markdown-scan — ASCII + CJK, shared with the lint rule). Guards the empty string explicitly — `"…".includes("")` is true, and `text[i]` past EOL yields undefined at some call sites. */
+/** Whether `c` is trailing punctuation (TrailingPunctuationChars in markdown-scan - ASCII + CJK, shared with the lint rule). Guards the empty string explicitly - `"…".includes("")` is true, and `text[i]` past EOL yields undefined at some call sites. */
 function isTrailingPunctuation(c: string | undefined): boolean {
     return !!c && TrailingPunctuationChars.includes(c);
 }
 
 // Word characters for the offset walks below are unicode
-// letters/numbers/marks — combining accents belong to the word they
+// letters/numbers/marks - combining accents belong to the word they
 // follow, matching the grapheme-aware `wordAt`. The walks step by CODE
 // POINTS: astral letters (Deseret, CJK Ext-B like 𠮷) are two UTF-16
 // units, and testing lone surrogates against \p{L} split words in table
@@ -75,9 +75,9 @@ function isTrailingPunctuation(c: string | undefined): boolean {
 const isWordCp = (cp: number | undefined) =>
     cp !== undefined && /[\p{L}\p{N}\p{M}_]/u.test(String.fromCodePoint(cp));
 
-// the code point touching `i` from the left — stepping over a low
+// the code point touching `i` from the left - stepping over a low
 // surrogate to the pair's start, and treating a mid-pair `i` as inside
-// its own pair — or undefined at the text's start
+// its own pair - or undefined at the text's start
 const cpBefore = (text: string, i: number): number | undefined => {
     if (i <= 0) return undefined;
     const prev = text.charCodeAt(i - 1);
@@ -106,7 +106,7 @@ export function endOfWordOffset(text: string, offset: number): number {
     }
     let end = offset;
     // a mid-pair start (found by fast-check, 2026-08-10) snaps back to its
-    // code point's boundary so the walk — and the returned caret — always
+    // code point's boundary so the walk - and the returned caret - always
     // land between code points
     const unitAtEnd = text.charCodeAt(end);
     if (unitAtEnd >= 0xdc00 && unitAtEnd <= 0xdfff) end--;
@@ -124,7 +124,7 @@ export function endOfWordOffset(text: string, offset: number): number {
  * whole-word expansion (Jason's ask 2026-08-29): from `offset`, the start
  * of the word the offset sits strictly INSIDE. An offset already at a
  * word's first character, or not on a word character at all, returns
- * unchanged — there is no start-side punctuation grab, because the
+ * unchanged - there is no start-side punctuation grab, because the
  * insert hop has no start-side analog either.
  */
 export function startOfWordOffset(text: string, offset: number): number {

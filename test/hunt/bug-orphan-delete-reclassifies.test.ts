@@ -5,7 +5,7 @@ import { removeOrphanedFootnoteReferences } from "../../src/linting/rules/remove
 
 // Found by the fast-check idempotence property (2026-08-10), ground truth
 // verified against Obsidian's metadataCache: deleting the orphaned "[^42]"
-// blanks the only paragraph between a definition and an indented chunk —
+// blanks the only paragraph between a definition and an indented chunk -
 // and Obsidian continues a footnote definition across ANY run of blank
 // lines, so the chunk flips from indented CODE to definition CONTINUATION.
 // The next lint pass then saw "[^73]" as a live (orphaned) reference and
@@ -21,7 +21,7 @@ describe("orphan-reference deletion never re-classifies other lines", () => {
 
     it("reindex's keepOrphanedDefinitions:false deletion is hoisted before the guard", () => {
         // Reindex used to delete the shielding [^1]: alpha definition
-        // AFTER the reference rule refused [^42]'s deletion because of it —
+        // AFTER the reference rule refused [^42]'s deletion because of it -
         // pass two then deleted what pass one refused. All definition
         // deletion now happens up front.
         const doc = "[^1]: alpha\n\n[^42]\n\n    indented code[^73]";
@@ -40,7 +40,7 @@ describe("orphan-reference deletion never re-classifies other lines", () => {
 
     it("a deletion's blank residue is re-settled within the same pass", () => {
         // "[^x]" was a paragraph of its own; deleting it leaves blank lines
-        // that the NEXT pass's move-to-bottom collapsed — the pipeline now
+        // that the NEXT pass's move-to-bottom collapsed - the pipeline now
         // re-runs move after a real deletion so pass one already emits the
         // fixed point
         const doc = "[^1]: alpha\n\n[^x]";
@@ -58,7 +58,7 @@ describe("orphan-reference deletion never re-classifies other lines", () => {
 
     it("reference deletion judges the layout AFTER move-to-bottom", () => {
         // Pass one refused [^1]'s deletion because [^note]'s definition sat
-        // above the code chunk — then move-to-bottom relocated that
+        // above the code chunk - then move-to-bottom relocated that
         // definition, and pass two deleted what pass one refused. The rule
         // now runs after move, on the settled layout, so its verdict is
         // the same on every pass.
@@ -79,7 +79,7 @@ describe("orphan-reference deletion never re-classifies other lines", () => {
         // With BOTH deletions on: [^1]: alpha is an orphaned definition and
         // [^9] an orphaned reference. References-first refused [^9] (its
         // blanking would flip the code chunk into a continuation of [^1])
-        // — then definitions-first deleted [^1], and the SECOND pass could
+        // - then definitions-first deleted [^1], and the SECOND pass could
         // delete what the first refused (idempotence property, 2026-08-10).
         // Definitions delete first, so the refusal guard judges the doc
         // that actually survives the pass.
@@ -100,7 +100,7 @@ describe("orphan-reference deletion never re-classifies other lines", () => {
         const doc =
             "keep[^1] drop[^9] end\n\npara\n\n    indented code[^73]\n\n[^1]: one";
         // the indented chunk is shielded by the "para" paragraph in BOTH
-        // the input and the output — [^9]'s deletion changes nothing
+        // the input and the output - [^9]'s deletion changes nothing
         expect(removeOrphanedFootnoteReferences(doc)).toBe(
             "keep[^1] drop end\n\npara\n\n    indented code[^73]\n\n[^1]: one",
         );

@@ -6,10 +6,10 @@ import { removeOrphanedFootnoteDefinitions } from "../../src/linting/rules/remov
 // Sol re-review bug #2 (2026-08-10), ground truth verified against
 // Obsidian's metadataCache (sections: "list:0-2"): a blank line and then
 // 4-space-indented content following a list item is a LIVE loose-list
-// continuation — indented code inside a list item starts 4 columns past
+// continuation - indented code inside a list item starts 4 columns past
 // the item's CONTENT indent, not at column 4 of the document. The scanner
 // classified such continuations as indented code, so references in them
-// were invisible — and orphan-definition deletion deleted a definition
+// were invisible - and orphan-definition deletion deleted a definition
 // whose only reference sat in one (silent data loss on ordinary lists).
 
 describe("loose-list indented continuations are live content", () => {
@@ -46,7 +46,7 @@ describe("loose-list indented continuations are live content", () => {
     });
 
     it("a paragraph after the list restores the document threshold", () => {
-        // the blank + column-0 paragraph closes the item — the later
+        // the blank + column-0 paragraph closes the item - the later
         // 4-space chunk is plain indented code again
         const prot = protectedLines(
             "- a\n\npara\n\n    code[^7]".split("\n"),

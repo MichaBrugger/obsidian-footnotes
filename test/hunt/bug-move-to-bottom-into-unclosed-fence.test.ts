@@ -6,7 +6,7 @@ import { findDefinitionBlocks, protectedLines } from "../../src/parsing/markdown
 // BUG: moveFootnoteDefinitionsToBottom relocates a valid definition INTO an
 // unclosed code fence. In the input, "[^1]: def" is a fully valid definition
 // ABOVE an unclosed fence. move-to-bottom appends it at the very end of the
-// document — after the unclosed fence — where protectedLines (by design, an
+// document - after the unclosed fence - where protectedLines (by design, an
 // unclosed fence protects to EOF) now treats it as inert code. The plugin's own
 // findDefinitionBlocks can no longer see the [^1] definition, so the working
 // [^1] reference on line 0 is severed from its body. (lint inherits this via its

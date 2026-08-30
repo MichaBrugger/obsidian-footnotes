@@ -7,14 +7,14 @@ import { lintFootnotes, lintOptionsFromSettings } from "../../src/linting/linter
 
 // BUG fixed 2026-08-25 (hunt, interactions lens): with footnote-prefix
 // "p." active AND the Apply-footnote-prefix lint rule on, renaming
-// [^p.1] to the bare "5" used to succeed silently — and the very next
+// [^p.1] to the bare "5" used to succeed silently - and the very next
 // lint swept [^5] back into the namespace as the byte-identical
 // original [^p.1], undoing the user's explicit rename with no notice.
 // planFootnoteRename consulted no prefix state at all (unlike every
 // creation path). NOW: the rename modal passes the ARMED sweep prefix
 // (feature on + lint rule on + valid note prefix) as
 // options.sweepPrefix, and the plan refuses an out-of-namespace name
-// with an inline reason naming the prefix to type — no silent undo can
+// with an inline reason naming the prefix to type - no silent undo can
 // follow. With the sweep unarmed (either toggle off), bare renames
 // stay allowed and durable, exactly as before.
 

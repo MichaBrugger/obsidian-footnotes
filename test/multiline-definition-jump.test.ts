@@ -93,7 +93,7 @@ describe("jumping back from a multi-line definition", () => {
 });
 
 // Bug #12 (2026-08-11 review, Kimi): jumping TO a definition hand-rolled a
-// weaker continuation walk than findDefinitionBlocks — it stopped at blank
+// weaker continuation walk than findDefinitionBlocks - it stopped at blank
 // lines and at protected region interiors, so the caret landed mid-
 // definition on blank-separated paragraphs and on definitions carrying an
 // indented math/comment region. The jump must land where the BLOCK ends.
@@ -121,7 +121,7 @@ describe("jumping TO a definition lands at the block's real end", () => {
 
     it("lands on the LAST definition when duplicates exist (the one Obsidian renders)", () => {
         // ground-truthed 2026-08-12: with duplicate definitions Obsidian
-        // renders only the LAST one — jumping to the first would land the
+        // renders only the LAST one - jumping to the first would land the
         // caret on dead text
         const lines = [
             "r[^d] here",

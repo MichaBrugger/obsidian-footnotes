@@ -1,9 +1,9 @@
 // Renders the property generators into vault notes for human review:
 //
-//   1. a DOCUMENT corpus — raw samples of docArb, the generator every
+//   1. a DOCUMENT corpus - raw samples of docArb, the generator every
 //      transform and press property fuzzes over, written unfenced so
 //      Obsidian renders the footnotes for realism review;
-//   2. an ENTRY corpus — generated creation-command scenarios (press,
+//   2. an ENTRY corpus - generated creation-command scenarios (press,
 //      typed name/body, clipboard, selection) executed against the same
 //      transaction-applying fake editor the press properties use, with
 //      the document shown before and after and the caret marked "‸".
@@ -341,7 +341,7 @@ async function main() {
         path.join(docsDir, "00 - Corpus Index.md"),
         `# Property corpus v2 (seed ${seed})
 
-100 raw samples of the CURRENT document generator (test/arbitraries.ts docArb) — the same one the transform and press properties fuzz over. Supersedes the "Property Corpus 2026-08-12" folder.
+100 raw samples of the CURRENT document generator (test/arbitraries.ts docArb) - the same one the transform and press properties fuzz over. Supersedes the "Property Corpus 2026-08-12" folder.
 
 Review prompts:
 - Does the prose/footnote ratio feel like a real note?

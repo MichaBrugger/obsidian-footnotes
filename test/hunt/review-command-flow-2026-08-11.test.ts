@@ -19,14 +19,14 @@ import { fakePlugin as sharedFakePlugin } from "../helpers/fake-plugin";
 
 // Pins for the 2026-08-11 review's command-flow bugs:
 //   #6 the empty-"[^]" hop used LINE-LOCAL masking while its guard used
-//      document-aware masking — inside a fence they disagreed and the
+//      document-aware masking - inside a fence they disagreed and the
 //      caret hopped in protected text instead of inserting
-//   #7 the inline-footnote guards did no masking at all — a literal "^[]"
+//   #7 the inline-footnote guards did no masking at all - a literal "^[]"
 //      inside a fence made every command inert with a wrong toast
 //   #8 autonum required currentMax === 1 for the section heading, skipping
 //      it on notes whose only footnote artifact is an orphan reference
 //   #9 caret guards ran before the table sub-editor fallback resolved the
-//      real cursor — they must honor a passed-in position
+//      real cursor - they must honor a passed-in position
 //  #13 openFootnotePopup's no-view early return skipped onUnavailable,
 //      stranding the fallback jump and the deferred creation lint
 
@@ -54,10 +54,10 @@ function fakePlugin(
 }
 
 describe("bug #6: the empty-[^] hop must be document-aware", () => {
-    it("a '[^]' inside a fence is plain text — the named command neither hops nor warns about it", async () => {
+    it("a '[^]' inside a fence is plain text - the named command neither hops nor warns about it", async () => {
         // originally pinned as "inserts instead of hopping"; since the
         // protected-caret guard (Jason's rule 2026-08-12) creation in a
-        // fence is blocked outright — the point that survives is that the
+        // fence is blocked outright - the point that survives is that the
         // caret never hops and the empty-reference toast never fires
         const doc = fakeEditor(["```", "x [^] y", "```", "prose"], { line: 1, ch: 4 });
         await insertNamedFootnote(fakePlugin(doc));
@@ -68,7 +68,7 @@ describe("bug #6: the empty-[^] hop must be document-aware", () => {
     it("a live '[^]' still gets the hop (control)", async () => {
         const doc = fakeEditor(["x [^] y"], { line: 0, ch: 4 });
         await insertNamedFootnote(fakePlugin(doc));
-        // the guard warns and stays — no changes, cursor untouched
+        // the guard warns and stays - no changes, cursor untouched
         expect(doc.appliedChanges).toEqual([]);
         expect(doc.cursor).toEqual({ line: 0, ch: 4 });
     });
@@ -76,7 +76,7 @@ describe("bug #6: the empty-[^] hop must be document-aware", () => {
 
 describe("bug #7: inline-footnote guards must mask", () => {
     // both cases originally pinned the insertion; since the protected-caret
-    // guard (Jason's rule 2026-08-12) creation there is blocked — what
+    // guard (Jason's rule 2026-08-12) creation there is blocked - what
     // survives of bug #7 is that the WRONG toasts (empty-inline warning,
     // hop-out) never fire on fence/code-span text
     it("a literal empty '^[]' inside a fence never fires the empty-inline warning", async () => {
@@ -133,7 +133,7 @@ describe("bug #8: the section heading belongs to the first DEFINITION", () => {
 describe("bug #9: guards honor a passed-in cursor position", () => {
     it("warnEmptyInlineFootnoteIfInside uses the given position, not getCursor()", () => {
         // getCursor() reports a stale position OUTSIDE the empty inline
-        // footnote; the passed position is inside it — the guard must warn
+        // footnote; the passed position is inside it - the guard must warn
         const doc = fakeEditor(["word ^[] more"], { line: 0, ch: 0 });
         expect(
             warnEmptyInlineFootnoteIfInside(doc, null, { line: 0, ch: 7 }),

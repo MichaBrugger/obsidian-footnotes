@@ -2,12 +2,12 @@ import { App, Modal, Platform, Setting } from "obsidian";
 
 // The one-validated-text-field modal every dialog in this plugin is:
 // a single Setting with a text input, an inline error line under it,
-// and a CTA button — Enter, the button, and (where a subclass wires
+// and a CTA button - Enter, the button, and (where a subclass wires
 // them) the plugin's own hotkeys all land in submit(). Three modals
 // (set-prefix, rename, name-the-selection) each hand-rolled this
 // wiring; the base owns it, the subclasses own ONLY their submit
 // semantics and any extra onOpen/onClose behavior (the name modal's
-// active-modal registry and hotkey scope stay in ITS overrides — the
+// active-modal registry and hotkey scope stay in ITS overrides - the
 // prefix modal deliberately does not participate in that protocol).
 //
 // Not in stryker.config.json's mutate list: modal DOM against the live
@@ -39,7 +39,7 @@ export abstract class ValidatedTextModal extends Modal {
         this.setTitle(this.ui.title);
         // On Android the soft keyboard OVERLAYS the webview instead of
         // resizing it, so a vertically centered modal keeps its lower
-        // half — the error line and the CTA button — hidden behind the
+        // half - the error line and the CTA button - hidden behind the
         // keyboard (Jason's beta report, 2026-08-28). Anchor the modal to
         // the TOP of the screen on mobile and cap its height to what the
         // keyboard leaves visible: visualViewport.height shrinks when the

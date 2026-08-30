@@ -2,7 +2,7 @@
 // hand-roll its own `fakeEditor` (39 copies at the 2026-08-25 count),
 // each with its own `as unknown as Editor` cast; this module owns that
 // cast in ONE place and keeps the fakes honest by funneling every edit
-// through `simulateChanges` — the exact CodeMirror change-application
+// through `simulateChanges` - the exact CodeMirror change-application
 // order the commands' born-dead simulation relies on.
 //
 // Capabilities are OPT-IN because a capability's absence is itself a
@@ -11,7 +11,7 @@
 // footnote-prefix perf rule, 2026-08-11), one built without `edits`
 // proves a navigation press never writes, one built without `words`
 // proves the end-of-word adjustment stayed off. A disabled method
-// THROWS naming its option instead of being undefined — the same test
+// THROWS naming its option instead of being undefined - the same test
 // failure as the old missing-method TypeError, but the message says
 // which contract fired.
 //
@@ -47,14 +47,14 @@ export interface FakeEditorOptions {
 
 /** the fake, typed as the real Editor plus its inspectable state */
 export type FakeEditor = Editor & {
-    /** live line array — reflects every applied transaction */
+    /** live line array - reflects every applied transaction */
     lines: string[];
-    /** live caret — setCursor and transaction selections move it */
+    /** live caret - setCursor and transaction selections move it */
     cursor: EditorPosition;
     /** number of transaction() calls (atomicity assertions) */
     transactions: number;
     /**
-     * every EditorChange handed to transaction(), in order — the raw
+     * every EditorChange handed to transaction(), in order - the raw
      * specs, for pins that assert exactly what a press asked the editor
      * to do. (The old appliedChanges-family fakes recorded these WITHOUT
      * applying them; this helper records and applies, which is strictly
@@ -74,10 +74,10 @@ export function fakeEditor(
     const hasCaret = !!(options.cursor ?? options.carets);
     const disabled = (method: string, option: string) => () => {
         throw new Error(
-            `fake editor: ${method}() is disabled — this spec's editor was built without \`${option}\`, so the code under test is not allowed to call it`,
+            `fake editor: ${method}() is disabled - this spec's editor was built without \`${option}\`, so the code under test is not allowed to call it`,
         );
     };
-    // state first, methods closing over it — merging the two at the end
+    // state first, methods closing over it - merging the two at the end
     // keeps the object self-reference out of TypeScript's inference
     const state = {
         lines: lines.slice(),

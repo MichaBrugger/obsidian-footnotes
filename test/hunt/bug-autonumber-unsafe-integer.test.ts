@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { computeNextFootnoteNumber } from "../../src/parsing/footnote-grammar";
 
-// With an existing [^9007199254740991] (MAX_SAFE_INTEGER), the autonumber mints 9007199254740992, which later scans skip via the isSafeInteger guard, so the NEXT press mints the same id AGAIN — duplicate footnote ids.
+// With an existing [^9007199254740991] (MAX_SAFE_INTEGER), the autonumber mints 9007199254740992, which later scans skip via the isSafeInteger guard, so the NEXT press mints the same id AGAIN - duplicate footnote ids.
 // Hunt: 2026-08-10. Lens: regressions.
 // Root cause: computeNextFootnoteNumber increments the largest scanned id without checking Number.isSafeInteger on the result, while the scan side's isSafeInteger guard can never see the minted id.
 

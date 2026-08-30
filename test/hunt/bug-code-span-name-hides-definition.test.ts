@@ -11,7 +11,7 @@ import { listExistingFootnoteDefinitions } from "../../src/editor/doc-context";
 // before the label is carved off, the emergent span `b]: c` swallows the
 // label's own "]:", and DefinitionStart no longer matches the masked
 // twin. Ground truth (micromark + gfm-footnote, the differential-oracle
-// convention): footnote-label recognition is NOT inline-tokenized — the
+// convention): footnote-label recognition is NOT inline-tokenized - the
 // line parses as footnoteDefinition{identifier:"a`b"} with body "c`d",
 // so Obsidian renders and links a definition this plugin can't see
 // (listing, orphan detection, navigation all blind). Real parsers carve
@@ -19,7 +19,7 @@ import { listExistingFootnoteDefinitions } from "../../src/editor/doc-context";
 // Skeptic-confirmed. NOTE the twin PROBE-ERROR ruling from the same
 // hunt: for "[^a`]:`x]" the label side WINS per ground truth (the raw
 // gate in referenceOccurrenceAtCursor is CORRECT to see a definition
-// there; the masked twin's phantom reference is the wrong side) — a fix
+// there; the masked twin's phantom reference is the wrong side) - a fix
 // must resolve the label before masking, not weaken the label check.
 
 describe("code-span-shaped names inside definition labels", () => {

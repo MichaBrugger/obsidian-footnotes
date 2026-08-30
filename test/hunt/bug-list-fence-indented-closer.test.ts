@@ -4,11 +4,11 @@ import { protectedLines, scanDocument } from "../../src/parsing/markdown-scan";
 
 // Sol re-review bug #1 (2026-08-10): a fence opened on a list-item line
 // ("10. ```", "  - ```") closes with a fence indented to the ITEM'S
-// content column — but the closer test only accepted 0-3 absolute spaces,
+// content column - but the closer test only accepted 0-3 absolute spaces,
 // so the fence ran to EOF: every reference and definition below the list
 // went invisible (duplicate autonumbers, reindex severing pairs). The
 // fence now records its container's content indent and accepts closers
-// indented up to that + 3 — the same one-level-deeper class as the
+// indented up to that + 3 - the same one-level-deeper class as the
 // bug-list-item-fence fix.
 
 describe("fences in list items accept content-indented closers", () => {

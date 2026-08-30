@@ -19,7 +19,7 @@ interface RuleExample<O = void> {
  * A single whole-document footnote rule. `apply` is the pure
  * markdown → markdown transform; `O` is its options type (void when the rule
  * takes none). `ignoreTypes` is declared for parity with Linter and to
- * document which regions the transform leaves alone — the transforms
+ * document which regions the transform leaves alone - the transforms
  * self-protect internally over markdown-scan, so this is documentation, not
  * wiring.
  */

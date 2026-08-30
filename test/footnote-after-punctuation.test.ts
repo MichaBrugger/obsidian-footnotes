@@ -59,7 +59,7 @@ describe("footnoteAfterPunctuation", () => {
     });
 
     // Bug (2026-08-11 review, both reviewers): the rule's hand-rolled regex
-    // didn't know the grammar's exclusions — an escaped "\[^1]" is literal
+    // didn't know the grammar's exclusions - an escaped "\[^1]" is literal
     // prose per CommonMark, and "^[…]" opens an inline footnote whose
     // bracket belongs to it. Swapping either turns text the user typed on
     // purpose into a live reference (which orphan-deletion then eats) or
@@ -83,7 +83,7 @@ describe("footnoteAfterPunctuation", () => {
 
     it("an escaped caret before the bracket is a real reference and still moves", () => {
         // "\^" is a literal caret, so the "[^x]" after it is NOT inline-
-        // footnote content — same branch as footnoteReferenceMatches
+        // footnote content - same branch as footnoteReferenceMatches
         expect(footnoteAfterPunctuation("odd \\^[^x]. end")).toBe(
             "odd \\^.[^x] end",
         );
@@ -126,7 +126,7 @@ describe("footnoteAfterPunctuation", () => {
 
 describe("footnoteAfterPunctuation and single-line HTML comments", () => {
     // found live 2026-07-17: "<!-- [^66]: x -->" had its colon swapped to
-    // ":[^66]" — the rule masked inline code but not one-line comments
+    // ":[^66]" - the rule masked inline code but not one-line comments
     it("never touches a reference-colon pair inside a comment", () => {
         const text = "<!-- [^66]: a commented-out definition -->";
         expect(footnoteAfterPunctuation(text)).toBe(text);

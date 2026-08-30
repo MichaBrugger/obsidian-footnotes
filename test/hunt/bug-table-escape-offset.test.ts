@@ -58,7 +58,7 @@ function fakeResolution(
 
 describe("table source-to-cell offset accounts for escape bytes (fixed 2026-08-10)", () => {
     it("leaves a caret BEFORE the escape unshifted", () => {
-        // head 3 sits after "lef", before any escape — the mapping must not
+        // head 3 sits after "lef", before any escape - the mapping must not
         // shift carets that no escape byte precedes
         expect(fakeResolution("| left \\| [^note] | tail |", "left | [^note]", 3)).toEqual({
             line: 7,

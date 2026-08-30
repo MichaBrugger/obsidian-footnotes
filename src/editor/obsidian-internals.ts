@@ -18,12 +18,12 @@ import {
 interface ObsidianEditorView {
     state: { selection: { main: { head: number } } };
     coordsAtPos(pos: number): { left: number; top: number; bottom: number } | null;
-    /** Maps a DOM node inside the editor — including widget DOM such as the
-     * table editor — to a document offset. Standard CM6 API. */
+    /** Maps a DOM node inside the editor - including widget DOM such as the
+     * table editor - to a document offset. Standard CM6 API. */
     posAtDOM?(node: Node): number;
     contentDOM: HTMLElement;
     focus(): void;
-    /** CM5-compatibility editor attached by the vim extension ("cm two levels deep"). `state.vim.insertMode` is how the popup's Escape handling tells "leave insert mode" apart from "close me" — the editor preventDefaults EVERY Escape, so event state can't (2026-08-13). */
+    /** CM5-compatibility editor attached by the vim extension ("cm two levels deep"). `state.vim.insertMode` is how the popup's Escape handling tells "leave insert mode" apart from "close me" - the editor preventDefaults EVERY Escape, so event state can't (2026-08-13). */
     cm?: { state?: { vim?: { insertMode?: boolean } } };
 }
 
@@ -53,7 +53,7 @@ interface AppWithMetadataTypeManager extends App {
 
 /**
  * Pin `name`'s vault-wide property type to "text". Obsidian INFERS an
- * unassigned property's type from its occurrences — numeric-looking
+ * unassigned property's type from its occurrences - numeric-looking
  * footnote-prefix values like "2." registered the property as a NUMBER,
  * after which the Properties panel coerces edits numerically (reported
  * 2026-08-12). An explicit assignment persists in types.json and wins over
@@ -67,11 +67,11 @@ export function ensureTextPropertyType(app: App, name: string): void {
     try {
         manager.setType(name, "text");
     } catch {
-        // private API — a shape change must never break the caller
+        // private API - a shape change must never break the caller
     }
 }
 
-/** Whether `mdView` is in Reading view — where every text-editing command must be inert (the editor API would edit the HIDDEN buffer). The structural parameter type keeps getMode honestly optional: bare test fakes without it count as editable. Lives beside viewEditor — both guard against what the view actually is (moved out of doc-context, 2026-08-11 review cleanliness). */
+/** Whether `mdView` is in Reading view - where every text-editing command must be inert (the editor API would edit the HIDDEN buffer). The structural parameter type keeps getMode honestly optional: bare test fakes without it count as editable. Lives beside viewEditor - both guard against what the view actually is (moved out of doc-context, 2026-08-11 review cleanliness). */
 export function readingViewActive(mdView: {
     getMode?: MarkdownView["getMode"];
 }): boolean {
@@ -85,7 +85,7 @@ interface MarkdownEmbed {
     saving?: boolean;
     saveAgain?: boolean;
     subpathNotFound?: boolean;
-    /** The section text as of the last set() — NOT live editor content. save()'s retry path reads this. */
+    /** The section text as of the last set() - NOT live editor content. save()'s retry path reads this. */
     text?: string;
     editMode?: {
         editor?: {
@@ -101,7 +101,7 @@ interface MarkdownEmbed {
     loadFile(): Promise<void>;
     showEditor(): void;
     /**
-     * Immediate save — `requestSave` is its debounced wrapper. The section
+     * Immediate save - `requestSave` is its debounced wrapper. The section
      * text and the write flag are REQUIRED: current Obsidian's save(t, n)
      * passes t straight into set(), and set(undefined) both throws deep in
      * the save chain AND poisons `this.text` so the embed's own later
@@ -110,7 +110,7 @@ interface MarkdownEmbed {
      * entirely.
      */
     save?(text: string, write: boolean): Promise<void> | void;
-    /** The debounced save/fold-save wrappers (Obsidian debounce objects). A timer left armed at unload fires against the CLEARED embed state and throws deep in the save chain (reported 2026-08-13) — teardown cancels both. */
+    /** The debounced save/fold-save wrappers (Obsidian debounce objects). A timer left armed at unload fires against the CLEARED embed state and throws deep in the save chain (reported 2026-08-13) - teardown cancels both. */
     requestSave?: { cancel?(): void };
     requestSaveFolds?: { cancel?(): void };
 }
@@ -191,7 +191,7 @@ export interface WindowWithVim extends Window {
 
 /**
  * The undocumented per-command hotkey registry behind Settings → Hotkeys.
- * Optional throughout — a future release renaming it degrades to "no
+ * Optional throughout - a future release renaming it degrades to "no
  * combos", never a crash.
  */
 interface HotkeyManager {
@@ -206,7 +206,7 @@ interface AppWithHotkeyManager extends App {
 /**
  * The key combos that currently trigger `commandId`: the user's custom
  * assignment when one exists, else the command's defaults, else none. The
- * name-the-footnote modal registers these on its own keyboard scope — a
+ * name-the-footnote modal registers these on its own keyboard scope - a
  * real keypress never reaches global hotkeys while a modal is open, so
  * the modal must speak the commands' combos itself (2026-08-22).
  */

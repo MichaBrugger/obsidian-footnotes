@@ -5,14 +5,14 @@ import { verifyLiveFootnoteInsertion } from "../src/editor/insertion-liveness";
 // Direct pins for the shared born-dead verdict (extracted 2026-08-25).
 // The call sites' behavior is pinned elsewhere (command-properties,
 // mutation-hardening-creation, selection-to-footnote); these hit the
-// helper's OWN contract — each refusal case below kills a mutant the
+// helper's OWN contract - each refusal case below kills a mutant the
 // 2026-08-25 scoped Stryker run showed surviving when only the call
 // sites were tested: the definition must start at EXACTLY the given
 // label line AND claim every seeded body line, and EVERY reference must
 // parse at EXACTLY its anchor under EXACTLY the given name.
 
 const LINES = ["alpha bravo", "", "tail"];
-// appends "\n\n[^1]: " after "tail" — label lands on simulated line 4
+// appends "\n\n[^1]: " after "tail" - label lands on simulated line 4
 const DEFINITION_APPEND = { from: { line: 2, ch: 4 }, text: "\n\n[^1]: " };
 
 describe("verifyLiveFootnoteInsertion", () => {
@@ -40,7 +40,7 @@ describe("verifyLiveFootnoteInsertion", () => {
             ],
             referenceChangeIndices: [0],
             footnoteId: "1",
-            // the label really lands on line 4 — a block that merely ENDS
+            // the label really lands on line 4 - a block that merely ENDS
             // past line 3 must not count as starting there
             definitionLabelLine: 3,
         });
@@ -68,7 +68,7 @@ describe("verifyLiveFootnoteInsertion", () => {
             changes: [
                 { from: { line: 0, ch: 5 }, text: "[^1]" },
                 // the second body line is a heading, which no definition
-                // block can claim — the block ends on the label line
+                // block can claim - the block ends on the label line
                 { from: { line: 2, ch: 4 }, text: "\n\n[^1]: one\n# two" },
             ],
             referenceChangeIndices: [0],
@@ -93,7 +93,7 @@ describe("verifyLiveFootnoteInsertion", () => {
         expect(verified).toBeNull();
     });
 
-    it("one dead landing refuses the lot — EVERY reference must be live", () => {
+    it("one dead landing refuses the lot - EVERY reference must be live", () => {
         const verified = verifyLiveFootnoteInsertion({
             lines: ["alpha bravo", "`code x`", "tail"],
             changes: [

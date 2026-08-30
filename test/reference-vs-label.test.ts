@@ -11,11 +11,11 @@ import { fakePlugin as sharedFakePlugin } from "./helpers/fake-plugin";
 
 const fakePlugin = sharedFakePlugin({ enablePopupEditor: false });
 
-describe("navigation twin — blockquoted duplicate label as phantom jump target", () => {
+describe("navigation twin - blockquoted duplicate label as phantom jump target", () => {
     it("caret on a column-0 definition whose only twin is a blockquoted duplicate label: should report, not jump", () => {
         // No references anywhere; two definitions of "1", one blockquoted.
         // Mirrors the pinned lone-callout case ("reports instead of jumping
-        // to itself") — a definition label is not a reference.
+        // to itself") - a definition label is not a reference.
         const lines = ["[^1]: first", "> [^1]: second"];
         const doc = fakeEditor(lines, { wholeDoc: true });
         shouldJumpFromDefinitionToReference(lines[0], { line: 0, ch: 2 }, fakePlugin, doc);
@@ -51,7 +51,7 @@ describe("tableRowCellSpans escape edges", () => {
     });
 });
 
-describe("orphan-reference deletion — harder negative cases", () => {
+describe("orphan-reference deletion - harder negative cases", () => {
     it("a reference whose definition sits inside a single-line HTML comment is an orphan (commented-out defs are inert)", () => {
         // "<!-- [^1]: old -->" is commented out; the live [^1] reference IS an orphan.
         const doc = "live[^1] here\n\n<!-- [^1]: old -->";

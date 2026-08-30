@@ -12,20 +12,20 @@ import {
 import { IgnoreType } from "../ignore-types";
 import { FootnoteRule } from "../rule";
 
-// Orphaned REFERENCES — the mirror image of reindex's orphaned definitions
+// Orphaned REFERENCES - the mirror image of reindex's orphaned definitions
 // (requested 2026-08-10): a "[^5]" with no "[^5]:" line anywhere renders as
 // literal text in Obsidian, so linting either alerts about them (the
 // default) or, with the "Orphaned references" setting on Delete, removes them
 // from the text. Shared exclusions, in both modes:
 //  - ids are case-insensitive, so a definition in any casing counts;
-//  - invalid names (spaces/backticks) are not footnotes to Obsidian either —
+//  - invalid names (spaces/backticks) are not footnotes to Obsidian either -
 //    deleting "[^my note]" would destroy literal prose, so they are left
 //    alone (the creation path already warns about them);
 //  - the note's own bare-prefix placeholder ("[^2.]" under prefix "2.") is
-//    an IN-PROGRESS footnote mid-naming, owned by the unnamed-reference alert —
+//    an IN-PROGRESS footnote mid-naming, owned by the unnamed-reference alert -
 //    deleting it out from under the user's caret would be data loss.
 
-/** The definition names present in the note, case-folded — column-0 labels and blockquoted/callout ones (C22). definitionLabelWithName owns the masked-scan/raw-re-slice invariant. */
+/** The definition names present in the note, case-folded - column-0 labels and blockquoted/callout ones (C22). definitionLabelWithName owns the masked-scan/raw-re-slice invariant. */
 function definitionNamesFolded(lines: string[], masked: string[]): Set<string> {
     const names = new Set<string>();
     for (let i = 0; i < masked.length; i++) {
@@ -50,7 +50,7 @@ function isOrphan(
 
 /**
  * Distinct names of orphaned references in first-appearance order, each in its
- * first-seen casing — the alert's list. `orphanSafePrefix` is the note's own valid
+ * first-seen casing - the alert's list. `orphanSafePrefix` is the note's own valid
  * footnote-prefix while the prefix feature is on ("" otherwise).
  */
 export function orphanedFootnoteReferenceNames(
@@ -60,7 +60,7 @@ export function orphanedFootnoteReferenceNames(
     // alert helpers (2026-08-11 review perf item); direct callers omit it
     precomputed?: { lines: string[]; masked: string[] },
 ): string[] {
-    // no "[^" anywhere means no references (and no orphans) — this alert
+    // no "[^" anywhere means no references (and no orphans) - this alert
     // scan runs on every lint (perf F4)
     if (!markdown.includes("[^")) return [];
     const lines = precomputed?.lines ?? normalizeEol(markdown).text.split("\n");
@@ -87,7 +87,7 @@ export function orphanedFootnoteReferenceNames(
  * Every orphaned reference occurrence removed from the text (definitions,
  * protected regions, and the exclusions above untouched). Spacing seams
  * heal: "a [^1] b" → "a b", and a reference that was the last thing on its
- * line takes the space before it along — but spaces the line already ended
+ * line takes the space before it along - but spaces the line already ended
  * with (a markdown hard break) survive.
  */
 export function removeOrphanedFootnoteReferences(
@@ -134,7 +134,7 @@ export function removeOrphanedFootnoteReferences(
     // Deleting reference text can re-classify a DISTANT line: blanking the
     // paragraph between a definition and an indented chunk turns that chunk
     // from indented CODE into a definition CONTINUATION (Obsidian continues
-    // a definition across any run of blank lines — verified against
+    // a definition across any run of blank lines - verified against
     // metadataCache, 2026-08-10; found by the idempotence property), so the
     // next lint pass would edit text this pass promised to protect. A
     // deletion that changes ANY other line's protection classification is

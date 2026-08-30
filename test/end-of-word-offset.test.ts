@@ -65,19 +65,19 @@ describe("endOfWordOffset and unicode graphemes/words", () => {
     const PRECOMPOSED_E_ACUTE = String.fromCharCode(0x00e9);
 
     it("does not split a decomposed combining mark off its base letter", () => {
-        // c0 a1 f2 e3 U+0301(4) ,5 (space)6 x7 — word spans 0..4, comma hopped → 6.
+        // c0 a1 f2 e3 U+0301(4) ,5 (space)6 x7 - word spans 0..4, comma hopped → 6.
         const text = "cafe" + COMBINING_ACUTE + ", x";
         expect(endOfWordOffset(text, 2)).toBe(6);
     });
 
     it("does not stop at a combining mark at the start of a word", () => {
-        // e0 U+0301(1) t2 u3 d4 e5 (space)6 x7 — the word ends at 6.
+        // e0 U+0301(1) t2 u3 d4 e5 (space)6 x7 - the word ends at 6.
         const text = "e" + COMBINING_ACUTE + "tude x";
         expect(endOfWordOffset(text, 0)).toBe(6);
     });
 
     it("treats a precomposed accented word as one word", () => {
-        // c0 a1 f2 U+00E9(3) (space)4 x5 — the word ends at 4, not 3.
+        // c0 a1 f2 U+00E9(3) (space)4 x5 - the word ends at 4, not 3.
         const text = "caf" + PRECOMPOSED_E_ACUTE + " x";
         expect(endOfWordOffset(text, 2)).toBe(4);
     });
@@ -87,7 +87,7 @@ describe("endOfWordOffset and unicode graphemes/words", () => {
 // mid-surrogate-pair snaps back to the code point boundary before walking
 describe("mid-surrogate-pair offsets", () => {
     it("snaps a mid-pair start to the pair's boundary and walks the word", () => {
-        // "𐐀 " — offset 1 is inside the astral letter; the word ends at 2
+        // "𐐀 " - offset 1 is inside the astral letter; the word ends at 2
         expect(endOfWordOffset("\uD801\uDC00 ", 1)).toBe(2);
     });
 });

@@ -8,14 +8,14 @@ import { insertAutonumFootnote } from "../../src/commands/insert-or-navigate-foo
 
 // BUG (hunt 2026-08-25, interactions lens; skeptic-confirmed): a press
 // with one real drag-selection PLUS a collapsed caret elsewhere
-// (shift-drag then Alt-click — ordinary CodeMirror multi-cursor use)
+// (shift-drag then Alt-click - ordinary CodeMirror multi-cursor use)
 // silently converts the selection and DISCARDS the extra caret: no
 // footnote there, no notice. normalizedMainSelection filters
 // listSelections() to non-empty ranges BEFORE its length checks, so the
 // caret vanishes from consideration and the press reads as a lone
 // selection; multiCaretTargets is never consulted. The 2026-08-22
 // "selection claim keeps priority" ruling covered all-non-empty (refuse)
-// and all-collapsed (multi-caret) — the MIXED shape was never ruled on,
+// and all-collapsed (multi-caret) - the MIXED shape was never ruled on,
 // and the multi-caret feature's own founding rationale ("extra carets
 // used to be silently ignored, which served nobody") argues against
 // silent dropping. Either fix satisfies this pin: refuse atomically with

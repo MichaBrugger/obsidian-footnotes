@@ -4,7 +4,7 @@ import { orphanedByUndo } from "../src/editor/undo-orphan-notice";
 
 // Creating a footnote from a table cell takes TWO undo steps (the
 // reference rides the cell sub-editor's dispatch, the definition the main
-// editor's — CodeMirror can never group them), and the first undo strands
+// editor's - CodeMirror can never group them), and the first undo strands
 // an orphaned reference with no feedback (Jason's report 2026-08-27;
 // notice always on, his call). orphanedByUndo is the pure decision: which
 // names had a definition before the undo, lost it, and still have
@@ -29,7 +29,7 @@ describe("orphanedByUndo", () => {
     });
 
     it("stays silent when an undo removes reference AND definition together", () => {
-        // the normal single-transaction creation: one undo reverts both —
+        // the normal single-transaction creation: one undo reverts both -
         // exactly the case that must never toast
         expect(
             orphanedByUndo(

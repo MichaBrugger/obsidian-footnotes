@@ -10,7 +10,7 @@ import { lintFootnotes } from "../src/linting/linter";
 //   - numbering continues after the highest existing prefixed footnote, so
 //     nothing collides
 //   - named footnotes get the prefix too, keeping their name (A6 bug,
-//     2026-07-20) — unless the prefixed name already exists as another
+//     2026-07-20) - unless the prefixed name already exists as another
 //     footnote, which a rename would silently merge
 //   - already-prefixed footnotes are untouched
 //   - protected regions (code, comments, frontmatter) are invisible
@@ -60,7 +60,7 @@ describe("applyFootnotePrefix", () => {
 
     it("skips a named rename that would merge two footnotes", () => {
         // renaming [^note] to [^2.note] would collide with the existing
-        // [^2.note] and silently fuse their contents — leave it alone
+        // [^2.note] and silently fuse their contents - leave it alone
         const input =
             "x[^note] y[^2.note] end\n\n[^note]: a\n[^2.note]: b";
         expect(applyFootnotePrefix(input, "2.")).toBe(input);

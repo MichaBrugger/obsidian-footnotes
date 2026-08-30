@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { endOfWordOffset } from "../../src/editor/cursor-motion";
 
-// endOfWordOffset treats astral-plane letters as non-word: the walk never starts on one, stops mid-word before one, and splits a name on CJK Ext-B kanji — diverging from the CM6 wordAt used on the main-editor path.
+// endOfWordOffset treats astral-plane letters as non-word: the walk never starts on one, stops mid-word before one, and splits a name on CJK Ext-B kanji - diverging from the CM6 wordAt used on the main-editor path.
 // Hunt: 2026-08-09. Lens: offsets.
 // Root cause: the walk tests single UTF-16 code units against \p{L}, so each half of an astral surrogate pair is a lone surrogate matching no unicode property, violating the function's own grapheme-aware contract comment.
 

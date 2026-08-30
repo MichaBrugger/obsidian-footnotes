@@ -14,9 +14,9 @@ import { fakePlugin as sharedFakePlugin } from "../helpers/fake-plugin";
 
 // Found by the command-press property suite (2026-08-12, shrunk from
 // "\[^81]. alpha[^1].", caret between "\" and "["): inserting a footnote
-// directly AFTER an escaping backslash escapes the INSERTION — the new
+// directly AFTER an escaping backslash escapes the INSERTION - the new
 // "[^N]" arrives as literal "\[^N]" (dead, its appended definition
-// instantly orphaned) — and simultaneously UN-escapes the text that
+// instantly orphaned) - and simultaneously UN-escapes the text that
 // backslash used to protect ("[^81]" went live as an orphan). Inline
 // presses had the twin failure: "\^[…]" is a literal caret, not an inline
 // footnote. The shared position adjuster now nudges such an insertion one
@@ -49,7 +49,7 @@ describe("insertion directly after an escaping backslash (bug-insert-after-backs
         expect(reference?.from).toEqual({ line: 0, ch: 0 });
     });
 
-    it("inline nudges left too — '\\^[…]' would be a literal caret", async () => {
+    it("inline nudges left too - '\\^[…]' would be a literal caret", async () => {
         const doc = fakeEditor(["prose\\ tail"], { line: 0, ch: 6 });
         await insertInlineFootnote(fakePlugin(doc));
         expect(doc.appliedChanges).toEqual([
@@ -57,7 +57,7 @@ describe("insertion directly after an escaping backslash (bug-insert-after-backs
         ]);
     });
 
-    it("autonum after an unescaped '^' nudges left — '^[^N]' would be inline-footnote content", async () => {
+    it("autonum after an unescaped '^' nudges left - '^[^N]' would be inline-footnote content", async () => {
         // shrunk from the 10k soak: caret inside the literal "\[^80]",
         // where the inserted "[^1]" landed as "^[^1]…" and died
         const doc = fakeEditor(["\\[^80] tail"], { line: 0, ch: 3 });
@@ -68,7 +68,7 @@ describe("insertion directly after an escaping backslash (bug-insert-after-backs
         expect(reference?.from).toEqual({ line: 0, ch: 2 });
     });
 
-    it("after an ESCAPED caret the position stands — '\\^' is a literal caret", async () => {
+    it("after an ESCAPED caret the position stands - '\\^' is a literal caret", async () => {
         const doc = fakeEditor(["a\\^ tail"], { line: 0, ch: 3 });
         await insertInlineFootnote(fakePlugin(doc));
         expect(doc.appliedChanges).toEqual([

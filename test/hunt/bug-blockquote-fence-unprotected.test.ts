@@ -4,8 +4,8 @@ import { computeNextFootnoteNumber } from "../../src/parsing/footnote-grammar";
 
 // BUG: a fenced code block nested inside a blockquote or callout is not
 // protected. `protectedLines`' fence-open regex is anchored at column 0
-// (up to 3 leading spaces only), so a "> ```" opener — valid CommonMark, and
-// how Obsidian renders code inside a blockquote/callout — is never recognized.
+// (up to 3 leading spaces only), so a "> ```" opener - valid CommonMark, and
+// how Obsidian renders code inside a blockquote/callout - is never recognized.
 // Footnote-shaped text inside the quoted code is counted as a live reference and
 // gets rewritten by reindex/lint (the exact class issue #41 fixed for
 // top-level fences).

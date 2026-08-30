@@ -13,7 +13,7 @@ import {
 // orphanedFootnoteDefinitionNames), which dedupe case-folded. A name
 // defined twice where both copies carry nesting comes back ["z","z"],
 // and the Notice tells the user nesting exists in "2 footnote
-// definitions ([^z], [^z])" — one real problem inflated by an unrelated
+// definitions ([^z], [^z])" - one real problem inflated by an unrelated
 // duplicate-definition problem, and a wasted slot in the
 // at-most-three-names list.
 

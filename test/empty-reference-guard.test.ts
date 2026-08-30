@@ -19,8 +19,8 @@ import { fakePlugin as sharedFakePlugin } from "./helpers/fake-plugin";
 // QOL sweep (2026-08-07): any footnote command pressed with the caret inside
 // an abandoned empty reference "[^]" warns ("give it a name") and leaves the
 // caret in place, instead of the old per-command chaos: the named command
-// hopped out past the bracket, and the numbered/inline commands — which
-// never see "[^]" because the reference regexes require a non-empty name —
+// hopped out past the bracket, and the numbered/inline commands - which
+// never see "[^]" because the reference regexes require a non-empty name -
 // nested a new insertion INTO it ("[^[^1]]", "[^^[]]"), corrupting the note.
 
 function fakeEditor(lines: string[], cursor: EditorPosition): FakeEditor {
@@ -90,7 +90,7 @@ describe("footnote commands inside an empty [^] reference", () => {
 
     // Originally these pinned that a code-masked "[^]" doesn't block the
     // INSERT (#41 parity). Since the protected-caret guard (Jason's rule
-    // 2026-08-12) creation inside code is blocked outright — what survives
+    // 2026-08-12) creation inside code is blocked outright - what survives
     // is that the EMPTY-REFERENCE toast never fires there; the block comes
     // from the protected-text guard instead.
     it("a [^] inside inline code never fires the empty-reference warning (#41 parity)", async () => {

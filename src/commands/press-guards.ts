@@ -19,7 +19,7 @@ import {
 } from "../parsing/markdown-scan";
 import { TableCellEditor } from "../editor/table-cursor";
 
-// The press guards: a footnote key was pressed — does something OTHER than
+// The press guards: a footnote key was pressed - does something OTHER than
 // creation own it? Empty placeholders warn, filled inline footnotes hop,
 // and protected text (definition interiors included) refuses outright.
 // Split out of the all-in-one commands file 2026-08-12: one subject, one
@@ -34,12 +34,12 @@ import { TableCellEditor } from "../editor/table-cursor";
  * "[^7-]" prefix placeholder asks for a suffix. True = the press was
  * consumed (toast or hop) and the command stops. The inline/paste
  * commands additionally navigate from inside a real reference
- * (navigateReferenceIfInside) at their call sites — the autonum/named
+ * (navigateReferenceIfInside) at their call sites - the autonum/named
  * commands run their own jump cascade instead.
  *
  * `cursorPosition` is the RESOLVED caret: the autonum/named commands call
  * this inside runOutsideTableCell's callback, whose sub-editor fallback
- * resolves the real position — the guards used to run before it with a
+ * resolves the real position - the guards used to run before it with a
  * stale getCursor() (2026-08-11 review bug #9).
  */
 export function caretGuardsHandled(
@@ -59,10 +59,10 @@ export function caretGuardsHandled(
 
 /**
  * Footnote CREATION is blocked when the caret sits inside code, math, a
- * comment, or frontmatter (Jason's rule 2026-08-12 — always on, inline
+ * comment, or frontmatter (Jason's rule 2026-08-12 - always on, inline
  * spans included): a reference minted there is dead text Obsidian never
  * renders, which the next lint's orphan handling then deletes. Runs at
- * the CREATION steps only — navigation never reaches protected text (its
+ * the CREATION steps only - navigation never reaches protected text (its
  * masked gates fall through). True = warned, press consumed.
  */
 export function warnProtectedCaretIfInside(
@@ -111,12 +111,12 @@ export const DefinitionCreationNotice =
     "No footnote was created: footnotes can't go inside another footnote's definition.";
 
 /**
- * Footnote CREATION is blocked anywhere inside a definition block — the
+ * Footnote CREATION is blocked anywhere inside a definition block - the
  * body after the label, and continuation lines (Jason's ruling
  * 2026-08-13: Obsidian technically renders footnotes nested inside
  * definitions, but that's wildly nonstandard markdown and the plugin
  * won't create it; the popup embed also mis-renders such definitions).
- * Label-line presses before the label's end never reach this — the
+ * Label-line presses before the label's end never reach this - the
  * navigation guards own them. Cells never hold real definitions. True =
  * warned, press consumed.
  */
@@ -141,13 +141,13 @@ export function warnDefinitionCaretIfInside(
 }
 
 // (navigateDefinitionLabelIfInside lived here 2026-08-12/13: the inline
-// pair's label-only navigation. Superseded by Jason's ruling — the inline
+// pair's label-only navigation. Superseded by Jason's ruling - the inline
 // commands now run the SAME whole-block jump step as the numbered/named
 // keys, shouldJumpFromDefinitionToReference, wired at their entries.)
 
 /**
- * When the caret sits inside an untouched prefilled reference — "[^7-]",
- * exactly the note's footnote-prefix with no name typed yet — leave the
+ * When the caret sits inside an untouched prefilled reference - "[^7-]",
+ * exactly the note's footnote-prefix with no name typed yet - leave the
  * caret where it is, ask for a suffix via a Notice, and report true. The
  * prefilled reference is the prefix-era twin of the empty "[^]" placeholder;
  * a press inside it must never create a footnote named after the bare
@@ -168,7 +168,7 @@ export function warnPrefilledReferenceIfInside(
         : doc.getLine((cursorPosition ?? doc.getCursor()).line);
     if (!rawText.includes("[^")) return false;
     const prefix = footnotePrefixFromEditor(doc);
-    // silent validity check — the invalid-prefix Notice belongs to the
+    // silent validity check - the invalid-prefix Notice belongs to the
     // insert path, not to every caret movement guard
     if (!prefix || footnotePrefixProblem(prefix) !== null) return false;
     const placeholder = `[^${prefix}]`;
@@ -182,7 +182,7 @@ export function warnPrefilledReferenceIfInside(
 /**
  * Whether the caret sits strictly inside a live occurrence of `placeholder`
  * ("[^]" or the prefilled "[^7-]"), in the cell's text or the caret's line.
- * A raw hit is confirmed against the code-masked text — a placeholder-shaped
+ * A raw hit is confirmed against the code-masked text - a placeholder-shaped
  * fragment inside inline code or a fence is plain text (#41 semantics), and
  * warning there would block a legitimate insert. The raw gate keeps the
  * whole-document masking off the hot path (this runs on every press).
@@ -216,7 +216,7 @@ function caretInsidePlaceholder(
  * the reference regexes (they require a non-empty name), so without this
  * guard the numbered/inline commands nested their insertion INTO the
  * brackets ("[^[^1]]") and the named command silently hopped the caret
- * out — a warning is the one response that tells the user what the
+ * out - a warning is the one response that tells the user what the
  * fragment is and how to fix it.
  */
 function warnEmptyReferenceIfInside(

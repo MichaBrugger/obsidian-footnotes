@@ -31,7 +31,7 @@ describe("exitInlineFootnoteIfInside", () => {
     });
 
     // bracket-walking definitions (nesting, escapes, unclosed) are the pure
-    // core's spec — see inline-footnote-exit.test.ts; this file only pins
+    // core's spec - see inline-footnote-exit.test.ts; this file only pins
     // the wrapper's delegation and editor plumbing
 
     it("routes through the cell editor when a table cell is active", () => {

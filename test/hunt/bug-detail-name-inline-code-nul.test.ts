@@ -7,7 +7,7 @@ import { fakeEditor } from "../helpers/fake-editor";
 // BUG: listExistingFootnoteDefinitions leaks NUL bytes when a footnote name
 // contains a backtick span. It reads the maskProtectedLines/maskInlineCode
 // twin of each line (including the definition line itself) and captures the
-// name group WITHOUT re-slicing back to the original text — so the masked NULs
+// name group WITHOUT re-slicing back to the original text - so the masked NULs
 // from the code span leak into the returned name ("a\0\0\0c"). Its sibling
 // listExistingFootnoteReferencesAndLocations already re-slices the original for
 // exactly this reason (see its comment); the definitions path was never given the

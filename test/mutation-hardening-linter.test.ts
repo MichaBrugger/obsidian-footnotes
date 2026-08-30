@@ -15,8 +15,8 @@ import {
 
 // Mutation hardening for the linter's unit-reachable surface (Stryker
 // re-baseline 2026-08-12: linter.ts scored 58%). The pure pipeline, the
-// settings→options mappings, and — through a transaction-APPLYING fake
-// editor — the whole lint-on-footnote-creation path: its guards, its
+// settings→options mappings, and - through a transaction-APPLYING fake
+// editor - the whole lint-on-footnote-creation path: its guards, its
 // minimal-diff writer, its notices, and the empty-definition relanding.
 // The live-Obsidian-only survivors (popup busy state, the save wrapper, the
 // vim adapter) are deliberately not chased here.
@@ -33,7 +33,7 @@ interface FakeDoc extends Editor {
  * An editor that actually APPLIES the transactions it is handed, so a test
  * can assert both the resulting document AND the exact change span that
  * produced it (replaceMinimal's whole job is that span). getLine throws
- * out of range like the real one does — CM6's doc.line() raises rather than
+ * out of range like the real one does - CM6's doc.line() raises rather than
  * handing back an empty string, and a lint that walks one line too far must
  * not look correct here.
  */
@@ -258,7 +258,7 @@ describe("lintFootnotes composition", () => {
 
     // L155 LogicalOperator/BooleanLiteral on `options.moveDefinitionsToBottom
     // ?? true`: deleting the reference blanks its line, and only the
-    // re-settle collapses that blank run — without it the pass is not its own
+    // re-settle collapses that blank run - without it the pass is not its own
     // fixed point.
     it("re-settles the layout after a reference deletion", () => {
         expect(
@@ -398,7 +398,7 @@ describe("lintAfterFootnoteCreation guards", () => {
     // L430 ConditionalExpression (-> false) and LogicalOperator (|| -> &&):
     // focus inside a nested sub-editor (here one with no td/th ancestor, so
     // activeTableCellEditor is null and only nestedSubEditorOwnsFocus is
-    // true) must stop the lint — the && mutant needs BOTH to be true.
+    // true) must stop the lint - the && mutant needs BOTH to be true.
     it("stays out while a nested sub-editor owns focus", () => {
         const nested = { closest: () => null };
         const contentDOM = {
@@ -421,7 +421,7 @@ describe("lintAfterFootnoteCreation guards", () => {
     });
 
     // L438 ConditionalExpression (-> false) and its BlockStatement: a clean
-    // note takes the alerts-only exit — no edit, and above all no toast (the
+    // note takes the alerts-only exit - no edit, and above all no toast (the
     // creation trigger is quiet by design).
     it("edits nothing and says nothing on an already-clean note", () => {
         const clean = "Alpha.[^1]\n\n[^1]: one";
@@ -529,7 +529,7 @@ describe("relanding the cursor on the new empty definition", () => {
 
     it("picks the empty definition out from among written ones", () => {
         // the "$" anchor: "[^b]: filled" is a definition too, and without the
-        // end anchor it reads as empty — the note would look ambiguous and
+        // end anchor it reads as empty - the note would look ambiguous and
         // the caret would never land.
         const doc = creationLint(
             "Alpha[^note], bravo[^b]\n\n[^note]: \n[^b]: filled",
@@ -556,7 +556,7 @@ describe("relanding the cursor on the new empty definition", () => {
 
     it("only column-0 labels count as definitions", () => {
         // the "^" anchor: a blockquoted "> [^x]: " is a definition of its
-        // own, but it is not the empty definition this walk hunts for — an
+        // own, but it is not the empty definition this walk hunts for - an
         // unanchored match would make the note look ambiguous and strand the
         // caret.
         const doc = creationLint(
@@ -587,7 +587,7 @@ describe("relanding the cursor on the new empty definition", () => {
 
 describe("the creation lint returns the relocated definition name", () => {
     // The popup arm lints BEFORE the popup opens and binds the popup to
-    // the returned post-lint id (Jason's ask 2026-08-27) — the same
+    // the returned post-lint id (Jason's ask 2026-08-27) - the same
     // relocation the caret reland uses, surfaced as the return value.
     it("returns the renumbered name of the unique empty definition", () => {
         const doc = fakeEditor("alpha[^5] bravo[^9]\n\n[^5]: five\n[^9]: ");

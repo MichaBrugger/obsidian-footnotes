@@ -45,7 +45,7 @@ describe("definitions inside blockquotes/callouts (C22)", () => {
             doc,
         );
         expect(handled).toBe(true);
-        // "> body[^1]" — the reference ends at ch 10
+        // "> body[^1]" - the reference ends at ch 10
         expect(doc.moves).toEqual([{ line: 1, ch: 10 }]);
     });
 
@@ -58,7 +58,7 @@ describe("definitions inside blockquotes/callouts (C22)", () => {
             fakePlugin,
             doc,
         );
-        expect(handled).toBe(true); // the Notice path — press consumed
+        expect(handled).toBe(true); // the Notice path - press consumed
         expect(doc.moves).toEqual([]);
     });
 

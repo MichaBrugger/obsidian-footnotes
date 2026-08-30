@@ -20,7 +20,7 @@ import { DefinitionCreationNotice } from "../src/commands/press-guards";
 import { ProtectedCreationNotice } from "../src/editor/insertion-liveness";
 
 // Multiple Alt-clicked carets get the SAME footnote at every one
-// (2026-08-22, Jason's ask — one source cited many times; always on, no
+// (2026-08-22, Jason's ask - one source cited many times; always on, no
 // toggle, atomic refusal, his calls). The autonum key mints one "[^N]"
 // per caret and ONE definition; named/inline/paste drop their skeleton at
 // each caret, with cursors left inside the brackets so typing fills all
@@ -118,7 +118,7 @@ describe("the auto-numbered key at several carets", () => {
             }),
         );
         // the press minted [^6] at both carets with one definition; the
-        // creation lint then renumbered 5→1, 6→2 — exactly what the same
+        // creation lint then renumbered 5→1, 6→2 - exactly what the same
         // press at a single caret produces
         expect(doc.lines).toEqual([
             "alpha[^1] bravo[^2]",
@@ -241,7 +241,7 @@ describe("the paste key at several carets", () => {
     });
 });
 
-describe("atomic refusals — one bad caret refuses the whole press", () => {
+describe("atomic refusals - one bad caret refuses the whole press", () => {
     it("a caret inside inline code refuses everything with the protected toast", async () => {
         const before = ["alpha `code` bravo"];
         const doc = fakeEditor(before, [
@@ -289,7 +289,7 @@ describe("atomic refusals — one bad caret refuses the whole press", () => {
 
 describe("a second press with EVERY caret inside the same footnote continues it (A14 report, 2026-08-27)", () => {
     // Jason's report: the named multi-caret flow (skeletons, type the name
-    // once) DEAD-ENDED — the second press refused with the atomic toast,
+    // once) DEAD-ENDED - the second press refused with the atomic toast,
     // and the filled inline flow could never hop back out. When every
     // caret sits inside the SAME artifact the press is unambiguous, so it
     // gets the single-caret continuation, aimed at the LAST artifact in
