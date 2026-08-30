@@ -72,19 +72,19 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
     getSettingDefinitions(): SettingDefinitionItem[] {
         return [
             {
+                name: "Edit footnotes in a popup",
+                desc: "Open the footnote definition in a small editor where you're typing, instead of jumping to the bottom of the note. Close with the footnote hotkey, the escape key, or by clicking outside.",
+                control: { type: "toggle", key: "enablePopupEditor" },
+            },
+            {
                 name: "Insert footnote reference at end of word",
                 desc: "A new footnote reference is only inserted at the end of the word and after any punctuation.",
                 control: { type: "toggle", key: "insertAtEndOfWord" },
             },
             {
                 name: "Expand selections to whole words",
-                desc: "When a selection is turned into a footnote, cut-off words at either end are included whole, and the end takes any trailing punctuation, like inserting at the end of word.",
+                desc: "When a selection is turned into a footnote, cut-off words at either end are included whole, along with any punctuation right after the last word.",
                 control: { type: "toggle", key: "expandSelectionToWholeWords" },
-            },
-            {
-                name: "Edit footnotes in a popup",
-                desc: "Open the footnote definition in a small editor where you're typing, instead of jumping to the bottom of the note. Close with the footnote hotkey, the escape key, or by clicking outside.",
-                control: { type: "toggle", key: "enablePopupEditor" },
             },
             {
                 name: "Per-note footnote prefix",
