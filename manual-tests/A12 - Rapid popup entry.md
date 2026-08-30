@@ -7,4 +7,5 @@ Starting from the end of this sentence, do three fast rounds of: press the numbe
 - [ ] Every definition below ends up with exactly the text typed for it — nothing swapped into a neighbor, nothing appended to the sentence itself
 - [ ] The console shows no `Cannot read properties of undefined (reading 'split')` errors
 - [ ] Closing feels immediate; the next popup opens without a long stall
-- [ ] Repeat once in mobile emulation: same results (the bug hit both modes; desktop mangled text worse)
+
+(The mobile repeat lives in P1 — the bug hit both modes; desktop mangled text worse.)

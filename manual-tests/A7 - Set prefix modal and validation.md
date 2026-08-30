@@ -19,6 +19,6 @@ Digit-ending guard, end to end: set the property back to `10` by hand, then
 
 - [ ] The auto-numbered hotkey shows a "No footnote was created" toast and inserts nothing (fixed 2026-08-07)
 - [ ] **Lint footnotes** alerts "Linting canceled" and leaves the note untouched
-- [ ] ON THE PHONE: with the keyboard open, the whole dialog — field, inline error, Create button — sits at the top of the screen above the keyboard, nothing hidden behind it (Android report 2026-08-28; the fix lives in the shared modal base, so the Rename and Name-the-footnote dialogs behave the same)
+(The phone keyboard-above-the-dialog check lives in P1.)
 
 [^6.1]: the first prefixed footnote

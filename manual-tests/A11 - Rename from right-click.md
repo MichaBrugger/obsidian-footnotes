@@ -7,7 +7,8 @@ Settings: defaults. Fixture footnote here[^menu] with its definition below.
 - [ ] Right-click on the `[^menu]:` definition label below: the item is there too
 - [ ] Right-click on plain prose in this line: no **Rename footnote** in the menu
 - [ ] Right-click on the fenced decoy below: no item (code is not a footnote)
-- [ ] In mobile emulation (or on the phone): long-press on the reference shows the item in the menu
+
+(The long-press twin on the phone lives in P1.)
 
 ```
 decoy [^menu] in code

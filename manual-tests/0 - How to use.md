@@ -9,6 +9,8 @@ settings it needs, carries its own fixture text, and expects an undo
   navigation, rename, tables, guards)
 - `L1-L17`: linting combos (rules solo and together, triggers, alerts,
   protected text, stability)
+- `P1`: phone and mobile-emulation checks — needs a beta release synced
+  to the phone, so it runs on its own schedule
 
 Inter-plugin compatibility sheets live separately in the repo's
 `compat-tests/` folder (vault mirror: "Footnote Compat Tests"); they
