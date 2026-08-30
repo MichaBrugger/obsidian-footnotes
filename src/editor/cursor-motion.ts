@@ -66,36 +66,42 @@ function isTrailingPunctuation(c: string | undefined): boolean {
     return !!c && TrailingPunctuationChars.includes(c);
 }
 
+// Word characters for the offset walks below are unicode
+// letters/numbers/marks — combining accents belong to the word they
+// follow, matching the grapheme-aware `wordAt`. The walks step by CODE
+// POINTS: astral letters (Deseret, CJK Ext-B like 𠮷) are two UTF-16
+// units, and testing lone surrogates against \p{L} split words in table
+// cells (bug-astral-word-walk).
+const isWordCp = (cp: number | undefined) =>
+    cp !== undefined && /[\p{L}\p{N}\p{M}_]/u.test(String.fromCodePoint(cp));
+
+// the code point touching `i` from the left — stepping over a low
+// surrogate to the pair's start, and treating a mid-pair `i` as inside
+// its own pair — or undefined at the text's start
+const cpBefore = (text: string, i: number): number | undefined => {
+    if (i <= 0) return undefined;
+    const prev = text.charCodeAt(i - 1);
+    if (prev >= 0xd800 && prev <= 0xdbff) {
+        return text.codePointAt(i - 1); // `i` sits mid-pair
+    }
+    if (prev >= 0xdc00 && prev <= 0xdfff && i >= 2) {
+        return text.codePointAt(i - 2);
+    }
+    return prev;
+};
+
 /**
  * The end-of-word insertion point within plain text: from `offset`, the end
  * of the word under (or just before) the cursor, plus one trailing
  * punctuation mark. Offsets with no word touching them are returned
  * unchanged. This is `adjustFootnotePosition` for table cells, where the
- * main editor's `wordAt` can't see the cell sub-editor's text. Word
- * characters are unicode letters/numbers/marks — combining accents belong
- * to the word they follow, matching the grapheme-aware `wordAt`.
+ * main editor's `wordAt` can't see the cell sub-editor's text.
  */
 export function endOfWordOffset(text: string, offset: number): number {
-    // walk by CODE POINTS: astral letters (Deseret, CJK Ext-B like 𠮷) are
-    // two UTF-16 units, and testing lone surrogates against \p{L} split
-    // words in table cells (bug-astral-word-walk)
-    const isWordCp = (cp: number | undefined) =>
-        cp !== undefined && /[\p{L}\p{N}\p{M}_]/u.test(String.fromCodePoint(cp));
-    // the code point touching `i` from the left — stepping over a low
-    // surrogate to the pair's start, and treating a mid-pair `i` as inside
-    // its own pair — or undefined at the text's start
-    const cpBefore = (i: number): number | undefined => {
-        if (i <= 0) return undefined;
-        const prev = text.charCodeAt(i - 1);
-        if (prev >= 0xd800 && prev <= 0xdbff) {
-            return text.codePointAt(i - 1); // `i` sits mid-pair
-        }
-        if (prev >= 0xdc00 && prev <= 0xdfff && i >= 2) {
-            return text.codePointAt(i - 2);
-        }
-        return prev;
-    };
-    if (!isWordCp(text.codePointAt(offset)) && !isWordCp(cpBefore(offset))) {
+    if (
+        !isWordCp(text.codePointAt(offset)) &&
+        !isWordCp(cpBefore(text, offset))
+    ) {
         return offset;
     }
     let end = offset;
@@ -111,6 +117,33 @@ export function endOfWordOffset(text: string, offset: number): number {
     }
     if (isTrailingPunctuation(text[end])) end++;
     return end;
+}
+
+/**
+ * endOfWordOffset's start-side twin, for the selection-to-footnote
+ * whole-word expansion (Jason's ask 2026-08-29): from `offset`, the start
+ * of the word the offset sits strictly INSIDE. An offset already at a
+ * word's first character, or not on a word character at all, returns
+ * unchanged — there is no start-side punctuation grab, because the
+ * insert hop has no start-side analog either.
+ */
+export function startOfWordOffset(text: string, offset: number): number {
+    let start = offset;
+    // mid-pair offsets snap back to the pair's start before the gates run
+    const unitAt = text.charCodeAt(start);
+    if (unitAt >= 0xdc00 && unitAt <= 0xdfff) start--;
+    if (
+        !isWordCp(text.codePointAt(start)) ||
+        !isWordCp(cpBefore(text, start))
+    ) {
+        return start;
+    }
+    for (;;) {
+        const cp = cpBefore(text, start);
+        if (!isWordCp(cp)) break;
+        start -= (cp as number) > 0xffff ? 2 : 1;
+    }
+    return start;
 }
 
 /** adjust cursor position to insert a footnote only at the end of word, and never where an escape or inline-footnote opener would swallow the insertion (safeInsertionCh in insertion-liveness) */

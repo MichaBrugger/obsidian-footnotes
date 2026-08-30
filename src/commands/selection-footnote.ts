@@ -9,7 +9,11 @@ import {
     referenceOccurrences,
 } from "../parsing/footnote-grammar";
 import { activeFootnotePrefix, footnotePrefixFromEditor } from "../parsing/footnote-prefix";
-import { moveCursorAndSetJumpPoint } from "../editor/cursor-motion";
+import {
+    endOfWordOffset,
+    moveCursorAndSetJumpPoint,
+    startOfWordOffset,
+} from "../editor/cursor-motion";
 import { commandHotkeys } from "../editor/obsidian-internals";
 import { buildDefinitionAppend, seedDefinitionBody } from "./definition-append";
 import { DocContext, docContext, listExistingFootnoteDefinitions } from "../editor/doc-context";
@@ -145,6 +149,11 @@ export function selectionPressHandled(
         while (from < to && /\s/.test(cellText[from])) from++;
         while (to > from && /\s/.test(cellText[to - 1])) to--;
         if (from === to) return false;
+        // whole-word expansion, same as the main-editor branch below
+        if (plugin.settings.expandSelectionToWholeWords) {
+            from = startOfWordOffset(cellText, from);
+            to = endOfWordOffset(cellText, to);
+        }
         if (command === "paste") {
             new Notice(SelectionCommandNotice, 8000);
             return true;
@@ -206,6 +215,24 @@ export function selectionPressHandled(
     // prose, not to the footnote
     const trimmed = trimSelectionEdges(doc, resolved.from, resolved.to);
     if (trimmed === null) return false;
+    // ... then, with the toggle on (default), grow the core to WHOLE
+    // words: the end-of-word insert's selection twin (Jason's ask
+    // 2026-08-29). The start walks to its word's first character when the
+    // selection begins mid-word; the end normalizes to word end plus one
+    // trailing punctuation mark with FULL insert-key parity (his call:
+    // even an exact word-end selection gains the mark). Expansion runs
+    // BEFORE every refusal check below, so the checks judge the range
+    // that would actually convert.
+    if (plugin.settings.expandSelectionToWholeWords) {
+        trimmed.from = {
+            line: trimmed.from.line,
+            ch: startOfWordOffset(doc.getLine(trimmed.from.line), trimmed.from.ch),
+        };
+        trimmed.to = {
+            line: trimmed.to.line,
+            ch: endOfWordOffset(doc.getLine(trimmed.to.line), trimmed.to.ch),
+        };
+    }
     if (command === "paste") {
         new Notice(SelectionCommandNotice, 8000);
         return true;

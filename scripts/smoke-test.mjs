@@ -145,6 +145,10 @@ async function setupNote(content) {
 const BASELINE_SETTINGS = {
     enablePopupEditor: false,
     insertAtEndOfWord: true,
+    // OFF in the baseline so the selection-conversion tests keep their
+    // exact-selection expectations; the whole-word expansion has its own
+    // unit coverage (2026-08-29)
+    expandSelectionToWholeWords: false,
     enableFootnotePrefix: false,
     enableFootnoteSectionHeading: false,
     enableRemoveBlankLastLines: true,

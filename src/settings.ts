@@ -8,6 +8,8 @@ export interface FootnotePluginSettings {
     /** Marks saved data whose one-time migrations have run (see loadSettings). Not shown in the settings tab. */
     settingsVersion: number;
     insertAtEndOfWord: boolean;
+    /** Selection-to-footnote conversions include cut-off words whole, the end normalized to word end + one trailing punctuation mark — the end-of-word insert's selection twin (2026-08-29). */
+    expandSelectionToWholeWords: boolean;
     enablePopupEditor: boolean;
     enableFootnotePrefix: boolean;
 
@@ -37,6 +39,7 @@ export const DEFAULT_SETTINGS: FootnotePluginSettings = {
     // migration block stamps the current version and saves once
     settingsVersion: 0,
     insertAtEndOfWord: true,
+    expandSelectionToWholeWords: true,
     enablePopupEditor: true,
     enableFootnotePrefix: false,
 
@@ -72,6 +75,11 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                 name: "Insert footnote reference at end of word",
                 desc: "A new footnote reference is only inserted at the end of the word and after any punctuation.",
                 control: { type: "toggle", key: "insertAtEndOfWord" },
+            },
+            {
+                name: "Expand selections to whole words",
+                desc: "When a selection is turned into a footnote, cut-off words at either end are included whole, and the end takes any trailing punctuation — like inserting at the end of word.",
+                control: { type: "toggle", key: "expandSelectionToWholeWords" },
             },
             {
                 name: "Edit footnotes in a popup",

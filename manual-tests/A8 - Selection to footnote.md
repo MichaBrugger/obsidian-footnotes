@@ -14,6 +14,7 @@ The paragraph wants to move this aside for later readers. A second sentence ride
 - [ ] Undo once: the sentence is back exactly as it was
 - [ ] INLINE hotkey on the same selection: it becomes `^[move this aside]` in place, caret after the bracket
 - [ ] Undo, select ` move this ` WITH the spaces: converting keeps both spaces in the sentence, only the words move
+- [ ] With `Expand selections to whole words` ON (the default): select from INSIDE `paragraph` to INSIDE `readers` — the conversion takes `paragraph wants to move this aside for later readers.` whole, cut-off ends completed and the period included (2026-08-29); with the toggle OFF, the same selection converts exactly as made
 - [ ] Select the whole line by dragging through the newline: the whole line still converts
 - [ ] Select BOTH sentences of the example paragraph plus this line (three-plus lines) and press the NUMBERED hotkey: everything moves into ONE definition, continuation lines indented four spaces — the blank separator lines between paragraphs carry the same four-space indent (2026-08-21), so the whole body sits flush; the rendered footnote shows the paragraphs (2026-08-19)
 - [ ] With the popup setting ON, the same multi-line conversion opens the popup showing the whole multi-paragraph body, no Properties widget bleed

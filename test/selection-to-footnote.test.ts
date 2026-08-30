@@ -901,6 +901,137 @@ describe("selections that refuse", () => {
     });
 });
 
+describe("selections expand to whole words when the toggle is on (Jason's ask 2026-08-29)", () => {
+    // The end-of-word insert's selection twin, default ON: cut-off words
+    // at either end join the footnote whole, and the END normalizes to
+    // word end + one trailing punctuation mark with FULL insert-key
+    // parity (Jason's call: even an exact word-end selection gains the
+    // mark). The start side has no punctuation analog — it only walks to
+    // the word's start, and only when the selection begins mid-word.
+    const sentence = "Bob loves Bill. Lorem ipsum dolor sit. Abbie likes Maddie.";
+
+    it("includes the cut-off words at both ends, plus the trailing punctuation", async () => {
+        // "rem ipsum dolor s" selected — Jason's example
+        const doc = fakeEditor(
+            [sentence],
+            { line: 0, ch: 18 },
+            { anchor: { line: 0, ch: 18 }, head: { line: 0, ch: 35 } },
+        );
+        await insertAutonumFootnote(
+            fakePlugin(doc, { expandSelectionToWholeWords: true }),
+        );
+        expect(doc.lines).toEqual([
+            "Bob loves Bill. [^1] Abbie likes Maddie.",
+            "",
+            "[^1]: Lorem ipsum dolor sit.",
+        ]);
+    });
+
+    it("an exact word-end selection still takes the punctuation (insert-key parity)", async () => {
+        // "dolor sit" selected exactly, "." right after
+        const doc = fakeEditor(
+            [sentence],
+            { line: 0, ch: 28 },
+            { anchor: { line: 0, ch: 28 }, head: { line: 0, ch: 37 } },
+        );
+        await insertAutonumFootnote(
+            fakePlugin(doc, { expandSelectionToWholeWords: true }),
+        );
+        expect(doc.lines).toEqual([
+            "Bob loves Bill. Lorem ipsum [^1] Abbie likes Maddie.",
+            "",
+            "[^1]: dolor sit.",
+        ]);
+    });
+
+    it("a selection ending before a space stays as made (no punctuation there)", async () => {
+        // "ipsum dolor" selected exactly, a space after
+        const doc = fakeEditor(
+            [sentence],
+            { line: 0, ch: 22 },
+            { anchor: { line: 0, ch: 22 }, head: { line: 0, ch: 33 } },
+        );
+        await insertAutonumFootnote(
+            fakePlugin(doc, { expandSelectionToWholeWords: true }),
+        );
+        expect(doc.lines[0]).toBe(
+            "Bob loves Bill. Lorem [^1] sit. Abbie likes Maddie.",
+        );
+        expect(doc.lines[2]).toBe("[^1]: ipsum dolor");
+    });
+
+    it("the inline key expands the same way", async () => {
+        const doc = fakeEditor(
+            [sentence],
+            { line: 0, ch: 18 },
+            { anchor: { line: 0, ch: 18 }, head: { line: 0, ch: 35 } },
+        );
+        await insertInlineFootnote(
+            fakePlugin(doc, { expandSelectionToWholeWords: true }),
+        );
+        expect(doc.lines).toEqual([
+            "Bob loves Bill. ^[Lorem ipsum dolor sit.] Abbie likes Maddie.",
+        ]);
+    });
+
+    it("multi-line selections expand at both outer ends", async () => {
+        const doc = fakeEditor(
+            ["alpha bravo", "charlie delta."],
+            { line: 0, ch: 3 },
+            { anchor: { line: 0, ch: 3 }, head: { line: 1, ch: 12 } },
+        );
+        await insertAutonumFootnote(
+            fakePlugin(doc, { expandSelectionToWholeWords: true }),
+        );
+        expect(doc.lines.join("\n")).toContain(
+            "[^1]: alpha bravo\n    charlie delta.",
+        );
+    });
+
+    it("with the toggle off the selection converts exactly as made", async () => {
+        const doc = fakeEditor(
+            [sentence],
+            { line: 0, ch: 18 },
+            { anchor: { line: 0, ch: 18 }, head: { line: 0, ch: 35 } },
+        );
+        await insertAutonumFootnote(fakePlugin(doc));
+        expect(doc.lines[2]).toBe("[^1]: rem ipsum dolor s");
+    });
+
+    it("cell selections expand too", () => {
+        const dispatched: {
+            changes?: { from: number; to?: number; insert: string };
+        }[] = [];
+        const cell: TableCellEditor = {
+            state: {
+                doc: { toString: () => "plain word here." },
+                selection: { main: { anchor: 7, head: 13 } },
+            },
+            dispatch: (spec) => {
+                dispatched.push(spec);
+            },
+        };
+        const doc = fakeEditor(["| plain word here. |", "| --- |", "| x |"], {
+            line: 0,
+            ch: 8,
+        });
+        selectionPressHandled(
+            fakePlugin(doc, { expandSelectionToWholeWords: true }),
+            doc,
+            cell,
+            "autonum",
+            { line: 0, ch: 8 },
+        );
+        // "ord her" expands to "word here." — words whole, punctuation taken
+        expect(dispatched[0]?.changes).toEqual({
+            from: 6,
+            to: 16,
+            insert: "[^1]",
+        });
+        expect(doc.lines[doc.lines.length - 1]).toBe("[^1]: word here.");
+    });
+});
+
 describe("selections inside an actively edited table cell", () => {
     function fakeCell(text: string, anchor: number, head: number) {
         const dispatched: {
