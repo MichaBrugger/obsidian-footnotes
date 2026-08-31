@@ -88,7 +88,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
             },
             {
                 name: "Per-note footnote prefix",
-                desc: "Footnotes respect a footnote-prefix property in the note's frontmatter: with \"footnote-prefix: 2.\" the numbered command inserts [^2.1], then [^2.2], and the named command starts its new reference with the prefix filled in ([^2.]). Useful when chapter notes are combined into one document. The \"Set footnote prefix\" command edits the property for you.",
+                desc: "Footnotes use the note's footnote-prefix property: with \"footnote-prefix: 2-\", the numbered command inserts [^2-1], [^2-2], and so on, and the named command prefills [^2-]. Useful when chapter notes merge into one document. Set it with the \"Set footnote prefix\" command.",
                 control: { type: "toggle", key: "enableFootnotePrefix" },
             },
             {
