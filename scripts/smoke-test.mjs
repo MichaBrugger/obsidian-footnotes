@@ -1325,6 +1325,32 @@ async function main() {
         );
     });
 
+    await test("the partial-undo notice dismisses itself when the next undo finishes the job (2026-08-29)", async () => {
+        // the notice guides the second undo; once that undo lands, the
+        // guidance is moot and the toast hides itself instead of lingering
+        // its full 8s (Jason's ask 2026-08-29)
+        resetSettings();
+        await setupNote("see[^q] here");
+        // a separate history entry for the definition: past CodeMirror's
+        // ~500ms group window, so undo #1 removes ONLY the definition
+        await sleep(900);
+        action(`(${EDITOR}).editor.replaceRange('\\n\\n[^q]: body', {line: 0, ch: 12});`);
+        await sleep(900);
+        action(`(${EDITOR}).editor.undo();`);
+        await pollUntil(
+            "the orphaned-reference notice",
+            `[...document.querySelectorAll('.notice')].map(n => n.textContent).join('|')`,
+            (v) => typeof v === "string" && v.includes("Undo again to remove the reference too."),
+        );
+        action(`(${EDITOR}).editor.undo();`);
+        await pollUntil(
+            "the notice dismissed itself",
+            `[...document.querySelectorAll('.notice')].every(n => !n.textContent.includes('Undo again to remove the reference too.'))`,
+            (v) => v === true,
+            3000,
+        );
+    });
+
     await test("lint with only reindex on renumbers and reorders footnotes", async () => {
         resetSettings({ lintFixPunctuation: false, lintMoveToBottom: false });
         await setupNote("Beta[^2] alpha[^1].\n\n[^1]: one\n[^2]: two");

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { orphanedByUndo } from "../src/editor/undo-orphan-notice";
+import {
+    orphanedByUndo,
+    stillOrphanedNames,
+} from "../src/editor/undo-orphan-notice";
 
 // Creating a footnote from a table cell takes TWO undo steps (the
 // reference rides the cell sub-editor's dispatch, the definition the main
@@ -64,5 +67,41 @@ describe("orphanedByUndo", () => {
                 "a[^x] b[^y]",
             ),
         ).toEqual(["x", "y"]);
+    });
+});
+
+describe("stillOrphanedNames (the notice's auto-dismiss check, 2026-08-29)", () => {
+    // The standing notice hides itself when a later undo or redo resolves
+    // the state it described: the reference gone, or the definition back.
+    it("an empty result when the second undo removed the reference", () => {
+        expect(stillOrphanedNames("word here", ["1"])).toEqual([]);
+    });
+
+    it("an empty result when a redo restored the definition", () => {
+        expect(
+            stillOrphanedNames("word[^1] here\n\n[^1]: body", ["1"]),
+        ).toEqual([]);
+    });
+
+    it("keeps a name whose orphan state persists", () => {
+        expect(stillOrphanedNames("word[^1] here", ["1"])).toEqual(["1"]);
+    });
+
+    it("a code-span decoy definition does not count as restored", () => {
+        expect(
+            stillOrphanedNames("word[^1] and `[^1]: fake` here", ["1"]),
+        ).toEqual(["1"]);
+    });
+
+    it("matches case-insensitively", () => {
+        expect(stillOrphanedNames("word[^note] here", ["Note"])).toEqual([
+            "Note",
+        ]);
+    });
+
+    it("resolves names independently", () => {
+        expect(
+            stillOrphanedNames("a[^x] here\n\n[^y]: restored", ["x", "y"]),
+        ).toEqual(["x"]);
     });
 });
