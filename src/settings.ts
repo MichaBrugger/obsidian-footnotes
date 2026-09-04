@@ -162,7 +162,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                             },
                             {
                                 name: "Apply the note's footnote prefix",
-                                desc: "When the per-note footnote prefix feature is on and the note has a footnote-prefix property, linting renames plain numbered and named footnotes to carry the prefix, and renumbers prefixed footnotes within their namespace. The Rename footnote command adds the prefix to a new name the same way. While off, footnotes carrying the prefix are treated as named footnotes and keep their ids.",
+                                desc: "Linting adds the note's footnote-prefix to plain footnotes and renumbers the prefixed ones within their namespace. The Rename footnote command adds the prefix the same way. While off, prefixed footnotes are treated as named and keep their ids.",
                                 control: {
                                     type: "toggle",
                                     key: "lintApplyPrefix",
