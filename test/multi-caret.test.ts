@@ -308,7 +308,11 @@ describe("a second press with EVERY caret inside the same footnote continues it 
             "",
             "[^cite]: ",
         ]);
-        // the multi-cursor collapsed; the caret sits on the definition
+        // the multi-cursor collapsed onto the FIRST reference before the
+        // definition was created (that collapse is what the popup arm
+        // hands back on close - Jason's consistency ask 2026-08-29)
+        expect(doc.moves[0]).toEqual({ line: 0, ch: 10 });
+        // ... and on the jump arm the caret then sits on the definition
         expect(doc.cursor).toEqual({ line: 2, ch: "[^cite]: ".length });
         expect(noticed(MultiCaretFootnoteNotice)).toBe(false);
     });
@@ -329,15 +333,18 @@ describe("a second press with EVERY caret inside the same footnote continues it 
         ]);
     });
 
-    it("filled inline footnotes: the press hops ONE cursor out after the LAST span", async () => {
+    it("filled inline footnotes: the press hops ONE cursor out after the FIRST span", async () => {
+        // the multi-cursor collapses onto the FIRST footnote in document
+        // order, matching where every other multi-caret flow ends up
+        // (Jason's consistency ask 2026-08-29; carets given unsorted)
         const before = ["x^[note] y^[note] z"];
         const doc = fakeEditor(before, [
-            { line: 0, ch: 5 },
             { line: 0, ch: 14 },
+            { line: 0, ch: 5 },
         ]);
         await insertInlineFootnote(fakePlugin(doc));
         expect(doc.lines).toEqual(before);
-        expect(doc.cursor).toEqual({ line: 0, ch: "x^[note] y^[note]".length });
+        expect(doc.cursor).toEqual({ line: 0, ch: "x^[note]".length });
         expect(noticed(MultiCaretFootnoteNotice)).toBe(false);
     });
 

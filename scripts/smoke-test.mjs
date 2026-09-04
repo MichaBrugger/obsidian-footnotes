@@ -683,6 +683,44 @@ async function main() {
         await sleep(800);
     });
 
+    await test("multi-caret named continuation returns the caret after the FIRST reference when the popup closes (2026-08-29)", async () => {
+        // Jason's consistency ruling: every multi-caret flow ends with the
+        // caret after the FIRST reference. The popup arm is the case units
+        // can't reach - it parks the caret wherever the continuation
+        // collapsed the multi-cursor and hands it back on close.
+        resetSettings({ enablePopupEditor: true });
+        await setupNote("alpha bravo charlie delta echo");
+        action(
+            `(() => { const v=${EDITOR}; v.editor.focus(); ` +
+            `v.editor.setSelections([{anchor:{line:0,ch:5},head:{line:0,ch:5}},{anchor:{line:0,ch:19},head:{line:0,ch:19}}]); ` +
+            `app.commands.executeCommandById('${CMD_NAMED}'); })();`,
+        );
+        await expectEditorText("alpha[^] bravo charlie[^] delta echo");
+        action(`(${EDITOR}).editor.replaceSelection('cite');`);
+        await expectEditorText("alpha[^cite] bravo charlie[^cite] delta echo");
+        action(`app.commands.executeCommandById('${CMD_NAMED}');`);
+        await pollUntil(
+            "popup bound to the shared definition",
+            `document.querySelector('.footnote-shortcut-popup-label')?.textContent ?? null`,
+            (v) => v === "[^cite]:",
+        );
+        action(
+            `document.querySelectorAll('.footnote-shortcut-popup').forEach((el) => ` +
+            `el.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true})));`,
+        );
+        await pollUntil(
+            "popup closed",
+            `!document.querySelector('.footnote-shortcut-popup')`,
+            (v) => v === true,
+        );
+        const cursor = readJson(`(${EDITOR}).editor.getCursor()`);
+        const want = { line: 0, ch: "alpha[^cite]".length };
+        if (!cursor || cursor.line !== want.line || cursor.ch !== want.ch) {
+            throw new Error(`caret at ${JSON.stringify(cursor)}, expected after the FIRST reference at ${JSON.stringify(want)}`);
+        }
+        await sleep(800);
+    });
+
     await test("inline footnote inserts ^[] at end of word with cursor inside", async () => {
         resetSettings();
         await setupNote("Alpha bravo charlie");

@@ -86,12 +86,12 @@ function caretArtifact(
 
 /**
  * A press with EVERY caret inside the same footnote artifact is not a
- * refusal - it is the single-caret CONTINUATION, aimed at the LAST
+ * refusal - it is the single-caret CONTINUATION, aimed at the FIRST
  * artifact in document order (A14 report, 2026-08-27: the named
  * multi-caret flow dead-ended on its second press, and filled inline
  * footnotes could never hop back out). Uniform empties/placeholders warn
  * through the shared guards WITHOUT collapsing, so typing keeps filling
- * every skeleton; a filled-inline press hops one cursor out past the last
+ * every skeleton; a filled-inline press hops one cursor out past the first
  * span; same-named dangling references get their ONE shared definition
  * (popup/jump + creation lint, via createMatchingFootnoteDefinition).
  * Anything mixed - kinds, names, emptiness - or already working (a
@@ -109,7 +109,11 @@ function multiCaretContinuation(
         new Notice(MultiCaretFootnoteNotice, 8000);
         return "handled";
     };
-    const last = carets.reduce((a, b) => (posCmp(a, b) >= 0 ? a : b));
+    // FIRST in document order (Jason's consistency ruling 2026-08-29): the
+    // numbered flow already parks and returns the caret after its first
+    // reference, so the named continuation and the inline hop-out land
+    // there too - one answer for "where am I when the insertion is done"
+    const first = carets.reduce((a, b) => (posCmp(a, b) <= 0 ? a : b));
     if (new Set(artifacts.map((a) => a.kind)).size !== 1) return refuse();
     const kind = artifacts[0].kind;
     if (kind === "inline") {
@@ -117,22 +121,21 @@ function multiCaretContinuation(
         if (new Set(artifacts.map((a) => a.kind === "inline" && a.empty)).size !== 1) {
             return refuse();
         }
-        // the shared guards do the rest at the last caret: warn while
-        // empty (every caret stays), or hop out past the last span
-        // (collapsing the multi-cursor - Jason's ask: land right after
-        // the LAST footnote)
-        caretGuardsHandled(plugin, doc, null, last);
+        // the shared guards do the rest at the first caret: warn while
+        // empty (every caret stays), or hop out past the first span
+        // (collapsing the multi-cursor)
+        caretGuardsHandled(plugin, doc, null, first);
         return "handled";
     }
     if (kind === "empty") {
         // the shared empty-"[^]" warning; every caret stays for typing
-        caretGuardsHandled(plugin, doc, null, last);
+        caretGuardsHandled(plugin, doc, null, first);
         return "handled";
     }
     const names = artifacts.map((a) => (a.kind === "ref" ? a.name : ""));
     if (new Set(names.map((n) => n.toLowerCase())).size !== 1) return refuse();
     // an untouched "[^prefix]" placeholder asks for its suffix (all stay)
-    if (warnPrefilledReferenceIfInside(plugin, doc, null, last)) {
+    if (warnPrefilledReferenceIfInside(plugin, doc, null, first)) {
         return "handled";
     }
     // the paste key has no definition-continuation semantics at a single
@@ -146,13 +149,14 @@ function multiCaretContinuation(
     }
     if (!isValidFootnoteName(name)) {
         // warns with the shared invalid-name notice, edits nothing
-        createMatchingFootnoteDefinition(doc.getLine(last.line), last, plugin, doc, ctx);
+        createMatchingFootnoteDefinition(doc.getLine(first.line), first, plugin, doc, ctx);
         return "handled";
     }
-    // collapse to the last caret first, then the single-caret continuation
-    // creates the ONE shared definition and lands (popup/jump + lint)
-    doc.setCursor(last);
-    createMatchingFootnoteDefinition(doc.getLine(last.line), last, plugin, doc, ctx);
+    // collapse to the first caret, then the single-caret continuation
+    // creates the ONE shared definition and lands (popup/jump + lint); the
+    // popup arm parks and returns the caret exactly there on close
+    doc.setCursor(first);
+    createMatchingFootnoteDefinition(doc.getLine(first.line), first, plugin, doc, ctx);
     return "handled";
 }
 
