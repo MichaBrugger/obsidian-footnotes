@@ -21,6 +21,8 @@ export interface ValidatedTextModalUi {
     placeholder?: string;
     /** prefills the input and selects it, so editing is one step */
     initialValue?: string;
+    /** selects only the tail of `initialValue` from this offset (the rename modal keeps an armed footnote-prefix visibly in place); omitted = select all */
+    selectFrom?: number;
 }
 
 export abstract class ValidatedTextModal extends Modal {
@@ -76,7 +78,12 @@ export abstract class ValidatedTextModal extends Modal {
                     }
                 });
                 text.inputEl.focus();
-                if (this.ui.initialValue !== undefined) text.inputEl.select();
+                if (this.ui.initialValue !== undefined) {
+                    text.inputEl.setSelectionRange(
+                        this.ui.selectFrom ?? 0,
+                        text.inputEl.value.length,
+                    );
+                }
             });
 
         this.errorEl = contentEl.createDiv({

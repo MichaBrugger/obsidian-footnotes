@@ -947,6 +947,31 @@ async function main() {
         }
     });
 
+    await test("rename under an armed apply-prefix sweep adds the note's prefix and says so (2026-08-29)", async () => {
+        // Jason's ruling: instead of refusing a bare new name (the
+        // 2026-08-25 fix), the rename writes it behind the note's prefix -
+        // what the next lint would do anyway - and the toast says so
+        resetSettings({ enableFootnotePrefix: true, lintApplyPrefix: true });
+        await setupNote("---\nfootnote-prefix: p.\n---\ntext with a ref[^p.1] here\n\n[^p.1]: body");
+        setCursorAndRun(3, 18, "obsidian-footnotes:rename-footnote");
+        await pollUntil(
+            "rename modal open with only the suffix selected",
+            `(() => { const i = document.querySelector('.modal-container input'); return i ? [i.value, i.selectionStart, i.selectionEnd] : null; })()`,
+            (v) => Array.isArray(v) && v[0] === "p.1" && v[1] === 2 && v[2] === 3,
+        );
+        action(
+            `(() => { const i = document.querySelector('.modal-container input'); i.value = '5'; ` +
+            `i.dispatchEvent(new Event('input', {bubbles: true})); ` +
+            `i.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true})); })();`,
+        );
+        await expectEditorText("---\nfootnote-prefix: p.\n---\ntext with a ref[^p.5] here\n\n[^p.5]: body");
+        await pollUntil(
+            "the toast names the added prefix",
+            `[...document.querySelectorAll('.notice')].map(n => n.textContent).join('|')`,
+            (v) => typeof v === "string" && v.includes("prefix " + String.fromCharCode(34) + "p." + String.fromCharCode(34) + " was added."),
+        );
+    });
+
     await test("right-click on a footnote offers Rename footnote, prose does not", async () => {
         // the editor-menu hook (Jason's ask 2026-08-13): parity with the
         // native "Rename this heading" on heading lines. Triggered
