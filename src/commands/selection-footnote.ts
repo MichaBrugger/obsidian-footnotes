@@ -97,7 +97,7 @@ export const ProtectedSelectionNotice =
 // sensible. Text inside ONE cell converts (the cell keeps its shape), and
 // a whole table travels with the prose around it like any other block.
 export const TableSelectionNotice =
-    "No footnote was created: the selection takes part of a table. Select text inside one cell, or the whole table with the text around it.";
+    "No footnote was created: the selection cuts through a table. Select text inside one cell, or the whole table with the text around it.";
 
 export type FootnoteCommandKind = "autonum" | "named" | "inline" | "paste";
 

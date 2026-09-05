@@ -26,7 +26,7 @@ select me in here
 - [ ] With cell editing active, select `target` and press the INLINE hotkey: it becomes `^[target]` inside the cell, pipes intact
 - [ ] Undo, select `word` and press the NUMBERED hotkey: the cell gets `[^1]` and the prefilled definition lands below the table
 - [ ] Switch to SOURCE mode. Select `word target` inside the cell and press the numbered hotkey: converts in place, pipes intact (text inside one cell is fine)
-- [ ] Undo. Select from `target` through the pipe into `click` (two cells) and press any converting hotkey: the "takes part of a table" toast, nothing changes (ruling 2026-09-04: a cell, a few cells, or a row never become a footnote; only text inside one cell, or the whole table with the text around it, which is A13's fixture)
+- [ ] Undo. Select from `target` through the pipe into `click` (two cells) and press any converting hotkey: the "cuts through a table" toast, nothing changes (ruling 2026-09-04: a cell, a few cells, or a row never become a footnote; only text inside one cell, or the whole table with the text around it, which is A13's fixture)
 - [ ] Select the header row through the `| --- |` row and convert: same toast, nothing changes
 - [ ] Select only whitespace anywhere: the press behaves like a plain insert at the caret
 - [ ] With the caret in a footnote definition's body below, EVERY insert hotkey (numbered, named, inline, paste) jumps back to the reference instead of creating (ruling 2026-08-13)
