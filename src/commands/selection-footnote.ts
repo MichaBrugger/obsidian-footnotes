@@ -37,7 +37,7 @@ import {
     replaceInTableCell,
 } from "./create-footnote";
 import { DefinitionCreationNotice } from "./press-guards";
-import { TableCellEditor } from "../editor/table-cursor";
+import { TableCellEditor, tableRowCellSpans, tableRowLines } from "../editor/table-cursor";
 
 // Turning a selection into a footnote (issue #35): a creation press with a
 // live selection REPLACES the selected text instead of inserting at the
@@ -90,6 +90,14 @@ export const NestedSelectionNotice =
 // (2026-08-19); cutting one apart would corrupt what stays behind.
 export const ProtectedSelectionNotice =
     "No footnote was created: the selection cuts through code, math, or other protected text. Select all of it or none of it.";
+
+// tables are protected against PARTIAL conversion (Jason's ruling
+// 2026-09-04, from his A13 pass): a cell, a few cells, or a row moved into
+// a footnote shreds the table left behind, and the body renders as nothing
+// sensible. Text inside ONE cell converts (the cell keeps its shape), and
+// a whole table travels with the prose around it like any other block.
+export const TableSelectionNotice =
+    "No footnote was created: the selection takes part of a table. Select text inside one cell, or the whole table with the text around it.";
 
 export type FootnoteCommandKind = "autonum" | "named" | "inline" | "paste";
 
@@ -245,6 +253,10 @@ export function selectionPressHandled(
     }
     const ctx = docContext(doc);
     const text = rangeText(ctx.lines, trimmed.from, trimmed.to);
+    if (selectionCutsTable(ctx, trimmed.from, trimmed.to)) {
+        new Notice(TableSelectionNotice, 8000);
+        return true;
+    }
     // protected CUTS are refused UP FRONT, not just simulated: the
     // born-dead checks prove the RESULT is live, but a selection that eats
     // a delimiter makes a live result out of DESTROYING the construct -
@@ -366,6 +378,26 @@ function spanTouchesFootnote(
         i = span.close;
     }
     return false;
+}
+
+/**
+ * Whether the selection takes PART of a table: an edge on a table row is
+ * refused unless both edges sit inside the same cell of one row (text
+ * inside a cell converts). A table contained whole, edges on the prose
+ * around it, passes - and a selection that is exactly the table refuses
+ * too, since a table can't start on the definition's label line.
+ */
+function selectionCutsTable(
+    ctx: DocContext,
+    from: EditorPosition,
+    to: EditorPosition,
+): boolean {
+    const rows = tableRowLines(ctx.lines, ctx.scan.isProtected);
+    if (!rows[from.line] && !rows[to.line]) return false;
+    if (from.line !== to.line) return true;
+    return !tableRowCellSpans(ctx.lines[from.line] ?? "").some(
+        (span) => span.from <= from.ch && to.ch <= span.to,
+    );
 }
 
 /** The multi-line sweep of spanTouchesFootnote over a trimmed selection. */

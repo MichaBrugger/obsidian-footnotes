@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { tableRowCellSpans } from "../src/editor/table-cursor";
+import { tableRowCellSpans, tableRowLines } from "../src/editor/table-cursor";
 
 // The escape-aware cell geometry that resolveTableCellCursor uses to map a
 // cell-local caret back to a document position. Only this slicing is
@@ -50,5 +50,54 @@ describe("tableRowCellSpans", () => {
 
     it("returns no spans for a line without pipes", () => {
         expect(tableRowCellSpans("plain prose, no table here")).toEqual([]);
+    });
+});
+
+// Which lines are rows of a GFM table: a run of consecutive unprotected
+// pipe-bearing lines whose SECOND line is the delimiter row. Powers the
+// partial-table selection refusal (Jason's ruling 2026-09-04).
+describe("tableRowLines", () => {
+    const none = (lines: string[]) => new Array<boolean>(lines.length).fill(false);
+
+    it("marks the header, delimiter, and body rows, not the prose around them", () => {
+        const lines = ["before", "| a | b |", "| --- | --- |", "| 1 | 2 |", "", "after"];
+        expect(tableRowLines(lines, none(lines))).toEqual([false, true, true, true, false, false]);
+    });
+
+    it("a header with its delimiter row and no body is still a table", () => {
+        const lines = ["| a | b |", "| --- | --- |"];
+        expect(tableRowLines(lines, none(lines))).toEqual([true, true]);
+    });
+
+    it("accepts alignment colons and pipe-less edges on the delimiter row", () => {
+        const lines = ["a | b", ":--- | ---:", "1 | 2"];
+        expect(tableRowLines(lines, none(lines))).toEqual([true, true, true]);
+    });
+
+    it("a pipe line without a delimiter row below it is prose", () => {
+        const lines = ["a | b", "1 | 2", "x | y"];
+        expect(tableRowLines(lines, none(lines))).toEqual([false, false, false]);
+    });
+
+    it("the run ends at the first pipe-less line", () => {
+        const lines = ["| a |", "| --- |", "| 1 |", "prose", "| 2 |"];
+        expect(tableRowLines(lines, none(lines))).toEqual([true, true, true, false, false]);
+    });
+
+    it("protected lines (a fenced table) are never rows", () => {
+        const lines = ["```", "| a |", "| --- |", "| 1 |", "```"];
+        expect(tableRowLines(lines, [true, true, true, true, true])).toEqual([
+            false, false, false, false, false,
+        ]);
+    });
+
+    it("quoted tables count, quote marks stripped for the delimiter test", () => {
+        const lines = ["> intro", "> | a | b |", "> | --- | --- |", "> | 1 | 2 |"];
+        expect(tableRowLines(lines, none(lines))).toEqual([false, true, true, true]);
+    });
+
+    it("a delimiter row needs at least one dash cell", () => {
+        const lines = ["| a |", "|   |", "| 1 |"];
+        expect(tableRowLines(lines, none(lines))).toEqual([false, false, false]);
     });
 });

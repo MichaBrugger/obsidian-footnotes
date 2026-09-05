@@ -27,6 +27,7 @@ import {
     SelectionChangedNotice,
     SelectionCommandNotice,
     SelectionSpanNotice,
+    TableSelectionNotice,
 } from "../src/commands/selection-footnote";
 import { ProtectedCreationNotice } from "../src/editor/insertion-liveness";
 import { commandHotkeys } from "../src/editor/obsidian-internals";
@@ -1467,5 +1468,119 @@ describe("nested footnotes are prevented in selections (2026-08-24)", () => {
         await insertAutonumFootnote(fakePlugin(doc));
         expect(doc.lines).toEqual(before);
         expect(noticed(NestedSelectionNotice)).toBe(true);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// tables are protected against PARTIAL conversion (Jason's ruling 2026-09-04
+// from his A13 pass): moving a cell, a few cells, or a row into a footnote
+// shreds the table left behind and yields a body that renders as nothing
+// sensible. Two shapes stay allowed - text INSIDE one cell (source mode
+// here; the cell sub-editor branch can't cross cells by construction), and
+// the whole table travelling with the prose around it (the block zoo above).
+// ---------------------------------------------------------------------------
+
+describe("partial-table selections refuse (Jason's ruling 2026-09-04)", () => {
+    const table = [
+        "before the table",
+        "",
+        "| a | b |",
+        "| --- | --- |",
+        "| one | two |",
+        "",
+        "after the table",
+    ];
+
+    async function refused(
+        anchor: EditorPosition,
+        head: EditorPosition,
+        command: (plugin: FootnotePlugin) => Promise<void> | void = insertAutonumFootnote,
+        lines: string[] = table,
+    ): Promise<void> {
+        const doc = fakeEditor(lines, anchor, { anchor, head });
+        await command(fakePlugin(doc));
+        expect(doc.lines).toEqual(lines);
+        expect(noticed(TableSelectionNotice)).toBe(true);
+    }
+
+    it("the header row alone (prose above through the header)", () =>
+        refused({ line: 0, ch: 0 }, { line: 2, ch: 9 }));
+
+    it("a cell's text through to the prose below", () =>
+        refused({ line: 4, ch: 2 }, { line: 6, ch: 5 }));
+
+    it("two cells of one row across their pipe", () =>
+        refused({ line: 4, ch: 2 }, { line: 4, ch: 11 }));
+
+    it("one cell WITH its pipes", () =>
+        refused({ line: 4, ch: 0 }, { line: 4, ch: 7 }));
+
+    it("the table exactly, without the prose around it (a table can't start on the definition label)", () =>
+        refused({ line: 2, ch: 0 }, { line: 4, ch: 13 }));
+
+    it("the inline key refuses the same shapes", () =>
+        refused({ line: 4, ch: 2 }, { line: 4, ch: 11 }, insertInlineFootnote));
+
+    it("the named key refuses before any modal opens", () =>
+        refused({ line: 0, ch: 0 }, { line: 2, ch: 9 }, insertNamedFootnote));
+
+    it("a quoted table refuses too", () =>
+        refused(
+            { line: 0, ch: 0 },
+            { line: 1, ch: 11 },
+            insertAutonumFootnote,
+            ["> intro", "> | a | b |", "> | --- | --- |", "> | 1 | 2 |"],
+        ));
+
+    it("text inside ONE cell still converts in source mode", async () => {
+        const doc = fakeEditor(table, { line: 4, ch: 2 }, {
+            anchor: { line: 4, ch: 2 },
+            head: { line: 4, ch: 5 },
+        });
+        await insertAutonumFootnote(fakePlugin(doc));
+        expect(doc.lines[4]).toBe("| [^1] | two |");
+        expect(doc.lines[doc.lines.length - 1]).toBe("[^1]: one");
+        expect(noticed(TableSelectionNotice)).toBe(false);
+    });
+
+    it("whole-word expansion stops at the cell's edge, not the pipe", async () => {
+        const doc = fakeEditor(table, { line: 4, ch: 3 }, {
+            anchor: { line: 4, ch: 3 },
+            head: { line: 4, ch: 4 },
+        });
+        await insertAutonumFootnote(
+            fakePlugin(doc, { expandSelectionToWholeWords: true }),
+        );
+        expect(doc.lines[4]).toBe("| [^1] | two |");
+    });
+
+    it("the inline key wraps text inside one cell", async () => {
+        const doc = fakeEditor(table, { line: 4, ch: 8 }, {
+            anchor: { line: 4, ch: 8 },
+            head: { line: 4, ch: 11 },
+        });
+        await insertInlineFootnote(fakePlugin(doc));
+        expect(doc.lines[4]).toBe("| one | ^[two] |");
+    });
+
+    it("a pipe in prose without a delimiter row is not a table", async () => {
+        const doc = fakeEditor(["pick a | b here"], { line: 0, ch: 5 }, {
+            anchor: { line: 0, ch: 5 },
+            head: { line: 0, ch: 10 },
+        });
+        await insertAutonumFootnote(fakePlugin(doc));
+        expect(doc.lines[0]).toBe("pick [^1] here");
+        expect(noticed(TableSelectionNotice)).toBe(false);
+    });
+
+    it("the whole table with its surrounding prose still converts (the block zoo contract)", async () => {
+        const doc = fakeEditor(table, { line: 0, ch: 0 }, {
+            anchor: { line: 0, ch: 0 },
+            head: { line: 6, ch: 15 },
+        });
+        await insertAutonumFootnote(fakePlugin(doc));
+        expect(doc.lines[0]).toBe("[^1]");
+        expect(doc.lines).toContain("    | one | two |");
+        expect(noticed(TableSelectionNotice)).toBe(false);
     });
 });

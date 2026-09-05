@@ -202,3 +202,46 @@ export function resolveTableCellCursor(editor: Editor): EditorPosition | null {
     const ch = Math.min(span.from + raw, span.to);
     return { line, ch };
 }
+
+// A GFM delimiter row's cell: optional alignment colons around at least one
+// dash. Judged on the row with any blockquote prefix stripped, so quoted
+// tables ("> | --- |") qualify too.
+const DelimiterCell = /^\s*:?-+:?\s*$/;
+const QuotePrefix = /^(\s*>)+\s?/;
+
+/**
+ * Which lines are rows of a table: every maximal run of consecutive
+ * unprotected lines carrying an unescaped pipe whose SECOND line is a
+ * delimiter row. A pipe-bearing line with no delimiter row under it is
+ * prose ("a | b"), and a table inside a fence or comment is text, not a
+ * table. Powers the partial-table selection refusal (Jason's ruling
+ * 2026-09-04): converting a cell, a few cells, or a row into a footnote
+ * shreds what stays behind.
+ */
+export function tableRowLines(lines: string[], isProtected: boolean[]): boolean[] {
+    const rows = new Array<boolean>(lines.length).fill(false);
+    const isRowShaped = (i: number) =>
+        !isProtected[i] && tableRowCellSpans(lines[i]).length > 0;
+    const isDelimiterRow = (i: number) => {
+        const stripped = lines[i].replace(QuotePrefix, "");
+        const spans = tableRowCellSpans(stripped);
+        return (
+            spans.length > 0 &&
+            spans.every((span) => DelimiterCell.test(stripped.slice(span.from, span.to)))
+        );
+    };
+    let i = 0;
+    while (i < lines.length) {
+        if (!isRowShaped(i)) {
+            i++;
+            continue;
+        }
+        let end = i;
+        while (end + 1 < lines.length && isRowShaped(end + 1)) end++;
+        if (end > i && isDelimiterRow(i + 1)) {
+            for (let k = i; k <= end; k++) rows[k] = true;
+        }
+        i = end + 1;
+    }
+    return rows;
+}

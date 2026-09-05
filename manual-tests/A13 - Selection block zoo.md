@@ -140,8 +140,9 @@ numbered/named keys.
 ## Cut refusals (spot checks — the toast, nothing changes)
 
 - [ ] Select from "before the table" through only the table's HEADER row and
-      convert: allowed (tables aren't protected) — note whether the
-      leftover half-table looks acceptable, this one is judgment territory
+      convert: the "takes part of a table" toast, nothing changes (tables
+      are protected against partial conversion, ruling 2026-09-04; the
+      cell-level cases are A9's)
 - [ ] Select from inside the `$$` block to below it: the cuts-through-protected
       toast (the fence-cut twin is A9's check — not repeated here)
 
