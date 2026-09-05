@@ -596,6 +596,65 @@ async function main() {
         await sleep(800);
     });
 
+    await test("popup still opens (no jump) when the metadata cache is slow to index (2026-09-04)", async () => {
+        // Jason's report 2026-09-04: with the popup ON, a busy PC sometimes
+        // JUMPED to the definition instead - the popup's bind retries ran
+        // on a 3s wall clock and fell back to the legacy jump when the
+        // cache hadn't re-indexed the note in time. Simulate the slow
+        // machine: serve the PRE-press cache for this note for 4.5s (the
+        // embed's subpath can't resolve), then restore it and fire the
+        // cache's own "changed" event. Old code: jump at 3s. New code:
+        // the waiting notice, then the popup once the event lands.
+        resetSettings({ enablePopupEditor: true });
+        await setupNote("Alpha bravo charlie");
+        action(`window.__slowSaved = false; (async () => { await (${EDITOR}).save(); window.__slowSaved = true; })();`);
+        await pollUntil("note saved to disk", `window.__slowSaved`, (v) => v === true);
+        action(
+            `(() => { const v=${EDITOR}; const mc = app.metadataCache; ` +
+            `const orig = mc.getFileCache; const path = v.file.path; ` +
+            `const snap = JSON.parse(JSON.stringify(orig.call(mc, v.file))); ` +
+            `window.__slowCache = { restored: false, restore: () => { if (mc.getFileCache !== orig) mc.getFileCache = orig; window.__slowCache.restored = true; } }; ` +
+            `mc.getFileCache = function (f) { return f && f.path === path ? snap : orig.call(this, f); }; ` +
+            `window.__slowPopup = { visibleAt: null, noticeSeen: false, jumped: false }; const t0 = performance.now(); ` +
+            `const mo = new MutationObserver(() => { ` +
+            `const p = document.querySelector('.footnote-shortcut-popup'); ` +
+            `if (p && !p.classList.contains('footnote-shortcut-popup-loading') && window.__slowPopup.visibleAt === null) { window.__slowPopup.visibleAt = Math.round(performance.now() - t0); } ` +
+            `for (const n of document.querySelectorAll('.notice')) { if (n.textContent.includes('Waiting for Obsidian to index')) window.__slowPopup.noticeSeen = true; } }); ` +
+            `mo.observe(document.body, {childList: true, subtree: true, attributes: true, attributeFilter: ['class']}); ` +
+            `window.__slowPopup.stop = () => mo.disconnect(); ` +
+            `setTimeout(() => { window.__slowCache.restore(); mc.trigger('changed', v.file, v.editor.getValue(), orig.call(mc, v.file)); }, 4500); ` +
+            `v.editor.setCursor({line:0,ch:5}); app.commands.executeCommandById('${CMD_AUTONUM}'); })();`,
+        );
+        try {
+            const result = await pollUntil(
+                "popup visible after the stalled index",
+                `window.__slowPopup`,
+                (v) => v && typeof v.visibleAt === "number",
+                15000,
+            );
+            // the stall was real: nothing could bind before the restore
+            if (result.visibleAt < 3500) {
+                throw new Error(`popup visible at ${result.visibleAt}ms - the cache stall didn't take, this run proves nothing`);
+            }
+            if (!result.noticeSeen) {
+                throw new Error("the waiting notice never appeared during the stall");
+            }
+            // ... and the caret never jumped to the definition line
+            const cursor = readJson(`(${EDITOR}).editor.getCursor()`);
+            if (!cursor || cursor.line !== 0) {
+                throw new Error(`caret at ${JSON.stringify(cursor)} - the popup fell back to the jump`);
+            }
+            await expectEditorText("Alpha[^1] bravo charlie\n\n[^1]: ");
+        } finally {
+            action(`window.__slowCache?.restore(); window.__slowPopup?.stop?.();`);
+            action(
+                `document.querySelectorAll('.footnote-shortcut-popup').forEach((el) => ` +
+                `el.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true})));`,
+            );
+            await sleep(800);
+        }
+    });
+
     await test("creation lint is applied BEFORE the popup opens (2026-08-27)", async () => {
         // Jason's ask 2026-08-27: with the popup on, the lint used to wait
         // until the popup CLOSED - the note looked unlinted the whole time

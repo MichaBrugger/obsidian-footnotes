@@ -2,6 +2,7 @@ import { MarkdownView, Notice } from "obsidian";
 
 import type FootnotePlugin from "../main";
 import { AppWithEmbedRegistry, EditorWithCm } from "../editor/obsidian-internals";
+import { PopupWaitingNotice, retryUntilShown } from "./popup-retry";
 
 // A small popup anchored at the cursor containing Obsidian's own editable
 // markdown embed, bound to just the footnote's definition via the `#[^id]`
@@ -418,37 +419,38 @@ export async function openFootnotePopup(
         return true;
     };
 
-    const waitForCacheChange = () =>
-        new Promise<void>((resolve) => {
-            const timeout = win.setTimeout(() => {
-                plugin.app.metadataCache.offref(ref);
-                resolve();
-            }, 500);
-            const ref = plugin.app.metadataCache.on("changed", (file) => {
-                if (file === mdView.file) {
-                    win.clearTimeout(timeout);
+    // retry as the metadata cache catches up with the saved file - driven
+    // by the cache's own change events, with the policy (idle cadence,
+    // waiting notice, safety cap) in popup-retry.ts where units pin it. A
+    // slow machine used to hit the old 3s deadline and JUMP instead
+    // (Jason's report 2026-09-04).
+    const showEditor = () =>
+        retryUntilShown({
+            tryShow,
+            // a loaded embed won't re-resolve its subpath, so rebuild each time
+            rebuild: () => {
+                embed.unload();
+                embedEl.empty();
+                embed = buildEmbed();
+            },
+            closed: popupClosed,
+            now: () => Date.now(),
+            delay: (ms) => new Promise<void>((resolve) => win.setTimeout(resolve, ms)),
+            onCacheChange: (listener) => {
+                const ref = plugin.app.metadataCache.on("changed", (changedFile) => {
+                    if (changedFile === mdView.file) listener();
+                });
+                return () => {
                     plugin.app.metadataCache.offref(ref);
-                    resolve();
-                }
-            });
+                };
+            },
+            showWaitingNotice: () => {
+                const notice = new Notice(PopupWaitingNotice, 0);
+                return () => {
+                    notice.hide();
+                };
+            },
         });
-
-    const showEditor = async (): Promise<boolean> => {
-        if (await tryShow()) return true;
-
-        // retry as the metadata cache catches up with the saved file; a
-        // loaded embed won't re-resolve its subpath, so rebuild each time
-        const deadline = Date.now() + 3000;
-        while (Date.now() < deadline) {
-            await waitForCacheChange();
-            if (popupClosed()) return true;
-            embed.unload();
-            embedEl.empty();
-            embed = buildEmbed();
-            if (await tryShow()) return true;
-        }
-        return false;
-    };
 
     showEditor()
         .then((shown) => {
