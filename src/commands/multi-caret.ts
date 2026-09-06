@@ -297,7 +297,12 @@ export async function multiCaretPastePressHandled(
         return true;
     }
     const text = `^[${content}]`;
-    insertSkeletonAtEveryCaret(doc, ctx, targets, text, text.length);
+    // a pasted body is complete - nothing left to type into every wrapper
+    // - so the press ends like every other multi-caret insertion: ONE
+    // caret after the FIRST footnote (Jason's consistency ruling, extended
+    // to paste 2026-09-04; a cursor after every wrapper only forced a
+    // mouse click to get back to one)
+    insertSkeletonAtEveryCaret(doc, ctx, targets, text, text.length, "first");
     return true;
 }
 
@@ -360,15 +365,17 @@ function insertReferenceAtEveryCaret(
 // ("^[clipboard]"): the same text at every caret, then a CURSOR placed
 // `innerOffset` into each - for named/inline that is inside the brackets,
 // so typing the name/body types into all of them at once (CodeMirror
-// multi-cursor input); for paste it is just past each wrapper. Born-dead
-// verify per caret on the one simulated result; any dead landing refuses
-// the lot.
+// multi-cursor input); for paste it is just past the FIRST wrapper only
+// (`land: "first"` - the body is complete, and one caret is the rule).
+// Born-dead verify per caret on the one simulated result; any dead
+// landing refuses the lot.
 function insertSkeletonAtEveryCaret(
     doc: Editor,
     ctx: DocContext,
     targets: EditorPosition[],
     text: string,
     innerOffset: number,
+    land: "every" | "first" = "every",
 ): void {
     const changes: EditorChange[] = targets.map((pos) => ({ from: pos, text }));
     const simulated = simulateChanges(ctx.lines, changes);
@@ -385,9 +392,11 @@ function insertSkeletonAtEveryCaret(
         new Notice(ProtectedCreationNotice, 8000);
         return;
     }
+    // targets arrive in document order, so anchors[0] is the first footnote
+    const landed = land === "first" ? anchors.slice(0, 1) : anchors;
     doc.transaction({
         changes,
-        selections: anchors.map((anchor) => ({
+        selections: landed.map((anchor) => ({
             from: { line: anchor.line, ch: anchor.ch + innerOffset },
         })),
     });

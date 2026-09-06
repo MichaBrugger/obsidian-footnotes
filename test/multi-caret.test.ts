@@ -203,22 +203,28 @@ describe("the named and inline keys at several carets", () => {
 });
 
 describe("the paste key at several carets", () => {
-    it("wraps the SAME clipboard text at every caret, cursor after each", async () => {
+    it("wraps the SAME clipboard text at every caret, ONE cursor after the FIRST wrapper", async () => {
+        // Jason's consistency ruling (2026-08-29, extended to paste
+        // 2026-09-04): every multi-caret insertion ends with a single
+        // caret after the FIRST reference. The named/inline skeletons keep
+        // a cursor in every bracket pair because the user still has to
+        // type into them; a pasted body is complete, so leaving a cursor
+        // after every wrapper only forced a mouse click to get back to
+        // one caret.
         vi.stubGlobal("navigator", {
             clipboard: { readText: () => Promise.resolve("same source") },
         });
         const doc = fakeEditor(
             ["alpha bravo"],
             [
-                { line: 0, ch: 5 },
                 { line: 0, ch: 11 },
+                { line: 0, ch: 5 },
             ],
         );
         await pasteInlineFootnote(fakePlugin(doc));
         expect(doc.lines).toEqual(["alpha^[same source] bravo^[same source]"]);
         expect(doc.selections).toEqual([
             { from: { line: 0, ch: 5 + "^[same source]".length } },
-            { from: { line: 0, ch: 25 + "^[same source]".length } },
         ]);
     });
 
