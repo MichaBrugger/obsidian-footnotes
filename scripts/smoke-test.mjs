@@ -691,6 +691,82 @@ async function main() {
         }
     });
 
+    await test("Escape pressed in the NOTE closes an open popup (2026-09-04)", async () => {
+        // Jason's report: after a reading-view round trip the caret sits in
+        // the note, and Escape there did nothing while a click outside or
+        // the hotkey still closed the popup. Escape now closes it from the
+        // note as well as from inside it.
+        resetSettings({ enablePopupEditor: true });
+        await setupNote("Alpha bravo charlie");
+        setCursorAndRun(0, 5, CMD_AUTONUM);
+        await pollUntil("popup open", `!!document.querySelector('.footnote-shortcut-popup:not(.footnote-shortcut-popup-loading)')`, (v) => v === true);
+        action(
+            `(() => { const v=${EDITOR}; v.editor.cm.focus(); ` +
+            `v.editor.cm.contentDOM.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true, cancelable:true})); })();`,
+        );
+        await pollUntil("popup closed by Escape from the note", `!document.querySelector('.footnote-shortcut-popup')`, (v) => v === true);
+        await sleep(800);
+    });
+
+    await test("the reading-view hotkey pressed INSIDE the popup closes it and toggles the note in ONE press (2026-09-04)", async () => {
+        // the popup's editor counts as Obsidian's active editor, so the
+        // toggle used to flip the EMBED's mode - a swallowed press that only
+        // dropped focus to the note. The popup's scope now catches the
+        // command's hotkey, closes the popup, and toggles the note.
+        resetSettings({ enablePopupEditor: true });
+        await setupNote("Alpha bravo charlie");
+        setCursorAndRun(0, 5, CMD_AUTONUM);
+        await pollUntil("popup open", `!!document.querySelector('.footnote-shortcut-popup:not(.footnote-shortcut-popup-loading)')`, (v) => v === true);
+        action(
+            `(() => { const hk = (app.hotkeyManager.getHotkeys('markdown:toggle-preview') ?? app.hotkeyManager.getDefaultHotkeys('markdown:toggle-preview'))[0]; ` +
+            `const mods = hk.modifiers; const mac = navigator.platform.startsWith('Mac'); ` +
+            `const inner = document.querySelector('.footnote-shortcut-popup .cm-content'); window.__toggleTarget = !!inner; ` +
+            `(inner ?? document.body).dispatchEvent(new KeyboardEvent('keydown', {key: hk.key.toLowerCase(), code: 'Key' + hk.key.toUpperCase(), ` +
+            `ctrlKey: mods.includes('Ctrl') || (mods.includes('Mod') && !mac), metaKey: mods.includes('Meta') || (mods.includes('Mod') && mac), ` +
+            `shiftKey: mods.includes('Shift'), altKey: mods.includes('Alt'), bubbles: true, cancelable: true})); })();`,
+        );
+        try {
+            if (readJson(`window.__toggleTarget`) !== true) throw new Error("no inline editor inside the popup to press the key in");
+            await pollUntil("popup closed by the toggle hotkey", `!document.querySelector('.footnote-shortcut-popup')`, (v) => v === true);
+            await pollUntil("reading view", `(${EDITOR}).getMode()`, (v) => v === "preview");
+            // exactly ONE toggle: still Reading view half a second later
+            await sleep(500);
+            const mode = readJson(`(${EDITOR}).getMode()`);
+            if (mode !== "preview") throw new Error(`mode is ${JSON.stringify(mode)} after the press: the toggle ran twice`);
+        } finally {
+            action(
+                `(async () => { const v=${EDITOR}; ` +
+                `await v.setState({...v.getState(), mode:'source', source:false}, {history:false}); })();`,
+            );
+            await pollUntil("editing view", `(${EDITOR}).getMode()`, (v) => v === "source");
+            await sleep(800);
+        }
+    });
+
+    await test("switching to Reading view by any route closes an open popup (2026-09-04)", async () => {
+        // the pen icon / a palette pick: no hotkey for the popup's scope to
+        // catch, so the layout-change listener closes it instead
+        resetSettings({ enablePopupEditor: true });
+        await setupNote("Alpha bravo charlie");
+        setCursorAndRun(0, 5, CMD_AUTONUM);
+        await pollUntil("popup open", `!!document.querySelector('.footnote-shortcut-popup:not(.footnote-shortcut-popup-loading)')`, (v) => v === true);
+        // toggleMode is what the pen icon, the palette command, and the
+        // hotkey all call, and it fires layout-change; a programmatic
+        // setState flip does NOT (probed live 2026-09-04), so this test
+        // must take the user's route
+        action(`(async () => { await (${EDITOR}).toggleMode(); })();`);
+        try {
+            await pollUntil("popup closed by the mode switch", `!document.querySelector('.footnote-shortcut-popup')`, (v) => v === true);
+        } finally {
+            action(
+                `(async () => { const v=${EDITOR}; ` +
+                `await v.setState({...v.getState(), mode:'source', source:false}, {history:false}); })();`,
+            );
+            await pollUntil("editing view", `(${EDITOR}).getMode()`, (v) => v === "source");
+            await sleep(800);
+        }
+    });
+
     await test("creation lint is applied BEFORE the popup opens (2026-08-27)", async () => {
         // Jason's ask 2026-08-27: with the popup on, the lint used to wait
         // until the popup CLOSED - the note looked unlinted the whole time
@@ -2251,15 +2327,13 @@ async function main() {
         // the punctuation fix applied at creation, before the popup
         const created = "Alpha,[^1] bravo\n\n[^1]: ";
         await expectEditorText(created);
-        // flip to Reading view WITHOUT a leaf change - the popup stays up
-        action(
-            `(async () => { const v=${EDITOR}; ` +
-            `await v.setState({...v.getState(), mode:'preview'}, {history:false}); })();`,
-        );
+        // flip to Reading view WITHOUT a leaf change, by the user's route
+        // (toggleMode fires layout-change; a programmatic setState flip
+        // does not) - the mode switch itself closes the popup (2026-09-04;
+        // it used to stay up until the hotkey's toggle path closed it)
+        action(`(async () => { await (${EDITOR}).toggleMode(); })();`);
         await pollUntil("reading view", `(${EDITOR}).getMode()`, (v) => v === "preview");
-        // the hotkey's toggle path closes the popup; nothing may edit the
-        // hidden buffer afterwards
-        action(`app.commands.executeCommandById('${CMD_AUTONUM}');`);
+        // nothing may edit the hidden buffer afterwards
         await pollUntil(
             "popup closed",
             `!document.querySelector('.footnote-shortcut-popup')`,

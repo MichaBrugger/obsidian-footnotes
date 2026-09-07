@@ -12,6 +12,9 @@ export class Modal {
     close() {}
 }
 export class MarkdownView {}
+export class Scope {
+    register() {}
+}
 export class PluginSettingTab {}
 export class Setting {}
 // Self-recording: tests assert on toasts via `noticeCalls` instead of

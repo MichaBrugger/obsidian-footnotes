@@ -1,7 +1,13 @@
-import { MarkdownView, Notice } from "obsidian";
+import { MarkdownView, Notice, Scope } from "obsidian";
 
 import type FootnotePlugin from "../main";
-import { AppWithEmbedRegistry, EditorWithCm } from "../editor/obsidian-internals";
+import {
+    AppWithCommands,
+    AppWithEmbedRegistry,
+    commandHotkeys,
+    EditorWithCm,
+    readingViewActive,
+} from "../editor/obsidian-internals";
 import { PopupWaitingNotice, retryUntilShown } from "./popup-retry";
 
 // A small popup anchored at the cursor containing Obsidian's own editable
@@ -15,6 +21,9 @@ type ActivePopup = {
 };
 
 let activePopup: ActivePopup | null = null;
+
+/** Obsidian's core "Toggle reading view" command. */
+const TogglePreviewCommand = "markdown:toggle-preview";
 
 // Resolves once no closed popup still has file work in flight. A closed
 // popup legitimately saves the user's typed definition on a debounce - but that
@@ -155,10 +164,13 @@ export async function openFootnotePopup(
             }
         }
     };
+    // assigned once the view hooks below exist; close() is the single exit
+    let releaseViewHooks = () => {};
     const close = (focusEditor: boolean) => {
         if (closed) return;
         closed = true;
         activePopup = null;
+        releaseViewHooks();
         if (domTeardown) {
             domTeardown(focusEditor);
         } else if (focusEditor) {
@@ -167,6 +179,38 @@ export async function openFootnotePopup(
         }
     };
     activePopup = { close };
+
+    // The reading-view toggle pressed while the popup (or the note under
+    // it) has focus used to be SWALLOWED: the popup's editor counts as
+    // Obsidian's active editor, so the toggle flipped the EMBED's own
+    // mode, which only dropped focus back to the note; the next press
+    // toggled the note, and the one after that left the caret in the note
+    // with Escape dead (Jason's report 2026-09-04). A scope pushed for the
+    // popup's lifetime catches the command's own hotkeys first, closes the
+    // popup, and runs the toggle against the note - one press, as if the
+    // popup weren't there.
+    const scope = new Scope(plugin.app.scope);
+    for (const hotkey of commandHotkeys(plugin.app, TogglePreviewCommand)) {
+        scope.register([...hotkey.modifiers], hotkey.key, () => {
+            close(true);
+            (plugin.app as AppWithCommands).commands?.executeCommandById?.(TogglePreviewCommand);
+            return false;
+        });
+    }
+    plugin.app.keymap.pushScope(scope);
+    // ... and a switch to Reading view by any other route (the pen icon,
+    // a palette pick) closes the popup too: editing a footnote in a popup
+    // over a rendered note is not a state worth keeping. Every user route
+    // goes through the view's toggleMode, which fires layout-change; a
+    // programmatic setState flip does not (probed live 2026-09-04), and
+    // no user gesture takes that route.
+    const layoutRef = plugin.app.workspace.on("layout-change", () => {
+        if (readingViewActive(mdView)) close(false);
+    });
+    releaseViewHooks = () => {
+        plugin.app.keymap.popScope(scope);
+        plugin.app.workspace.offref(layoutRef);
+    };
 
     const dataDeadline = Date.now() + 2000;
     // the data buffer usually catches up within a tick - check again almost
@@ -289,30 +333,38 @@ export async function openFootnotePopup(
     };
     doc.addEventListener("mousedown", onDocMouseDown, true);
 
-    // CAPTURE phase, reading the vim state directly: the embedded editor
-    // preventDefaults EVERY Escape (not just vim's), so the old bubble-
-    // phase defaultPrevented check never closed the popup at all -
-    // regression from the E28 cleanup, caught by the A3 manual pass
-    // (2026-08-13). E28's actual rule survives by asking vim itself: an
-    // editor still in INSERT mode keeps the key (leaving insert must not
-    // also close); anything else means "close me".
-    containerEl.addEventListener(
-        "keydown",
-        (evt: KeyboardEvent) => {
-            if (evt.key !== "Escape") return;
-            const inner = embed.editMode?.editor as EditorWithCm | undefined;
-            if (inner?.cm?.cm?.state?.vim?.insertMode) return;
-            evt.preventDefault();
-            evt.stopPropagation();
-            close(true);
-        },
-        true,
-    );
+    // Escape closes the popup from INSIDE it or from the note under it
+    // (Jason's report 2026-09-04: after a reading-view round trip the
+    // caret sat in the note and Escape there did nothing, while a click
+    // outside or the hotkey still closed the popup). Keys from anywhere
+    // else - a modal, the command palette - are not ours. CAPTURE phase on
+    // the document, reading the vim state directly: the editors
+    // preventDefault EVERY Escape (not just vim's), so a bubble-phase
+    // defaultPrevented check never closed the popup at all - regression
+    // from the E28 cleanup, caught by the A3 manual pass (2026-08-13).
+    // E28's actual rule survives by asking vim itself: whichever editor
+    // holds focus and is still in INSERT mode keeps the key (leaving
+    // insert must not also close); anything else means "close me".
+    const onDocKeydown = (evt: KeyboardEvent) => {
+        if (evt.key !== "Escape") return;
+        const target = evt.target as Node | null;
+        const inPopup = !!target && containerEl.contains(target);
+        if (!inPopup && !(target && mdView.containerEl.contains(target))) return;
+        const focused = inPopup
+            ? (embed.editMode?.editor as EditorWithCm | undefined)
+            : (editor as EditorWithCm);
+        if (focused?.cm?.cm?.state?.vim?.insertMode) return;
+        evt.preventDefault();
+        evt.stopPropagation();
+        close(true);
+    };
+    doc.addEventListener("keydown", onDocKeydown, true);
 
     // from here on, closing must also tear the DOM and the embed down
     domTeardown = (focusEditor: boolean) => {
         resizeObserver.disconnect();
         doc.removeEventListener("mousedown", onDocMouseDown, true);
+        doc.removeEventListener("keydown", onDocKeydown, true);
         // OUT of the document immediately, not just hidden: the embed's
         // inline editor stays live while its save settles (up to ~5s), and
         // keystrokes from someone already typing the NEXT footnote landed
