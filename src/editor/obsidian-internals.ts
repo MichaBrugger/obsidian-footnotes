@@ -78,6 +78,25 @@ export function readingViewActive(mdView: {
     return mdView.getMode?.() === "preview";
 }
 
+/**
+ * Whether the Live Preview Properties widget owns focus. The widget renders
+ * the frontmatter OUTSIDE CodeMirror's contentDOM (in the sizer), so while
+ * the user edits a property the main editor's caret is wherever they last
+ * clicked in the prose - and a footnote command acting on that stale caret
+ * minted a footnote far from where they were looking (Jason's A19 pass,
+ * 2026-09-04). Source mode refuses the same press as a protected-line
+ * caret; this is the Live Preview twin of that guard. Structural type so
+ * bare test fakes without a container count as "not the widget".
+ */
+export function propertiesWidgetOwnsFocus(mdView: {
+    containerEl?: {
+        ownerDocument: { activeElement: { closest(selector: string): unknown } | null };
+    };
+}): boolean {
+    const active = mdView.containerEl?.ownerDocument.activeElement;
+    return !!active?.closest(".metadata-container");
+}
+
 /** The editable markdown embed produced by the embed registry. */
 interface MarkdownEmbed {
     editable: boolean;

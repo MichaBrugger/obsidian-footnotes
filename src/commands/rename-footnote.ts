@@ -291,16 +291,23 @@ export function registerRenameFootnoteMenu(plugin: FootnotePlugin) {
 
 /** The "Rename footnote" command: resolve the name under the caret, then hand off to the modal. */
 export async function renameFootnote(plugin: FootnotePlugin) {
-    await withEditableEditor(plugin, (doc) => {
-        runOutsideTableCell(doc, (cursorPosition) => {
-            const target = renameTargetAtCursor(doc, cursorPosition);
-            if (target === null) {
-                new Notice(RenameTargetNotice, 8000);
-                return;
-            }
-            new RenameFootnoteModal(plugin, doc, target).open();
-        });
-    });
+    await withEditableEditor(
+        plugin,
+        (doc) => {
+            runOutsideTableCell(doc, (cursorPosition) => {
+                const target = renameTargetAtCursor(doc, cursorPosition);
+                if (target === null) {
+                    new Notice(RenameTargetNotice, 8000);
+                    return;
+                }
+                new RenameFootnoteModal(plugin, doc, target).open();
+            });
+        },
+        // focus in the Properties widget: there is no footnote under a
+        // property field, and the editor's caret is stale - same answer
+        // as a caret on plain prose
+        RenameTargetNotice,
+    );
 }
 
 // One text input prefilled with the current name; Enter (or the Rename

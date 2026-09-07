@@ -13,7 +13,7 @@ import { docContext, referenceOccurrenceAtCursor } from "../editor/doc-context";
 import { inlineWrapLandsIntact, sanitizeInlineFootnoteContent } from "./inline-footnotes";
 import { ProtectedCreationNotice, simulatedMaskedLine } from "../editor/insertion-liveness";
 import { shouldJumpFromDefinitionToReference, shouldJumpFromReferenceToDefinition } from "./navigation";
-import { readingViewActive, viewEditor } from "../editor/obsidian-internals";
+import { propertiesWidgetOwnsFocus, readingViewActive, viewEditor } from "../editor/obsidian-internals";
 import { caretGuardsHandled, warnProtectedCaretIfInside } from "./press-guards";
 import { selectionPressHandled, submitActiveNameModal } from "./selection-footnote";
 import { multiCaretPastePressHandled, multiCaretPressHandled } from "./multi-caret";
@@ -64,6 +64,7 @@ import { activeTableCellEditor, resolveTableCellCursor, runOutsideTableCell, Tab
 export async function withEditableEditor(
     plugin: FootnotePlugin,
     action: (doc: Editor) => void | Promise<void>,
+    propertiesFocusNotice: string = ProtectedCreationNotice,
 ): Promise<void> {
     // an open Name-the-footnote modal claims the press FIRST: any footnote
     // command submits it, exactly like Enter (Jason's ask 2026-08-22) -
@@ -76,6 +77,15 @@ export async function withEditableEditor(
     const doc = mdView && viewEditor(mdView);
     if (!mdView || !doc) return;
     if (readingViewActive(mdView)) return;
+    // Live Preview's Properties widget: the caret the editor reports is
+    // the STALE one from before the user clicked into a property field,
+    // so acting on it edits prose they aren't looking at. Source mode
+    // refuses the same press as a protected frontmatter caret; match it
+    // (Jason's A19 pass, 2026-09-04).
+    if (propertiesWidgetOwnsFocus(mdView)) {
+        new Notice(propertiesFocusNotice, 8000);
+        return;
+    }
     return action(doc);
 }
 

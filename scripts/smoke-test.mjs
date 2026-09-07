@@ -655,6 +655,42 @@ async function main() {
         }
     });
 
+    await test("a hotkey pressed inside the Live Preview Properties widget refuses instead of editing the stale caret (2026-09-04)", async () => {
+        // Jason's A19 pass: source mode refuses a frontmatter caret, but in
+        // Live Preview the frontmatter is the Properties widget, which
+        // lives outside CodeMirror's contentDOM - the main editor's caret
+        // stayed where the user last clicked in the prose, and the hotkey
+        // minted a footnote THERE. Focus in the widget must refuse like
+        // source mode does.
+        resetSettings();
+        const before = "---\ntitle: fixture\n---\nAlpha bravo charlie";
+        await setupNote(before);
+        // the stale caret: mid-prose, where the footnote used to land
+        action(`const v=${EDITOR}; v.editor.focus(); v.editor.setCursor({line:3,ch:5});`);
+        const field = await pollUntil(
+            "a Properties value field rendered",
+            `(() => { const v=${EDITOR}; const f = v.containerEl.querySelector('.metadata-container .metadata-input-longtext, .metadata-container input.metadata-input-text'); return f ? f.className : null; })()`,
+            (v) => typeof v === "string",
+        );
+        if (!field) throw new Error("no Properties field to focus");
+        action(
+            `(() => { const v=${EDITOR}; const f = v.containerEl.querySelector('.metadata-container .metadata-input-longtext, .metadata-container input.metadata-input-text'); ` +
+            `window.__propsNotice = false; const mo = new MutationObserver(() => { for (const n of document.querySelectorAll('.notice')) { if (n.textContent.includes('No footnote was created')) window.__propsNotice = true; } }); ` +
+            `mo.observe(document.body, {childList: true, subtree: true}); window.__propsStop = () => mo.disconnect(); ` +
+            `f.focus(); window.__propsFocused = document.activeElement === f || f.contains(document.activeElement); ` +
+            `app.commands.executeCommandById('${CMD_AUTONUM}'); })();`,
+        );
+        try {
+            const focused = readJson(`window.__propsFocused`);
+            if (focused !== true) throw new SkipTest("could not focus the Properties field (window not focused?)");
+            await pollUntil("the protected-text toast", `window.__propsNotice`, (v) => v === true);
+            await sleep(300);
+            await expectEditorText(before);
+        } finally {
+            action(`window.__propsStop?.(); const v=${EDITOR}; v.editor.focus();`);
+        }
+    });
+
     await test("creation lint is applied BEFORE the popup opens (2026-08-27)", async () => {
         // Jason's ask 2026-08-27: with the popup on, the lint used to wait
         // until the popup CLOSED - the note looked unlinted the whole time
