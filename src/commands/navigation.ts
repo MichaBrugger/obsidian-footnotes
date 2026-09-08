@@ -99,7 +99,7 @@ export function shouldJumpFromDefinitionToReference(
         // have since deleted; explain and stand still instead (QOL sweep,
         // 2026-08-07)
         new Notice(
-            `Nothing references this footnote. Add a [^${definitionName}] reference in the text, or delete the definition.`,
+            `Nothing references this footnote. Add a "[^${definitionName}]" reference in the text, or delete the definition.`,
             8000,
         );
         return true;

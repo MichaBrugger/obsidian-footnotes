@@ -144,7 +144,7 @@ describe("the orphaned-reference alert", () => {
         noticeLintAlerts(fakePlugin({}), "see [^lost]");
         expect(
             messageShown(
-                "This note has a footnote reference with no definition ([^lost]). Write its definition or delete the reference.",
+                'This note has a footnote reference with no definition ("[^lost]"). Write its definition or delete the reference.',
             ),
         ).toBe(true);
     });
@@ -153,7 +153,7 @@ describe("the orphaned-reference alert", () => {
         noticeLintAlerts(fakePlugin({}), "see [^a] [^b] [^c]");
         expect(
             messageShown(
-                "This note has 3 footnote references with no definition ([^a], [^b], [^c]). Write their definitions or delete the references.",
+                'This note has 3 footnote references with no definition ("[^a]", "[^b]", "[^c]"). Write their definitions or delete the references.',
             ),
         ).toBe(true);
     });
@@ -162,7 +162,7 @@ describe("the orphaned-reference alert", () => {
         noticeLintAlerts(fakePlugin({}), "see [^a] [^b] [^c] [^d]");
         expect(
             messageShown(
-                "This note has 4 footnote references with no definition ([^a], [^b], [^c], …). Write their definitions or delete the references.",
+                'This note has 4 footnote references with no definition ("[^a]", "[^b]", "[^c]", …). Write their definitions or delete the references.',
             ),
         ).toBe(true);
     });
@@ -181,7 +181,7 @@ describe("the orphaned-definition alert", () => {
         noticeLintAlerts(fakePlugin({}), "[^unused]: nothing points here");
         expect(
             messageShown(
-                "This note has a footnote definition nothing references ([^unused]). Add its reference in the text or delete the definition.",
+                'This note has a footnote definition nothing references ("[^unused]"). Add its reference in the text or delete the definition.',
             ),
         ).toBe(true);
     });
@@ -190,7 +190,7 @@ describe("the orphaned-definition alert", () => {
         noticeLintAlerts(fakePlugin({}), "[^u1]: a\n[^u2]: b");
         expect(
             messageShown(
-                "This note has 2 footnote definitions nothing references ([^u1], [^u2]). Add their references in the text or delete the definitions.",
+                'This note has 2 footnote definitions nothing references ("[^u1]", "[^u2]"). Add their references in the text or delete the definitions.',
             ),
         ).toBe(true);
     });
@@ -209,7 +209,7 @@ describe("the duplicate-definition alert", () => {
         noticeLintAlerts(fakePlugin({}), "see [^d]\n\n[^d]: one\n\n[^d]: two");
         expect(
             messageShown(
-                'This note defines [^d] more than once. Obsidian renders only the last definition. Merge them, or turn on "Merge duplicate definitions".',
+                'This note defines "[^d]" more than once. Obsidian renders only the last definition. Merge them, or turn on "Merge duplicate definitions".',
             ),
         ).toBe(true);
     });
@@ -221,7 +221,7 @@ describe("the duplicate-definition alert", () => {
         );
         expect(
             messageShown(
-                'This note defines 2 footnotes more than once ([^d], [^e]). Obsidian renders only each one\'s last definition. Merge them, or turn on "Merge duplicate definitions".',
+                'This note defines 2 footnotes more than once ("[^d]", "[^e]"). Obsidian renders only each one\'s last definition. Merge them, or turn on "Merge duplicate definitions".',
             ),
         ).toBe(true);
     });

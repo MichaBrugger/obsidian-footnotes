@@ -88,9 +88,9 @@ function noticeEmptyReferences(
     );
 }
 
-/** "[^a], [^b], …" - at most three names spelled out, an ellipsis for the rest. */
+/** `"[^a]", "[^b]", …` - at most three names spelled out, each in quotes like every other toast that names a footnote (Jason's consistency ask 2026-09-04), an ellipsis for the rest. */
 function referenceList(names: string[]): string {
-    const shown = names.slice(0, 3).map((name) => `[^${name}]`).join(", ");
+    const shown = names.slice(0, 3).map((name) => `"[^${name}]"`).join(", ");
     return names.length > 3 ? `${shown}, …` : shown;
 }
 

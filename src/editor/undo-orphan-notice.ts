@@ -127,7 +127,8 @@ export function undoOrphanNoticeExtension() {
             update.state.doc.toString(),
         );
         if (orphaned.length === 0) return;
-        const refs = orphaned.map((name) => `[^${name}]`).join(", ");
+        // quoted like every other toast that names a footnote (2026-09-04)
+        const refs = orphaned.map((name) => `"[^${name}]"`).join(", ");
         standing?.notice.hide();
         standing = {
             notice: new Notice(
