@@ -36,7 +36,7 @@ import { TableCellEditor } from "../src/editor/table-cursor";
 
 // Turning a selection into a footnote (issue #35, Jason's calls 2026-08-12:
 // overload the existing hotkeys, always on; single-line selections only;
-// named/paste redirect instead of converting). The auto-numbered key moves
+// named/paste redirect instead of converting). The numbered key moves
 // the selected text into a new definition's body; the inline key wraps it
 // as "^[…]" in place. The generative twin lives in
 // command-properties.test.ts - these pin the concrete contracts.
@@ -83,7 +83,7 @@ afterEach(() => {
     vi.unstubAllGlobals();
 });
 
-describe("the auto-numbered key converts a selection", () => {
+describe("the numbered key converts a selection", () => {
     it("moves the selected text into a new definition's body", async () => {
         const doc = fakeEditor(
             ["The quick fox jumps", "", "tail"],
@@ -1089,7 +1089,7 @@ describe("selections inside an actively edited table cell", () => {
         ]);
     });
 
-    it("the auto-numbered key replaces in the cell and appends the seeded definition", () => {
+    it("the numbered key replaces in the cell and appends the seeded definition", () => {
         const { cell, dispatched } = fakeCell("plain word here", 6, 10);
         const doc = fakeEditor(
             ["| plain word here |", "| --- |", "| x |"],

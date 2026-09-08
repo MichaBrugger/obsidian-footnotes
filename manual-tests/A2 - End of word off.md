@@ -2,5 +2,5 @@
 
 Settings: `Insert footnote at end of word` OFF, popup OFF.
 
-- [ ] Auto-numbered hotkey mid-"bravo" here: Alpha bravo charlie, reference lands exactly at the caret (mid-word)
+- [ ] Numbered hotkey mid-"bravo" here: Alpha bravo charlie, reference lands exactly at the caret (mid-word)
 - [ ] Same for named and inline hotkeys

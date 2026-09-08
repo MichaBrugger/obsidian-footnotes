@@ -4,7 +4,7 @@ Settings: `Lint on footnote creation` ON, everything else default.
 
 This replaced the old `Lint on focused file change` trigger (2026-08-05): the lint now happens in the note you are LOOKING AT, at the moment a new footnote definition is created.
 
-The line below is out of order; insert a NEW auto-numbered footnote into the word "start" and watch everything renumber at once.
+The line below is out of order; insert a NEW numbered footnote into the word "start" and watch everything renumber at once.
 
 start messy[^20] references[^10] here
 

@@ -63,7 +63,7 @@ describe("footnote commands in Reading view", () => {
         expect(doc.cursor).toEqual(START);
     });
 
-    it("the auto-numbered command changes nothing", async () => {
+    it("the numbered command changes nothing", async () => {
         const doc = fakeEditor(["alpha bravo charlie"], { ...START });
         await insertAutonumFootnote(previewPlugin(doc));
         expect(doc.appliedChanges).toEqual([]);

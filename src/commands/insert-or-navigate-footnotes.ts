@@ -90,7 +90,7 @@ export async function withEditableEditor(
     return action(doc);
 }
 
-/** The auto-numbered command ("Insert / navigate auto-numbered footnote"): runs the decision cascade, creating "[^N]" + definition when nothing to navigate to. */
+/** The numbered command ("Insert / navigate numbered footnote"): runs the decision cascade, creating "[^N]" + definition when nothing to navigate to. */
 export async function insertAutonumFootnote(plugin: FootnotePlugin) {
     await withEditableEditor(plugin, (doc) => {
         // an actively edited table cell owns the real caret; getCursor() is
@@ -286,7 +286,7 @@ export async function insertInlineFootnote(plugin: FootnotePlugin) {
 export async function pasteInlineFootnote(plugin: FootnotePlugin) {
     await withEditableEditor(plugin, async (doc) => {
         const pasteCell = activeTableCellEditor(doc);
-        // a selection redirects to the auto-numbered/inline keys - the
+        // a selection redirects to the numbered/inline keys - the
         // clipboard already carries this key's body (issue #35); before the
         // clipboard await, like the guards below
         if (selectionPressHandled(plugin, doc, pasteCell, "paste")) return;

@@ -1,4 +1,4 @@
-// Plugin entry point: registers the hotkey commands (auto-numbered and
+// Plugin entry point: registers the hotkey commands (numbered and
 // named footnotes - each one "insert OR navigate", see
 // insert-or-navigate-footnotes.ts for the decision cascade - the two
 // inline-footnote inserts, and the whole-document cleanups from
@@ -86,7 +86,7 @@ export default class FootnotePlugin extends Plugin {
     }> = [
       {
         id: "insert-autonumbered-footnote",
-        name: "Insert / navigate auto-numbered footnote",
+        name: "Insert / navigate numbered footnote",
         icon: "footnote-numbered",
         run: insertAutonumFootnote,
       },

@@ -21,7 +21,7 @@ After installing and activating this plugin, you still have to SET UP your hotke
 
 I personally use:
 
-- <kbd>Alt</kbd>+<kbd>0</kbd> as my auto-numbered footnote hotkey
+- <kbd>Alt</kbd>+<kbd>0</kbd> as my numbered footnote hotkey
 - <kbd>Alt</kbd>+<kbd>-</kbd> as my named footnote hotkey
 
 ![Hotkey](https://user-images.githubusercontent.com/68677082/228659877-8ea81271-37c4-4fdf-99de-1d4b6ca1c85f.png)
@@ -35,7 +35,7 @@ If you would like, you can further customize the plugin's behavior in Footnote S
 #### Scenario: No previous numbered (e.g. "[^1]") footnotes exist
 
 1. Given my cursor is where I want a numbered footnote to exist (e.g. `Foo bar baz▊`)
-2. When I hit `auto-numbered footnote hotkey`
+2. When I hit `numbered footnote hotkey`
 3. Then a new footnote marker (e.g. `[^1]`) is inserted where my cursor was (e.g. `Foo bar baz[^1]`)
 4. And a new footnote details marker (e.g. `[^1]: `) is inserted on the last line of the document
 5. And my cursor is now placed at the end of the detail marker (e.g. `[^1]: ▊`)
@@ -44,7 +44,7 @@ If you would like, you can further customize the plugin's behavior in Footnote S
 
 1. Given there is one or more numbered footnotes in my text
 2. And my cursor is where I want a numbered footnote to exist (e.g. `Foo bar[^1] baz▊`)
-3. When I hit `auto-numbered footnote hotkey`
+3. When I hit `numbered footnote hotkey`
 4. Then a new footnote marker with the next numbered index (e.g. `[^2]`) is inserted where my cursor was (e.g. `Foo bar[^1] baz[^2]`)
 5. And a new footnote details marker (e.g. `[^2]: `) is inserted on the last line of the document
 6. And my cursor is now placed at the end of the detail marker (e.g. `[^2]: ▊`)
@@ -54,7 +54,7 @@ If you would like, you can further customize the plugin's behavior in Footnote S
 1. Given my note is one chapter of a combined document, so plain numbers would collide across chapters
 2. And I have enabled `Per-note footnote prefix` in the plugin settings (off by default)
 3. And my note's properties (frontmatter) set a prefix, e.g. `footnote-prefix: 2.`
-4. When I hit `auto-numbered footnote hotkey`
+4. When I hit `numbered footnote hotkey`
 5. Then the new footnotes are numbered within that prefix (e.g. `[^2.1]`, then `[^2.2]`, …)
 6. And notes without the property keep plain numbering (`[^1]`, `[^2]`, …)
 
@@ -88,13 +88,13 @@ If you would like, you can further customize the plugin's behavior in Footnote S
 #### Scenario: Jumping TO a footnote detail
 
 1. Given I'm on a footnote detail line (e.g. `[^1]: ▊`)
-2. When I hit `auto-numbered footnote hotkey` OR `named footnote hotkey`
+2. When I hit `numbered footnote hotkey` OR `named footnote hotkey`
 3. Then my cursor is placed right after the *first* occurence of this footnote in my text (e.g. `[^1]▊`)
 
 #### Scenario: Jumping BACK to a footnote
 
 1. Given I'm on (or next to) a footnote (e.g. `[^1]▊`) in my text
-2. When I hit `auto-numbered footnote hotkey` OR `named footnote hotkey`
+2. When I hit `numbered footnote hotkey` OR `named footnote hotkey`
 3. Then my cursor is placed to the right of the footnote (e.g. `[^1]: ▊`)
 
 ## More Info

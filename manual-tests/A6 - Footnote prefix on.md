@@ -9,7 +9,7 @@ Settings: `Per-note footnote prefix` ON.
 This note already carries one prefixed footnote[^7-1], and a hand-written
 plain reference[^tag] waits here for the keeps-its-name check.
 
-- [ ] Auto-numbered hotkey inserts `[^7-2]` in this sentence
+- [ ] Numbered hotkey inserts `[^7-2]` in this sentence
 - [ ] Again right after the new reference chains `[^7-3]`
 - [ ] Named hotkey creates `[^7-]` with the caret right after the prefix, so the namespace is visible while you type the name
 - [ ] Type a name and press again inside `[^7-tag]`: the `[^7-tag]:` definition is created

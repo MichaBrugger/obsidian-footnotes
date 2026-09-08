@@ -240,7 +240,7 @@ async function runScenario(kind: Kind, s: Scenario): Promise<Rendered> {
         case "autonum press":
         case "selection to autonum":
             await insertAutonumFootnote(plugin);
-            steps.push("pressed the auto-numbered hotkey");
+            steps.push("pressed the numbered hotkey");
             break;
         case "selection to inline":
             await insertInlineFootnote(plugin);

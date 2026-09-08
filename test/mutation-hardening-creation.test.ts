@@ -691,10 +691,10 @@ describe("the selection notices", () => {
             "Select one continuous stretch of text to turn it into a footnote.",
         );
         expect(SelectionCommandNotice).toBe(
-            "To turn the selected text into a footnote, use the auto-numbered, named, or inline footnote command.",
+            "To turn the selected text into a footnote, use the numbered, named, or inline footnote command.",
         );
         expect(InlineSelectionNotice).toBe(
-            "Inline footnotes are single-line. Use the auto-numbered or named footnote command to convert a multi-line selection.",
+            "Inline footnotes are single-line. Use the numbered or named footnote command to convert a multi-line selection.",
         );
     });
 });
@@ -969,7 +969,7 @@ describe("the inline selection conversion", () => {
     });
 });
 
-describe("the auto-numbered selection conversion", () => {
+describe("the numbered selection conversion", () => {
     // L215 ConditionalExpression, `if (prefix === null) return` -> false: an
     // invalid prefix blocks the conversion outright.
     it("blocks the conversion on an invalid prefix", () => {
@@ -1029,7 +1029,7 @@ describe("the auto-numbered selection conversion", () => {
     });
 });
 
-describe("the auto-numbered cell selection conversion", () => {
+describe("the numbered cell selection conversion", () => {
     // L286 ConditionalExpression, `if (prefix === null) return` -> false: the
     // cell twin of the invalid-prefix block - and nothing is written to the
     // cell either.

@@ -72,7 +72,7 @@ const STALE = { line: 3, ch: 5 };
 const NOTE = ["---", "title: fixture", "---", "alpha bravo charlie"];
 
 describe("footnote commands while the Properties widget owns focus", () => {
-    it("the auto-numbered command changes nothing and toasts the protected-text notice", async () => {
+    it("the numbered command changes nothing and toasts the protected-text notice", async () => {
         const doc = fakeEditor([...NOTE], { ...STALE });
         await insertAutonumFootnote(pluginWithFocus(doc, true));
         expect(doc.appliedChanges).toEqual([]);

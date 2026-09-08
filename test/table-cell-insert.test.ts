@@ -67,7 +67,7 @@ describe("insertInTableCell", () => {
         expect(dispatched[0]?.selection).toEqual({ anchor: 5 });
     });
 
-    it("places the caret after a full autonumbered reference", () => {
+    it("places the caret after a full numbered reference", () => {
         const { cell, dispatched } = fakeCell("Sit", 3);
         insertInTableCell(cell, fakePlugin(false), "[^12]", "[^12]".length);
         expect(dispatched[0]?.selection).toEqual({ anchor: 8 });

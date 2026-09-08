@@ -11,13 +11,13 @@ Run **Set footnote prefix** from the command palette:
 - [ ] `10` + Enter: inline ends-in-a-number error, modal stays open
 - [ ] `a b` + Enter: inline spaces/brackets error, modal stays open
 - [ ] `7.` + Enter: modal closes, notice confirms, frontmatter now says `7.`
-- [ ] The auto-numbered hotkey now inserts `[^7.1]` in this sentence
+- [ ] The numbered hotkey now inserts `[^7.1]` in this sentence
 - [ ] Rerun the command, clear the field, Enter: the property is removed
 - [ ] Turn `Per-note footnote prefix` OFF, set a prefix via the command: the confirmation warns the feature toggle is off (QOL 2026-08-07); turn it back ON afterwards
 
 Digit-ending guard, end to end: set the property back to `10` by hand, then
 
-- [ ] The auto-numbered hotkey shows a "No footnote was created" toast and inserts nothing (fixed 2026-08-07)
+- [ ] The numbered hotkey shows a "No footnote was created" toast and inserts nothing (fixed 2026-08-07)
 - [ ] **Lint footnotes** alerts "Linting canceled" and leaves the note untouched
 (The phone keyboard-above-the-dialog check lives in P1.)
 

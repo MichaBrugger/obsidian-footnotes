@@ -34,7 +34,7 @@ function parsePrefixValue(captured: string | undefined): string {
 
 /**
  * The note's `footnote-prefix` frontmatter value, or "" when absent. Chapter
- * notes of a combined document set this (e.g. "2.") so the autonumbered
+ * notes of a combined document set this (e.g. "2.") so the numbered
  * command creates "[^2.1]", "[^2.2]", … - unique across the merged export
  * (issue #31). Walks the head line-by-line WITHOUT splitting the whole
  * document - this runs several times per lint on the full note text

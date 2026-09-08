@@ -21,7 +21,7 @@ export class SetFootnotePrefixModal extends ValidatedTextModal {
             title: "Set footnote prefix",
             fieldName: "Prefix",
             fieldDesc:
-                'Written to the note\'s footnote-prefix property. With "2." the auto-numbered command inserts [^2.1], then [^2.2], and so on. Leave empty to remove the property.',
+                'Written to the note\'s footnote-prefix property. With "2." the numbered command inserts [^2.1], then [^2.2], and so on. Leave empty to remove the property.',
             buttonText: "Save",
             placeholder: "2.",
             initialValue: currentPrefix,

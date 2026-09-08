@@ -34,8 +34,8 @@ Fixture lines for these: `one two three` and `alpha $x+y$ beta` and the
 table further down.
 
 - [ ] Two Alt-dragged selections, any converting key: "Select one continuous stretch of text to turn it into a footnote."
-- [ ] Any selection, PASTE key: "To turn the selected text into a footnote, use the auto-numbered, named, or inline footnote command."
-- [ ] A selection spanning two lines, INLINE key: "Inline footnotes are single-line. Use the auto-numbered or named footnote command to convert a multi-line selection."
+- [ ] Any selection, PASTE key: "To turn the selected text into a footnote, use the numbered, named, or inline footnote command."
+- [ ] A selection spanning two lines, INLINE key: "Inline footnotes are single-line. Use the numbered or named footnote command to convert a multi-line selection."
 - [ ] Select `x+y` inside the dollars (cutting the math), numbered key: "No footnote was created: the selection cuts through code, math, or other protected text. Select all of it or none of it."
 - [ ] Select `plain[^1] here` (contains a live reference): "No footnote was created: footnotes can't be nested inside other footnotes."
 - [ ] Select text inside the `[^1]:` definition body at the bottom: "No footnote was created: footnotes can't be nested inside other footnotes." (the same nesting toast)

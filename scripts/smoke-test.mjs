@@ -460,7 +460,7 @@ async function main() {
 
     console.log(`running smoke tests against vault "${vault}"\n`);
 
-    await test("autonumbered footnote inserts at end of word", async () => {
+    await test("numbered footnote inserts at end of word", async () => {
         resetSettings();
         await setupNote("Alpha bravo charlie");
         setCursorAndRun(0, 8, CMD_AUTONUM); // mid "bravo"
@@ -1766,7 +1766,7 @@ async function main() {
         ].join("\n"));
     });
 
-    await test("footnote-prefix property namespaces autonumbered footnotes (issue #31)", async () => {
+    await test("footnote-prefix property namespaces numbered footnotes (issue #31)", async () => {
         resetSettings({ enableFootnotePrefix: true });
         await setupNote("---\nfootnote-prefix: 2-\n---\nAlpha bravo");
         setCursorAndRun(3, 8, CMD_AUTONUM); // mid "bravo"

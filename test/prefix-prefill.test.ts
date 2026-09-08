@@ -102,7 +102,7 @@ describe("named command prefills the footnote-prefix into the new reference", ()
         ]);
     });
 
-    it("the auto-numbered command aborts the same way on an invalid prefix", () => {
+    it("the numbered command aborts the same way on an invalid prefix", () => {
         const doc = fakeEditor(["---", "footnote-prefix: 10", "---", "Alpha"], {
             line: 3,
             ch: 5,

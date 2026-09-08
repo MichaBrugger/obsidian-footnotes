@@ -48,7 +48,7 @@ import { TableCellEditor, tableRowCellSpans, tableRowLines } from "../editor/tab
 
 // Turning a selection into a footnote (issue #35): a creation press with a
 // live selection REPLACES the selected text instead of inserting at the
-// caret - the auto-numbered key moves it into a new definition's body, the
+// caret - the numbered key moves it into a new definition's body, the
 // inline key wraps it as "^[…]" in place, and the NAMED key asks for the
 // name in a small modal and then does what autonum does under the chosen
 // name (Jason's ask 2026-08-13; the named flow's usual second press can't
@@ -74,14 +74,14 @@ import { TableCellEditor, tableRowCellSpans, tableRowLines } from "../editor/tab
 export const SelectionSpanNotice =
     "Select one continuous stretch of text to turn it into a footnote.";
 export const SelectionCommandNotice =
-    "To turn the selected text into a footnote, use the auto-numbered, named, or inline footnote command.";
+    "To turn the selected text into a footnote, use the numbered, named, or inline footnote command.";
 export const SelectionChangedNotice =
     "The note changed while naming the footnote. Reselect the text and try again.";
 // inline footnotes are single-line by nature; flattening a multi-line
 // selection (paste parity) was tried and REVERTED (Jason, 2026-08-20) -
 // it basically never looked correct outside clean paragraphs
 export const InlineSelectionNotice =
-    "Inline footnotes are single-line. Use the auto-numbered or named footnote command to convert a multi-line selection.";
+    "Inline footnotes are single-line. Use the numbered or named footnote command to convert a multi-line selection.";
 // nested footnotes are prevented across the plugin (Jason's ruling
 // 2026-08-24, after the Obsidian Academia Discord confirmed nobody uses
 // them and modern style guides engineered the pattern out): converting a

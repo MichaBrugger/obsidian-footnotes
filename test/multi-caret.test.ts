@@ -61,7 +61,7 @@ afterEach(() => {
     vi.unstubAllGlobals();
 });
 
-describe("the auto-numbered key at several carets", () => {
+describe("the numbered key at several carets", () => {
     it("inserts the SAME reference at every caret with ONE definition", async () => {
         const doc = fakeEditor(
             ["alpha bravo charlie", "delta echo"],

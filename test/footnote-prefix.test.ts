@@ -7,7 +7,7 @@ import { lintBlockedByPrefix } from "../src/linting/linter";
 // Issue #31: notes that are chapters of a larger document need their
 // numbered footnotes namespaced (e.g. [^2.1] in chapter 2) so the combined
 // export has no colliding numbers. The prefix comes from a per-note
-// frontmatter property `footnote-prefix`; the autonumbered command then
+// frontmatter property `footnote-prefix`; the numbered command then
 // counts and creates only references carrying that prefix.
 
 describe("footnotePrefix", () => {

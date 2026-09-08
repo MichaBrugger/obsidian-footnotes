@@ -189,7 +189,7 @@ export function positionAfterReference(
  * (2026-08-25 unification).
  */
 /**
- * The next auto-numbered id under the note's active prefix, or null when
+ * The next numbered id under the note's active prefix, or null when
  * the prefix is invalid (its Notice already explained why). The prefix
  * comes from the frontmatter-only editor read (joining the lines
  * materialized the whole document per press just to parse its head,

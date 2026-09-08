@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { computeNextFootnoteNumber } from "../src/parsing/footnote-grammar";
 
-// The pure core of the auto-numbered command: next number = highest
+// The pure core of the numbered command: next number = highest
 // existing numbered reference/definition + 1. Deliberate policy pinned here:
 // gaps are never reused and named footnotes never count.
 

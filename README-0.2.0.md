@@ -8,7 +8,7 @@ Create, navigate, and edit Obsidian footnotes with a single hotkey:
 
 - **One hotkey for footnote creation/editing**: insert a new footnote, and jump between the footnote reference and its definition
 - **Popup editor**: edit the footnote right at your cursor, no scrolling to the bottom
-- **Auto-numbered, named, and inline** footnote styles
+- **Numbered, named, and inline** footnote styles
 - **Selection to footnote**: turn text you already wrote into a footnote in one press
 - **Rename a footnote** everywhere at once, like renaming a variable in a code editor
 - **Footnote linter** to keep footnote formatting tidy
@@ -27,7 +27,7 @@ Of the plugin's seven commands, the ones you'll press constantly deserve hotkeys
 
 | Command                                  | Recommended hotkey                           |
 | ---------------------------------------- | -------------------------------------------- |
-| Insert / navigate auto-numbered footnote | <kbd>Alt</kbd>+<kbd>0</kbd>                  |
+| Insert / navigate numbered footnote | <kbd>Alt</kbd>+<kbd>0</kbd>                  |
 | Insert / navigate named footnote         | <kbd>Alt</kbd>+<kbd>-</kbd>                  |
 | Insert inline footnote                   | <kbd>Alt</kbd>+<kbd>=</kbd>                  |
 | Insert inline footnote from clipboard    | <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>=</kbd> |
@@ -42,11 +42,11 @@ Everything also works on mobile from the toolbar.
 
 ## Creating footnotes
 
-### Auto-numbered footnotes
+### Numbered footnotes
 
 Put your cursor where the footnote belongs and press the hotkey. The plugin finds the next free number, inserts the reference (say `[^3]`), creates the matching `[^3]: ` definition at the bottom of the note, and lets you type the definition text immediately.
 
-<!-- GIF: auto-numbered insert, popup opens, note typed, popup closed -->
+<!-- GIF: numbered insert, popup opens, note typed, popup closed -->
 
 ### Named footnotes
 
@@ -70,14 +70,14 @@ Two commands cover Obsidian's inline `^[...]` style:
 
 Sometimes you write something mid-sentence and realize it should be a footnote. Select it and press a footnote hotkey:
 
-- The **auto-numbered** hotkey replaces the selection with the next numbered footnote reference and moves the selected text into that footnote's definition. Multi-paragraph selections work too — the whole block becomes one multi-paragraph footnote, code blocks and all.
+- The **numbered** hotkey replaces the selection with the next numbered footnote reference and moves the selected text into that footnote's definition. Multi-paragraph selections work too — the whole block becomes one multi-paragraph footnote, code blocks and all.
 - The **named** hotkey asks you for a name first, then does the same under `[^yourname]`. Confirm with Enter, the Create button — or just press any footnote hotkey again.
 - The **inline** hotkey wraps the selection as `^[...]` right where it is (single-line selections only — for a multi-line selection it points you to the other two).
 - A selection that contains (or cuts through) an existing footnote refuses to convert: footnotes can't be nested inside other footnotes. Nesting is prevented throughout the plugin — it doesn't survive export to Pandoc/LaTeX and most markdown tools can't read it — and linting alerts you if a note already has hand-typed nesting.
 
 <!-- GIF: select a clause, press hotkey, clause becomes a footnote. Repeat for all 3 types. -->
 
-**Multiple cursors** (Alt+click) get the same footnote at every one of them — handy when one source is cited in several places. The auto-numbered hotkey puts the same `[^N]` at every cursor, sharing a single definition. The named and inline hotkeys drop their brackets at every cursor and leave a cursor inside each pair, so you type the name (or the footnote text) once and it lands everywhere; pasting as an inline footnote wraps the same clipboard text at every cursor. If any cursor sits where a footnote can't go, nothing is inserted anywhere — and one undo reverts the whole press.
+**Multiple cursors** (Alt+click) get the same footnote at every one of them — handy when one source is cited in several places. The numbered hotkey puts the same `[^N]` at every cursor, sharing a single definition. The named and inline hotkeys drop their brackets at every cursor and leave a cursor inside each pair, so you type the name (or the footnote text) once and it lands everywhere; pasting as an inline footnote wraps the same clipboard text at every cursor. If any cursor sits where a footnote can't go, nothing is inserted anywhere — and one undo reverts the whole press.
 
 ## Navigating footnotes
 
@@ -128,12 +128,12 @@ If you're writing a book via chapter notes (e.g. when using the [Longform](https
 To fix this, turn on **Per-note footnote prefix** and give each chapter its own unique prefix, so footnotes stay unique across the whole book:
 
 1. Run the **Set footnote prefix** command and enter a prefix, e.g. `2-` for chapter 2 (this saves a `footnote-prefix` property in the note).
-2. From then on, the auto-numbered command inserts `[^2-1]`, `[^2-2]`, … and the named command starts new references with the prefix (`[^2-]`) filled in.
+2. From then on, the numbered command inserts `[^2-1]`, `[^2-2]`, … and the named command starts new references with the prefix (`[^2-]`) filled in.
 3. The linter understands prefixes too: it renumbers `[^2.x]` footnotes within their own namespace, and can also convert a note's existing plain footnotes to carry the prefix.
 
 Notes without the property keep normal `[^1]`, `[^2]`, … numbering.
 
-<!-- GIF: add footnote prefix, add prefixed autonumbered and named footnotes -->
+<!-- GIF: add footnote prefix, add prefixed numbered and named footnotes -->
 ## Other settings
 
 - **Insert footnote reference at end of word** *(on by default)*: pressing the hotkey mid-word places the reference at the end of the word, past any trailing punctuation, so you don't have to aim.
