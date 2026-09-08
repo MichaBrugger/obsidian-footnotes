@@ -11,7 +11,8 @@ carries `3.`) with the `Apply footnote prefix` lint rule OFF, so nothing
 gets renamed.
 
 Fixture: text[^used] here, a stray[^99] with no definition, an empty [^]
-reference, and an untouched prefix placeholder [^3.] in this sentence.
+reference, an untouched prefix placeholder [^3.] in this sentence, and a
+hand-typed invalid name [^bad name] that no rule will touch.
 
 [^used]: referenced definition
 [^lost]: named orphan, nothing uses it
@@ -20,6 +21,8 @@ reference, and an untouched prefix placeholder [^3.] in this sentence.
 - [ ] **Lint footnotes**: an alert names the definitions nothing references (`lost`, `31`), and they stay in the note
 - [ ] The alert for `stray[^99]` says to write its definition or delete the reference
 - [ ] The empty `[^]` gets its own alert (it won't render); the bare prefix placeholder `[^3.]` counts as unfilled exactly like `[^]` (QOL 2026-08-07)
+- [ ] The invalid name gets its own alert: "This note has a footnote with an invalid name ("[^bad name]"). Footnote names can't contain spaces, backticks, brackets, or "#"." (2026-09-08; add a `[^c#d]` and the alert lists both)
+- [ ] Add five stray references (`[^o1]` to `[^o5]`) with no definitions and lint: the missing-definition alert lists ALL five names, no "…" (2026-09-08)
 - [ ] `Delete orphaned references` ON + lint: `stray[^99]` is removed from the text, spacing healed (2026-08-10)
 - [ ] `Delete orphaned definitions` ON + lint: both orphan definitions are deleted (see L5 for the reindex interplay)
 - [ ] Hand-type a reference INSIDE a definition body (e.g. `[^used]: referenced definition citing[^lost]`) and lint: an alert names the nesting definition and says nested footnotes don't survive export — the lint never rewrites or deletes the nested content itself (2026-08-24)

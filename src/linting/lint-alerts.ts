@@ -8,7 +8,13 @@ import {
     normalizeEol,
     scanDocument,
 } from "../parsing/markdown-scan";
-import { quotedReference, referenceOccurrences, referenceText } from "../parsing/footnote-grammar";
+import {
+    footnoteNameProblem,
+    InvalidNameCharacters,
+    quotedReference,
+    referenceOccurrences,
+    referenceText,
+} from "../parsing/footnote-grammar";
 import { inlineFootnoteSpanAt } from "../commands/inline-footnotes";
 import { duplicateFootnoteDefinitionNames } from "./rules/merge-duplicate-definitions";
 import { orphanedFootnoteDefinitionNames } from "./rules/remove-orphaned-definitions";
@@ -87,10 +93,9 @@ function noticeEmptyReferences(
     );
 }
 
-/** `"[^a]", "[^b]", …` - at most three names spelled out, each in quotes like every other toast that names a footnote (Jason's consistency ask 2026-09-04), an ellipsis for the rest. */
+/** `"[^a]", "[^b]", "[^c]"` - EVERY name spelled out, each in quotes like every other toast that names a footnote (Jason's consistency ask 2026-09-04). The list used to stop at three with an ellipsis; the user needs the whole list to fix them (his L-series pass, 2026-09-08). */
 function referenceList(names: string[]): string {
-    const shown = names.slice(0, 3).map(quotedReference).join(", ");
-    return names.length > 3 ? `${shown}, …` : shown;
+    return names.map(quotedReference).join(", ");
 }
 
 // the alert half of "Delete orphaned references": while the toggle is off,
@@ -145,6 +150,46 @@ function noticeDuplicateDefinitions(
         names.length === 1
             ? `This note defines ${referenceList(names)} more than once. Obsidian renders only the last definition. Merge them, or turn on "Merge duplicate definitions".`
             : `This note defines ${names.length} footnotes more than once (${referenceList(names)}). Obsidian renders only each one's last definition. Merge them, or turn on "Merge duplicate definitions".`,
+        8000,
+    );
+}
+
+/**
+ * Names that no footnote can carry - whitespace, backticks, "#" - among the
+ * note's live references and definition labels, one entry per name
+ * (case-folded). Creation and rename refuse such names, but hand-typed and
+ * pre-existing ones can't be fixed automatically (which name did the user
+ * mean?), so the lint ALERTS (Jason's L-series pass 2026-09-08). Masked
+ * fakes don't count. Brackets can't form a reference at all, so they never
+ * reach here.
+ */
+export function invalidFootnoteNames(
+    lines: string[],
+    scan: DocumentScan,
+    masked: string[],
+): string[] {
+    const names: string[] = [];
+    const seen = new Set<string>();
+    const consider = (name: string) => {
+        const folded = name.toLowerCase();
+        if (seen.has(folded) || footnoteNameProblem(name) === null) return;
+        seen.add(folded);
+        names.push(name);
+    };
+    for (let i = 0; i < lines.length; i++) {
+        for (const { name } of referenceOccurrences(lines[i], masked[i])) consider(name);
+    }
+    for (const block of findDefinitionBlocks(lines, scan.isProtected, scan)) consider(block.name);
+    return names;
+}
+
+function noticeInvalidNames(lines: string[], scan: DocumentScan, masked: string[]) {
+    const names = invalidFootnoteNames(lines, scan, masked);
+    if (names.length === 0) return;
+    showNotice(
+        names.length === 1
+            ? `This note has a footnote with an invalid name (${referenceList(names)}). ${InvalidNameCharacters}`
+            : `This note has ${names.length} footnotes with invalid names (${referenceList(names)}). ${InvalidNameCharacters}`,
         8000,
     );
 }
@@ -231,4 +276,5 @@ export function noticeLintAlerts(plugin: FootnotePlugin, markdown: string) {
     noticeOrphanedDefinitions(plugin, markdown, { lines, scan });
     noticeDuplicateDefinitions(plugin, markdown, { lines, scan });
     noticeNestedFootnotes(lines, scan, masked);
+    noticeInvalidNames(lines, scan, masked);
 }

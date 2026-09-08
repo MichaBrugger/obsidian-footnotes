@@ -91,6 +91,8 @@ footnotes in quotes and never splits a quoted name across lines:
 - [ ] A `[^unused]:` nothing references, delete-orphans OFF: "This note has a footnote definition nothing references ("[^unused]"). Add a "[^unused]" reference in the text, or delete the definition."
 - [ ] Two `[^d]:` definitions, merge OFF: "This note defines "[^d]" more than once. Obsidian renders only the last definition. Merge them, or turn on "Merge duplicate definitions"."
 - [ ] The bare `[^]` fixture: "This note has an unnamed footnote reference ("[^]"). Give it a name or delete it."
+- [ ] The `[^bad name]` and `[^#tag]` fixtures: "This note has 2 footnotes with invalid names ("[^bad name]", "[^#tag]"). Footnote names can't contain spaces, backticks, brackets, or "#"." (2026-09-08)
+- [ ] Any alert that lists footnotes lists EVERY one, never an ellipsis (2026-09-08)
 
 [^1]: the plain definition
 [^2]: the second definition

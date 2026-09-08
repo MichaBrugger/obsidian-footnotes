@@ -16,7 +16,13 @@ $$
     indented code[^90] block, standalone
 
 Comment boundaries: live[^c1] <!-- hidden [^c2]
---> live again[^c3], short form <!--> done.
+--> live again[^c3].
+
+(The short-form comment `<!-->` is deliberately NOT in this sheet: Reading
+view shows it as literal text and the plugin treats it as complete, both
+per CommonMark, but Live Preview's highlighter paints everything after it
+as one unclosed comment, which made this note display wrong - 2026-09-08.
+The short form is pinned by units instead.)
 
 > ```
 > quoted fence[^f1]

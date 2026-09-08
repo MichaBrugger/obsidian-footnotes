@@ -7,9 +7,12 @@ import { fakePlugin as sharedFakePlugin } from "./helpers/fake-plugin";
 import FootnotePlugin from "../src/main";
 import {
     countEmptyFootnoteReferences,
+    invalidFootnoteNames,
     noticeLintAlerts,
     orphanSafePrefixFor,
 } from "../src/linting/lint-alerts";
+import { InvalidNameCharacters } from "../src/parsing/footnote-grammar";
+import { maskProtectedLines, scanDocument } from "../src/parsing/markdown-scan";
 
 // Mutation hardening for the post-lint alert tail (Stryker re-baseline
 // 2026-08-12: lint-alerts scored 19.79% - the merge-duplicates work pinned
@@ -157,11 +160,11 @@ describe("the orphaned-reference alert", () => {
         ).toBe(true);
     });
 
-    it("elides past three names with an ellipsis", () => {
-        noticeLintAlerts(fakePlugin({}), "see [^a] [^b] [^c] [^d]");
+    it("names EVERY orphan, no ellipsis - the user needs the whole list to fix them (2026-09-08)", () => {
+        noticeLintAlerts(fakePlugin({}), "see [^a] [^b] [^c] [^d] [^e]");
         expect(
             messageShown(
-                'This note has 4 footnote references with no definition ("[^a]", "[^b]", "[^c]", …). Write their definitions or delete the references.',
+                'This note has 5 footnote references with no definition ("[^a]", "[^b]", "[^c]", "[^d]", "[^e]"). Write their definitions or delete the references.',
             ),
         ).toBe(true);
     });
@@ -247,3 +250,49 @@ describe("the shared gate", () => {
         expect(noticeCalls).toEqual([]);
     });
 });
+
+// The invalid-name alert (Jason's L-series pass 2026-09-08): creation and
+// rename refuse spaces, backticks, brackets, and "#", but a hand-typed or
+// pre-existing name slips past every rule and used to stay silent - the
+// orphan rules skip such names on purpose (they read as prose).
+describe("the invalid-name alert", () => {
+    const names = (markdown: string) => {
+        const lines = markdown.split("\n");
+        const scan = scanDocument(lines);
+        return invalidFootnoteNames(lines, scan, maskProtectedLines(lines, scan));
+    };
+
+    it("finds spaced, backticked, and hashed names in references and definition labels, one entry per name", () => {
+        expect(
+            names("see [^bad name] and [^#tag] and [^Bad Name]\n\n[^#tag]: def\n[^tick`y]: def"),
+        ).toEqual(["bad name", "#tag", "tick`y"]);
+    });
+
+    it("ignores valid names and masked fakes", () => {
+        expect(names("see [^ok] and `[^a b]` here\n\n[^ok]: def\n\n```\n[^x y]: fenced\n```")).toEqual([]);
+    });
+
+    it("alerts once, naming the footnote and the rule", () => {
+        noticeLintAlerts(fakePlugin({}), "see [^bad name] here\n\n[^bad name]: def");
+        expect(
+            messageShown(
+                `This note has a footnote with an invalid name ("[^bad name]"). ${InvalidNameCharacters}`,
+            ),
+        ).toBe(true);
+    });
+
+    it("plural, listing every name", () => {
+        noticeLintAlerts(fakePlugin({}), "see [^a b] [^c#d] [^e`f]");
+        expect(
+            messageShown(
+                `This note has 3 footnotes with invalid names ("[^a b]", "[^c#d]", "[^e\`f]"). ${InvalidNameCharacters}`,
+            ),
+        ).toBe(true);
+    });
+
+    it("stays silent for a clean note", () => {
+        noticeLintAlerts(fakePlugin({}), "see [^ok]\n\n[^ok]: def");
+        expect(anyMessageContaining("invalid name")).toBe(false);
+    });
+});
+
