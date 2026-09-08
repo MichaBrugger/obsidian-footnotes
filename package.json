@@ -52,6 +52,9 @@
     "ignoreBinaries": [
       "Obsidian.com",
       "ffmpeg"
+    ],
+    "ignoreDependencies": [
+      "electron"
     ]
   }
 }
