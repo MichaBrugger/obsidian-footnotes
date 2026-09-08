@@ -2,6 +2,7 @@ import { EditorPosition } from "obsidian";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { noticeCalls } from "./mocks/obsidian";
+import { resetNotices } from "./helpers/notices";
 
 import FootnotePlugin from "../src/main";
 import {
@@ -44,7 +45,7 @@ function fakePlugin(doc: FakeEditor): FootnotePlugin {
 }
 
 beforeEach(() => {
-    noticeCalls.length = 0;
+    resetNotices();
 });
 afterEach(() => {
     vi.unstubAllGlobals();

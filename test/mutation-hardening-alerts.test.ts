@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { noticeCalls } from "./mocks/obsidian";
+import { messages, resetNotices } from "./helpers/notices";
+import { fakePlugin as sharedFakePlugin } from "./helpers/fake-plugin";
 
 import FootnotePlugin from "../src/main";
 import {
@@ -16,22 +18,19 @@ import {
 // texts and the exact conditions each alert fires under.
 
 function fakePlugin(settings: Partial<FootnotePlugin["settings"]>): FootnotePlugin {
-    return {
-        settings: {
-            enableFootnotePrefix: false,
-            lintDeleteOrphanedReferences: false,
-            lintDeleteOrphanedDefinitions: false,
-            lintMergeDuplicateDefinitions: false,
-            ...settings,
-        },
-    } as unknown as FootnotePlugin;
+    return sharedFakePlugin({
+        enableFootnotePrefix: false,
+        lintDeleteOrphanedReferences: false,
+        lintDeleteOrphanedDefinitions: false,
+        lintMergeDuplicateDefinitions: false,
+        ...settings,
+    });
 }
 
 beforeEach(() => {
-    noticeCalls.length = 0;
+    resetNotices();
 });
 
-const messages = () => noticeCalls.map((args) => args[0] as string);
 const messageShown = (text: string) => messages().includes(text);
 const anyMessageContaining = (part: string) =>
     messages().some((text) => text.includes(part));

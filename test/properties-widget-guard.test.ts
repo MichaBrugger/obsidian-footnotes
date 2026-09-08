@@ -1,7 +1,7 @@
 import { EditorPosition } from "obsidian";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { noticeCalls } from "./mocks/obsidian";
+import { noticed, resetNotices } from "./helpers/notices";
 import FootnotePlugin from "../src/main";
 import {
     insertAutonumFootnote,
@@ -59,11 +59,8 @@ function pluginWithFocus(doc: FakeEditor, insideProperties: boolean): FootnotePl
     } as unknown as FootnotePlugin;
 }
 
-const noticed = (message: string) =>
-    noticeCalls.some((args) => args[0] === message);
-
 beforeEach(() => {
-    noticeCalls.length = 0;
+    resetNotices();
 });
 
 afterEach(() => {

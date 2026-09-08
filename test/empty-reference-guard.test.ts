@@ -2,6 +2,7 @@ import { EditorPosition } from "obsidian";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { noticeCalls } from "./mocks/obsidian";
+import { resetNotices } from "./helpers/notices";
 
 import FootnotePlugin from "../src/main";
 import {
@@ -95,7 +96,7 @@ describe("footnote commands inside an empty [^] reference", () => {
     // from the protected-text guard instead.
     it("a [^] inside inline code never fires the empty-reference warning (#41 parity)", async () => {
         // "use `x [^] y` here" with the caret between the code span's brackets
-        noticeCalls.length = 0;
+        resetNotices();
         const line = "use `x [^] y` here";
         const doc = fakeEditor([line], { line: 0, ch: 9 });
         await insertAutonumFootnote(fakePlugin(doc));
@@ -105,7 +106,7 @@ describe("footnote commands inside an empty [^] reference", () => {
     });
 
     it("a [^] inside a code fence never fires the empty-reference warning either", async () => {
-        noticeCalls.length = 0;
+        resetNotices();
         const doc = fakeEditor(["```", "a [^] b", "```"], { line: 1, ch: 4 });
         await insertAutonumFootnote(fakePlugin(doc));
         expect(doc.appliedChanges).toEqual([]);

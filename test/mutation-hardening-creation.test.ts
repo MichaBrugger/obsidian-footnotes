@@ -2,6 +2,7 @@ import { EditorPosition } from "obsidian";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { noticeCalls } from "./mocks/obsidian";
+import { messages, noticed, resetNotices } from "./helpers/notices";
 import {
     fakeEditor as sharedFakeEditor,
     FakeEditor,
@@ -106,11 +107,8 @@ function fakeCell(text: string, head: number, anchor: number = head) {
 }
 
 beforeEach(() => {
-    noticeCalls.length = 0;
+    resetNotices();
 });
-
-const messages = () => noticeCalls.map((args) => args[0] as string);
-const noticed = (text: string) => messages().includes(text);
 
 const INVALID_PREFIX_NOTICE =
     'No footnote was created: this note\'s footnote-prefix ("10") is invalid. The footnote prefix can\'t end in a number. Its footnotes would be indistinguishable from plain numbered ones.';

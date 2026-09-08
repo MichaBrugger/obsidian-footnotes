@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { noticeCalls } from "./mocks/obsidian";
+import { resetNotices } from "./helpers/notices";
 import { noticeSegments, showNotice } from "../src/editor/notice";
 
 // Jason's report 2026-09-04: right after every toast gained quotes around
@@ -10,7 +11,7 @@ import { noticeSegments, showNotice } from "../src/editor/notice";
 // no-wrap span; everything else stays plain text.
 
 beforeEach(() => {
-    noticeCalls.length = 0;
+    resetNotices();
 });
 
 afterEach(() => {

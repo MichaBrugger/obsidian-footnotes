@@ -11,6 +11,7 @@ import { warnPrefilledReferenceIfInside } from "../src/commands/press-guards";
 // the stub Notice records into noticeCalls - vi.mock("obsidian") does not
 // survive `isolate: false` (see the note in test/mocks/obsidian.ts)
 import { noticeCalls } from "./mocks/obsidian";
+import { resetNotices } from "./helpers/notices";
 import {
     fakeEditor as sharedFakeEditor,
     FakeEditor,
@@ -85,7 +86,7 @@ describe("named command prefills the footnote-prefix into the new reference", ()
             line: 3,
             ch: 5,
         });
-        noticeCalls.length = 0;
+        resetNotices();
         createFootnoteReference(
             "Alpha",
             { line: 3, ch: 5 },
@@ -106,7 +107,7 @@ describe("named command prefills the footnote-prefix into the new reference", ()
             line: 3,
             ch: 5,
         });
-        noticeCalls.length = 0;
+        resetNotices();
         createAutonumFootnote(
             "Alpha",
             { line: 3, ch: 5 },
@@ -143,7 +144,7 @@ describe("warnPrefilledReferenceIfInside (the [^7-] placeholder toast)", () => {
             line: 3,
             ch: 9,
         });
-        noticeCalls.length = 0;
+        resetNotices();
         expect(warnPrefilledReferenceIfInside(fakePlugin(true), doc, null)).toBe(
             true,
         );

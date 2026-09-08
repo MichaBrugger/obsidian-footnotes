@@ -2,6 +2,7 @@ import { App, EditorPosition } from "obsidian";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { noticeCalls } from "./mocks/obsidian";
+import { noticed, resetNotices } from "./helpers/notices";
 import {
     fakeEditor as sharedFakeEditor,
     FakeEditor,
@@ -76,14 +77,11 @@ function fakePlugin(
 }
 
 beforeEach(() => {
-    noticeCalls.length = 0;
+    resetNotices();
 });
 afterEach(() => {
     vi.unstubAllGlobals();
 });
-
-const noticed = (message: string) =>
-    noticeCalls.some((args) => args[0] === message);
 
 describe("the auto-numbered key converts a selection", () => {
     it("moves the selected text into a new definition's body", async () => {
@@ -815,7 +813,7 @@ describe("selections that refuse", () => {
             "> ```",
         ];
         for (const command of [insertInlineFootnote, insertAutonumFootnote]) {
-            noticeCalls.length = 0;
+            resetNotices();
             const doc = fakeEditor(before, { line: 8, ch: 0 }, {
                 anchor: { line: 8, ch: 0 },
                 head: { line: 9, ch: 0 },
@@ -1293,7 +1291,7 @@ describe("quote-relative indented code refuses at the edges (second 30k-soak fin
         // edge - converting it consumed protected text
         const before = ["", ">     > gap code[^88]", "", "alpha[^1]."];
         for (const command of [insertInlineFootnote, insertAutonumFootnote]) {
-            noticeCalls.length = 0;
+            resetNotices();
             const doc = fakeEditor(before, { line: 1, ch: 0 }, {
                 anchor: { line: 0, ch: 0 },
                 head: { line: 2, ch: 0 },
@@ -1416,7 +1414,7 @@ describe("nested footnotes are prevented in selections (2026-08-24)", () => {
 
     it("a selection containing an INLINE footnote or a [^] placeholder refuses", async () => {
         for (const line of ["keep ^[inline note] here", "keep [^] here"]) {
-            noticeCalls.length = 0;
+            resetNotices();
             const before = [line];
             const doc = fakeEditor(before, { line: 0, ch: 0 }, {
                 anchor: { line: 0, ch: 0 },

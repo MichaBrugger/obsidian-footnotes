@@ -21,8 +21,8 @@ export class Setting {}
 // vi.mock("obsidian") - module mocking breaks under `isolate: false`
 // (vitest.config.ts), because modules already imported by earlier test
 // files in the worker keep their reference to the ORIGINAL Notice, so a
-// per-file mock is never wired in. Call noticeCalls.length = 0 before
-// asserting.
+// per-file mock is never wired in. Read and reset it through
+// test/helpers/notices.ts (messages/noticed/resetNotices).
 export const noticeCalls: unknown[][] = [];
 export class Notice {
     constructor(...args: unknown[]) {

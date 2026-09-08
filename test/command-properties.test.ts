@@ -4,6 +4,8 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { docArb } from "./arbitraries";
 import { noticeCalls } from "./mocks/obsidian";
+import { resetNotices } from "./helpers/notices";
+import { fakePlugin as sharedFakePlugin } from "./helpers/fake-plugin";
 import FootnotePlugin from "../src/main";
 import {
     indentDefinitionBody,
@@ -137,19 +139,16 @@ interface PressSettings {
 }
 
 function fakePlugin(doc: PressDoc, settings: PressSettings): FootnotePlugin {
-    return {
-        app: {
-            workspace: { getActiveViewOfType: () => ({ editor: doc }) },
-            vault: {},
-        },
-        settings: {
+    return sharedFakePlugin(
+        {
             ...settings,
             footnoteSectionHeading: "# Footnotes",
             enablePopupEditor: false,
             enableFootnotePrefix: false,
             lintOnFootnoteCreation: false,
         },
-    } as unknown as FootnotePlugin;
+        doc,
+    );
 }
 
 // ---------- the generated press ----------
@@ -621,7 +620,7 @@ describe("creation-command invariants over random documents", () => {
                 async ({ lines, span, selection, settings }, command) => {
                     const trimmed = trimmedSpan(lines, span.from, span.to);
                     const protectedBefore = scanDocument(lines).isProtected;
-                    noticeCalls.length = 0;
+                    resetNotices();
                     const doc = pressEditor(lines, span.from, selection);
                     await COMMANDS[command](fakePlugin(doc, settings));
                     const unchanged =
@@ -767,7 +766,7 @@ describe("creation-command invariants over random documents", () => {
                     if (trimmedSpan(lines, span.from, span.to) === null) {
                         return; // falls through to the cascade
                     }
-                    noticeCalls.length = 0;
+                    resetNotices();
                     const doc = pressEditor(lines, span.from, selection);
                     await COMMANDS[command](fakePlugin(doc, settings));
                     // the press itself never edits: paste explains itself,
@@ -815,7 +814,7 @@ describe("creation-command invariants over random documents", () => {
                                 head: { line, ch: lineText.length },
                             },
                         ];
-                    noticeCalls.length = 0;
+                    resetNotices();
                     await COMMANDS[command](fakePlugin(doc, settings));
                     expect(doc.lines.join("\n")).toBe(lines.join("\n"));
                     expect(

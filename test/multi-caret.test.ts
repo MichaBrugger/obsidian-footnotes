@@ -1,7 +1,7 @@
 import { EditorPosition } from "obsidian";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { noticeCalls } from "./mocks/obsidian";
+import { noticed, resetNotices } from "./helpers/notices";
 import {
     fakeEditor as sharedFakeEditor,
     FakeEditor,
@@ -55,14 +55,11 @@ function fakePlugin(doc: FakeEditor, settings: Settings = {}): FootnotePlugin {
 }
 
 beforeEach(() => {
-    noticeCalls.length = 0;
+    resetNotices();
 });
 afterEach(() => {
     vi.unstubAllGlobals();
 });
-
-const noticed = (message: string) =>
-    noticeCalls.some((args) => args[0] === message);
 
 describe("the auto-numbered key at several carets", () => {
     it("inserts the SAME reference at every caret with ONE definition", async () => {

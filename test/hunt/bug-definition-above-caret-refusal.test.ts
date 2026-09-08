@@ -2,6 +2,7 @@ import { EditorPosition } from "obsidian";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { noticeCalls } from "../mocks/obsidian";
+import { resetNotices } from "../helpers/notices";
 import {
     fakeEditor as sharedFakeEditor,
     FakeEditor,
@@ -53,7 +54,7 @@ function fakePlugin(doc: FakeEditor): FootnotePlugin {
 }
 
 beforeEach(() => {
-    noticeCalls.length = 0;
+    resetNotices();
 });
 
 describe("bug: a definition block above the caret falsely refused creation", () => {

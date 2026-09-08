@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { docArb } from "./arbitraries";
 import { noticeCalls } from "./mocks/obsidian";
+import { resetNotices } from "./helpers/notices";
 import {
     planFootnoteRename,
     renameFootnote,
@@ -174,7 +175,7 @@ describe("planFootnoteRename", () => {
 
 describe("the command entry", () => {
     it("explains itself when the caret is on nothing renameable", async () => {
-        noticeCalls.length = 0;
+        resetNotices();
         const doc = sharedFakeEditor(["plain prose here"], {
             wholeDoc: true,
             cursor: { line: 0, ch: 3 },

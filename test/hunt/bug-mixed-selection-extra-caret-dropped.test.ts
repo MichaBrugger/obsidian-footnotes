@@ -2,6 +2,7 @@ import { EditorPosition } from "obsidian";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { noticeCalls } from "../mocks/obsidian";
+import { resetNotices } from "../helpers/notices";
 import { fakeEditor as sharedFakeEditor } from "../helpers/fake-editor";
 import { fakePlugin as sharedFakePlugin } from "../helpers/fake-plugin";
 import { insertAutonumFootnote } from "../../src/commands/insert-or-navigate-footnotes";
@@ -23,7 +24,7 @@ import { insertAutonumFootnote } from "../../src/commands/insert-or-navigate-foo
 // reference at the caret).
 
 beforeEach(() => {
-    noticeCalls.length = 0;
+    resetNotices();
 });
 afterEach(() => {
     vi.unstubAllGlobals();

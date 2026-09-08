@@ -1,7 +1,7 @@
 import { EditorPosition } from "obsidian";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { noticeCalls } from "./mocks/obsidian";
+import { noticed, resetNotices } from "./helpers/notices";
 import {
     fakeEditor as sharedFakeEditor,
     FakeEditor,
@@ -54,7 +54,7 @@ function fakePlugin(doc: FakeEditor): FootnotePlugin {
 }
 
 beforeEach(() => {
-    noticeCalls.length = 0;
+    resetNotices();
 });
 afterEach(() => {
     vi.unstubAllGlobals();
@@ -67,9 +67,6 @@ const LINES = [
     "    continued definition line",
 ];
 
-const noticed = () =>
-    noticeCalls.some((args) => args[0] === NestedFootnoteNotice);
-
 describe("the inline pair NAVIGATES from inside a definition (ruling refined 2026-08-13)", () => {
     // first ruling: refuse with a toast. Refined the same day: jump back
     // to the reference EXACTLY like the numbered/named keys - same
@@ -78,7 +75,7 @@ describe("the inline pair NAVIGATES from inside a definition (ruling refined 202
         const doc = fakeEditor(LINES, { line: 2, ch: 15 });
         await insertInlineFootnote(fakePlugin(doc));
         expect(doc.lines).toEqual(LINES);
-        expect(noticed()).toBe(false);
+        expect(noticed(NestedFootnoteNotice)).toBe(false);
         expect(doc.cursor.line).toBe(0);
     });
 
@@ -86,7 +83,7 @@ describe("the inline pair NAVIGATES from inside a definition (ruling refined 202
         const doc = fakeEditor(LINES, { line: 3, ch: 10 });
         await insertInlineFootnote(fakePlugin(doc));
         expect(doc.lines).toEqual(LINES);
-        expect(noticed()).toBe(false);
+        expect(noticed(NestedFootnoteNotice)).toBe(false);
         expect(doc.cursor.line).toBe(0);
     });
 
@@ -132,7 +129,7 @@ describe("the inline pair NAVIGATES from inside a definition (ruling refined 202
         const doc = fakeEditor(LINES, { line: 3, ch: 10 });
         await insertAutonumFootnote(fakePlugin(doc));
         expect(doc.lines).toEqual(LINES);
-        expect(noticed()).toBe(false);
+        expect(noticed(NestedFootnoteNotice)).toBe(false);
         expect(doc.cursor.line).toBe(0);
     });
 
@@ -140,7 +137,7 @@ describe("the inline pair NAVIGATES from inside a definition (ruling refined 202
         const doc = fakeEditor(LINES, { line: 3, ch: 10 });
         await insertNamedFootnote(fakePlugin(doc));
         expect(doc.lines).toEqual(LINES);
-        expect(noticed()).toBe(false);
+        expect(noticed(NestedFootnoteNotice)).toBe(false);
         expect(doc.cursor.line).toBe(0);
     });
 
@@ -151,7 +148,7 @@ describe("the inline pair NAVIGATES from inside a definition (ruling refined 202
         });
         await insertAutonumFootnote(fakePlugin(doc));
         expect(doc.lines).toEqual(LINES);
-        expect(noticed()).toBe(true);
+        expect(noticed(NestedFootnoteNotice)).toBe(true);
     });
 });
 
@@ -160,7 +157,7 @@ describe("what stays untouched", () => {
         const doc = fakeEditor(LINES, { line: 2, ch: 2 });
         await insertAutonumFootnote(fakePlugin(doc));
         expect(doc.lines).toEqual(LINES);
-        expect(noticed()).toBe(false);
+        expect(noticed(NestedFootnoteNotice)).toBe(false);
         // jumped to the reference on line 0
         expect(doc.cursor.line).toBe(0);
     });
@@ -169,6 +166,6 @@ describe("what stays untouched", () => {
         const doc = fakeEditor(LINES, { line: 0, ch: 15 });
         await insertInlineFootnote(fakePlugin(doc));
         expect(doc.lines[0]).toBe("alpha[^1] prose^[] here");
-        expect(noticed()).toBe(false);
+        expect(noticed(NestedFootnoteNotice)).toBe(false);
     });
 });

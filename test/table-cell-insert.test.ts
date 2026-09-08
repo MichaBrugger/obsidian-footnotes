@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { insertInTableCell } from "../src/commands/create-footnote";
 import type FootnotePlugin from "../src/main";
 import type { TableCellEditor } from "../src/editor/table-cursor";
+import { fakePlugin as sharedFakePlugin } from "./helpers/fake-plugin";
 
 // Regression companion to the table-corruption smoke test (2026-07-15).
 // The contract with Obsidian itself - that a cell sub-editor can be FOUND
@@ -29,7 +30,7 @@ function fakeCell(text: string, head: number) {
 }
 
 function fakePlugin(insertAtEndOfWord: boolean): FootnotePlugin {
-    return { settings: { insertAtEndOfWord } } as unknown as FootnotePlugin;
+    return sharedFakePlugin({ insertAtEndOfWord });
 }
 
 describe("insertInTableCell", () => {

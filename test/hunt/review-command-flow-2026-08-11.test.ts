@@ -2,6 +2,7 @@ import { EditorPosition } from "obsidian";
 import { describe, expect, it, vi } from "vitest";
 
 import { noticeCalls } from "../mocks/obsidian";
+import { resetNotices } from "../helpers/notices";
 
 import FootnotePlugin from "../../src/main";
 import { openFootnotePopup } from "../../src/commands/footnote-popup";
@@ -80,7 +81,7 @@ describe("bug #7: inline-footnote guards must mask", () => {
     // survives of bug #7 is that the WRONG toasts (empty-inline warning,
     // hop-out) never fire on fence/code-span text
     it("a literal empty '^[]' inside a fence never fires the empty-inline warning", async () => {
-        noticeCalls.length = 0;
+        resetNotices();
         const doc = fakeEditor(["```", "see ^[] here", "```", "after"], {
             line: 1,
             ch: 6,

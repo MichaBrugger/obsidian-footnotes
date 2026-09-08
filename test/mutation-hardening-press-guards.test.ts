@@ -2,6 +2,7 @@ import { EditorPosition } from "obsidian";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { noticeCalls } from "./mocks/obsidian";
+import { messages, resetNotices } from "./helpers/notices";
 
 import FootnotePlugin from "../src/main";
 import {
@@ -48,10 +49,8 @@ function fakeCell(text: string, head: number): TableCellEditor {
 }
 
 beforeEach(() => {
-    noticeCalls.length = 0;
+    resetNotices();
 });
-
-const messages = () => noticeCalls.map((args) => args[0] as string);
 
 describe("the protected-caret guard inside a table cell", () => {
     // the main-editor line is deliberately plain in these: only the cell

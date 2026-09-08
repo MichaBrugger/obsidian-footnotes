@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { Editor, EditorChange, EditorPosition } from "obsidian";
 
 import { noticeCalls } from "./mocks/obsidian";
+import { messages, resetNotices } from "./helpers/notices";
 
 import FootnotePlugin from "../src/main";
 import {
@@ -140,10 +141,8 @@ function creationLint(
     return doc;
 }
 
-const messages = () => noticeCalls.map((args) => args[0] as string);
-
 beforeEach(() => {
-    noticeCalls.length = 0;
+    resetNotices();
 });
 
 // ---------- the settings → options mappings ----------
