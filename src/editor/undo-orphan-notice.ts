@@ -7,6 +7,7 @@ import {
 } from "../parsing/footnote-grammar";
 import { maskProtectedLines } from "../parsing/markdown-scan";
 
+import { showNotice } from "./notice";
 // Feedback for a PARTIAL undo (Jason's report 2026-08-27, notice always
 // on - his call): creating a footnote from a table cell takes TWO undo
 // steps, because the reference is dispatched through the cell's own
@@ -131,7 +132,7 @@ export function undoOrphanNoticeExtension() {
         const refs = orphaned.map((name) => `"[^${name}]"`).join(", ");
         standing?.notice.hide();
         standing = {
-            notice: new Notice(
+            notice: showNotice(
                 `The undo removed the footnote definition, but ${refs} ${
                     orphaned.length === 1 ? "is" : "are"
                 } still in the note. Undo again to remove the reference too.`,

@@ -1,4 +1,4 @@
-import { Editor, EditorChange, EditorPosition, MarkdownView, Notice } from "obsidian";
+import { Editor, EditorChange, EditorPosition, MarkdownView } from "obsidian";
 
 import type FootnotePlugin from "../main";
 import { ValidatedTextModal } from "./validated-text-modal";
@@ -19,6 +19,7 @@ import {
 import { runOutsideTableCell } from "../editor/table-cursor";
 import { withEditableEditor } from "./insert-or-navigate-footnotes";
 
+import { showNotice } from "../editor/notice";
 // Renaming a footnote (issue #36, Jason's calls 2026-08-12): with the
 // caret on a "[^name]" reference or a definition label, the Rename
 // footnote command opens a modal prefilled with the current name and
@@ -297,7 +298,7 @@ export async function renameFootnote(plugin: FootnotePlugin) {
             runOutsideTableCell(doc, (cursorPosition) => {
                 const target = renameTargetAtCursor(doc, cursorPosition);
                 if (target === null) {
-                    new Notice(RenameTargetNotice, 8000);
+                    showNotice(RenameTargetNotice, 8000);
                     return;
                 }
                 new RenameFootnoteModal(plugin, doc, target).open();
@@ -377,7 +378,7 @@ class RenameFootnoteModal extends ValidatedTextModal {
             case "renamed":
                 this.doc.transaction({ changes: plan.changes });
                 this.close();
-                new Notice(
+                showNotice(
                     `Renamed "[^${this.oldName}]" to "[^${plan.newName}]" in ${plan.count} ${plan.count === 1 ? "place" : "places"}.` +
                         (plan.prefixAdded
                             ? ` The note's prefix "${sweepPrefix}" was added.`

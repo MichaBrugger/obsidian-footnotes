@@ -150,8 +150,11 @@ describe("warnPrefilledReferenceIfInside (the [^7-] placeholder toast)", () => {
         // the caret does NOT move - the toast is the whole response
         expect(doc.cursor).toEqual({ line: 3, ch: 9 });
         expect(doc.appliedChanges).toEqual([]);
+        // showNotice always passes (message, duration) - the duration is
+        // undefined for this one-liner toast
         expect(noticeCalls).toContainEqual([
             expect.stringContaining("suffix"),
+            undefined,
         ]);
     });
 

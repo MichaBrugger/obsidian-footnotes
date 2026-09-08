@@ -1,5 +1,3 @@
-import { Notice } from "obsidian";
-
 import type FootnotePlugin from "../main";
 import { footnotePrefix, footnotePrefixProblem } from "../parsing/footnote-prefix";
 import {
@@ -16,6 +14,7 @@ import { duplicateFootnoteDefinitionNames } from "./rules/merge-duplicate-defini
 import { orphanedFootnoteDefinitionNames } from "./rules/remove-orphaned-definitions";
 import { orphanedFootnoteReferenceNames } from "./rules/remove-orphaned-references";
 
+import { showNotice } from "../editor/notice";
 // The post-lint alert tail: every lint entry point reports what the rules
 // could not (or were not allowed to) fix - empty "[^]" placeholders,
 // orphans while their delete toggles are off, duplicates while merging is
@@ -80,7 +79,7 @@ function noticeEmptyReferences(
     const count = countEmptyFootnoteReferences(markdown, prefix, masked);
     if (count === 0) return;
     const hint = prefix ? `"[^]" or the bare prefix "[^${prefix}]"` : '"[^]"';
-    new Notice(
+    showNotice(
         count === 1
             ? `This note has an unnamed footnote reference (${hint}). Give it a name or delete it.`
             : `This note has ${count} unnamed footnote references (${hint}). Give them names or delete them.`,
@@ -105,7 +104,7 @@ function noticeOrphanedReferences(
     if (plugin.settings.lintDeleteOrphanedReferences) return;
     const names = orphanedFootnoteReferenceNames(markdown, prefix, precomputed);
     if (names.length === 0) return;
-    new Notice(
+    showNotice(
         names.length === 1
             ? `This note has a footnote reference with no definition (${referenceList(names)}). Write its definition or delete the reference.`
             : `This note has ${names.length} footnote references with no definition (${referenceList(names)}). Write their definitions or delete the references.`,
@@ -123,7 +122,7 @@ function noticeOrphanedDefinitions(
     if (plugin.settings.lintDeleteOrphanedDefinitions) return;
     const names = orphanedFootnoteDefinitionNames(markdown, precomputed);
     if (names.length === 0) return;
-    new Notice(
+    showNotice(
         names.length === 1
             ? `This note has a footnote definition nothing references (${referenceList(names)}). Add its reference in the text or delete the definition.`
             : `This note has ${names.length} footnote definitions nothing references (${referenceList(names)}). Add their references in the text or delete the definitions.`,
@@ -142,7 +141,7 @@ function noticeDuplicateDefinitions(
     if (plugin.settings.lintMergeDuplicateDefinitions) return;
     const names = duplicateFootnoteDefinitionNames(markdown, precomputed);
     if (names.length === 0) return;
-    new Notice(
+    showNotice(
         names.length === 1
             ? `This note defines ${referenceList(names)} more than once. Obsidian renders only the last definition. Merge them, or turn on "Merge duplicate definitions".`
             : `This note defines ${names.length} footnotes more than once (${referenceList(names)}). Obsidian renders only each one's last definition. Merge them, or turn on "Merge duplicate definitions".`,
@@ -207,7 +206,7 @@ function noticeNestedFootnotes(
 ) {
     const names = nestedFootnoteDefinitionNames(lines, scan, masked);
     if (names.length === 0) return;
-    new Notice(
+    showNotice(
         names.length === 1
             ? `This note has a footnote nested inside another footnote's definition (${referenceList(names)}). Nested footnotes don't survive export and most tools can't read them. Move it into the text.`
             : `This note has footnotes nested inside ${names.length} footnote definitions (${referenceList(names)}). Nested footnotes don't survive export and most tools can't read them. Move them into the text.`,

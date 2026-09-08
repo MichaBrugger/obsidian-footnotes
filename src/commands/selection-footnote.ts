@@ -1,4 +1,4 @@
-import { Editor, EditorChange, EditorPosition, Notice } from "obsidian";
+import { Editor, EditorChange, EditorPosition } from "obsidian";
 
 import type FootnotePlugin from "../main";
 import { ValidatedTextModal } from "./validated-text-modal";
@@ -39,6 +39,7 @@ import {
 import { DefinitionCreationNotice } from "./press-guards";
 import { TableCellEditor, tableRowCellSpans, tableRowLines } from "../editor/table-cursor";
 
+import { showNotice } from "../editor/notice";
 // Turning a selection into a footnote (issue #35): a creation press with a
 // live selection REPLACES the selected text instead of inserting at the
 // caret - the auto-numbered key moves it into a new definition's body, the
@@ -163,7 +164,7 @@ export function selectionPressHandled(
             to = endOfWordOffset(cellText, to);
         }
         if (command === "paste") {
-            new Notice(SelectionCommandNotice, 8000);
+            showNotice(SelectionCommandNotice, 8000);
             return true;
         }
         // protected-EDGE cut is refused UP FRONT, not just simulated: the
@@ -176,12 +177,12 @@ export function selectionPressHandled(
             caretInsideMaskedSpan(maskedCell, from, false, false) ||
             caretInsideMaskedSpan(maskedCell, to, false, false)
         ) {
-            new Notice(ProtectedSelectionNotice, 8000);
+            showNotice(ProtectedSelectionNotice, 8000);
             return true;
         }
         // no nesting in cells either (2026-08-24)
         if (spanTouchesFootnote(cellText, maskedCell, from, to)) {
-            new Notice(NestedSelectionNotice, 8000);
+            showNotice(NestedSelectionNotice, 8000);
             return true;
         }
         const text = cellText.slice(from, to);
@@ -214,7 +215,7 @@ export function selectionPressHandled(
     const resolved = normalizedMainSelection(doc);
     if (resolved === null) return false;
     if (resolved === "multi") {
-        new Notice(SelectionSpanNotice, 8000);
+        showNotice(SelectionSpanNotice, 8000);
         return true;
     }
     // shrink to the non-whitespace core (line breaks included): a
@@ -242,19 +243,19 @@ export function selectionPressHandled(
         };
     }
     if (command === "paste") {
-        new Notice(SelectionCommandNotice, 8000);
+        showNotice(SelectionCommandNotice, 8000);
         return true;
     }
     // the inline key only converts within one line - a line-spanning
     // selection redirects to the definition-backed keys (2026-08-20)
     if (command === "inline" && trimmed.from.line !== trimmed.to.line) {
-        new Notice(InlineSelectionNotice, 8000);
+        showNotice(InlineSelectionNotice, 8000);
         return true;
     }
     const ctx = docContext(doc);
     const text = rangeText(ctx.lines, trimmed.from, trimmed.to);
     if (selectionCutsTable(ctx, trimmed.from, trimmed.to)) {
-        new Notice(TableSelectionNotice, 8000);
+        showNotice(TableSelectionNotice, 8000);
         return true;
     }
     // protected CUTS are refused UP FRONT, not just simulated: the
@@ -273,7 +274,7 @@ export function selectionPressHandled(
         selectionCutsProtectedText(ctx, trimmed.from, trimmed.to) ||
         replacementReclassifiesDoc(ctx, trimmed.from, trimmed.to, replacement)
     ) {
-        new Notice(ProtectedSelectionNotice, 8000);
+        showNotice(ProtectedSelectionNotice, 8000);
         return true;
     }
     // a selection inside - or lapping over - another footnote's definition
@@ -287,13 +288,13 @@ export function selectionPressHandled(
                 trimmed.from.line <= block.end && trimmed.to.line >= block.start,
         )
     ) {
-        new Notice(DefinitionCreationNotice, 8000);
+        showNotice(DefinitionCreationNotice, 8000);
         return true;
     }
     // ... and a selection touching any LIVE footnote artifact refuses too
     // (nesting prevented plugin-wide, 2026-08-24)
     if (selectionTouchesFootnote(ctx, trimmed.from, trimmed.to)) {
-        new Notice(NestedSelectionNotice, 8000);
+        showNotice(NestedSelectionNotice, 8000);
         return true;
     }
     const selection = { from: trimmed.from, to: trimmed.to, text };
@@ -615,7 +616,7 @@ export function convertSelectionToNamed(
         selection.to.line >= doc.lineCount() ||
         rangeText(ctx.lines, selection.from, selection.to) !== selection.text
     ) {
-        new Notice(SelectionChangedNotice, 8000);
+        showNotice(SelectionChangedNotice, 8000);
         return null;
     }
     convertMainSelection(plugin, doc, selection, ctx, name);
@@ -635,7 +636,7 @@ export function convertCellSelectionToNamed(
     if (problem !== null) return problem;
     const cellText = cell.state.doc.toString();
     if (cellText.slice(selection.from, selection.to) !== selection.text) {
-        new Notice(SelectionChangedNotice, 8000);
+        showNotice(SelectionChangedNotice, 8000);
         return null;
     }
     convertCellSelection(plugin, doc, cell, selection, cursorPosition, name);
@@ -690,7 +691,7 @@ function convertMainSelectionToInline(
     ]);
     const masked = maskedLineAt(simulated, selection.from.line);
     if (!inlineWrapLandsIntact(masked, selection.from.ch, text.length)) {
-        new Notice(ProtectedCreationNotice, 8000);
+        showNotice(ProtectedCreationNotice, 8000);
         return;
     }
     const after = { line: selection.from.line, ch: selection.from.ch + text.length };
@@ -765,7 +766,7 @@ function convertMainSelection(
         simulated,
     });
     if (!verified) {
-        new Notice(ProtectedCreationNotice, 8000);
+        showNotice(ProtectedCreationNotice, 8000);
         return;
     }
 

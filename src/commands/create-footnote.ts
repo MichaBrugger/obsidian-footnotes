@@ -2,7 +2,6 @@ import {
     Editor,
     EditorChange,
     EditorPosition,
-    Notice,
 } from "obsidian";
 
 import type FootnotePlugin from "../main";
@@ -36,6 +35,7 @@ import { maskInlineRegions, maskedLineAt } from "../parsing/markdown-scan";
 import { warnDefinitionCaretIfInside, warnProtectedCaretIfInside } from "./press-guards";
 import { TableCellEditor } from "../editor/table-cursor";
 
+import { showNotice } from "../editor/notice";
 // The creation steps of the command cascade: mint a reference, append its
 // definition, and hand off to the popup (or jump) - each step verified
 // against the insertion-liveness kit before any edit is dispatched. This
@@ -104,7 +104,7 @@ function dispatchCellEditIfLive(
           inlineWrapLandsIntact(maskedCell, from, text.length)
         : maskedCell.slice(from, from + text.length) === text;
     if (!live) {
-        new Notice(ProtectedCreationNotice, 8000);
+        showNotice(ProtectedCreationNotice, 8000);
         return false;
     }
     cell.dispatch({
@@ -426,7 +426,7 @@ export function createAutonumFootnote(
         definitionLabelLine: definition.cursor.line,
     });
     if (!verified) {
-        new Notice(ProtectedCreationNotice, 8000);
+        showNotice(ProtectedCreationNotice, 8000);
         return true;
     }
 
@@ -476,7 +476,7 @@ export function createMatchingFootnoteDefinition(
         const offender = footnoteId.includes("`")
             ? "backticks"
             : "spaces";
-        new Notice(
+        showNotice(
             `Footnote name "${footnoteId}" contains ${offender}, so Obsidian won't render it as a footnote. Remove the ${offender}.`,
             8000,
         );
@@ -597,7 +597,7 @@ export function createFootnoteReference(
             cursorPosition.ch + emptyReference.length,
         ) !== emptyReference
     ) {
-        new Notice(ProtectedCreationNotice, 8000);
+        showNotice(ProtectedCreationNotice, 8000);
         return true;
     }
     const newCursorPos = {

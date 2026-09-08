@@ -1,9 +1,10 @@
-import { Editor, EditorPosition, Notice } from "obsidian";
+import { Editor, EditorPosition } from "obsidian";
 
 import { docLines } from "../editor/doc-context";
 import { maskInlineRegions, maskedLineAt } from "../parsing/markdown-scan";
 import { TableCellEditor } from "../editor/table-cursor";
 
+import { showNotice } from "../editor/notice";
 // Inline footnotes ("^[...]"): content sanitizing, the escape-aware span
 // scanner, and the two caret guards every command shares. Split out of the
 // all-in-one commands file 2026-08-11.
@@ -142,7 +143,7 @@ export function warnEmptyInlineFootnoteIfInside(
     const span = maskedInlineFootnoteSpan(doc, cell, cursorPosition);
     if (span === null) return false;
     if (span.text.slice(span.open + 2, span.close).trim() !== "") return false;
-    new Notice(
+    showNotice(
         "This inline footnote is empty. Type its text between the brackets.",
         8000,
     );

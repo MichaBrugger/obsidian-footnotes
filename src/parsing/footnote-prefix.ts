@@ -1,8 +1,9 @@
-import { Editor, Notice } from "obsidian";
+import { Editor } from "obsidian";
 
 import type FootnotePlugin from "../main";
 import { isValidFootnoteName } from "./footnote-grammar";
 
+import { showNotice } from "../editor/notice";
 // The note's `footnote-prefix` frontmatter property: parsing (a hand-rolled
 // YAML subset matching what Obsidian shows as a property), validity rules,
 // and the settings-aware resolver the insert commands share. Depends only
@@ -122,7 +123,7 @@ export function activeFootnotePrefix(
     if (!prefix) return "";
     const problem = footnotePrefixProblem(prefix);
     if (problem) {
-        new Notice(
+        showNotice(
             `No footnote was created: this note's footnote-prefix ("${prefix}") is invalid. ${problem}`,
             8000,
         );

@@ -1,4 +1,4 @@
-import { Editor, EditorPosition, Notice } from "obsidian";
+import { Editor, EditorPosition } from "obsidian";
 
 import type FootnotePlugin from "../main";
 import { emptyReferenceStart } from "../parsing/footnote-grammar";
@@ -19,6 +19,7 @@ import {
 } from "../parsing/markdown-scan";
 import { TableCellEditor } from "../editor/table-cursor";
 
+import { showNotice } from "../editor/notice";
 // The press guards: a footnote key was pressed - does something OTHER than
 // creation own it? Empty placeholders warn, filled inline footnotes hop,
 // and protected text (definition interiors included) refuses outright.
@@ -103,7 +104,7 @@ export function warnProtectedCaretIfInside(
             );
     }
     if (!inside) return false;
-    new Notice(ProtectedCreationNotice, 8000);
+    showNotice(ProtectedCreationNotice, 8000);
     return true;
 }
 
@@ -136,7 +137,7 @@ export function warnDefinitionCaretIfInside(
             cursorPosition.line >= block.start && cursorPosition.line <= block.end,
     );
     if (!inside) return false;
-    new Notice(DefinitionCreationNotice, 8000);
+    showNotice(DefinitionCreationNotice, 8000);
     return true;
 }
 
@@ -175,7 +176,7 @@ export function warnPrefilledReferenceIfInside(
     if (!caretInsidePlaceholder(doc, cell, placeholder, cursorPosition)) {
         return false;
     }
-    new Notice("Please add a footnote suffix after the prefix.");
+    showNotice("Please add a footnote suffix after the prefix.");
     return true;
 }
 
@@ -225,7 +226,7 @@ function warnEmptyReferenceIfInside(
     cursorPosition?: EditorPosition,
 ): boolean {
     if (!caretInsidePlaceholder(doc, cell, "[^]", cursorPosition)) return false;
-    new Notice(
+    showNotice(
         "This footnote reference is empty. Type a name between the brackets.",
         8000,
     );

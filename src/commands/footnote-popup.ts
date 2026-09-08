@@ -10,6 +10,7 @@ import {
 } from "../editor/obsidian-internals";
 import { PopupWaitingNotice, retryUntilShown } from "./popup-retry";
 
+import { showNotice } from "../editor/notice";
 // A small popup anchored at the cursor containing Obsidian's own editable
 // markdown embed, bound to just the footnote's definition via the `#[^id]`
 // subpath (the same machinery the core Footnotes view uses). Editing in the
@@ -50,7 +51,7 @@ export async function settleFootnotePopupWithFeedback(): Promise<void> {
     // which TypeScript's narrowing can't see through on a plain variable
     const feedback: { notice: Notice | null } = { notice: null };
     const noticeTimer = window.setTimeout(() => {
-        feedback.notice = new Notice("Saving the previous footnote…", 0);
+        feedback.notice = showNotice("Saving the previous footnote…", 0);
     }, 150);
     try {
         // re-read through a function each pass: the awaited teardown can
@@ -497,7 +498,7 @@ export async function openFootnotePopup(
                 };
             },
             showWaitingNotice: () => {
-                const notice = new Notice(PopupWaitingNotice, 0);
+                const notice = showNotice(PopupWaitingNotice, 0);
                 return () => {
                     notice.hide();
                 };

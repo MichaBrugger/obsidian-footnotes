@@ -1,4 +1,4 @@
-import { Editor, MarkdownView, Notice } from "obsidian";
+import { Editor, MarkdownView } from "obsidian";
 
 import type FootnotePlugin from "../main";
 import {
@@ -27,6 +27,7 @@ import { removeOrphanedFootnoteReferences } from "./rules/remove-orphaned-refere
 import { mergeDuplicateFootnoteDefinitions } from "./rules/merge-duplicate-definitions";
 import { noticeLintAlerts, orphanSafePrefixFor } from "./lint-alerts";
 
+import { showNotice } from "../editor/notice";
 // The whole-document footnote linter: each pure rule (see src/linting/rules/)
 // gets a command, plus one "lint" command composing all three. This module
 // owns the editor plumbing they share, the mapping from plugin settings to
@@ -305,7 +306,7 @@ function lintActiveNoteIfSafe(plugin: FootnotePlugin) {
     // pipeline is a no-op by construction, and "No linting needed." would
     // wrongly imply the note was checked and found clean (E34)
     if (lintRulesAllDisabled(plugin)) {
-        new Notice(
+        showNotice(
             "All lint rules are turned off in the plugin settings, so there is nothing to lint.",
         );
         return;
@@ -313,7 +314,7 @@ function lintActiveNoteIfSafe(plugin: FootnotePlugin) {
     const before = doc.getValue();
     const blocked = lintBlockedByPrefix(before);
     if (blocked) {
-        new Notice(blocked, 8000);
+        showNotice(blocked, 8000);
         return;
     }
     const after = lintFootnotes(
@@ -326,10 +327,10 @@ function lintActiveNoteIfSafe(plugin: FootnotePlugin) {
     // change); only the lint-on-footnote-creation trigger stays silent
     // when there is nothing to do
     if (after === before) {
-        new Notice("No linting needed.");
+        showNotice("No linting needed.");
     } else {
         replaceMinimal(doc, before, after);
-        new Notice("Footnotes linted.");
+        showNotice("Footnotes linted.");
     }
     noticeLintAlerts(plugin, after);
 }
@@ -510,7 +511,7 @@ export function lintAfterFootnoteCreation(
         return null;
     }
     replaceMinimal(doc, before, after);
-    new Notice("Footnotes linted.");
+    showNotice("Footnotes linted.");
     noticeLintAlerts(plugin, after);
     const relocated =
         seededBody === undefined
@@ -553,15 +554,15 @@ export async function runFootnoteTransformCommand(
         // would otherwise renumber the prefixed references as plain ones
         const blocked = lintBlockedByPrefix(before);
         if (blocked) {
-            new Notice(blocked, 8000);
+            showNotice(blocked, 8000);
             return;
         }
         const after = transform(before, configuredSectionHeading(plugin));
         if (after === before) {
-            new Notice(notices.noop);
+            showNotice(notices.noop);
         } else {
             replaceMinimal(doc, before, after);
-            new Notice(notices.done);
+            showNotice(notices.done);
         }
         noticeLintAlerts(plugin, after);
     });

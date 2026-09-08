@@ -7,8 +7,7 @@
 import {
   addIcon,
   MarkdownView,
-  Notice,
-  Plugin
+  Plugin,
 } from "obsidian";
 
 import { ensureTextPropertyType, readingViewActive, VaultWithConfigEvents, viewEditor } from "./editor/obsidian-internals";
@@ -28,6 +27,7 @@ import {
   lintOptionsFromSettings,
 } from "./linting/linter";
 
+import { showNotice } from "./editor/notice";
 // bump when adding a new one-time settings migration in loadSettings
 const CURRENT_SETTINGS_VERSION = 2;
 
@@ -169,7 +169,7 @@ export default class FootnotePlugin extends Plugin {
         // with every rule toggled off the pipeline is a no-op - say that,
         // instead of a misleading "No linting needed."
         if (lintRulesAllDisabled(this)) {
-          new Notice(
+          showNotice(
             "All lint rules are turned off in the plugin settings, so there is nothing to lint.",
           );
           return;

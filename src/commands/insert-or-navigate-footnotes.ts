@@ -1,4 +1,4 @@
-import { Editor, EditorPosition, MarkdownView, Notice } from "obsidian";
+import { Editor, EditorPosition, MarkdownView } from "obsidian";
 
 import type FootnotePlugin from "../main";
 import { settleFootnotePopupWithFeedback, toggleCloseFootnotePopup } from "./footnote-popup";
@@ -19,6 +19,7 @@ import { selectionPressHandled, submitActiveNameModal } from "./selection-footno
 import { multiCaretPastePressHandled, multiCaretPressHandled } from "./multi-caret";
 import { activeTableCellEditor, resolveTableCellCursor, runOutsideTableCell, TableCellEditor } from "../editor/table-cursor";
 
+import { showNotice } from "../editor/notice";
 // The command entry points: each press walks the same decision cascade
 // against the caret position:
 //   1. on a definition line ("[^x]: …")      → jump back to the first reference
@@ -83,7 +84,7 @@ export async function withEditableEditor(
     // refuses the same press as a protected frontmatter caret; match it
     // (Jason's A19 pass, 2026-09-04).
     if (propertiesWidgetOwnsFocus(mdView)) {
-        new Notice(propertiesFocusNotice, 8000);
+        showNotice(propertiesFocusNotice, 8000);
         return;
     }
     return action(doc);
@@ -227,7 +228,7 @@ function insertInlineText(
         // it carries (pasted inline code) may mask INSIDE the brackets
         const masked = simulatedMaskedLine(doc, at, text);
         if (!inlineWrapLandsIntact(masked, at.ch, text.length)) {
-            new Notice(ProtectedCreationNotice, 8000);
+            showNotice(ProtectedCreationNotice, 8000);
             return;
         }
         const newCursorPos = { line: at.line, ch: at.ch + caretOffsetInText };
@@ -327,7 +328,7 @@ export async function pasteInlineFootnote(plugin: FootnotePlugin) {
         try {
             raw = await navigator.clipboard.readText();
         } catch {
-            new Notice("Couldn't read the clipboard.");
+            showNotice("Couldn't read the clipboard.");
             return;
         }
         // re-check the view mode after the await: the user (or a script)
@@ -339,7 +340,7 @@ export async function pasteInlineFootnote(plugin: FootnotePlugin) {
         if (!viewAfterAwait || readingViewActive(viewAfterAwait)) return;
         const content = sanitizeInlineFootnoteContent(raw);
         if (!content) {
-            new Notice("The clipboard is empty, so there is nothing to put in an inline footnote.");
+            showNotice("The clipboard is empty, so there is nothing to put in an inline footnote.");
             return;
         }
         const text = `^[${content}]`;

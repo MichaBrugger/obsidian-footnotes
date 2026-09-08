@@ -1,4 +1,4 @@
-import { Editor, EditorPosition, Notice } from "obsidian";
+import { Editor, EditorPosition } from "obsidian";
 
 import type FootnotePlugin from "../main";
 import { moveCursorAndSetJumpPoint } from "../editor/cursor-motion";
@@ -16,6 +16,7 @@ import {
 import { openFootnotePopup, popupEditingAvailable } from "./footnote-popup";
 import { definitionLabelIn, findDefinitionBlocks } from "../parsing/markdown-scan";
 
+import { showNotice } from "../editor/notice";
 // The jump half of the decision cascade: definition → first reference,
 // reference → its definition (popup-edit when enabled). Imports the popup
 // but never the linter, so the linter can depend on jumps without a cycle.
@@ -98,7 +99,7 @@ export function shouldJumpFromDefinitionToReference(
         // user almost certainly pressed the key to jump to the reference they
         // have since deleted; explain and stand still instead (QOL sweep,
         // 2026-08-07)
-        new Notice(
+        showNotice(
             `Nothing references this footnote. Add a "[^${definitionName}]" reference in the text, or delete the definition.`,
             8000,
         );

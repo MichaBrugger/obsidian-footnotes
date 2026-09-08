@@ -79,3 +79,10 @@
     max-height: var(--footnote-shortcut-viewport-max, 100%);
     overflow-y: auto;
 }
+
+/* A quoted footnote reference inside a toast ("[^name]") is one visual
+   token: Obsidian's notice wraps with overflow-wrap: anywhere, which
+   could split the quotes from the name across lines (2026-09-04). */
+.footnote-shortcut-nowrap {
+    white-space: nowrap;
+}

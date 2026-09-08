@@ -1,4 +1,4 @@
-import { Editor, EditorChange, EditorPosition, MarkdownView, Notice } from "obsidian";
+import { Editor, EditorChange, EditorPosition, MarkdownView } from "obsidian";
 
 import type FootnotePlugin from "../main";
 import {
@@ -37,6 +37,7 @@ import {
 } from "./press-guards";
 import { readingViewActive } from "../editor/obsidian-internals";
 
+import { showNotice } from "../editor/notice";
 // Multiple Alt-clicked carets get the SAME footnote at every one of them
 // (Jason's ask 2026-08-22 - one source referenced many times; always on,
 // no toggle, his call): the autonum key inserts the same "[^N]" at each
@@ -106,7 +107,7 @@ function multiCaretContinuation(
     allowDefinitionContinuation: boolean,
 ): "handled" {
     const refuse = (): "handled" => {
-        new Notice(MultiCaretFootnoteNotice, 8000);
+        showNotice(MultiCaretFootnoteNotice, 8000);
         return "handled";
     };
     // FIRST in document order (Jason's consistency ruling 2026-08-29): the
@@ -203,7 +204,7 @@ function multiCaretTargets(
         // are exactly what the atomic rule forbids (all-inside-the-same
         // presses continue instead - see multiCaretContinuation above)
         if (artifacts[index] !== null) {
-            new Notice(MultiCaretFootnoteNotice, 8000);
+            showNotice(MultiCaretFootnoteNotice, 8000);
             return "handled";
         }
         // protected text and definition interiors refuse with their own
@@ -282,7 +283,7 @@ export async function multiCaretPastePressHandled(
     try {
         raw = await navigator.clipboard.readText();
     } catch {
-        new Notice("Couldn't read the clipboard.");
+        showNotice("Couldn't read the clipboard.");
         return true;
     }
     // the view can flip to Reading view while the clipboard prompt is up -
@@ -291,7 +292,7 @@ export async function multiCaretPastePressHandled(
     if (!viewAfterAwait || readingViewActive(viewAfterAwait)) return true;
     const content = sanitizeInlineFootnoteContent(raw);
     if (!content) {
-        new Notice(
+        showNotice(
             "The clipboard is empty, so there is nothing to put in an inline footnote.",
         );
         return true;
@@ -340,7 +341,7 @@ function insertReferenceAtEveryCaret(
         definitionLabelLine: definition.cursor.line,
     });
     if (!verified) {
-        new Notice(ProtectedCreationNotice, 8000);
+        showNotice(ProtectedCreationNotice, 8000);
         return;
     }
 
@@ -389,7 +390,7 @@ function insertSkeletonAtEveryCaret(
             : masked.slice(anchor.ch, anchor.ch + text.length) === text;
     });
     if (!everyLive) {
-        new Notice(ProtectedCreationNotice, 8000);
+        showNotice(ProtectedCreationNotice, 8000);
         return;
     }
     // targets arrive in document order, so anchors[0] is the first footnote

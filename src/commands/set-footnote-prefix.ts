@@ -1,10 +1,11 @@
-import { MarkdownView, Notice, TFile } from "obsidian";
+import { MarkdownView, TFile } from "obsidian";
 
 import type FootnotePlugin from "../main";
 import { footnotePrefixProblem } from "../parsing/footnote-prefix";
 import { ensureTextPropertyType } from "../editor/obsidian-internals";
 import { ValidatedTextModal } from "./validated-text-modal";
 
+import { showNotice } from "../editor/notice";
 // The "Set footnote prefix" command's modal: one text input that writes the
 // footnote-prefix frontmatter property on Enter (or the Save button). An
 // invalid prefix - spaces, brackets, or a trailing digit - shows the reason
@@ -61,12 +62,12 @@ export class SetFootnotePrefixModal extends ValidatedTextModal {
             // the property was written but nothing reads it while the
             // feature is off - without this warning the insert commands
             // just silently ignore the prefix the user set
-            new Notice(
+            showNotice(
                 `Footnote prefix set to "${prefix}", but the "Per-note footnote prefix" setting is turned off, so it won't be used until you enable it.`,
                 8000,
             );
         } else {
-            new Notice(
+            showNotice(
                 prefix
                     ? `Footnote prefix set to "${prefix}".`
                     : "Footnote prefix removed.",
