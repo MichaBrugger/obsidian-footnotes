@@ -404,6 +404,11 @@ describe("the named key converts a selection through its modal (2026-08-13)", ()
         expect(
             convertSelectionToNamed(fakePlugin(doc), doc, selection, "a[b"),
         ).toBe("Footnote names can't contain brackets.");
+        // "#" names render but Obsidian's preview and sidebar can't find
+        // them (2026-09-05)
+        expect(
+            convertSelectionToNamed(fakePlugin(doc), doc, selection, "a#b"),
+        ).toBe(`Footnote names can't contain "#". Obsidian's footnote preview and sidebar can't find such footnotes.`);
         expect(doc.lines).toEqual(["The quick fox"]);
     });
 

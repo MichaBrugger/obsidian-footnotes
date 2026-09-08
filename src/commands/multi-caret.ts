@@ -5,7 +5,7 @@ import {
     computeNextFootnoteNumber,
     emptyReferenceStart,
     idListIncludes,
-    isValidFootnoteName,
+    footnoteNameProblem,
     occurrenceAtCursor,
     referenceOccurrences,
 } from "../parsing/footnote-grammar";
@@ -148,7 +148,7 @@ function multiCaretContinuation(
         // already a working footnote - nothing to continue
         return refuse();
     }
-    if (!isValidFootnoteName(name)) {
+    if (footnoteNameProblem(name) !== null) {
         // warns with the shared invalid-name notice, edits nothing
         createMatchingFootnoteDefinition(doc.getLine(first.line), first, plugin, doc, ctx);
         return "handled";

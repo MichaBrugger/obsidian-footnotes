@@ -323,6 +323,21 @@ describe("a second press with EVERY caret inside the same footnote continues it 
         expect(noticed(MultiCaretFootnoteNotice)).toBe(false);
     });
 
+    it('a "#" name at every caret warns and creates nothing (2026-09-05)', async () => {
+        const before = ["alpha b[^#x] c[^#x] end"];
+        const doc = fakeEditor(before, [
+            { line: 0, ch: 10 },
+            { line: 0, ch: 18 },
+        ]);
+        await insertNamedFootnote(fakePlugin(doc));
+        expect(doc.lines).toEqual(before);
+        expect(
+            noticed(
+                'Footnote name "#x" contains "#", so Obsidian\'s footnote preview and sidebar can\'t find it. Remove the "#".',
+            ),
+        ).toBe(true);
+    });
+
     it("the numbered key continues the same way (single-caret parity)", async () => {
         const doc = fakeEditor(
             ["alpha b[^cite] c[^cite] end"],

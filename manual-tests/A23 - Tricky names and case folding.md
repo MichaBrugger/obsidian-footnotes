@@ -18,6 +18,7 @@ hand[^p-1] typed lowercase-prefixed reference for the collision check.
 - [ ] Prefix feature ON (prefix `P-` from the frontmatter), with the fixture's `hand[^p-1] typed`: autonumber mints `[^P-2]`, NOT a colliding `[^P-1]`
 - [ ] Change the property to `footnote-prefix: 2. # a comment` by hand: the ordinary invalid-prefix toast (the whole text after the colon is the value; YAML comments aren't honored, ruling 2026-09-05)
 - [ ] Change it to `footnote-prefix: #chapter-` by hand: the invalid-prefix toast names `"#"` as the problem; nothing is minted (it used to mint `[^#chapter-1]`, an id the popup can never open; ruling 2026-09-05)
+- [ ] Names with `#` are refused everywhere (2026-09-05; they render in Reading view, but Obsidian's footnote hover and sidebar say "Footnote not found"): the named modal and the Rename footnote modal refuse `a#b` inline with the "can't contain "#"" reason; the named two-step press inside a hand-typed `[^#y]` with no definition toasts and creates nothing
 - [ ] Popup ON, with a hand-typed `hand[^#x]` reference and its `[^#x]:` definition: the hotkey inside it JUMPS to the definition at once, no "Waiting for Obsidian to index" notice (the popup can't bind ids containing `#`)
 - [ ] Change it to `footnote-prefix:2.` (no space after the colon) by hand: it is IGNORED — Obsidian shows no property, the plugin reads none
 

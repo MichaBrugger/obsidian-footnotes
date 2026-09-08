@@ -152,6 +152,23 @@ export function isValidFootnoteName(name: string): boolean {
     return name.length > 0 && !/[\s`]/.test(name);
 }
 
+// "#" is refused at CREATION and RENAME on top of the render rule: a
+// "[^#x]" renders in Reading view, but Obsidian's footnote hover preview
+// and its Footnotes sidebar resolve footnotes through a "#[^id]" subpath
+// that splits on "#" - both say "Footnote not found" for it (Jason's
+// finding 2026-09-05), and the plugin's popup can't bind it either. An
+// EXISTING "#" reference stays a footnote to the scanner and the linter,
+// because it does render.
+export const HashNameProblem = `Footnote names can't contain "#". Obsidian's footnote preview and sidebar can't find such footnotes.`;
+
+/** Why `name` can't name a NEW or RENAMED footnote, or null when it can: brackets, then whitespace or backticks (never renders), then "#". */
+export function footnoteNameProblem(name: string): string | null {
+    if (/[[\]]/.test(name)) return "Footnote names can't contain brackets.";
+    if (!isValidFootnoteName(name)) return "Footnote names can't contain spaces or backticks.";
+    if (name.includes("#")) return HashNameProblem;
+    return null;
+}
+
 /**
  * The reference whose brackets contain `ch`, or null. Strictly INSIDE only -
  * same rule as inline footnotes: a caret immediately after the closing

@@ -2,7 +2,11 @@ import { Editor } from "obsidian";
 import { describe, expect, it } from "vitest";
 
 import { createMatchingFootnoteDefinition } from "../src/commands/create-footnote";
-import { isValidFootnoteName } from "../src/parsing/footnote-grammar";
+import {
+    footnoteNameProblem,
+    HashNameProblem,
+    isValidFootnoteName,
+} from "../src/parsing/footnote-grammar";
 import type FootnotePlugin from "../src/main";
 
 // Regression (reported 2026-07-14): footnote names containing spaces are a
@@ -36,6 +40,33 @@ describe("isValidFootnoteName", () => {
 
     it("rejects an empty name", () => {
         expect(isValidFootnoteName("")).toBe(false);
+    });
+
+    it('still accepts "#" - such footnotes RENDER, so the scanner and the linter keep treating them as footnotes', () => {
+        expect(isValidFootnoteName("#x")).toBe(true);
+        expect(isValidFootnoteName("a#b")).toBe(true);
+    });
+});
+
+describe("footnoteNameProblem (the creation and rename rule, 2026-09-05)", () => {
+    it("brackets, then whitespace or backticks, then \"#\" - each with its own reason", () => {
+        expect(footnoteNameProblem("a[b")).toBe("Footnote names can't contain brackets.");
+        expect(footnoteNameProblem("a b")).toBe("Footnote names can't contain spaces or backticks.");
+        expect(footnoteNameProblem("a`b")).toBe("Footnote names can't contain spaces or backticks.");
+        expect(footnoteNameProblem("#x")).toBe(HashNameProblem);
+        expect(footnoteNameProblem("a#b")).toBe(HashNameProblem);
+    });
+
+    it('"#" is refused because Obsidian\'s preview and sidebar can\'t find such footnotes (Jason\'s finding)', () => {
+        expect(HashNameProblem).toBe(
+            `Footnote names can't contain "#". Obsidian's footnote preview and sidebar can't find such footnotes.`,
+        );
+    });
+
+    it("an ordinary name has no problem", () => {
+        expect(footnoteNameProblem("note")).toBeNull();
+        expect(footnoteNameProblem("arXiv:1234.5678")).toBeNull();
+        expect(footnoteNameProblem("2.7")).toBeNull();
     });
 });
 

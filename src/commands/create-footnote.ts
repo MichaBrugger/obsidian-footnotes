@@ -9,6 +9,7 @@ import {
     computeNextFootnoteNumber,
     emptyReferenceStart,
     idListIncludes,
+    footnoteNameProblem,
     isValidFootnoteName,
     referenceOccurrences,
 } from "../parsing/footnote-grammar";
@@ -470,14 +471,20 @@ export function createMatchingFootnoteDefinition(
     ctx = hit.ctx;
     const footnoteId = hit.target.name;
 
-    // a spaced or backticked name is an authoring mistake Obsidian
-    // won't render; warn instead of creating a definition that can't work
-    if (!isValidFootnoteName(footnoteId)) {
-        const offender = footnoteId.includes("`")
-            ? "backticks"
-            : "spaces";
+    // a spaced or backticked name is an authoring mistake Obsidian won't
+    // render, and a "#" name is one Obsidian's preview and sidebar can't
+    // find (HashNameProblem in the grammar); warn instead of creating a
+    // definition that can't work
+    if (footnoteNameProblem(footnoteId) !== null) {
+        const offender = isValidFootnoteName(footnoteId)
+            ? null
+            : footnoteId.includes("`")
+              ? "backticks"
+              : "spaces";
         showNotice(
-            `Footnote name "${footnoteId}" contains ${offender}, so Obsidian won't render it as a footnote. Remove the ${offender}.`,
+            offender === null
+                ? `Footnote name "${footnoteId}" contains "#", so Obsidian's footnote preview and sidebar can't find it. Remove the "#".`
+                : `Footnote name "${footnoteId}" contains ${offender}, so Obsidian won't render it as a footnote. Remove the ${offender}.`,
             8000,
         );
         return true;

@@ -355,6 +355,24 @@ describe("createMatchingFootnoteDefinition", () => {
         expect(doc.lines).toEqual(["a `[^x]` b"]);
     });
 
+    it('a "#" name warns that the preview and sidebar can\'t find it, and creates nothing (2026-09-05)', () => {
+        const doc = fakeEditor(["see [^#x] x"], { line: 0, ch: 7 });
+        expect(
+            createMatchingFootnoteDefinition(
+                "see [^#x] x",
+                { line: 0, ch: 7 },
+                fakePlugin(doc),
+                doc,
+            ),
+        ).toBe(true);
+        expect(
+            noticed(
+                'Footnote name "#x" contains "#", so Obsidian\'s footnote preview and sidebar can\'t find it. Remove the "#".',
+            ),
+        ).toBe(true);
+        expect(doc.lines).toEqual(["see [^#x] x"]);
+    });
+
     // L321 StringLiteral (`includes("`")` -> `includes("")`), L323 StringLiteral
     // ("spaces" -> "") and L325 StringLiteral (the whole message): the exact
     // wording, with the SPACES offender named twice.
@@ -1122,6 +1140,15 @@ describe("renameTargetAtCursor", () => {
 });
 
 describe("planFootnoteRename's refusals", () => {
+    it('refuses a "#" name with the preview-and-sidebar reason (2026-09-05)', () => {
+        expect(
+            planFootnoteRename(renameDoc(["a[^x]", "", "[^x]: d"]), "x", "a#b"),
+        ).toEqual({
+            kind: "invalid",
+            reason: `Footnote names can't contain "#". Obsidian's footnote preview and sidebar can't find such footnotes.`,
+        });
+    });
+
     // L83 / L89 StringLiteral -> "": the exact reasons.
     it("gives the exact reason for a bracketed name", () => {
         expect(

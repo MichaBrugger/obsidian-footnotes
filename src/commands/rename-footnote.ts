@@ -3,7 +3,7 @@ import { Editor, EditorChange, EditorPosition, MarkdownView } from "obsidian";
 import type FootnotePlugin from "../main";
 import { ValidatedTextModal } from "./validated-text-modal";
 import {
-    isValidFootnoteName,
+    footnoteNameProblem,
     occurrenceAtCursor,
     referenceOccurrences,
 } from "../parsing/footnote-grammar";
@@ -103,18 +103,8 @@ export function planFootnoteRename(
     },
 ): RenamePlan {
     if (newName === oldName || newName === "") return { kind: "noop" };
-    if (/[[\]]/.test(newName)) {
-        return {
-            kind: "invalid",
-            reason: "Footnote names can't contain brackets.",
-        };
-    }
-    if (!isValidFootnoteName(newName)) {
-        return {
-            kind: "invalid",
-            reason: "Footnote names can't contain spaces or backticks.",
-        };
-    }
+    const problem = footnoteNameProblem(newName);
+    if (problem !== null) return { kind: "invalid", reason: problem };
     const effective = effectiveRenameName(newName, options?.sweepPrefix);
     const prefixAdded = effective !== newName;
     newName = effective;

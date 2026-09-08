@@ -5,7 +5,7 @@ import { ValidatedTextModal } from "./validated-text-modal";
 import {
     computeNextFootnoteNumber,
     idListIncludes,
-    isValidFootnoteName,
+    footnoteNameProblem,
     referenceOccurrences,
 } from "../parsing/footnote-grammar";
 import { activeFootnotePrefix, footnotePrefixFromEditor } from "../parsing/footnote-prefix";
@@ -583,12 +583,8 @@ function namedSelectionProblem(
     name: string,
     ctx: DocContext = docContext(doc),
 ): string | null {
-    if (/[[\]]/.test(name)) {
-        return "Footnote names can't contain brackets.";
-    }
-    if (!isValidFootnoteName(name)) {
-        return "Footnote names can't contain spaces or backticks.";
-    }
+    const problem = footnoteNameProblem(name);
+    if (problem !== null) return problem;
     if (idListIncludes(listExistingFootnoteDefinitions(doc, ctx), name)) {
         return `"[^${name}]" is already defined. Pick a new name.`;
     }
