@@ -141,7 +141,7 @@ const ACTIVE_IS_SMOKE =
 // and make it the active tab
 const ACTIVATE_SMOKE =
     `(async () => { const f = app.vault.getAbstractFileByPath(${jsLiteral(NOTE_PATH)}); if (!f) return; ` +
-    `let leaf = null; app.workspace.iterateAllLeaves((l) => { if (l.view && l.view.file && l.view.file.path === f.path) leaf = l; }); ` +
+    `let leaf = null; app.workspace.iterateAllLeaves((l) => { if (l.view && l.view.getViewType && l.view.getViewType() === 'markdown' && l.view.file && l.view.file.path === f.path) leaf = l; }); ` +
     `if (!leaf) { leaf = app.workspace.getLeaf('tab'); await leaf.openFile(f); } ` +
     `app.workspace.setActiveLeaf(leaf, { focus: true }); })();`;
 

@@ -27,19 +27,24 @@
         G.previousLeaf = app.workspace.activeLeaf;
         const f = app.vault.getAbstractFileByPath(NOTE_PATH);
         if (!f) throw new Error("smoke note missing");
+        // markdown views only: the Outline and Footnotes sidebar views report
+        // the same file and have no editor
         let leaf = null;
         app.workspace.iterateAllLeaves((l) => {
-            if (l.view && l.view.file && l.view.file.path === f.path) leaf = l;
+            if (l.view && l.view.getViewType && l.view.getViewType() === "markdown" && l.view.file && l.view.file.path === f.path) leaf = l;
         });
         if (!leaf) {
             leaf = app.workspace.getLeaf("tab");
             await leaf.openFile(f);
         }
-        // a freshly opened (or deferred) view has no editor for a moment
-        for (let i = 0; i < 40 && !(leaf.view && leaf.view.editor); i++) await G.sleep(100);
+        // a background tab may be a DEFERRED view (no editor until it is
+        // loaded); activating it loads it, and a freshly opened view has no
+        // editor for a moment either
+        if (typeof leaf.loadIfDeferred === "function") await leaf.loadIfDeferred();
+        app.workspace.setActiveLeaf(leaf, { focus: true });
+        for (let i = 0; i < 50 && !(leaf.view && leaf.view.editor); i++) await G.sleep(100);
         if (!(leaf.view && leaf.view.editor)) throw new Error("smoke note view has no editor");
         G.leaf = leaf;
-        app.workspace.setActiveLeaf(leaf, { focus: true });
         const w = remote.getCurrentWindow();
         if (w.isMinimized()) w.restore();
         w.show();
@@ -189,7 +194,7 @@
             el.style.transition = "opacity .3s";
             el.style.opacity = "0";
             setTimeout(() => el.remove(), 320);
-        }, ms || 1400);
+        }, ms || 2600);
     };
 
     G.press = async (id, keys, caption, ms) => {
