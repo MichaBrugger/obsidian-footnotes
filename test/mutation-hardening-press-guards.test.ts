@@ -6,6 +6,7 @@ import { noticeCalls } from "./mocks/obsidian";
 import FootnotePlugin from "../src/main";
 import {
     caretGuardsHandled,
+    PrefixOnlyNotice,
     warnPrefilledReferenceIfInside,
     warnProtectedCaretIfInside,
 } from "../src/commands/press-guards";
@@ -171,7 +172,7 @@ describe("the protected-caret guard at a line's edges", () => {
 });
 
 describe("the prefilled-reference guard", () => {
-    const prefixNotice = "Please add a footnote suffix after the prefix.";
+    const prefixNotice = PrefixOnlyNotice;
     const noteWith = (prefix: string, body: string) => [
         "---",
         `footnote-prefix: "${prefix}"`,
@@ -253,7 +254,7 @@ describe("the caret guard cascade", () => {
                 { line: 3, ch: 6 },
             ),
         ).toBe(true);
-        expect(messages()).toEqual(["Please add a footnote suffix after the prefix."]);
+        expect(messages()).toEqual([PrefixOnlyNotice]);
     });
 
     it("claims nothing on plain prose", () => {

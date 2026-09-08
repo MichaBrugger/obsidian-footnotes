@@ -19,7 +19,7 @@ import {
 import { runOutsideTableCell } from "../editor/table-cursor";
 import { withEditableEditor } from "./insert-or-navigate-footnotes";
 
-import { showNotice } from "../editor/notice";
+import { nameAlreadyUsed, showNotice } from "../editor/notice";
 // Renaming a footnote (issue #36, Jason's calls 2026-08-12): with the
 // caret on a "[^name]" reference or a definition label, the Rename
 // footnote command opens a modal prefilled with the current name and
@@ -357,7 +357,7 @@ class RenameFootnoteModal extends ValidatedTextModal {
                 return;
             case "collision":
                 this.showProblem(
-                    `"[^${newName}]" is already used by another footnote.`,
+                    nameAlreadyUsed(newName),
                 );
                 return;
             case "dead":

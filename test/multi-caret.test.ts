@@ -15,8 +15,8 @@ import {
     insertNamedFootnote,
     pasteInlineFootnote,
 } from "../src/commands/insert-or-navigate-footnotes";
-import { MultiCaretFootnoteNotice } from "../src/commands/multi-caret";
-import { DefinitionCreationNotice } from "../src/commands/press-guards";
+import { MultiCaretNestedNotice, NestedFootnoteNotice } from "../src/editor/notice";
+import { PrefixOnlyNotice } from "../src/commands/press-guards";
 import { ProtectedCreationNotice } from "../src/editor/insertion-liveness";
 
 // Multiple Alt-clicked carets get the SAME footnote at every one
@@ -267,7 +267,7 @@ describe("atomic refusals - one bad caret refuses the whole press", () => {
         ]);
         await insertAutonumFootnote(fakePlugin(doc));
         expect(doc.lines).toEqual(before);
-        expect(noticed(MultiCaretFootnoteNotice)).toBe(true);
+        expect(noticed(MultiCaretNestedNotice)).toBe(true);
     });
 
     it("a caret inside a definition body refuses with the definition toast", async () => {
@@ -278,7 +278,7 @@ describe("atomic refusals - one bad caret refuses the whole press", () => {
         ]);
         await insertInlineFootnote(fakePlugin(doc));
         expect(doc.lines).toEqual(before);
-        expect(noticed(DefinitionCreationNotice)).toBe(true);
+        expect(noticed(NestedFootnoteNotice)).toBe(true);
     });
 
     it("a caret inside an inline footnote refuses (mixed meanings, no hop)", async () => {
@@ -289,7 +289,7 @@ describe("atomic refusals - one bad caret refuses the whole press", () => {
         ]);
         await insertInlineFootnote(fakePlugin(doc));
         expect(doc.lines).toEqual(before);
-        expect(noticed(MultiCaretFootnoteNotice)).toBe(true);
+        expect(noticed(MultiCaretNestedNotice)).toBe(true);
     });
 });
 
@@ -320,7 +320,7 @@ describe("a second press with EVERY caret inside the same footnote continues it 
         expect(doc.moves[0]).toEqual({ line: 0, ch: 10 });
         // ... and on the jump arm the caret then sits on the definition
         expect(doc.cursor).toEqual({ line: 2, ch: "[^cite]: ".length });
-        expect(noticed(MultiCaretFootnoteNotice)).toBe(false);
+        expect(noticed(MultiCaretNestedNotice)).toBe(false);
     });
 
     it('a "#" name at every caret warns and creates nothing (2026-09-05)', async () => {
@@ -333,7 +333,7 @@ describe("a second press with EVERY caret inside the same footnote continues it 
         expect(doc.lines).toEqual(before);
         expect(
             noticed(
-                'Footnote name "#x" contains "#", so it won\'t work as a footnote in Obsidian. Remove the "#".',
+                '"[^#x]" won\'t work as a footnote. Footnote names can\'t contain spaces, backticks, brackets, or "#".',
             ),
         ).toBe(true);
     });
@@ -366,7 +366,7 @@ describe("a second press with EVERY caret inside the same footnote continues it 
         await insertInlineFootnote(fakePlugin(doc));
         expect(doc.lines).toEqual(before);
         expect(doc.cursor).toEqual({ line: 0, ch: "x^[note]".length });
-        expect(noticed(MultiCaretFootnoteNotice)).toBe(false);
+        expect(noticed(MultiCaretNestedNotice)).toBe(false);
     });
 
     it("EMPTY inline footnotes warn and stay, so typing keeps filling all of them", async () => {
@@ -415,7 +415,7 @@ describe("a second press with EVERY caret inside the same footnote continues it 
             fakePlugin(doc, { enableFootnotePrefix: true }),
         );
         expect(doc.lines).toEqual(before);
-        expect(noticed("Please add a footnote suffix after the prefix.")).toBe(
+        expect(noticed(PrefixOnlyNotice)).toBe(
             true,
         );
     });
@@ -428,7 +428,7 @@ describe("a second press with EVERY caret inside the same footnote continues it 
         ]);
         await insertNamedFootnote(fakePlugin(doc));
         expect(doc.lines).toEqual(before);
-        expect(noticed(MultiCaretFootnoteNotice)).toBe(true);
+        expect(noticed(MultiCaretNestedNotice)).toBe(true);
     });
 
     it("carets inside an already-DEFINED reference keep the atomic refusal", async () => {
@@ -439,6 +439,6 @@ describe("a second press with EVERY caret inside the same footnote continues it 
         ]);
         await insertNamedFootnote(fakePlugin(doc));
         expect(doc.lines).toEqual(before);
-        expect(noticed(MultiCaretFootnoteNotice)).toBe(true);
+        expect(noticed(MultiCaretNestedNotice)).toBe(true);
     });
 });

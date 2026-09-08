@@ -37,7 +37,7 @@ import {
 } from "./press-guards";
 import { readingViewActive } from "../editor/obsidian-internals";
 
-import { showNotice } from "../editor/notice";
+import { MultiCaretNestedNotice, showNotice } from "../editor/notice";
 // Multiple Alt-clicked carets get the SAME footnote at every one of them
 // (Jason's ask 2026-08-22 - one source referenced many times; always on,
 // no toggle, his call): the autonum key inserts the same "[^N]" at each
@@ -49,8 +49,8 @@ import { showNotice } from "../editor/notice";
 // whole press refuses with one toast - and the edit is one transaction,
 // one undo. Extra carets used to be silently ignored, which served nobody.
 
-export const MultiCaretFootnoteNotice =
-    "No footnotes were created: one of the cursors is inside an existing footnote.";
+// the mixed-caret refusal is MultiCaretNestedNotice (editor/notice.ts):
+// the same nesting sentence as the single-caret guards, plural opener
 
 const posCmp = (a: EditorPosition, b: EditorPosition) =>
     a.line - b.line || a.ch - b.ch;
@@ -107,7 +107,7 @@ function multiCaretContinuation(
     allowDefinitionContinuation: boolean,
 ): "handled" {
     const refuse = (): "handled" => {
-        showNotice(MultiCaretFootnoteNotice, 8000);
+        showNotice(MultiCaretNestedNotice, 8000);
         return "handled";
     };
     // FIRST in document order (Jason's consistency ruling 2026-08-29): the
@@ -204,7 +204,7 @@ function multiCaretTargets(
         // are exactly what the atomic rule forbids (all-inside-the-same
         // presses continue instead - see multiCaretContinuation above)
         if (artifacts[index] !== null) {
-            showNotice(MultiCaretFootnoteNotice, 8000);
+            showNotice(MultiCaretNestedNotice, 8000);
             return "handled";
         }
         // protected text and definition interiors refuse with their own

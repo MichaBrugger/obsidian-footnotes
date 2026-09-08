@@ -16,7 +16,7 @@ import {
 import { openFootnotePopup, popupEditingAvailable } from "./footnote-popup";
 import { definitionLabelIn, findDefinitionBlocks } from "../parsing/markdown-scan";
 
-import { showNotice } from "../editor/notice";
+import { addReferenceOrDeleteDefinition, showNotice } from "../editor/notice";
 // The jump half of the decision cascade: definition → first reference,
 // reference → its definition (popup-edit when enabled). Imports the popup
 // but never the linter, so the linter can depend on jumps without a cycle.
@@ -100,7 +100,7 @@ export function shouldJumpFromDefinitionToReference(
         // have since deleted; explain and stand still instead (QOL sweep,
         // 2026-08-07)
         showNotice(
-            `Nothing references this footnote. Add a "[^${definitionName}]" reference in the text, or delete the definition.`,
+            `Nothing references this footnote. ${addReferenceOrDeleteDefinition(definitionName)}`,
             8000,
         );
         return true;

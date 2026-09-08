@@ -14,7 +14,7 @@ import { duplicateFootnoteDefinitionNames } from "./rules/merge-duplicate-defini
 import { orphanedFootnoteDefinitionNames } from "./rules/remove-orphaned-definitions";
 import { orphanedFootnoteReferenceNames } from "./rules/remove-orphaned-references";
 
-import { showNotice } from "../editor/notice";
+import { addReferenceOrDeleteDefinition, showNotice } from "../editor/notice";
 // The post-lint alert tail: every lint entry point reports what the rules
 // could not (or were not allowed to) fix - empty "[^]" placeholders,
 // orphans while their delete toggles are off, duplicates while merging is
@@ -124,8 +124,8 @@ function noticeOrphanedDefinitions(
     if (names.length === 0) return;
     showNotice(
         names.length === 1
-            ? `This note has a footnote definition nothing references (${referenceList(names)}). Add its reference in the text or delete the definition.`
-            : `This note has ${names.length} footnote definitions nothing references (${referenceList(names)}). Add their references in the text or delete the definitions.`,
+            ? `This note has a footnote definition nothing references (${referenceList(names)}). ${addReferenceOrDeleteDefinition(names[0])}`
+            : `This note has ${names.length} footnote definitions nothing references (${referenceList(names)}). Add their references in the text, or delete the definitions.`,
         8000,
     );
 }

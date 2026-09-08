@@ -9,6 +9,39 @@ import { Notice } from "obsidian";
 // wrapped in a no-wrap span so the quotes, the brackets, and the name
 // always land on the same line. Messages without one stay plain strings.
 
+// ---- Shared toast text ------------------------------------------------
+// One string per rule, built from shared parts (Jason, 2026-09-05): a
+// refusal that means the same thing says the same thing wherever it
+// fires, so there are fewer unique strings to maintain and, later, to
+// translate.
+
+/** The refusal opener every "nothing was created" toast starts with. */
+export const NoFootnoteCreated = "No footnote was created: ";
+/** Its plural, for the multi-caret press. */
+const NoFootnotesCreated = "No footnotes were created: ";
+/** The lint's opener when a note can't be linted at all. */
+export const LintingCanceled = "Linting canceled: ";
+
+/** The one nesting rule: a caret in a definition body, a selection holding a footnote, a caret inside a footnote among plain-text carets. */
+const NestingRule = "footnotes can't be nested inside other footnotes.";
+export const NestedFootnoteNotice = NoFootnoteCreated + NestingRule;
+export const MultiCaretNestedNotice = NoFootnotesCreated + NestingRule;
+
+/** The advice for a definition nothing references - the navigation press and the lint alert give the same one. */
+export function addReferenceOrDeleteDefinition(name: string): string {
+    return `Add a "[^${name}]" reference in the text, or delete the definition.`;
+}
+
+/** A name another footnote already carries - the named-selection and Rename modals say the same thing. */
+export function nameAlreadyUsed(name: string): string {
+    return `"[^${name}]" is already used by another footnote.`;
+}
+
+/** An invalid footnote-prefix property, as the insert refusal and the lint cancel both report it. */
+export function invalidPrefixMessage(opener: string, prefix: string, problem: string): string {
+    return `${opener}this note's footnote-prefix ("${prefix}") is invalid. ${problem}`;
+}
+
 /** A quoted footnote reference exactly as the toasts spell it: `"[^name]"`, the empty `"[^]"` and bare-prefix `"[^2.]"` placeholders included. */
 const QuotedReference = /"\[\^[^"\]]*\]"/g;
 

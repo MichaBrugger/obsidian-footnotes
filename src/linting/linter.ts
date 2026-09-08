@@ -27,7 +27,7 @@ import { removeOrphanedFootnoteReferences } from "./rules/remove-orphaned-refere
 import { mergeDuplicateFootnoteDefinitions } from "./rules/merge-duplicate-definitions";
 import { noticeLintAlerts, orphanSafePrefixFor } from "./lint-alerts";
 
-import { showNotice } from "../editor/notice";
+import { invalidPrefixMessage, LintingCanceled, showNotice } from "../editor/notice";
 // The whole-document footnote linter: each pure rule (see src/linting/rules/)
 // gets a command, plus one "lint" command composing all three. This module
 // owns the editor plumbing they share, the mapping from plugin settings to
@@ -262,8 +262,9 @@ export function lintRulesAllDisabled(plugin: FootnotePlugin): boolean {
  */
 export function lintBlockedByPrefix(markdown: string): string | null {
     const prefix = footnotePrefix(markdown);
-    if (!prefix || footnotePrefixProblem(prefix) === null) return null;
-    return `Linting canceled: this note's footnote-prefix ("${prefix}") is invalid. ${footnotePrefixProblem(prefix)}`;
+    const problem = prefix ? footnotePrefixProblem(prefix) : null;
+    if (!prefix || problem === null) return null;
+    return invalidPrefixMessage(LintingCanceled, prefix, problem);
 }
 
 /**

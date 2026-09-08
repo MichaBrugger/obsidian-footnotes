@@ -20,9 +20,9 @@ an inline^[body] one, a spaced [^bad name] one, a hashed [^#tag] one, and a
 - [ ] Caret in the body of the `[^1]:` definition at the bottom: the key JUMPS back to the reference (a jump, not a toast; the nesting refusal below is the selection twin)
 - [ ] Caret inside the bare `[^]`: "This footnote reference is empty. Type a name between the brackets." (caret stays)
 - [ ] Caret inside `^[body]` after deleting the body so it reads `^[]`: "This inline footnote is empty. Type its text between the brackets."
-- [ ] Caret inside `[^bad name]`, NAMED key: "Footnote name "bad name" contains spaces, so it won't work as a footnote in Obsidian. Remove the spaces."
-- [ ] Caret inside `[^#tag]`, NAMED key: same shape, naming `"#"` as the offender
-- [ ] Prefix feature ON, caret inside a fresh `[^P-]` placeholder (press the named key once, type nothing): "Please add a footnote suffix after the prefix."
+- [ ] Caret inside `[^bad name]`, NAMED key: ""[^bad name]" won't work as a footnote. Footnote names can't contain spaces, backticks, brackets, or "#"."
+- [ ] Caret inside `[^#tag]`, NAMED key: the same toast, naming `[^#tag]`
+- [ ] Prefix feature ON, caret inside a fresh `[^P-]` placeholder (press the named key once, type nothing): "This footnote reference has only the prefix. Type a name after it."
 
 ```
 fence [^fake] here
@@ -37,8 +37,8 @@ table further down.
 - [ ] Any selection, PASTE key: "To turn the selected text into a footnote, use the auto-numbered, named, or inline footnote command."
 - [ ] A selection spanning two lines, INLINE key: "Inline footnotes are single-line. Use the auto-numbered or named footnote command to convert a multi-line selection."
 - [ ] Select `x+y` inside the dollars (cutting the math), numbered key: "No footnote was created: the selection cuts through code, math, or other protected text. Select all of it or none of it."
-- [ ] Select `plain[^1] here` (contains a live reference): "No footnote was created: the selection contains a footnote, and footnotes can't be nested inside other footnotes."
-- [ ] Select text inside the `[^1]:` definition body at the bottom: "No footnote was created: footnotes can't go inside another footnote's definition."
+- [ ] Select `plain[^1] here` (contains a live reference): "No footnote was created: footnotes can't be nested inside other footnotes."
+- [ ] Select text inside the `[^1]:` definition body at the bottom: "No footnote was created: footnotes can't be nested inside other footnotes." (the same nesting toast)
 - [ ] Select from the row `| a | b |` through `| 1 | 2 |` (part of a table, source mode): "No footnote was created: the selection cuts through a table. Select text inside one cell, or the whole table with the text around it."
 - [ ] Named key on a selection, then edit the note behind the open modal and press Enter: "The note changed while naming the footnote. Reselect the text and try again."
 
@@ -53,15 +53,15 @@ after the table
 ## Naming and renaming (inline reasons in the modal)
 
 - [ ] Named key on a selection, type `a[b`, then `a b`, then `a` + backtick + `b`, then `a#b`: each shows "Footnote names can't contain spaces, backticks, brackets, or "#"."
-- [ ] Type `1` (already defined): ""[^1]" is already defined. Pick a new name."
+- [ ] Type `1` (already a footnote): ""[^1]" is already used by another footnote."
 - [ ] Rename footnote with the caret on plain prose: "Place the cursor on a footnote reference or definition to rename it."
 - [ ] Rename `[^1]` to `bad name`, `a#b`, `a[b`: the same message, inline
 - [ ] Rename `[^1]` to `2` (the second live footnote below): ""[^2]" is already used by another footnote."
 
 ## Multi-caret
 
-- [ ] Two Alt-click carets, one in prose and one inside `[^1]`, any insert key: "No footnotes were created: one of the cursors is inside an existing footnote."
-- [ ] Two carets, both inside `[^#tag]`, NAMED key: the contains-"#" warning, nothing created
+- [ ] Two Alt-click carets, one in prose and one inside `[^1]`, any insert key: "No footnotes were created: footnotes can't be nested inside other footnotes."
+- [ ] Two carets, both inside `[^#tag]`, NAMED key: the won't-work-as-a-footnote toast, nothing created
 - [ ] Two carets in prose, PASTE key with an empty clipboard: "The clipboard is empty, so there is nothing to put in an inline footnote."
 
 ## Prefix (feature ON)
@@ -88,7 +88,7 @@ to fix; L13 and L14 own the detail. Spot-check that each names its
 footnotes in quotes and never splits a quoted name across lines:
 
 - [ ] A `[^lost]` with no definition, delete-orphans OFF: "This note has a footnote reference with no definition ("[^lost]"). Write its definition or delete the reference."
-- [ ] A `[^unused]:` nothing references, delete-orphans OFF: "This note has a footnote definition nothing references ("[^unused]"). Add its reference in the text or delete the definition."
+- [ ] A `[^unused]:` nothing references, delete-orphans OFF: "This note has a footnote definition nothing references ("[^unused]"). Add a "[^unused]" reference in the text, or delete the definition."
 - [ ] Two `[^d]:` definitions, merge OFF: "This note defines "[^d]" more than once. Obsidian renders only the last definition. Merge them, or turn on "Merge duplicate definitions"."
 - [ ] The bare `[^]` fixture: "This note has an unnamed footnote reference ("[^]"). Give it a name or delete it."
 

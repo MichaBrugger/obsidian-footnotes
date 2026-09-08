@@ -20,7 +20,7 @@ The paragraph wants to move this aside for later readers. A second sentence ride
 - [ ] With the popup setting ON, the same multi-line conversion opens the popup showing the whole multi-paragraph body, no Properties widget bleed
 - [ ] NAMED hotkey with a selection: a modal asks for the name; Enter creates `[^name]` with the selection as its definition, one undo reverts it all
 - [ ] NAMED hotkey with a MULTI-LINE selection: same modal flow, the body lands multi-paragraph
-- [ ] In the modal: a name that's already defined, or one with a space, shows the reason inline and stays open; Escape cancels with nothing changed
+- [ ] In the modal: a name another footnote already uses, or one with a space, shows the reason inline and stays open; Escape cancels with nothing changed
 - [ ] With the modal open and a name typed, press ANY footnote hotkey (numbered/named/inline): it submits exactly like Enter — footnote created, modal closed (2026-08-22); with an INVALID name typed, the hotkey shows the inline reason and the modal stays open
 - [ ] Paste-inline hotkey with a selection: a toast redirects to the other keys, and the clipboard is untouched
 - [ ] With `Lint on footnote creation` and `Reindex` ON (popup off): converting a selection (NUMBERED, and NAMED via the modal) renumbers everything (the fixture's `[^5]`→`[^1]`, the new footnote→`[^2]`/its name kept) right after the conversion — every footnote-creating press lints, same as a plain insert (2026-08-25)

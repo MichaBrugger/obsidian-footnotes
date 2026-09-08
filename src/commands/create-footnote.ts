@@ -10,6 +10,7 @@ import {
     emptyReferenceStart,
     idListIncludes,
     footnoteNameProblem,
+    InvalidNameCharacters,
     referenceOccurrences,
 } from "../parsing/footnote-grammar";
 import { openFootnotePopup, popupEditingAvailable } from "./footnote-popup";
@@ -475,13 +476,8 @@ export function createMatchingFootnoteDefinition(
     // find (see footnoteNameProblem); one warning names the offender
     // instead of creating a definition that can't work
     if (footnoteNameProblem(footnoteId) !== null) {
-        const offender = footnoteId.includes("`")
-            ? "backticks"
-            : /\s/.test(footnoteId)
-              ? "spaces"
-              : '"#"';
         showNotice(
-            `Footnote name "${footnoteId}" contains ${offender}, so it won't work as a footnote in Obsidian. Remove the ${offender}.`,
+            `"[^${footnoteId}]" won't work as a footnote. ${InvalidNameCharacters}`,
             8000,
         );
         return true;

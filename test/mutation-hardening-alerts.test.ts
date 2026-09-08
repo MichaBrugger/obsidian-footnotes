@@ -181,7 +181,7 @@ describe("the orphaned-definition alert", () => {
         noticeLintAlerts(fakePlugin({}), "[^unused]: nothing points here");
         expect(
             messageShown(
-                'This note has a footnote definition nothing references ("[^unused]"). Add its reference in the text or delete the definition.',
+                'This note has a footnote definition nothing references ("[^unused]"). Add a "[^unused]" reference in the text, or delete the definition.',
             ),
         ).toBe(true);
     });
@@ -190,7 +190,7 @@ describe("the orphaned-definition alert", () => {
         noticeLintAlerts(fakePlugin({}), "[^u1]: a\n[^u2]: b");
         expect(
             messageShown(
-                'This note has 2 footnote definitions nothing references ("[^u1]", "[^u2]"). Add their references in the text or delete the definitions.',
+                'This note has 2 footnote definitions nothing references ("[^u1]", "[^u2]"). Add their references in the text, or delete the definitions.',
             ),
         ).toBe(true);
     });

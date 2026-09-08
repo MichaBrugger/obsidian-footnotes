@@ -153,7 +153,7 @@ describe("warnPrefilledReferenceIfInside (the [^7-] placeholder toast)", () => {
         // showNotice always passes (message, duration) - the duration is
         // undefined for this one-liner toast
         expect(noticeCalls).toContainEqual([
-            expect.stringContaining("suffix"),
+            expect.stringContaining("only the prefix"),
             undefined,
         ]);
     });

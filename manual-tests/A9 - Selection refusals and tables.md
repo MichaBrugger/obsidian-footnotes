@@ -30,7 +30,7 @@ select me in here
 - [ ] Select the header row through the `| --- |` row and convert: same toast, nothing changes
 - [ ] Select only whitespace anywhere: the press behaves like a plain insert at the caret
 - [ ] With the caret in a footnote definition's body below, EVERY insert hotkey (numbered, named, inline, paste) jumps back to the reference instead of creating (ruling 2026-08-13)
-- [ ] Selecting text inside the definition body and pressing a converting hotkey refuses with the "can't go inside another footnote's definition" toast (a selection can't jump)
+- [ ] Selecting text inside the definition body and pressing a converting hotkey refuses with the "can't be nested inside other footnotes" toast (a selection can't jump)
 
 Fixture for the definition checks[^d].
 

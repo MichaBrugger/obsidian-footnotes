@@ -36,10 +36,14 @@ import {
     landDefinitionBackedInsertion,
     replaceInTableCell,
 } from "./create-footnote";
-import { DefinitionCreationNotice } from "./press-guards";
+import {
+    nameAlreadyUsed,
+    NestedFootnoteNotice,
+    NoFootnoteCreated,
+    showNotice,
+} from "../editor/notice";
 import { TableCellEditor, tableRowCellSpans, tableRowLines } from "../editor/table-cursor";
 
-import { showNotice } from "../editor/notice";
 // Turning a selection into a footnote (issue #35): a creation press with a
 // live selection REPLACES the selected text instead of inserting at the
 // caret - the auto-numbered key moves it into a new definition's body, the
@@ -83,14 +87,14 @@ export const InlineSelectionNotice =
 // it into the new footnote's body - and a PARTIAL overlap would corrupt
 // the artifact it cuts. Dead reference-shaped text inside code spans is
 // not a footnote and still travels.
-export const NestedSelectionNotice =
-    "No footnote was created: the selection contains a footnote, and footnotes can't be nested inside other footnotes.";
+// (the nesting refusal itself is NestedFootnoteNotice, shared with the
+// caret guards - one rule, one sentence)
 // distinct from ProtectedCreationNotice on purpose (Jason's manual pass,
 // 2026-08-13): here the caret isn't INSIDE protected text - the selection
 // EDGE cuts through some. Whole constructs inside the selection are fine
 // (2026-08-19); cutting one apart would corrupt what stays behind.
 export const ProtectedSelectionNotice =
-    "No footnote was created: the selection cuts through code, math, or other protected text. Select all of it or none of it.";
+    NoFootnoteCreated + "the selection cuts through code, math, or other protected text. Select all of it or none of it.";
 
 // tables are protected against PARTIAL conversion (Jason's ruling
 // 2026-09-04, from his A13 pass): a cell, a few cells, or a row moved into
@@ -98,7 +102,7 @@ export const ProtectedSelectionNotice =
 // sensible. Text inside ONE cell converts (the cell keeps its shape), and
 // a whole table travels with the prose around it like any other block.
 export const TableSelectionNotice =
-    "No footnote was created: the selection cuts through a table. Select text inside one cell, or the whole table with the text around it.";
+    NoFootnoteCreated + "the selection cuts through a table. Select text inside one cell, or the whole table with the text around it.";
 
 export type FootnoteCommandKind = "autonum" | "named" | "inline" | "paste";
 
@@ -182,7 +186,7 @@ export function selectionPressHandled(
         }
         // no nesting in cells either (2026-08-24)
         if (spanTouchesFootnote(cellText, maskedCell, from, to)) {
-            showNotice(NestedSelectionNotice, 8000);
+            showNotice(NestedFootnoteNotice, 8000);
             return true;
         }
         const text = cellText.slice(from, to);
@@ -288,13 +292,13 @@ export function selectionPressHandled(
                 trimmed.from.line <= block.end && trimmed.to.line >= block.start,
         )
     ) {
-        showNotice(DefinitionCreationNotice, 8000);
+        showNotice(NestedFootnoteNotice, 8000);
         return true;
     }
     // ... and a selection touching any LIVE footnote artifact refuses too
     // (nesting prevented plugin-wide, 2026-08-24)
     if (selectionTouchesFootnote(ctx, trimmed.from, trimmed.to)) {
-        showNotice(NestedSelectionNotice, 8000);
+        showNotice(NestedFootnoteNotice, 8000);
         return true;
     }
     const selection = { from: trimmed.from, to: trimmed.to, text };
@@ -586,7 +590,7 @@ function namedSelectionProblem(
     const problem = footnoteNameProblem(name);
     if (problem !== null) return problem;
     if (idListIncludes(listExistingFootnoteDefinitions(doc, ctx), name)) {
-        return `"[^${name}]" is already defined. Pick a new name.`;
+        return nameAlreadyUsed(name);
     }
     return null;
 }

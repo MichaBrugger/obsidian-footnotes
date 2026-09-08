@@ -19,7 +19,7 @@ import {
 } from "../parsing/markdown-scan";
 import { TableCellEditor } from "../editor/table-cursor";
 
-import { showNotice } from "../editor/notice";
+import { NestedFootnoteNotice, showNotice } from "../editor/notice";
 // The press guards: a footnote key was pressed - does something OTHER than
 // creation own it? Empty placeholders warn, filled inline footnotes hop,
 // and protected text (definition interiors included) refuses outright.
@@ -108,8 +108,9 @@ export function warnProtectedCaretIfInside(
     return true;
 }
 
-export const DefinitionCreationNotice =
-    "No footnote was created: footnotes can't go inside another footnote's definition.";
+/** The untouched "[^7-]" placeholder: the prefix is there, the name is not. */
+export const PrefixOnlyNotice =
+    "This footnote reference has only the prefix. Type a name after it.";
 
 /**
  * Footnote CREATION is blocked anywhere inside a definition block - the
@@ -137,7 +138,7 @@ export function warnDefinitionCaretIfInside(
             cursorPosition.line >= block.start && cursorPosition.line <= block.end,
     );
     if (!inside) return false;
-    showNotice(DefinitionCreationNotice, 8000);
+    showNotice(NestedFootnoteNotice, 8000);
     return true;
 }
 
@@ -176,7 +177,7 @@ export function warnPrefilledReferenceIfInside(
     if (!caretInsidePlaceholder(doc, cell, placeholder, cursorPosition)) {
         return false;
     }
-    showNotice("Please add a footnote suffix after the prefix.");
+    showNotice(PrefixOnlyNotice);
     return true;
 }
 

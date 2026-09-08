@@ -367,7 +367,7 @@ describe("createMatchingFootnoteDefinition", () => {
         ).toBe(true);
         expect(
             noticed(
-                'Footnote name "#x" contains "#", so it won\'t work as a footnote in Obsidian. Remove the "#".',
+                '"[^#x]" won\'t work as a footnote. Footnote names can\'t contain spaces, backticks, brackets, or "#".',
             ),
         ).toBe(true);
         expect(doc.lines).toEqual(["see [^#x] x"]);
@@ -388,7 +388,7 @@ describe("createMatchingFootnoteDefinition", () => {
         ).toBe(true);
         expect(
             noticed(
-                'Footnote name "a b" contains spaces, so it won\'t work as a footnote in Obsidian. Remove the spaces.',
+                '"[^a b]" won\'t work as a footnote. Footnote names can\'t contain spaces, backticks, brackets, or "#".',
             ),
         ).toBe(true);
         expect(doc.lines).toEqual(["see [^a b] x"]);
@@ -407,7 +407,7 @@ describe("createMatchingFootnoteDefinition", () => {
         ).toBe(true);
         expect(
             noticed(
-                'Footnote name "a`b" contains backticks, so it won\'t work as a footnote in Obsidian. Remove the backticks.',
+                '"[^a`b]" won\'t work as a footnote. Footnote names can\'t contain spaces, backticks, brackets, or "#".',
             ),
         ).toBe(true);
     });

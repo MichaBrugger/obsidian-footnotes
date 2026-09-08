@@ -15,7 +15,7 @@ import {
     insertNamedFootnote,
     pasteInlineFootnote,
 } from "../src/commands/insert-or-navigate-footnotes";
-import { DefinitionCreationNotice } from "../src/commands/press-guards";
+import { NestedFootnoteNotice } from "../src/editor/notice";
 
 // Jason's ruling (2026-08-13, from manual testing): Obsidian technically
 // renders footnotes nested inside footnote definitions, but that's wildly
@@ -68,7 +68,7 @@ const LINES = [
 ];
 
 const noticed = () =>
-    noticeCalls.some((args) => args[0] === DefinitionCreationNotice);
+    noticeCalls.some((args) => args[0] === NestedFootnoteNotice);
 
 describe("the inline pair NAVIGATES from inside a definition (ruling refined 2026-08-13)", () => {
     // first ruling: refuse with a toast. Refined the same day: jump back

@@ -2016,7 +2016,7 @@ async function main() {
         await pollUntil(
             "the add-a-suffix toast",
             `[...document.querySelectorAll('.notice')].map(n => n.textContent).join('|')`,
-            (v) => typeof v === "string" && v.includes("footnote suffix"),
+            (v) => typeof v === "string" && v.includes("only the prefix"),
         );
         // the caret stays put and nothing was inserted
         const cursor = readJson(`(${EDITOR}).editor.getCursor()`);

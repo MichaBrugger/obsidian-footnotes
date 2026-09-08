@@ -1,4 +1,5 @@
 import { Editor, EditorChange, EditorPosition } from "obsidian";
+import { NoFootnoteCreated } from "./notice";
 
 import { docLines } from "./doc-context";
 import { escapedAt, referenceOccurrences } from "../parsing/footnote-grammar";
@@ -13,7 +14,7 @@ import { findDefinitionBlocks, maskedLineAt, scanDocument } from "../parsing/mar
 // commands file 2026-08-12: one subject, independently mutation-testable.
 
 export const ProtectedCreationNotice =
-    "No footnote was created: footnotes can't go inside code, math, or other protected text.";
+    NoFootnoteCreated + "footnotes can't go inside code, math, or other protected text.";
 
 /**
  * The rightmost column at or left of `ch` where an insertion keeps its

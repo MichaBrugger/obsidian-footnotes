@@ -18,7 +18,6 @@ import {
 import {
     convertCellSelectionToNamed,
     InlineSelectionNotice,
-    NestedSelectionNotice,
     ProtectedSelectionNotice,
     convertSelectionToNamed,
     registerActiveNameModal,
@@ -31,7 +30,7 @@ import {
 } from "../src/commands/selection-footnote";
 import { ProtectedCreationNotice } from "../src/editor/insertion-liveness";
 import { commandHotkeys } from "../src/editor/obsidian-internals";
-import { DefinitionCreationNotice } from "../src/commands/press-guards";
+import { NestedFootnoteNotice } from "../src/editor/notice";
 import { TableCellEditor } from "../src/editor/table-cursor";
 
 // Turning a selection into a footnote (issue #35, Jason's calls 2026-08-12:
@@ -387,7 +386,7 @@ describe("the named key converts a selection through its modal (2026-08-13)", ()
             { from: { line: 0, ch: 4 }, to: { line: 0, ch: 9 }, text: "quick" },
             "Taken",
         );
-        expect(problem).toBe('"[^Taken]" is already defined. Pick a new name.');
+        expect(problem).toBe('"[^Taken]" is already used by another footnote.');
         expect(doc.lines).toEqual(before);
     });
 
@@ -892,7 +891,7 @@ describe("selections that refuse", () => {
         });
         await insertAutonumFootnote(fakePlugin(doc));
         expect(doc.lines).toEqual(before);
-        expect(noticed(DefinitionCreationNotice)).toBe(true);
+        expect(noticed(NestedFootnoteNotice)).toBe(true);
     });
 
     it("a multi-line selection swallowing a whole definition refuses too", async () => {
@@ -903,7 +902,7 @@ describe("selections that refuse", () => {
         });
         await insertAutonumFootnote(fakePlugin(doc));
         expect(doc.lines).toEqual(before);
-        expect(noticed(DefinitionCreationNotice)).toBe(true);
+        expect(noticed(NestedFootnoteNotice)).toBe(true);
     });
 });
 
@@ -1400,7 +1399,7 @@ describe("nested footnotes are prevented in selections (2026-08-24)", () => {
         });
         await insertAutonumFootnote(fakePlugin(doc));
         expect(doc.lines).toEqual(before);
-        expect(noticed(NestedSelectionNotice)).toBe(true);
+        expect(noticed(NestedFootnoteNotice)).toBe(true);
     });
 
     it("a selection CUTTING a reference in half refuses (corruption guard)", async () => {
@@ -1412,7 +1411,7 @@ describe("nested footnotes are prevented in selections (2026-08-24)", () => {
         });
         await insertAutonumFootnote(fakePlugin(doc));
         expect(doc.lines).toEqual(before);
-        expect(noticed(NestedSelectionNotice)).toBe(true);
+        expect(noticed(NestedFootnoteNotice)).toBe(true);
     });
 
     it("a selection containing an INLINE footnote or a [^] placeholder refuses", async () => {
@@ -1425,7 +1424,7 @@ describe("nested footnotes are prevented in selections (2026-08-24)", () => {
             });
             await insertAutonumFootnote(fakePlugin(doc));
             expect(doc.lines).toEqual(before);
-            expect(noticed(NestedSelectionNotice)).toBe(true);
+            expect(noticed(NestedFootnoteNotice)).toBe(true);
         }
     });
 
@@ -1461,7 +1460,7 @@ describe("nested footnotes are prevented in selections (2026-08-24)", () => {
             selectionPressHandled(fakePlugin(doc), doc, cell, "inline"),
         ).toBe(true);
         expect(dispatched).toEqual([]);
-        expect(noticed(NestedSelectionNotice)).toBe(true);
+        expect(noticed(NestedFootnoteNotice)).toBe(true);
     });
 
     it("a multi-line selection with the reference on its SECOND line refuses", async () => {
@@ -1472,7 +1471,7 @@ describe("nested footnotes are prevented in selections (2026-08-24)", () => {
         });
         await insertAutonumFootnote(fakePlugin(doc));
         expect(doc.lines).toEqual(before);
-        expect(noticed(NestedSelectionNotice)).toBe(true);
+        expect(noticed(NestedFootnoteNotice)).toBe(true);
     });
 });
 
