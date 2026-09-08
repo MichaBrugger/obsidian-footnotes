@@ -141,7 +141,7 @@ const frontmatterArb = fc.constantFrom(
     "---\ntitle: t\n---",
     "---\nfootnote-prefix: 2.\n---",
     "---\nfootnote-prefix: P-\n---",
-    "---\nfootnote-prefix: 2. # comment\n---",
+    '---\nfootnote-prefix: "2."\n---',
 );
 
 export const docArb = fc

@@ -16,20 +16,20 @@ import { showNotice } from "../editor/notice";
 const stripCrLine = (line: string): string =>
     line.endsWith("\r") ? line.slice(0, -1) : line;
 
-/** The parsed value of one "footnote-prefix:" property line. */
+/**
+ * The parsed value of one "footnote-prefix:" property line: the text after
+ * the colon, minus the quotes Obsidian adds around a value YAML would
+ * otherwise misread. YAML comments are NOT honored (Jason's ruling
+ * 2026-09-05, reversing the 2026-08-10 hunt fix): nobody writes them, the
+ * Properties editor can't produce them, and stripping them was checking
+ * code nobody needed - so "2. # a comment" is the value "2. # a comment",
+ * which the prefix validity rules refuse with the ordinary invalid-prefix
+ * toast instead of silently reading "2.".
+ */
 function parsePrefixValue(captured: string | undefined): string {
-    let value = (captured ?? "").trim();
-    // a value that IS a comment is an empty value
-    if (value.startsWith("#")) return "";
-    // quotes end the value - anything after the closing quote
-    // (typically a comment) is not part of it
-    const quoted = value.match(/^(["'])(.*?)\1/);
-    if (quoted) return quoted[2];
-    // an unquoted value ends at a whitespace-preceded "#" (YAML
-    // comments); a "#" glued to text is value content
-    const commentAt = value.search(/(?:^|\s)#/);
-    if (commentAt !== -1) value = value.slice(0, commentAt).trim();
-    return value;
+    const value = (captured ?? "").trim();
+    const quoted = value.match(/^(["'])(.*)\1$/);
+    return quoted ? quoted[2] : value;
 }
 
 /**

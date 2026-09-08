@@ -16,7 +16,7 @@ hand[^p-1] typed lowercase-prefixed reference for the collision check.
 - [ ] Autonumber right after `and[^b$2]`: the span between the dollars is NOT math — both dollar names stay footnotes
 - [ ] Press inside `[^Note]`: navigates to the LOWERCASE `[^note]:` definition (ids fold case; no duplicate)
 - [ ] Prefix feature ON (prefix `P-` from the frontmatter), with the fixture's `hand[^p-1] typed`: autonumber mints `[^P-2]`, NOT a colliding `[^P-1]`
-- [ ] Change the property to `footnote-prefix: 2. # a comment` by hand: inserts use `2.`, no phantom-value complaint (YAML comments stripped)
+- [ ] Change the property to `footnote-prefix: 2. # a comment` by hand: the ordinary invalid-prefix toast (the whole text after the colon is the value; YAML comments aren't honored, ruling 2026-09-05)
 - [ ] Change it to `footnote-prefix:2.` (no space after the colon) by hand: it is IGNORED — Obsidian shows no property, the plugin reads none
 
 [^note]: lowercase definition for the uppercase reference
