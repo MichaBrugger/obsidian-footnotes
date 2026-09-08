@@ -1,7 +1,6 @@
 import { footnotePrefixProblem } from "../../parsing/footnote-prefix";
 import { computeNextFootnoteNumber, referenceOccurrences } from "../../parsing/footnote-grammar";
 import {
-    DefinitionStart,
     findDefinitionBlocks,
     maskProtectedLines,
     normalizeEol,
@@ -9,6 +8,7 @@ import {
     restoreEol,
 } from "../../parsing/markdown-scan";
 import { IgnoreType } from "../ignore-types";
+import { rewriteFootnoteNames } from "../rewrite-footnote-names";
 import { FootnoteRule } from "../rule";
 
 // QOL rule (2026-07-18): footnotes written before the note got its
@@ -90,27 +90,9 @@ export function applyFootnotePrefix(markdown: string, prefix: string): string {
         return `${prefix}${id}`;
     };
 
-    const rewritten = lines.map((line, i) => {
-        if (isProtected[i]) return line;
-        const masked = maskedLines[i];
-        let result = "";
-        let copied = 0;
-        for (const { name, start, end } of referenceOccurrences(line, masked)) {
-            const newName = renameFor(name);
-            if (newName === null) continue;
-            result += line.slice(copied, start) + `[^${newName}]`;
-            copied = end;
-        }
-        result += line.slice(copied);
-        const definition = line.match(DefinitionStart);
-        if (definition) {
-            const newName = renameFor(definition[1]);
-            if (newName !== null) {
-                result = `[^${newName}]:` + result.slice(definition[0].length);
-            }
-        }
-        return result;
-    });
+    const rewritten = lines.map((line, i) =>
+        isProtected[i] ? line : rewriteFootnoteNames(line, maskedLines[i], renameFor),
+    );
     const joined = rewritten.join("\n");
     // byte-identical no-op on mixed-EOL notes (spec-mixed-eol-noop-rewrite)
     return joined === text ? markdown : restoreEol(joined, eol);

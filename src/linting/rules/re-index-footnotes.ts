@@ -1,7 +1,6 @@
 import { footnotePrefixProblem } from "../../parsing/footnote-prefix";
 import { referenceOccurrences } from "../../parsing/footnote-grammar";
 import {
-    DefinitionStart,
     findDefinitionBlocks,
     maskProtectedLines,
     normalizeEol,
@@ -10,6 +9,7 @@ import {
     restoreEol,
 } from "../../parsing/markdown-scan";
 import { IgnoreType } from "../ignore-types";
+import { rewriteFootnoteNames } from "../rewrite-footnote-names";
 import { FootnoteRule } from "../rule";
 import { orphanedDefinitionBlocks } from "./remove-orphaned-definitions";
 
@@ -61,23 +61,6 @@ function referenceAppearanceOrder(
         }
     }
     return order;
-}
-
-/** All references on the line rewritten through `renames` (code spans and the definition label skipped; ids matched case-insensitively); the map is complete, so swaps can't collide. `masked` is the line's document-aware masked twin. */
-function rewriteReferences(
-    line: string,
-    masked: string,
-    renames: Map<string, string>,
-): string {
-    let out = "";
-    let copied = 0;
-    for (const { name, start, end } of referenceOccurrences(line, masked)) {
-        const newName = renames.get(name.toLowerCase());
-        if (newName === undefined) continue;
-        out += line.slice(copied, start) + `[^${newName}]`;
-        copied = end;
-    }
-    return out + line.slice(copied);
 }
 
 /**
@@ -206,18 +189,13 @@ function reindexOnce(
         }
     }
 
-    const rewritten = lines.map((line, i) => {
-        if (scan.isProtected[i]) return line;
-        let result = rewriteReferences(line, maskedLines[i], renames);
-        const definition = line.match(DefinitionStart);
-        if (definition) {
-            const newName = renames.get(definition[1].toLowerCase());
-            if (newName !== undefined) {
-                result = `[^${newName}]:` + result.slice(definition[0].length);
-            }
-        }
-        return result;
-    });
+    // ids matched case-insensitively; the map is complete, so swaps can't
+    // collide
+    const rewritten = lines.map((line, i) =>
+        scan.isProtected[i]
+            ? line
+            : rewriteFootnoteNames(line, maskedLines[i], (name) => renames.get(name.toLowerCase()) ?? null),
+    );
 
     // permute definition blocks among their existing slots so they read in
     // appearance order; a stable sort keeps duplicate definitions together
