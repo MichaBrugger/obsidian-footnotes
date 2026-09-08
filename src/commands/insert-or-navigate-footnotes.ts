@@ -10,7 +10,7 @@ import {
     insertInTableCell,
 } from "./create-footnote";
 import { docContext, referenceOccurrenceAtCursor } from "../editor/doc-context";
-import { inlineWrapLandsIntact, readInlineFootnoteFromClipboard } from "./inline-footnotes";
+import { insertionLandsIntact, readInlineFootnoteFromClipboard } from "./inline-footnotes";
 import { ProtectedCreationNotice, simulatedMaskedLine } from "../editor/insertion-liveness";
 import { shouldJumpFromDefinitionToReference, shouldJumpFromReferenceToDefinition } from "./navigation";
 import { propertiesWidgetOwnsFocus, readingViewActive, viewEditor } from "../editor/obsidian-internals";
@@ -227,7 +227,7 @@ function insertInlineText(
         // parse as an inline-footnote span on the masked result - content
         // it carries (pasted inline code) may mask INSIDE the brackets
         const masked = simulatedMaskedLine(doc, at, text);
-        if (!inlineWrapLandsIntact(masked, at.ch, text.length)) {
+        if (!insertionLandsIntact(masked, at.ch, text)) {
             showNotice(ProtectedCreationNotice, 8000);
             return;
         }

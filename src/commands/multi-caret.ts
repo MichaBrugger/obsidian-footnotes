@@ -15,7 +15,7 @@ import { buildDefinitionAppend } from "./definition-append";
 import { DocContext, docContext, listExistingFootnoteDefinitions } from "../editor/doc-context";
 import {
     inlineFootnoteSpanAt,
-    inlineWrapLandsIntact,
+    insertionLandsIntact,
     readInlineFootnoteFromClipboard,
 } from "./inline-footnotes";
 import {
@@ -365,12 +365,9 @@ function insertSkeletonAtEveryCaret(
     const anchors = targets.map((_, index) =>
         simulatedAnchor(ctx.lines, changes, index, simulated),
     );
-    const everyLive = anchors.every((anchor) => {
-        const masked = maskedLineAt(simulated, anchor.line);
-        return text.startsWith("^[")
-            ? inlineWrapLandsIntact(masked, anchor.ch, text.length)
-            : masked.slice(anchor.ch, anchor.ch + text.length) === text;
-    });
+    const everyLive = anchors.every((anchor) =>
+        insertionLandsIntact(maskedLineAt(simulated, anchor.line), anchor.ch, text),
+    );
     if (!everyLive) {
         showNotice(ProtectedCreationNotice, 8000);
         return;

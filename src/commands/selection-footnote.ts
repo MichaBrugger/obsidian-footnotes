@@ -17,7 +17,7 @@ import {
 import { commandHotkeys } from "../editor/obsidian-internals";
 import { buildDefinitionAppend, seedDefinitionBody } from "./definition-append";
 import { DocContext, docContext, listExistingFootnoteDefinitions } from "../editor/doc-context";
-import { inlineFootnoteSpanAt, inlineWrapLandsIntact, sanitizeInlineFootnoteContent } from "./inline-footnotes";
+import { inlineFootnoteSpanAt, insertionLandsIntact, sanitizeInlineFootnoteContent } from "./inline-footnotes";
 import {
     caretInsideMaskedSpan,
     ProtectedCreationNotice,
@@ -690,7 +690,7 @@ function convertMainSelectionToInline(
         { from: selection.from, to: selection.to, text },
     ]);
     const masked = maskedLineAt(simulated, selection.from.line);
-    if (!inlineWrapLandsIntact(masked, selection.from.ch, text.length)) {
+    if (!insertionLandsIntact(masked, selection.from.ch, text)) {
         showNotice(ProtectedCreationNotice, 8000);
         return;
     }

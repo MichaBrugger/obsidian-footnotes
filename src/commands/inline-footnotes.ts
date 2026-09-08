@@ -96,6 +96,21 @@ export function sanitizeInlineFootnoteContent(raw: string): string {
  * ONE landing predicate for every inline-wrap writer: caret insert,
  * paste, multi-caret skeletons, cell writes, selection conversion.
  */
+/**
+ * The born-dead rule in one place (duplicated-logic audit, 2026-09-05):
+ * does `text`, written at `at` on the MASKED simulated line, still read
+ * as what it is? An inline footnote must survive as an intact span
+ * (pasted content may carry its own code, masked INSIDE the brackets);
+ * anything else - a reference, a placeholder - must come back byte for
+ * byte, or the insertion completed a construct around itself and would
+ * be born masked.
+ */
+export function insertionLandsIntact(masked: string, at: number, text: string): boolean {
+    return text.startsWith("^[")
+        ? inlineWrapLandsIntact(masked, at, text.length)
+        : masked.slice(at, at + text.length) === text;
+}
+
 export function inlineWrapLandsIntact(
     masked: string,
     at: number,

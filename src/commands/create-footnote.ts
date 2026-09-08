@@ -24,7 +24,7 @@ import {
     listExistingFootnoteDefinitions,
     referenceOccurrenceAtCursor,
 } from "../editor/doc-context";
-import { inlineWrapLandsIntact } from "./inline-footnotes";
+import { insertionLandsIntact } from "./inline-footnotes";
 import {
     ProtectedCreationNotice,
     safeInsertionCh,
@@ -98,13 +98,7 @@ function dispatchCellEditIfLive(
     // suite, 2026-08-12); cell text is a single line, so line-local
     // masking decides
     const simulatedCell = cellText.slice(0, from) + text + cellText.slice(to);
-    const maskedCell = maskInlineRegions(simulatedCell);
-    const live = text.startsWith("^[")
-        ? // pasted content may carry its own inline code (masked inside the
-          // brackets) - the inline SPAN surviving INTACT is what matters
-          inlineWrapLandsIntact(maskedCell, from, text.length)
-        : maskedCell.slice(from, from + text.length) === text;
-    if (!live) {
+    if (!insertionLandsIntact(maskInlineRegions(simulatedCell), from, text)) {
         showNotice(ProtectedCreationNotice, 8000);
         return false;
     }
@@ -591,12 +585,7 @@ export function createFootnoteReference(
     // born-dead check (see simulatedMaskedLine): a placeholder that lands
     // masked would silently strand the name-entry flow
     const masked = simulatedMaskedLine(doc, cursorPosition, emptyReference);
-    if (
-        masked.slice(
-            cursorPosition.ch,
-            cursorPosition.ch + emptyReference.length,
-        ) !== emptyReference
-    ) {
+    if (!insertionLandsIntact(masked, cursorPosition.ch, emptyReference)) {
         showNotice(ProtectedCreationNotice, 8000);
         return true;
     }
