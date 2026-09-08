@@ -229,6 +229,17 @@
         }
     };
 
+    // a drag-like selection: the anchor stays, the head sweeps to the end
+    G.selectSweep = async (line, fromCh, toCh, steps, msPerStep) => {
+        const v = G.view();
+        const n = steps || 10;
+        for (let i = 1; i <= n; i++) {
+            const ch = Math.round(fromCh + ((toCh - fromCh) * i) / n);
+            v.editor.setSelection({ line, ch: fromCh }, { line, ch });
+            await G.sleep(msPerStep || 60);
+        }
+    };
+
     G.waitFor = async (fn, ms) => {
         const t = Date.now();
         while (Date.now() - t < (ms || 8000)) {

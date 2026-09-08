@@ -2,7 +2,7 @@
 // numbered footnote and come straight back, keep writing, a named footnote
 // (two presses) and back, an inline footnote, then Lint footnotes tidies a
 // hand-typed reference that sits before its period and gathers the
-// definitions under a heading.
+// definitions under a heading. A selection becomes a footnote on the way.
 (async () => {
     const G = window.__gif;
     window.__scene = { stage: "start" };
@@ -28,7 +28,7 @@
         await G.activate();
         await G.setNote("# Field notes\n\n", { line: 2, ch: 0 });
         await G.sleep(600);
-        G.startRecording("hero", 8, "editor", 450);
+        G.startRecording("hero", 8, "editor", 520);
         await G.sleep(700);
 
         // 1. a first sentence, then a numbered footnote at its end
@@ -70,9 +70,27 @@
         await G.sleep(500);
         // a hand-typed reference before its period: the linter's cue
         await G.typeMain(" showed no change from the earlier count[^1].", T);
-        await G.sleep(1200);
+        await G.sleep(500);
 
-        // 4. lint: the reference moves past the period, the definitions get a heading
+        // 4. write two more sentences, select the last one, convert it
+        const tail = " Temperatures stayed in range. The buoy log confirms this independently.";
+        await G.typeMain(tail, T);
+        await G.sleep(600);
+        const v = G.view();
+        const cur = v.editor.getCursor();
+        const lineText = v.editor.getLine(cur.line);
+        const sentence = "The buoy log confirms this independently.";
+        const from = lineText.lastIndexOf(sentence);
+        await G.selectSweep(cur.line, from, from + sentence.length, 12, 55);
+        await G.sleep(700);
+        await G.press(NUM, ["Alt", "0"], "Selected text becomes a footnote");
+        if (!(await G.waitFor(G.popupOpen))) throw new Error("popup 3 did not open");
+        await G.sleep(1500);
+        await G.press(NUM, ["Alt", "0"], "Same hotkey: back to the text");
+        if (!(await G.waitFor(G.popupGone))) throw new Error("popup 3 did not close");
+        await G.sleep(1000);
+
+        // 5. lint: the references move past their punctuation, the definitions get a heading
         G.setSettings({ enableFootnoteSectionHeading: true });
         await G.press(LINT, ["Ctrl", "P"], "Lint footnotes (command palette)");
         await G.sleep(2800);
