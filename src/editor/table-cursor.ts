@@ -245,3 +245,14 @@ export function tableRowLines(lines: string[], isProtected: boolean[]): boolean[
     }
     return rows;
 }
+
+/**
+ * The caret a command should act on: the actively edited cell's caret
+ * mapped into the document when `cell` is set (the main editor's own
+ * caret is stale then - see resolveTableCellCursor), else the main
+ * caret. The one spelling of that fallback (it used to be inlined at
+ * five sites).
+ */
+export function resolvedCaret(doc: Editor, cell: TableCellEditor | null): EditorPosition {
+    return (cell ? resolveTableCellCursor(doc) : null) ?? doc.getCursor();
+}

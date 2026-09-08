@@ -17,7 +17,7 @@ import { propertiesWidgetOwnsFocus, readingViewActive, viewEditor } from "../edi
 import { caretGuardsHandled, warnProtectedCaretIfInside } from "./press-guards";
 import { selectionPressHandled, submitActiveNameModal } from "./selection-footnote";
 import { multiCaretPastePressHandled, multiCaretPressHandled } from "./multi-caret";
-import { activeTableCellEditor, resolveTableCellCursor, runOutsideTableCell, TableCellEditor } from "../editor/table-cursor";
+import { activeTableCellEditor, resolvedCaret, runOutsideTableCell, TableCellEditor } from "../editor/table-cursor";
 
 import { showNotice } from "../editor/notice";
 // The command entry points: each press walks the same decision cascade
@@ -128,7 +128,7 @@ export async function insertAutonumFootnote(plugin: FootnotePlugin) {
 
             createAutonumFootnote(lineText, cursorPosition, plugin, doc, cell, ctx);
         };
-        if (cell) run(resolveTableCellCursor(doc) ?? doc.getCursor());
+        if (cell) run(resolvedCaret(doc, cell));
         else runOutsideTableCell(doc, run);
     });
 }
@@ -165,7 +165,7 @@ export async function insertNamedFootnote(plugin: FootnotePlugin) {
                 return;
             createFootnoteReference(lineText, cursorPosition, plugin, doc, cell, ctx);
         };
-        if (cell) run(resolveTableCellCursor(doc) ?? doc.getCursor());
+        if (cell) run(resolvedCaret(doc, cell));
         else runOutsideTableCell(doc, run);
     });
 }
@@ -183,8 +183,7 @@ export function navigateReferenceIfInside(
     doc: Editor,
     cell: TableCellEditor | null,
 ): boolean {
-    const cursorPosition =
-        (cell ? resolveTableCellCursor(doc) : null) ?? doc.getCursor();
+    const cursorPosition = resolvedCaret(doc, cell);
     const lineText = doc.getLine(cursorPosition.line);
     // the shared lookup raw-gates before masking - this runs on every
     // inline-command press, and a "[^x]" inside code is plain text where
@@ -256,8 +255,7 @@ export async function insertInlineFootnote(plugin: FootnotePlugin) {
         // typing writes the same body into all of them (2026-08-22)
         if (multiCaretPressHandled(plugin, doc, cell !== null, "inline")) return;
         if (caretGuardsHandled(plugin, doc, cell)) return;
-        const cursorPosition =
-            (cell ? resolveTableCellCursor(doc) : null) ?? doc.getCursor();
+        const cursorPosition = resolvedCaret(doc, cell);
         const ctx = docContext(doc);
         // anywhere inside a definition (label, body, continuation), jump
         // back to the reference EXACTLY like the numbered/named keys -
@@ -298,8 +296,7 @@ export async function pasteInlineFootnote(plugin: FootnotePlugin) {
         // the same guards every other insert command runs (missed here until
         // the 2026-08-07 QOL sweep; pinned by test/paste-inline-in-inline.test.ts)
         if (caretGuardsHandled(plugin, doc, pasteCell)) return;
-        const pastePosition =
-            (pasteCell ? resolveTableCellCursor(doc) : null) ?? doc.getCursor();
+        const pastePosition = resolvedCaret(doc, pasteCell);
         const pasteCtx = docContext(doc);
         // inside a definition, jump back like every other footnote key -
         // before the clipboard await, so a handled press never reads it

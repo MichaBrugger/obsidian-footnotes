@@ -2,7 +2,6 @@ import { Editor, EditorChange, EditorPosition } from "obsidian";
 
 import type FootnotePlugin from "../main";
 import {
-    computeNextFootnoteNumber,
     emptyReferenceStart,
     idListIncludes,
     footnoteNameProblem,
@@ -10,7 +9,7 @@ import {
     referenceOccurrences,
 } from "../parsing/footnote-grammar";
 import { activeFootnotePrefix, footnotePrefixFromEditor } from "../parsing/footnote-prefix";
-import { adjustFootnotePosition } from "../editor/cursor-motion";
+import { adjustFootnotePosition, comparePositions } from "../editor/cursor-motion";
 import { buildDefinitionAppend } from "./definition-append";
 import { DocContext, docContext, listExistingFootnoteDefinitions } from "../editor/doc-context";
 import {
@@ -26,6 +25,7 @@ import {
 } from "../editor/insertion-liveness";
 import { maskedLineAt } from "../parsing/markdown-scan";
 import {
+    autonumFootnoteId,
     createMatchingFootnoteDefinition,
     landDefinitionBackedInsertion,
 } from "./create-footnote";
@@ -50,9 +50,6 @@ import { MultiCaretNestedNotice, showNotice } from "../editor/notice";
 
 // the mixed-caret refusal is MultiCaretNestedNotice (editor/notice.ts):
 // the same nesting sentence as the single-caret guards, plural opener
-
-const posCmp = (a: EditorPosition, b: EditorPosition) =>
-    a.line - b.line || a.ch - b.ch;
 
 /** What a caret sits inside, for the continuation check - the same probe trio the guard sweep refuses on. Inline wins over reference shape on purpose: an inline body can contain reference-shaped text (single-caret guard precedence). */
 type CaretArtifact =
@@ -113,7 +110,7 @@ function multiCaretContinuation(
     // numbered flow already parks and returns the caret after its first
     // reference, so the named continuation and the inline hop-out land
     // there too - one answer for "where am I when the insertion is done"
-    const first = carets.reduce((a, b) => (posCmp(a, b) <= 0 ? a : b));
+    const first = carets.reduce((a, b) => (comparePositions(a, b) <= 0 ? a : b));
     if (new Set(artifacts.map((a) => a.kind)).size !== 1) return refuse();
     const kind = artifacts[0].kind;
     if (kind === "inline") {
@@ -181,7 +178,7 @@ function multiCaretTargets(
     // any non-empty range belongs to the selection-conversion claim, which
     // runs before this and would have consumed the press - reaching here
     // with one means the claim declined (e.g. whitespace-only): not ours
-    if (ranges.some((range) => posCmp(range.anchor, range.head) !== 0)) {
+    if (ranges.some((range) => comparePositions(range.anchor, range.head) !== 0)) {
         return null;
     }
     const artifacts = ranges.map((range) => caretArtifact(doc, ctx, range.head));
@@ -219,11 +216,11 @@ function multiCaretTargets(
             plugin,
         ),
     );
-    adjusted.sort(posCmp);
+    adjusted.sort(comparePositions);
     // end-of-word can gather carets from the same word onto one spot -
     // that spot gets ONE insert
     return adjusted.filter(
-        (pos, i) => i === 0 || posCmp(pos, adjusted[i - 1]) !== 0,
+        (pos, i) => i === 0 || comparePositions(pos, adjusted[i - 1]) !== 0,
     );
 }
 
@@ -300,10 +297,8 @@ function insertReferenceAtEveryCaret(
     ctx: DocContext,
     targets: EditorPosition[],
 ): void {
-    const prefix = activeFootnotePrefix(plugin, footnotePrefixFromEditor(doc));
-    if (prefix === null) return;
-    const masked = ctx.maskedLines().join("\n");
-    const footnoteId = `${prefix}${computeNextFootnoteNumber(masked, prefix, masked)}`;
+    const footnoteId = autonumFootnoteId(plugin, doc, ctx);
+    if (footnoteId === null) return;
     const footnoteReference = `[^${footnoteId}]`;
     const isFirstFootnote = listExistingFootnoteDefinitions(doc, ctx).length === 0;
 

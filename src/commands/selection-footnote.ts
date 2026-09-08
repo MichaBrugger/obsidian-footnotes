@@ -2,14 +2,9 @@ import { Editor, EditorChange, EditorPosition } from "obsidian";
 
 import type FootnotePlugin from "../main";
 import { ValidatedTextModal } from "./validated-text-modal";
+import { idListIncludes, footnoteNameProblem, referenceOccurrences } from "../parsing/footnote-grammar";
 import {
-    computeNextFootnoteNumber,
-    idListIncludes,
-    footnoteNameProblem,
-    referenceOccurrences,
-} from "../parsing/footnote-grammar";
-import { activeFootnotePrefix, footnotePrefixFromEditor } from "../parsing/footnote-prefix";
-import {
+    comparePositions,
     endOfWordOffset,
     moveCursorAndSetJumpPoint,
     startOfWordOffset,
@@ -32,6 +27,7 @@ import {
     scanDocument,
 } from "../parsing/markdown-scan";
 import {
+    autonumFootnoteId,
     landCellDefinitionAppend,
     landDefinitionBackedInsertion,
     replaceInTableCell,
@@ -563,18 +559,6 @@ export function indentDefinitionBody(text: string): string {
         .join("\n");
 }
 
-/** The next auto-numbered id under the note's active prefix, or null when the prefix is invalid (its Notice already explained why). */
-function autonumFootnoteId(
-    plugin: FootnotePlugin,
-    doc: Editor,
-    ctx: DocContext = docContext(doc),
-): string | null {
-    const prefix = activeFootnotePrefix(plugin, footnotePrefixFromEditor(doc));
-    if (prefix === null) return null;
-    const masked = ctx.maskedLines().join("\n");
-    return `${prefix}${computeNextFootnoteNumber(masked, prefix, masked)}`;
-}
-
 /**
  * The modal's validation: why `name` can't name the selection's new
  * footnote, or null when it can. An existing DEFINITION refuses (the
@@ -653,11 +637,9 @@ export function convertCellSelectionToNamed(
 function normalizedMainSelection(
     doc: Editor,
 ): { from: EditorPosition; to: EditorPosition } | "multi" | null {
-    const posCmp = (a: EditorPosition, b: EditorPosition) =>
-        a.line - b.line || a.ch - b.ch;
     const all = doc.listSelections();
     const ranges = all.filter(
-        (range) => posCmp(range.anchor, range.head) !== 0,
+        (range) => comparePositions(range.anchor, range.head) !== 0,
     );
     if (ranges.length === 0) return null;
     // ONE real range plus extra collapsed carets (shift-drag then
@@ -668,7 +650,7 @@ function normalizedMainSelection(
     if (ranges.length > 1 || all.length > ranges.length) return "multi";
     let from = ranges[0].anchor;
     let to = ranges[0].head;
-    if (posCmp(from, to) > 0) [from, to] = [to, from];
+    if (comparePositions(from, to) > 0) [from, to] = [to, from];
     return { from, to };
 }
 

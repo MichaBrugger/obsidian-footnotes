@@ -97,6 +97,11 @@ const cpBefore = (text: string, i: number): number | undefined => {
  * unchanged. This is `adjustFootnotePosition` for table cells, where the
  * main editor's `wordAt` can't see the cell sub-editor's text.
  */
+/** Document order of two positions: negative, zero, or positive like a sort comparator. The one comparator (it used to live in two files). */
+export function comparePositions(a: EditorPosition, b: EditorPosition): number {
+    return a.line - b.line || a.ch - b.ch;
+}
+
 export function endOfWordOffset(text: string, offset: number): number {
     if (
         !isWordCp(text.codePointAt(offset)) &&

@@ -186,6 +186,27 @@ export function positionAfterReference(
  * insertion reaches here through landDefinitionBackedInsertion below
  * (2026-08-25 unification).
  */
+/**
+ * The next auto-numbered id under the note's active prefix, or null when
+ * the prefix is invalid (its Notice already explained why). The prefix
+ * comes from the frontmatter-only editor read (joining the lines
+ * materialized the whole document per press just to parse its head,
+ * 2026-08-11 review perf item); the numbering scan only ever reads the
+ * MASKED text (its first argument exists to derive a default mask), so
+ * the masked twin is passed as both. One home for the three sites that
+ * computed it (duplicated-logic audit, 2026-09-05).
+ */
+export function autonumFootnoteId(
+    plugin: FootnotePlugin,
+    doc: Editor,
+    ctx: DocContext = docContext(doc),
+): string | null {
+    const prefix = activeFootnotePrefix(plugin, footnotePrefixFromEditor(doc));
+    if (prefix === null) return null;
+    const masked = ctx.maskedLines().join("\n");
+    return `${prefix}${computeNextFootnoteNumber(masked, prefix, masked)}`;
+}
+
 // Stryker disable all: popup handoff against the live workspace - smoke-test
 // territory, unreachable from units (coverage-verified by the 2026-08-12
 // re-baseline: every mutant in this function was no-coverage)
@@ -346,18 +367,11 @@ export function createAutonumFootnote(
     // can't be trusted here). The prefix comes from the frontmatter-only
     // read: joining ctx.lines materialized the whole document per creation
     // press just to parse its head (2026-08-11 review perf item)
-    const prefix = activeFootnotePrefix(plugin, footnotePrefixFromEditor(doc));
     // an invalid prefix blocks the insert outright (the Notice already
     // explained why) - no unprefixed fallback footnote to clean up; the
     // press was still consumed
-    if (prefix === null) return true;
-    // the numbering scan only ever reads the MASKED text (the first
-    // argument exists to derive a default mask), so the masked twin is
-    // passed as both
-    const masked = ctx.maskedLines().join("\n");
-    const currentMax = computeNextFootnoteNumber(masked, prefix, masked);
-
-    const footnoteId = `${prefix}${currentMax}`;
+    const footnoteId = autonumFootnoteId(plugin, doc, ctx);
+    if (footnoteId === null) return true;
     const footnoteReference = `[^${footnoteId}]`;
 
     // "first footnote" = first DEFINITION, matching the named command and
