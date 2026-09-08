@@ -61,6 +61,13 @@ function ob(...args) {
 // The CLI occasionally swallows eval output; actions are fire-and-forget and
 // state is read back with polling reads instead.
 function action(code) {
+    if (code.includes("executeCommandById(")) {
+        // commands act on the ACTIVE view; refuse rather than press a
+        // footnote key into whichever note the user has in front
+        if (readJson(ACTIVE_IS_SMOKE) !== true) {
+            throw new Error("refusing to run a command: the smoke note is not the active tab");
+        }
+    }
     ob("eval", `code=${code}`);
 }
 
@@ -98,7 +105,29 @@ async function pollUntil(desc, code, predicate, timeoutMs = 6000) {
 
 // ---------- vault helpers ----------
 
-const EDITOR = "app.workspace.activeLeaf.view";
+// The smoke note's OWN view, found by file path - never the active tab.
+// The suite used to read app.workspace.activeLeaf.view, and the CLI's
+// "open" command does not switch tabs: with another note focused, every
+// setValue and every command press landed in THAT note (it overwrote one
+// of Jason's working test sheets, 2026-09-08). Resolving by path makes a
+// wrong-tab run fail loudly instead.
+const NOTE_PATH = `${NOTE}.md`;
+const EDITOR =
+    `(() => { let leaf = null; app.workspace.iterateAllLeaves((l) => { ` +
+    `if (l.view && l.view.file && l.view.file.path === ${JSON.stringify(NOTE_PATH)} && l.view.editor) leaf = l; }); ` +
+    `if (!leaf) throw new Error('smoke note is not open'); return leaf.view; })()`;
+// true only while the smoke note is the active tab - commands act on the
+// active view, so a press with another tab in front would edit that note
+const ACTIVE_IS_SMOKE =
+    `(() => { const v = app.workspace.activeLeaf && app.workspace.activeLeaf.view; ` +
+    `return !!(v && v.file && v.file.path === ${JSON.stringify(NOTE_PATH)}); })()`;
+// open the smoke note in its own tab (reusing one if it is already open)
+// and make it the active tab
+const ACTIVATE_SMOKE =
+    `(async () => { const f = app.vault.getAbstractFileByPath(${JSON.stringify(NOTE_PATH)}); if (!f) return; ` +
+    `let leaf = null; app.workspace.iterateAllLeaves((l) => { if (l.view && l.view.file && l.view.file.path === f.path) leaf = l; }); ` +
+    `if (!leaf) { leaf = app.workspace.getLeaf('tab'); await leaf.openFile(f); } ` +
+    `app.workspace.setActiveLeaf(leaf, { focus: true }); })();`;
 
 // content is set through the editor (not the file) so there is never a
 // disk-vs-unsaved-buffer conflict between tests
@@ -106,7 +135,9 @@ let noteReady = false;
 async function setupNote(content) {
     if (!noteReady) {
         ob("create", `name=${NOTE}`, "content=placeholder", "overwrite", "silent");
-        ob("open", `file=${NOTE}`);
+        // the CLI's "open" does not switch tabs - open and activate in-app
+        ob("eval", `code=${ACTIVATE_SMOKE}`);
+        await pollUntil("smoke note open and active", ACTIVE_IS_SMOKE, (v) => v === true);
         // the suite REQUIRES live preview: raw source mode renders no
         // table widgets (the cell tests just time out), and the leaf
         // inherits whatever mode its previous note used - force the mode
@@ -117,6 +148,12 @@ async function setupNote(content) {
         );
         await sleep(300);
         noteReady = true;
+    }
+    // the user may have clicked another tab mid-run: bring the smoke note
+    // back in front before anything is written or pressed
+    if (readJson(ACTIVE_IS_SMOKE) !== true) {
+        ob("eval", `code=${ACTIVATE_SMOKE}`);
+        await pollUntil("smoke note active again", ACTIVE_IS_SMOKE, (v) => v === true);
     }
     // close any popup a previous test left open (Escape routes through the
     // plugin's own close path, keeping its internal state consistent)
@@ -249,7 +286,7 @@ async function activateTableCell(line, outsideLine, landmark) {
     await sleep(200);
     await pollUntil(
         "table cell sub-editor open and focused on the target cell",
-        `(() => { const v=${EDITOR}; const t=document.querySelector('.markdown-source-view table'); ` +
+        `(() => { const v=${EDITOR}; const t=v.containerEl.querySelector('.markdown-source-view table'); ` +
         `const cc = t && t.querySelector('.cm-content'); ` +
         `if (cc && cc.textContent.includes(${JSON.stringify(landmark)})) { ` +
         `if (cc.contains(document.activeElement)) return true; cc.focus(); return false; } ` +
@@ -1823,7 +1860,7 @@ async function main() {
         // contentDOM directly and jiggle the cursor until the widget bites
         await pollUntil(
             "table cell sub-editor to open",
-            `(() => { const t=document.querySelector('.markdown-source-view table'); ` +
+            `(() => { const t=(${EDITOR}).containerEl.querySelector('.markdown-source-view table'); ` +
             `const v=${EDITOR}; ` +
             `const cm = !!(t && t.querySelector('.cm-content')); ` +
             `if (!cm) { v.editor.cm.contentDOM.focus(); ` +
@@ -2229,7 +2266,7 @@ async function main() {
         );
         await pollUntil(
             "table cell sub-editor to open",
-            `(() => { const t=document.querySelector('.markdown-source-view table'); ` +
+            `(() => { const t=(${EDITOR}).containerEl.querySelector('.markdown-source-view table'); ` +
             `return !!(t && t.querySelector('.cm-content')); })()`,
             (v) => v === true,
         );
