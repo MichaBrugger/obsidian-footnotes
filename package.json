@@ -48,6 +48,10 @@
     ],
     "ignore": [
       "vitest.stryker.config.ts"
+    ],
+    "ignoreBinaries": [
+      "Obsidian.com",
+      "ffmpeg"
     ]
   }
 }
