@@ -5,6 +5,7 @@ import { ValidatedTextModal } from "./validated-text-modal";
 import {
     footnoteNameProblem,
     occurrenceAtCursor,
+    quotedReference,
     referenceOccurrences,
 } from "../parsing/footnote-grammar";
 import { DocContext, docContext } from "../editor/doc-context";
@@ -362,7 +363,7 @@ class RenameFootnoteModal extends ValidatedTextModal {
                 return;
             case "dead":
                 this.showProblem(
-                    `"[^${newName}]" wouldn't survive as a footnote where it's used. Try a different name.`,
+                    `${quotedReference(newName)} wouldn't survive as a footnote where it's used. Try a different name.`,
                 );
                 return;
             case "renamed":

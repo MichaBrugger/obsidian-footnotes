@@ -2,7 +2,13 @@ import { Editor, EditorChange, EditorPosition } from "obsidian";
 
 import type FootnotePlugin from "../main";
 import { ValidatedTextModal } from "./validated-text-modal";
-import { idListIncludes, footnoteNameProblem, referenceOccurrences } from "../parsing/footnote-grammar";
+import {
+    definitionLabel,
+    footnoteNameProblem,
+    idListIncludes,
+    referenceOccurrences,
+    referenceText,
+} from "../parsing/footnote-grammar";
 import {
     comparePositions,
     endOfWordOffset,
@@ -699,7 +705,7 @@ function convertMainSelection(
     footnoteId: string | null,
 ): void {
     if (footnoteId === null) return;
-    const footnoteReference = `[^${footnoteId}]`;
+    const footnoteReference = referenceText(footnoteId);
     const isFirstFootnote = listExistingFootnoteDefinitions(doc, ctx).length === 0;
 
     // a multi-line selection becomes a multi-paragraph body: continuation
@@ -727,7 +733,7 @@ function convertMainSelection(
     // verifyLiveFootnoteInsertion reuses the same simulated result.
     const simulated = simulateChanges(ctx.lines, changes);
     const definitionAnchor = simulatedAnchor(ctx.lines, changes, 1, simulated);
-    const labelAt = definition.change.text.lastIndexOf(`[^${footnoteId}]: `);
+    const labelAt = definition.change.text.lastIndexOf(`${definitionLabel(footnoteId)} `);
     const labelLine =
         definitionAnchor.line +
         definition.change.text.slice(0, labelAt).split("\n").length -
@@ -792,7 +798,7 @@ function convertCellSelection(
 ): void {
     if (footnoteId === null) return;
     const ctx = docContext(doc);
-    const footnoteReference = `[^${footnoteId}]`;
+    const footnoteReference = referenceText(footnoteId);
     const isFirstFootnote = listExistingFootnoteDefinitions(doc, ctx).length === 0;
     if (
         !replaceInTableCell(cell, footnoteReference, selection.from, selection.to, footnoteReference.length)

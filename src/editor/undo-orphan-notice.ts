@@ -1,10 +1,7 @@
 import { EditorView, ViewUpdate } from "@codemirror/view";
 import { Notice } from "obsidian";
 
-import {
-    definitionLabelWithName,
-    referenceOccurrences,
-} from "../parsing/footnote-grammar";
+import { definitionLabelWithName, quotedReference, referenceOccurrences } from "../parsing/footnote-grammar";
 import { maskProtectedLines } from "../parsing/markdown-scan";
 
 import { showNotice } from "./notice";
@@ -129,7 +126,7 @@ export function undoOrphanNoticeExtension() {
         );
         if (orphaned.length === 0) return;
         // quoted like every other toast that names a footnote (2026-09-04)
-        const refs = orphaned.map((name) => `"[^${name}]"`).join(", ");
+        const refs = orphaned.map(quotedReference).join(", ");
         standing?.notice.hide();
         standing = {
             notice: showNotice(

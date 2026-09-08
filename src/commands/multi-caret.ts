@@ -3,10 +3,11 @@ import { Editor, EditorChange, EditorPosition } from "obsidian";
 import type FootnotePlugin from "../main";
 import {
     emptyReferenceStart,
-    idListIncludes,
     footnoteNameProblem,
+    idListIncludes,
     occurrenceAtCursor,
     referenceOccurrences,
+    referenceText,
 } from "../parsing/footnote-grammar";
 import { activeFootnotePrefix, footnotePrefixFromEditor } from "../parsing/footnote-prefix";
 import { adjustFootnotePosition, comparePositions } from "../editor/cursor-motion";
@@ -251,7 +252,7 @@ export function multiCaretPressHandled(
             : "";
         // an invalid prefix already toasted its reason
         if (prefix === null) return true;
-        const skeleton = `[^${prefix}]`;
+        const skeleton = referenceText(prefix);
         insertSkeletonAtEveryCaret(doc, ctx, targets, skeleton, 2 + prefix.length);
         return true;
     }
@@ -299,7 +300,7 @@ function insertReferenceAtEveryCaret(
 ): void {
     const footnoteId = autonumFootnoteId(plugin, doc, ctx);
     if (footnoteId === null) return;
-    const footnoteReference = `[^${footnoteId}]`;
+    const footnoteReference = referenceText(footnoteId);
     const isFirstFootnote = listExistingFootnoteDefinitions(doc, ctx).length === 0;
 
     const definition = buildDefinitionAppend(doc, footnoteId, isFirstFootnote, plugin, ctx);

@@ -148,6 +148,26 @@ export function idListIncludes(ids: string[], id: string): boolean {
 // about instead of silently misbehaving. Dollar signs are FINE - Jason
 // verified live that "[^a$1]" renders as a footnote (the scanner keeps
 // in-reference dollars out of math pairing for the same reason).
+// The three spellings of a footnote name, each with ONE owner (the
+// duplicated-logic audit found "[^…]" built in twenty places, 2026-09-05;
+// a spelling with one home is also what a future translation or syntax
+// change would need).
+
+/** The reference: "[^name]". */
+export function referenceText(name: string): string {
+    return `[^${name}]`;
+}
+
+/** The definition label, without the space before the body: "[^name]:". */
+export function definitionLabel(name: string): string {
+    return `[^${name}]:`;
+}
+
+/** The reference as every toast quotes it: `"[^name]"`. */
+export function quotedReference(name: string): string {
+    return `"[^${name}]"`;
+}
+
 export function isValidFootnoteName(name: string): boolean {
     return name.length > 0 && !/[\s`]/.test(name);
 }

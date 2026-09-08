@@ -1,6 +1,7 @@
 import { MarkdownView, Notice, Scope } from "obsidian";
 
 import type FootnotePlugin from "../main";
+import { definitionLabel, referenceText } from "../parsing/footnote-grammar";
 import {
     AppWithCommands,
     AppWithEmbedRegistry,
@@ -164,7 +165,7 @@ export async function openFootnotePopup(
     const placeCursorAfterReference = () => {
         const cursor = editor.getCursor();
         const line = editor.getLine(cursor.line);
-        const reference = `[^${footnoteId}]`;
+        const reference = referenceText(footnoteId);
         for (let idx = line.indexOf(reference); idx !== -1; idx = line.indexOf(reference, idx + 1)) {
             if (cursor.ch >= idx && cursor.ch <= idx + reference.length) {
                 editor.setCursor({ line: cursor.line, ch: idx + reference.length });
@@ -305,7 +306,7 @@ export async function openFootnotePopup(
     // name the footnote being edited so the user can tell references apart
     containerEl.createDiv({
         cls: "footnote-shortcut-popup-label",
-        text: `[^${footnoteId}]:`,
+        text: definitionLabel(footnoteId),
     });
     const embedEl = containerEl.createDiv("footnote-shortcut-popup-embed");
 

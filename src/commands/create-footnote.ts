@@ -8,10 +8,12 @@ import type FootnotePlugin from "../main";
 import {
     computeNextFootnoteNumber,
     emptyReferenceStart,
-    idListIncludes,
     footnoteNameProblem,
+    idListIncludes,
     InvalidNameCharacters,
+    quotedReference,
     referenceOccurrences,
+    referenceText,
 } from "../parsing/footnote-grammar";
 import { openFootnotePopup, popupEditingAvailable } from "./footnote-popup";
 import { jumpToFootnoteDefinition } from "./navigation";
@@ -372,7 +374,7 @@ export function createAutonumFootnote(
     // press was still consumed
     const footnoteId = autonumFootnoteId(plugin, doc, ctx);
     if (footnoteId === null) return true;
-    const footnoteReference = `[^${footnoteId}]`;
+    const footnoteReference = referenceText(footnoteId);
 
     // "first footnote" = first DEFINITION, matching the named command and
     // move-to-bottom's fixed point - the old "&& currentMax === 1" skipped
@@ -485,7 +487,7 @@ export function createMatchingFootnoteDefinition(
     // instead of creating a definition that can't work
     if (footnoteNameProblem(footnoteId) !== null) {
         showNotice(
-            `"[^${footnoteId}]" won't work as a footnote. ${InvalidNameCharacters}`,
+            `${quotedReference(footnoteId)} won't work as a footnote. ${InvalidNameCharacters}`,
             8000,
         );
         return true;
@@ -564,7 +566,7 @@ export function createFootnoteReference(
         // through the cell's own editor (never the main editor - that races
         // the cell's sync-back and corrupts the table); the caret lands
         // inside the brackets and focus stays in the cell for name entry
-        insertInTableCell(cell, plugin, `[^${prefix}]`, 2 + prefix.length);
+        insertInTableCell(cell, plugin, referenceText(prefix), 2 + prefix.length);
         return true;
     }
 
@@ -594,7 +596,7 @@ export function createFootnoteReference(
 
     const prefix = resolvePrefix();
     if (prefix === null) return true;
-    const emptyReference = `[^${prefix}]`;
+    const emptyReference = referenceText(prefix);
     cursorPosition = adjustFootnotePosition(cursorPosition, doc, lineText, plugin);
     // born-dead check (see simulatedMaskedLine): a placeholder that lands
     // masked would silently strand the name-entry flow

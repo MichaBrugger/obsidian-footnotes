@@ -8,7 +8,7 @@ import {
 } from "../commands/footnote-popup";
 import { jumpToFootnoteDefinition } from "../commands/navigation";
 import { docContext } from "../editor/doc-context";
-import { definitionLabelWithName } from "../parsing/footnote-grammar";
+import { definitionLabel, definitionLabelWithName } from "../parsing/footnote-grammar";
 import { footnotePrefix, footnotePrefixProblem } from "../parsing/footnote-prefix";
 import {
     findDefinitionBlocks,
@@ -447,7 +447,7 @@ function uniqueSeededDefinitionName(doc: Editor, body: string): string | null {
             ctx.maskedLine(block.start),
         );
         if (!hit) continue;
-        if (ctx.lines[block.start] !== `[^${hit.name}]: ${bodyLines[0]}`) {
+        if (ctx.lines[block.start] !== `${definitionLabel(hit.name)} ${bodyLines[0]}`) {
             continue;
         }
         let same = true;

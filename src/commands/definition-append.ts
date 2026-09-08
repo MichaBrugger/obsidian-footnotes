@@ -2,6 +2,7 @@ import { Editor, EditorChange, EditorPosition } from "obsidian";
 
 import type FootnotePlugin from "../main";
 import { DocContext, docContext } from "../editor/doc-context";
+import { definitionLabel } from "../parsing/footnote-grammar";
 import { findDefinitionBlocks, findLineRunEnd, scanDocument } from "../parsing/markdown-scan";
 
 // Where a new footnote definition lands: the section-heading setting and
@@ -130,10 +131,10 @@ export function buildDefinitionAppend(
             // the unclosed region starts at line 0 - plant the definition
             // on top, blank-separated from whatever follows
             const topText =
-                `[^${footnoteId}]: \n` + (lines[0].trim() === "" ? "" : "\n");
+                `${definitionLabel(footnoteId)} \n` + (lines[0].trim() === "" ? "" : "\n");
             return {
                 change: { from: { line: 0, ch: 0 }, text: topText },
-                cursor: { line: 0, ch: `[^${footnoteId}]: `.length },
+                cursor: { line: 0, ch: definitionLabel(footnoteId).length + 1 },
             };
         }
     } else if (plugin.settings.enableRemoveBlankLastLines) {
@@ -206,7 +207,7 @@ export function seedDefinitionBody(
     footnoteId: string,
     body: string,
 ): { change: EditorChange; cursor: EditorPosition; prepend?: EditorChange } {
-    const label = `[^${footnoteId}]: `;
+    const label = `${definitionLabel(footnoteId)} `;
     const text = definition.change.text;
     const at = text.lastIndexOf(label) + label.length;
     const bodyLines = body.split("\n");

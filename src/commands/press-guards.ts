@@ -1,7 +1,7 @@
 import { Editor, EditorPosition } from "obsidian";
 
 import type FootnotePlugin from "../main";
-import { emptyReferenceStart } from "../parsing/footnote-grammar";
+import { emptyReferenceStart, referenceText } from "../parsing/footnote-grammar";
 import { footnotePrefixFromEditor, footnotePrefixProblem } from "../parsing/footnote-prefix";
 import {
     exitInlineFootnoteIfInside,
@@ -173,7 +173,7 @@ export function warnPrefilledReferenceIfInside(
     // silent validity check - the invalid-prefix Notice belongs to the
     // insert path, not to every caret movement guard
     if (!prefix || footnotePrefixProblem(prefix) !== null) return false;
-    const placeholder = `[^${prefix}]`;
+    const placeholder = referenceText(prefix);
     if (!caretInsidePlaceholder(doc, cell, placeholder, cursorPosition)) {
         return false;
     }

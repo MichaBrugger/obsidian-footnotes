@@ -8,7 +8,7 @@ import {
     normalizeEol,
     scanDocument,
 } from "../parsing/markdown-scan";
-import { referenceOccurrences } from "../parsing/footnote-grammar";
+import { quotedReference, referenceOccurrences, referenceText } from "../parsing/footnote-grammar";
 import { inlineFootnoteSpanAt } from "../commands/inline-footnotes";
 import { duplicateFootnoteDefinitionNames } from "./rules/merge-duplicate-definitions";
 import { orphanedFootnoteDefinitionNames } from "./rules/remove-orphaned-definitions";
@@ -38,7 +38,7 @@ export function countEmptyFootnoteReferences(
     // alert helpers (2026-08-11 review perf item); direct callers omit it
     masked?: string[],
 ): number {
-    const needles = prefix ? ["[^]", `[^${prefix}]`] : ["[^]"];
+    const needles = prefix ? ["[^]", referenceText(prefix)] : ["[^]"];
     // masking only ever REMOVES needle occurrences, so a raw miss is
     // definitive - this runs on every lint, and most notes have no "[^]"
     // (perf F4: skip the whole-document masking pass)
@@ -89,7 +89,7 @@ function noticeEmptyReferences(
 
 /** `"[^a]", "[^b]", …` - at most three names spelled out, each in quotes like every other toast that names a footnote (Jason's consistency ask 2026-09-04), an ellipsis for the rest. */
 function referenceList(names: string[]): string {
-    const shown = names.slice(0, 3).map((name) => `"[^${name}]"`).join(", ");
+    const shown = names.slice(0, 3).map(quotedReference).join(", ");
     return names.length > 3 ? `${shown}, …` : shown;
 }
 

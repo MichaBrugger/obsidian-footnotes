@@ -1,4 +1,4 @@
-import { referenceOccurrences } from "../parsing/footnote-grammar";
+import { definitionLabel, referenceOccurrences, referenceText } from "../parsing/footnote-grammar";
 import { DefinitionStart } from "../parsing/markdown-scan";
 
 /**
@@ -21,7 +21,7 @@ export function rewriteFootnoteNames(
     for (const { name, start, end } of referenceOccurrences(line, masked)) {
         const newName = resolve(name);
         if (newName === null) continue;
-        result += line.slice(copied, start) + `[^${newName}]`;
+        result += line.slice(copied, start) + referenceText(newName);
         copied = end;
     }
     result += line.slice(copied);
@@ -29,7 +29,7 @@ export function rewriteFootnoteNames(
     if (definition) {
         const newName = resolve(definition[1]);
         if (newName !== null) {
-            result = `[^${newName}]:` + result.slice(definition[0].length);
+            result = definitionLabel(newName) + result.slice(definition[0].length);
         }
     }
     return result;

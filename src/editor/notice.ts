@@ -1,5 +1,7 @@
 import { Notice } from "obsidian";
 
+import { quotedReference } from "../parsing/footnote-grammar";
+
 // Every toast the plugin shows goes through showNotice. Obsidian's notice
 // wraps with `overflow-wrap: anywhere`, which is allowed to break a line
 // between ANY two characters once the line is full - so a quoted footnote
@@ -29,12 +31,12 @@ export const MultiCaretNestedNotice = NoFootnotesCreated + NestingRule;
 
 /** The advice for a definition nothing references - the navigation press and the lint alert give the same one. */
 export function addReferenceOrDeleteDefinition(name: string): string {
-    return `Add a "[^${name}]" reference in the text, or delete the definition.`;
+    return `Add a ${quotedReference(name)} reference in the text, or delete the definition.`;
 }
 
 /** A name another footnote already carries - the named-selection and Rename modals say the same thing. */
 export function nameAlreadyUsed(name: string): string {
-    return `"[^${name}]" is already used by another footnote.`;
+    return `${quotedReference(name)} is already used by another footnote.`;
 }
 
 /** An invalid footnote-prefix property, as the insert refusal and the lint cancel both report it. */
