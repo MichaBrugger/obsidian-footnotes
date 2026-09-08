@@ -12,7 +12,7 @@ import {
     SelectionSpanNotice,
     trimSelectionEdges,
 } from "../src/commands/selection-footnote";
-import { isValidFootnoteName } from "../src/parsing/footnote-grammar";
+import { footnoteNameProblem, isValidFootnoteName } from "../src/parsing/footnote-grammar";
 import {
     inlineFootnoteSpanAt,
     sanitizeInlineFootnoteContent,
@@ -280,7 +280,7 @@ function definitionNamesFolded(lines: string[]): Set<string> {
 const typedNameArb = fc.oneof(
     fc.constantFrom("note", "Note", "9", "a$1", "ch-2", "x"),
     fc.constantFrom("fresh", "Fresh-Name", "注釈", "x.y", "$start"),
-    fc.constantFrom("bad name", "tick`name"),
+    fc.constantFrom("bad name", "tick`name", "#tag", "a#b"),
     fc
         .string({ minLength: 1, maxLength: 12 })
         .map((s) => s.replace(/[[\]\s`\\^$\n\r]/g, ""))
@@ -419,8 +419,11 @@ describe("creation-command invariants over random documents", () => {
                     const folded = name.toLowerCase();
                     const definitionsAfter = definitionNamesFolded(doc.lines);
 
-                    if (!isValidFootnoteName(name)) {
-                        // spaces/backticks: warned about, nothing created
+                    if (footnoteNameProblem(name) !== null) {
+                        // spaces/backticks/"#": warned about, nothing
+                        // created (the creation rule, stricter than the
+                        // render rule - "#" renders but is refused,
+                        // 2026-09-05)
                         expect([...definitionsAfter].sort()).toEqual(
                             [...definitionsBefore].sort(),
                         );

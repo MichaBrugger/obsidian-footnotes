@@ -49,16 +49,16 @@ describe("isValidFootnoteName", () => {
 });
 
 describe("footnoteNameProblem (the creation and rename rule, 2026-09-05)", () => {
-    it("brackets have their own reason; spaces, backticks, and \"#\" share the one invalid-character message", () => {
-        expect(footnoteNameProblem("a[b")).toBe("Footnote names can't contain brackets.");
+    it("spaces, backticks, brackets, and \"#\" all share the one invalid-character message", () => {
+        expect(footnoteNameProblem("a[b")).toBe(InvalidNameCharacters);
         expect(footnoteNameProblem("a b")).toBe(InvalidNameCharacters);
         expect(footnoteNameProblem("a`b")).toBe(InvalidNameCharacters);
         expect(footnoteNameProblem("#x")).toBe(InvalidNameCharacters);
         expect(footnoteNameProblem("a#b")).toBe(InvalidNameCharacters);
     });
 
-    it('the message names all three (Jason: one rule, one toast, 2026-09-05)', () => {
-        expect(InvalidNameCharacters).toBe('Footnote names can\'t contain spaces, backticks, or "#".');
+    it('the message names all four (Jason: one rule, one toast, 2026-09-05)', () => {
+        expect(InvalidNameCharacters).toBe('Footnote names can\'t contain spaces, backticks, brackets, or "#".');
     });
 
     it("an ordinary name has no problem", () => {

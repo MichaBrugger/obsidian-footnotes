@@ -52,11 +52,10 @@ after the table
 
 ## Naming and renaming (inline reasons in the modal)
 
-- [ ] Named key on a selection, type `a[b`: "Footnote names can't contain brackets."
-- [ ] Type `a b`, then `a` + backtick + `b`, then `a#b`: each shows "Footnote names can't contain spaces, backticks, or "#"."
+- [ ] Named key on a selection, type `a[b`, then `a b`, then `a` + backtick + `b`, then `a#b`: each shows "Footnote names can't contain spaces, backticks, brackets, or "#"."
 - [ ] Type `1` (already defined): ""[^1]" is already defined. Pick a new name."
 - [ ] Rename footnote with the caret on plain prose: "Place the cursor on a footnote reference or definition to rename it."
-- [ ] Rename `[^1]` to `bad name`, `a#b`, `a[b`: the same three reasons as above, inline
+- [ ] Rename `[^1]` to `bad name`, `a#b`, `a[b`: the same message, inline
 - [ ] Rename `[^1]` to `2` (the second live footnote below): ""[^2]" is already used by another footnote."
 
 ## Multi-caret

@@ -160,12 +160,11 @@ export function isValidFootnoteName(name: string): boolean {
 // EXISTING "#" reference stays a footnote to the scanner and the linter,
 // because it does render. It shares the ordinary invalid-character
 // message with spaces and backticks (Jason: one rule, one toast).
-export const InvalidNameCharacters = 'Footnote names can\'t contain spaces, backticks, or "#".';
+export const InvalidNameCharacters = 'Footnote names can\'t contain spaces, backticks, brackets, or "#".';
 
-/** Why `name` can't name a NEW or RENAMED footnote, or null when it can: brackets, or any of the characters a footnote name can't carry. */
+/** Why `name` can't name a NEW or RENAMED footnote, or null when it can: one message for every character a name can't carry (Jason, 2026-09-05: the separate brackets line was redundant). */
 export function footnoteNameProblem(name: string): string | null {
-    if (/[[\]]/.test(name)) return "Footnote names can't contain brackets.";
-    if (!isValidFootnoteName(name) || name.includes("#")) return InvalidNameCharacters;
+    if (/[[\]#]/.test(name) || !isValidFootnoteName(name)) return InvalidNameCharacters;
     return null;
 }
 

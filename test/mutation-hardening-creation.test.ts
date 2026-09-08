@@ -1145,7 +1145,7 @@ describe("planFootnoteRename's refusals", () => {
             planFootnoteRename(renameDoc(["a[^x]", "", "[^x]: d"]), "x", "a#b"),
         ).toEqual({
             kind: "invalid",
-            reason: 'Footnote names can\'t contain spaces, backticks, or "#".',
+            reason: 'Footnote names can\'t contain spaces, backticks, brackets, or "#".',
         });
     });
 
@@ -1155,7 +1155,7 @@ describe("planFootnoteRename's refusals", () => {
             planFootnoteRename(renameDoc(["a[^x]", "", "[^x]: d"]), "x", "a[b"),
         ).toEqual({
             kind: "invalid",
-            reason: "Footnote names can't contain brackets.",
+            reason: 'Footnote names can\'t contain spaces, backticks, brackets, or "#".',
         });
     });
 
@@ -1164,13 +1164,13 @@ describe("planFootnoteRename's refusals", () => {
             planFootnoteRename(renameDoc(["a[^x]", "", "[^x]: d"]), "x", "bad name"),
         ).toEqual({
             kind: "invalid",
-            reason: 'Footnote names can\'t contain spaces, backticks, or "#".',
+            reason: 'Footnote names can\'t contain spaces, backticks, brackets, or "#".',
         });
         expect(
             planFootnoteRename(renameDoc(["a[^x]", "", "[^x]: d"]), "x", "tick`y"),
         ).toEqual({
             kind: "invalid",
-            reason: 'Footnote names can\'t contain spaces, backticks, or "#".',
+            reason: 'Footnote names can\'t contain spaces, backticks, brackets, or "#".',
         });
     });
 
