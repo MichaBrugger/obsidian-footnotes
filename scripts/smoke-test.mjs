@@ -174,6 +174,10 @@ async function waitForEditorText(expected) {
     );
 }
 
+function document_hasPopup() {
+    return readJson(`!!document.querySelector('.footnote-shortcut-popup')`) === true;
+}
+
 function setCursorAndRun(line, ch, commandId) {
     action(
         `const v=${EDITOR}; v.editor.setCursor({line:${line},ch:${ch}}); ` +
@@ -1655,6 +1659,38 @@ async function main() {
             `!document.querySelector('.footnote-shortcut-popup:not(.footnote-shortcut-popup-closed)')`,
             (v) => v === true,
         );
+    });
+
+    await test('an id containing "#" skips the popup and jumps at once, no waiting notice (2026-09-05)', async () => {
+        // Jason's report: a "#chapter-" prefix minted "[^#chapter-1]", the
+        // popup never came up (its "#[^id]" subpath splits on "#"), and the
+        // waiting notice sat there until the retry cap. The prefix rule now
+        // refuses "#"; for an id that already exists the popup must not
+        // even try - straight to the jump.
+        resetSettings({ enablePopupEditor: true });
+        await setupNote("Ref [^#x] end.\n\n[^#x]: hash def");
+        action(
+            `window.__hashNotice = false; const mo = new MutationObserver(() => { ` +
+            `for (const n of document.querySelectorAll('.notice')) { if (n.textContent.includes('Waiting for Obsidian to index')) window.__hashNotice = true; } }); ` +
+            `mo.observe(document.body, {childList: true, subtree: true}); window.__hashStop = () => mo.disconnect();`,
+        );
+        const t0 = Date.now();
+        setCursorAndRun(0, 6, CMD_NAMED); // inside [^#x]
+        try {
+            await pollUntil(
+                "caret on the definition line",
+                `(${EDITOR}).editor.getCursor().line`,
+                (v) => v === 2,
+                5000,
+            );
+            const took = Date.now() - t0;
+            if (took > 2500) throw new Error(`jump took ${took}ms - the popup retried instead of giving up at once`);
+            await sleep(400);
+            if (document_hasPopup()) throw new Error("a popup element was created for an id the subpath can't resolve");
+            if (readJson(`window.__hashNotice`) === true) throw new Error("the waiting notice appeared");
+        } finally {
+            action(`window.__hashStop?.();`);
+        }
     });
 
     await test("autonumbering ignores [^x] inside code blocks (issue #41)", async () => {

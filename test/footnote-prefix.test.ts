@@ -88,6 +88,13 @@ describe("computeNextFootnoteNumber with a prefix", () => {
 });
 
 describe("footnotePrefixProblem (QOL: prefix validation)", () => {
+    it('refuses "#" anywhere: a leading one is a YAML comment to Obsidian, and the popup can never bind an id with one (2026-09-05)', () => {
+        const message = `The footnote prefix can't contain spaces, backticks, brackets, or "#".`;
+        expect(footnotePrefixProblem("#chapter-")).toBe(message);
+        expect(footnotePrefixProblem("ch#")).toBe(message);
+        expect(footnotePrefixProblem("a#b-")).toBe(message);
+    });
+
     it("accepts a normal prefix", () => {
         expect(footnotePrefixProblem("2.")).toBeNull();
         expect(footnotePrefixProblem("ch-")).toBeNull();
@@ -99,9 +106,9 @@ describe("footnotePrefixProblem (QOL: prefix validation)", () => {
     });
 
     it("rejects spaces and brackets", () => {
-        expect(footnotePrefixProblem("a b")).toMatch(/spaces, backticks, or brackets/);
-        expect(footnotePrefixProblem("a[b]")).toMatch(/spaces, backticks, or brackets/);
-        expect(footnotePrefixProblem("a`b`")).toMatch(/spaces, backticks, or brackets/);
+        expect(footnotePrefixProblem("a b")).toMatch(/spaces, backticks, brackets, or "#"/);
+        expect(footnotePrefixProblem("a[b]")).toMatch(/spaces, backticks, brackets, or "#"/);
+        expect(footnotePrefixProblem("a`b`")).toMatch(/spaces, backticks, brackets, or "#"/);
     });
 
     it("rejects a trailing digit: [^101] would be ambiguous", () => {

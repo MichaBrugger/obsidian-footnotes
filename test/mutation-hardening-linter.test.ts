@@ -352,7 +352,7 @@ describe("lintBlockedByPrefix", () => {
         expect(
             lintBlockedByPrefix('---\nfootnote-prefix: "two words-"\n---\nbody'),
         ).toBe(
-            'Linting canceled: this note\'s footnote-prefix ("two words-") is invalid. The footnote prefix can\'t contain spaces, backticks, or brackets.',
+            'Linting canceled: this note\'s footnote-prefix ("two words-") is invalid. The footnote prefix can\'t contain spaces, backticks, brackets, or "#".',
         );
     });
 

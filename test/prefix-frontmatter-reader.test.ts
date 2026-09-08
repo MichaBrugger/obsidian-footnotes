@@ -25,7 +25,7 @@ describe("the footnote-prefix frontmatter reader", () => {
         const value = footnotePrefix("---\nfootnote-prefix: 2. # later chapters\n---\nbody");
         expect(value).toBe("2. # later chapters");
         expect(footnotePrefixProblem(value)).toBe(
-            "The footnote prefix can't contain spaces, backticks, or brackets.",
+            `The footnote prefix can't contain spaces, backticks, brackets, or "#".`,
         );
     });
 
@@ -35,11 +35,16 @@ describe("the footnote-prefix frontmatter reader", () => {
         expect(footnotePrefixProblem(value)).not.toBeNull();
     });
 
-    it("a comment-only value is read as the prefix it spells (accepted consequence of the ruling)", () => {
-        // YAML would call this an empty value; the plugin reads "#chapter".
-        // Hand-written edge nobody hits - the Properties editor can't
-        // write it - and it needs no special case.
-        expect(footnotePrefix("---\nfootnote-prefix: #chapter\n---\nbody")).toBe("#chapter");
+    it("a comment-only value is read literally and refused as invalid (Jason's ruling 2026-09-05)", () => {
+        // YAML would call this an empty value; the plugin reads "#chapter-"
+        // and the "#" rule refuses it with the ordinary invalid-prefix
+        // toast - it used to mint "[^#chapter-1]", an id the popup can
+        // never open (his report: blank definition, waiting notice)
+        const value = footnotePrefix("---\nfootnote-prefix: #chapter-\n---\nbody");
+        expect(value).toBe("#chapter-");
+        expect(footnotePrefixProblem(value)).toBe(
+            `The footnote prefix can't contain spaces, backticks, brackets, or "#".`,
+        );
     });
 
     it("a key with no space after the colon is not a YAML mapping entry (Obsidian shows no property)", () => {

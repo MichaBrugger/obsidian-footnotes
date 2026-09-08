@@ -100,8 +100,15 @@ export function footnotePrefixFromEditor(doc: Editor): string {
  */
 export function footnotePrefixProblem(prefix: string): string | null {
     if (!prefix) return null;
-    if (!isValidFootnoteName(prefix) || /[[\]]/.test(prefix)) {
-        return "The footnote prefix can't contain spaces, backticks, or brackets.";
+    // "#" is refused on top of the name rules: a leading "#" is a YAML
+    // comment to Obsidian (the property shows as empty, so the prefix
+    // would namespace footnotes from a value the user can't see), and a
+    // "#" ANYWHERE in an id is one the popup can never bind - its subpath
+    // uses "#" as the delimiter (Jason's report 2026-09-05: a
+    // "#chapter-" prefix minted "[^#chapter-1]", the popup never came up,
+    // and the waiting notice sat there until the cap).
+    if (!isValidFootnoteName(prefix) || /[[\]#]/.test(prefix)) {
+        return `The footnote prefix can't contain spaces, backticks, brackets, or "#".`;
     }
     if (/\d$/.test(prefix)) {
         return "The footnote prefix can't end in a number. Its footnotes would be indistinguishable from plain numbered ones.";

@@ -18,6 +18,18 @@
 
 export const PopupWaitingNotice = "Waiting for Obsidian to index the new footnote…";
 
+/**
+ * Whether the popup can bind `footnoteId` at all. The embed is bound by
+ * the subpath "#[^id]", and Obsidian splits subpaths on "#" - so an id
+ * carrying one can never resolve, no matter how long the retries wait
+ * (Jason's report 2026-09-05: a "[^#chapter-1]" sat behind the waiting
+ * notice until the cap, then jumped). Such ids skip the retry loop and
+ * take the jump fallback immediately.
+ */
+export function popupCanBind(footnoteId: string): boolean {
+    return !footnoteId.includes("#");
+}
+
 export const PopupRetryTiming = {
     /** How long before the wait gets a notice - past the point it feels like a dropped keypress. */
     noticeAfterMs: 1000,

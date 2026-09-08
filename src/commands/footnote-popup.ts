@@ -8,7 +8,7 @@ import {
     EditorWithCm,
     readingViewActive,
 } from "../editor/obsidian-internals";
-import { PopupWaitingNotice, retryUntilShown } from "./popup-retry";
+import { popupCanBind, PopupWaitingNotice, retryUntilShown } from "./popup-retry";
 
 import { showNotice } from "../editor/notice";
 // A small popup anchored at the cursor containing Obsidian's own editable
@@ -98,6 +98,13 @@ export async function openFootnotePopup(
     onUnavailable?: () => void,
 ) {
     dismissFootnotePopup();
+
+    // an id the subpath can never resolve: straight to the jump, no
+    // waiting notice, no 20s of retries (see popupCanBind)
+    if (!popupCanBind(footnoteId)) {
+        onUnavailable?.();
+        return;
+    }
 
     const mdView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
     if (!mdView || !mdView.file) {

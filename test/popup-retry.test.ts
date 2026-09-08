@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+    popupCanBind,
     PopupRetryHooks,
     PopupRetryTiming,
     retryUntilShown,
@@ -90,6 +91,19 @@ function harness(tryShowResults: () => boolean) {
         notices: () => ({ shown: noticeShown, hidden: noticeHidden }),
     };
 }
+
+describe("popupCanBind", () => {
+    it('an id with "#" can never resolve through the "#[^id]" subpath, so the popup must not even try', () => {
+        expect(popupCanBind("#chapter-1")).toBe(false);
+        expect(popupCanBind("a#b")).toBe(false);
+    });
+
+    it("ordinary ids, colons and dots included, can", () => {
+        expect(popupCanBind("1")).toBe(true);
+        expect(popupCanBind("arXiv:1234.5678")).toBe(true);
+        expect(popupCanBind("2.7")).toBe(true);
+    });
+});
 
 const T = PopupRetryTiming;
 const rebuilds = (log: string[]) => log.filter((e) => e.startsWith("rebuild"));
