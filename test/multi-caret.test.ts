@@ -333,7 +333,7 @@ describe("a second press with EVERY caret inside the same footnote continues it 
         expect(doc.lines).toEqual(before);
         expect(
             noticed(
-                'Footnote name "#x" contains "#", so Obsidian\'s footnote preview and sidebar can\'t find it. Remove the "#".',
+                'Footnote name "#x" contains "#", so it won\'t work as a footnote in Obsidian. Remove the "#".',
             ),
         ).toBe(true);
     });

@@ -400,7 +400,7 @@ describe("the named key converts a selection through its modal (2026-08-13)", ()
         };
         expect(
             convertSelectionToNamed(fakePlugin(doc), doc, selection, "bad name"),
-        ).toBe("Footnote names can't contain spaces or backticks.");
+        ).toBe('Footnote names can\'t contain spaces, backticks, or "#".');
         expect(
             convertSelectionToNamed(fakePlugin(doc), doc, selection, "a[b"),
         ).toBe("Footnote names can't contain brackets.");
@@ -408,7 +408,7 @@ describe("the named key converts a selection through its modal (2026-08-13)", ()
         // them (2026-09-05)
         expect(
             convertSelectionToNamed(fakePlugin(doc), doc, selection, "a#b"),
-        ).toBe(`Footnote names can't contain "#". Obsidian's footnote preview and sidebar can't find such footnotes.`);
+        ).toBe('Footnote names can\'t contain spaces, backticks, or "#".');
         expect(doc.lines).toEqual(["The quick fox"]);
     });
 

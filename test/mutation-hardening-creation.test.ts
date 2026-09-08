@@ -367,7 +367,7 @@ describe("createMatchingFootnoteDefinition", () => {
         ).toBe(true);
         expect(
             noticed(
-                'Footnote name "#x" contains "#", so Obsidian\'s footnote preview and sidebar can\'t find it. Remove the "#".',
+                'Footnote name "#x" contains "#", so it won\'t work as a footnote in Obsidian. Remove the "#".',
             ),
         ).toBe(true);
         expect(doc.lines).toEqual(["see [^#x] x"]);
@@ -388,7 +388,7 @@ describe("createMatchingFootnoteDefinition", () => {
         ).toBe(true);
         expect(
             noticed(
-                'Footnote name "a b" contains spaces, so Obsidian won\'t render it as a footnote. Remove the spaces.',
+                'Footnote name "a b" contains spaces, so it won\'t work as a footnote in Obsidian. Remove the spaces.',
             ),
         ).toBe(true);
         expect(doc.lines).toEqual(["see [^a b] x"]);
@@ -407,7 +407,7 @@ describe("createMatchingFootnoteDefinition", () => {
         ).toBe(true);
         expect(
             noticed(
-                'Footnote name "a`b" contains backticks, so Obsidian won\'t render it as a footnote. Remove the backticks.',
+                'Footnote name "a`b" contains backticks, so it won\'t work as a footnote in Obsidian. Remove the backticks.',
             ),
         ).toBe(true);
     });
@@ -1145,7 +1145,7 @@ describe("planFootnoteRename's refusals", () => {
             planFootnoteRename(renameDoc(["a[^x]", "", "[^x]: d"]), "x", "a#b"),
         ).toEqual({
             kind: "invalid",
-            reason: `Footnote names can't contain "#". Obsidian's footnote preview and sidebar can't find such footnotes.`,
+            reason: 'Footnote names can\'t contain spaces, backticks, or "#".',
         });
     });
 
@@ -1164,13 +1164,13 @@ describe("planFootnoteRename's refusals", () => {
             planFootnoteRename(renameDoc(["a[^x]", "", "[^x]: d"]), "x", "bad name"),
         ).toEqual({
             kind: "invalid",
-            reason: "Footnote names can't contain spaces or backticks.",
+            reason: 'Footnote names can\'t contain spaces, backticks, or "#".',
         });
         expect(
             planFootnoteRename(renameDoc(["a[^x]", "", "[^x]: d"]), "x", "tick`y"),
         ).toEqual({
             kind: "invalid",
-            reason: "Footnote names can't contain spaces or backticks.",
+            reason: 'Footnote names can\'t contain spaces, backticks, or "#".',
         });
     });
 

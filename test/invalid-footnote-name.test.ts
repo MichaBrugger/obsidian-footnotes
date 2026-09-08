@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { createMatchingFootnoteDefinition } from "../src/commands/create-footnote";
 import {
     footnoteNameProblem,
-    HashNameProblem,
+    InvalidNameCharacters,
     isValidFootnoteName,
 } from "../src/parsing/footnote-grammar";
 import type FootnotePlugin from "../src/main";
@@ -49,18 +49,16 @@ describe("isValidFootnoteName", () => {
 });
 
 describe("footnoteNameProblem (the creation and rename rule, 2026-09-05)", () => {
-    it("brackets, then whitespace or backticks, then \"#\" - each with its own reason", () => {
+    it("brackets have their own reason; spaces, backticks, and \"#\" share the one invalid-character message", () => {
         expect(footnoteNameProblem("a[b")).toBe("Footnote names can't contain brackets.");
-        expect(footnoteNameProblem("a b")).toBe("Footnote names can't contain spaces or backticks.");
-        expect(footnoteNameProblem("a`b")).toBe("Footnote names can't contain spaces or backticks.");
-        expect(footnoteNameProblem("#x")).toBe(HashNameProblem);
-        expect(footnoteNameProblem("a#b")).toBe(HashNameProblem);
+        expect(footnoteNameProblem("a b")).toBe(InvalidNameCharacters);
+        expect(footnoteNameProblem("a`b")).toBe(InvalidNameCharacters);
+        expect(footnoteNameProblem("#x")).toBe(InvalidNameCharacters);
+        expect(footnoteNameProblem("a#b")).toBe(InvalidNameCharacters);
     });
 
-    it('"#" is refused because Obsidian\'s preview and sidebar can\'t find such footnotes (Jason\'s finding)', () => {
-        expect(HashNameProblem).toBe(
-            `Footnote names can't contain "#". Obsidian's footnote preview and sidebar can't find such footnotes.`,
-        );
+    it('the message names all three (Jason: one rule, one toast, 2026-09-05)', () => {
+        expect(InvalidNameCharacters).toBe('Footnote names can\'t contain spaces, backticks, or "#".');
     });
 
     it("an ordinary name has no problem", () => {

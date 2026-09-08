@@ -158,14 +158,14 @@ export function isValidFootnoteName(name: string): boolean {
 // that splits on "#" - both say "Footnote not found" for it (Jason's
 // finding 2026-09-05), and the plugin's popup can't bind it either. An
 // EXISTING "#" reference stays a footnote to the scanner and the linter,
-// because it does render.
-export const HashNameProblem = `Footnote names can't contain "#". Obsidian's footnote preview and sidebar can't find such footnotes.`;
+// because it does render. It shares the ordinary invalid-character
+// message with spaces and backticks (Jason: one rule, one toast).
+export const InvalidNameCharacters = 'Footnote names can\'t contain spaces, backticks, or "#".';
 
-/** Why `name` can't name a NEW or RENAMED footnote, or null when it can: brackets, then whitespace or backticks (never renders), then "#". */
+/** Why `name` can't name a NEW or RENAMED footnote, or null when it can: brackets, or any of the characters a footnote name can't carry. */
 export function footnoteNameProblem(name: string): string | null {
     if (/[[\]]/.test(name)) return "Footnote names can't contain brackets.";
-    if (!isValidFootnoteName(name)) return "Footnote names can't contain spaces or backticks.";
-    if (name.includes("#")) return HashNameProblem;
+    if (!isValidFootnoteName(name) || name.includes("#")) return InvalidNameCharacters;
     return null;
 }
 
