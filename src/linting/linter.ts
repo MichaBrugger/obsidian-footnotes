@@ -8,14 +8,10 @@ import {
 } from "../commands/footnote-popup";
 import { jumpToFootnoteDefinition } from "../commands/navigation";
 import { docContext } from "../editor/doc-context";
+import { rewriteDocument } from "./rewrite-document";
 import { definitionLabel, definitionLabelWithName } from "../parsing/footnote-grammar";
 import { footnotePrefix, footnotePrefixProblem } from "../parsing/footnote-prefix";
-import {
-    findDefinitionBlocks,
-    maskProtectedLines,
-    normalizeEol,
-    restoreEol,
-} from "../parsing/markdown-scan";
+import { findDefinitionBlocks, maskProtectedLines } from "../parsing/markdown-scan";
 import { AppWithCommands, AppWithPlugins, readingViewActive, viewEditor, WindowWithVim } from "../editor/obsidian-internals";
 import { activeTableCellEditor, nestedSubEditorOwnsFocus, runOutsideTableCell } from "../editor/table-cursor";
 import { applyFootnotePrefix } from "./rules/apply-footnote-prefix";
@@ -103,99 +99,97 @@ export function lintFootnotes(
 ): string {
     // normalize once here so the composed steps all see LF and the note's
     // original endings are restored a single time on the way out
-    const { text, eol } = normalizeEol(markdown);
-    let result = text;
-    // duplicates merge FIRST of all: every rule below then sees one
-    // definition block per name - orphan deletion judges one block, move
-    // gathers one, reindex permutes one - and a second pass has no
-    // duplicates left, so the pipeline stays idempotent
-    if (options.mergeDuplicateDefinitions) {
-        result = mergeDuplicateFootnoteDefinitions(result);
-    }
-    // definitions slated for deletion shouldn't be moved, prefixed,
-    // or handed numbers by the rules below - and deleting orphaned
-    // definitions can't orphan a live reference (a reference's presence is
-    // exactly what keeps a definition alive). Reindex's own
-    // keepOrphanedDefinitions:false deletion is hoisted here too (the two
-    // routes share orphanedDefinitionBlocks, so they agree; reindex's
-    // internal pass then finds nothing left): EVERY definition deletion
-    // must precede the reference deletion below, whose refusal guard
-    // judges definition geometry - a definition deleted after that
-    // judgment flipped the verdict between passes (idempotence property,
-    // 2026-08-10).
-    const reindexDeletesOrphans =
-        (options.reindex ?? true) &&
-        options.reindexOptions?.keepOrphanedDefinitions === false;
-    if (options.removeOrphanedDefinitions || reindexDeletesOrphans) {
-        result = removeOrphanedFootnoteDefinitions(result);
-    }
-    if (options.fixPunctuation ?? true) {
-        result = footnoteAfterPunctuation(result);
-    }
-    if (options.moveDefinitionsToBottom ?? true) {
-        result = moveFootnoteDefinitionsToBottom(
-            result,
-            options.sectionHeading ?? "",
-        );
-    }
-    // orphaned-REFERENCE deletion runs on the SETTLED layout - after the
-    // deletions and moves above, before prefix/reindex hand out numbers.
-    // Its classification-refusal guard (bug-orphan-delete-reclassifies)
-    // judges the geometry of definitions around the reference, and both
-    // definition deletion and move-to-bottom change that geometry: judged
-    // any earlier, pass one can refuse a deletion pass two then performs
-    // (caught twice by the idempotence property, 2026-08-10). Punctuation
-    // may swap a doomed reference first - harmless, the deletion seam
-    // heals to the same text. Everything downstream only renames or
-    // permutes definitions among existing slots, which never changes
-    // whether a definition sits above a reference, so the guard's verdict
-    // is stable across passes.
-    if (options.removeOrphanedReferences) {
-        const beforeDeletion = result;
-        result = removeOrphanedFootnoteReferences(
-            result,
-            options.orphanSafePrefix ?? "",
-        );
-        // a deleted reference can leave its line blank; where that blank
-        // touches the moved definitions' seams, the NEXT pass's move would
-        // collapse it - re-settle now so this pass's output is already the
-        // fixed point (idempotence property, 2026-08-10)
-        if (result !== beforeDeletion && (options.moveDefinitionsToBottom ?? true)) {
+    return rewriteDocument(markdown, (text) => {
+        let result = text;
+        // duplicates merge FIRST of all: every rule below then sees one
+        // definition block per name - orphan deletion judges one block, move
+        // gathers one, reindex permutes one - and a second pass has no
+        // duplicates left, so the pipeline stays idempotent
+        if (options.mergeDuplicateDefinitions) {
+            result = mergeDuplicateFootnoteDefinitions(result);
+        }
+        // definitions slated for deletion shouldn't be moved, prefixed,
+        // or handed numbers by the rules below - and deleting orphaned
+        // definitions can't orphan a live reference (a reference's presence is
+        // exactly what keeps a definition alive). Reindex's own
+        // keepOrphanedDefinitions:false deletion is hoisted here too (the two
+        // routes share orphanedDefinitionBlocks, so they agree; reindex's
+        // internal pass then finds nothing left): EVERY definition deletion
+        // must precede the reference deletion below, whose refusal guard
+        // judges definition geometry - a definition deleted after that
+        // judgment flipped the verdict between passes (idempotence property,
+        // 2026-08-10).
+        const reindexDeletesOrphans =
+            (options.reindex ?? true) &&
+            options.reindexOptions?.keepOrphanedDefinitions === false;
+        if (options.removeOrphanedDefinitions || reindexDeletesOrphans) {
+            result = removeOrphanedFootnoteDefinitions(result);
+        }
+        if (options.fixPunctuation ?? true) {
+            result = footnoteAfterPunctuation(result);
+        }
+        if (options.moveDefinitionsToBottom ?? true) {
             result = moveFootnoteDefinitionsToBottom(
                 result,
                 options.sectionHeading ?? "",
             );
         }
-    }
-    // the note's own valid footnote-prefix, when the prefix behavior is on
-    // (an invalid property changes nothing here - the lint guard cancels
-    // those runs outright anyway)
-    const notePrefix = options.applyNotePrefix ? footnotePrefix(result) : "";
-    const validPrefix =
-        notePrefix && footnotePrefixProblem(notePrefix) === null
-            ? notePrefix
-            : "";
-    if (options.applyNotePrefix && validPrefix) {
-        // BEFORE reindex: strays adopt the prefix (plain numbers slot past
-        // the existing maximum, names keep their name behind it), and the
-        // prefix-aware reindex below then renumbers the WHOLE namespace by
-        // reading order - one lint converges instead of needing a second pass
-        result = applyFootnotePrefix(result, validPrefix);
-    }
-    if (options.reindex ?? true) {
-        result = reindexFootnotes(result, {
-            ...options.reindexOptions,
-            // matching-prefixed footnotes are numbered footnotes (QOL):
-            // reindex renumbers them within the namespace like plain ones.
-            // validPrefix is "" unless applyNotePrefix is on - both prefix
-            // behaviors ride the one flag
-            prefix: validPrefix,
-        });
-    }
-    // byte-identical no-op: restoring EOL onto an unchanged result would
-    // normalize a mixed-EOL note and report a phantom lint (decided
-    // 2026-08-10, spec-mixed-eol-noop-rewrite)
-    return result === text ? markdown : restoreEol(result, eol);
+        // orphaned-REFERENCE deletion runs on the SETTLED layout - after the
+        // deletions and moves above, before prefix/reindex hand out numbers.
+        // Its classification-refusal guard (bug-orphan-delete-reclassifies)
+        // judges the geometry of definitions around the reference, and both
+        // definition deletion and move-to-bottom change that geometry: judged
+        // any earlier, pass one can refuse a deletion pass two then performs
+        // (caught twice by the idempotence property, 2026-08-10). Punctuation
+        // may swap a doomed reference first - harmless, the deletion seam
+        // heals to the same text. Everything downstream only renames or
+        // permutes definitions among existing slots, which never changes
+        // whether a definition sits above a reference, so the guard's verdict
+        // is stable across passes.
+        if (options.removeOrphanedReferences) {
+            const beforeDeletion = result;
+            result = removeOrphanedFootnoteReferences(
+                result,
+                options.orphanSafePrefix ?? "",
+            );
+            // a deleted reference can leave its line blank; where that blank
+            // touches the moved definitions' seams, the NEXT pass's move would
+            // collapse it - re-settle now so this pass's output is already the
+            // fixed point (idempotence property, 2026-08-10)
+            if (result !== beforeDeletion && (options.moveDefinitionsToBottom ?? true)) {
+                result = moveFootnoteDefinitionsToBottom(
+                    result,
+                    options.sectionHeading ?? "",
+                );
+            }
+        }
+        // the note's own valid footnote-prefix, when the prefix behavior is on
+        // (an invalid property changes nothing here - the lint guard cancels
+        // those runs outright anyway)
+        const notePrefix = options.applyNotePrefix ? footnotePrefix(result) : "";
+        const validPrefix =
+            notePrefix && footnotePrefixProblem(notePrefix) === null
+                ? notePrefix
+                : "";
+        if (options.applyNotePrefix && validPrefix) {
+            // BEFORE reindex: strays adopt the prefix (plain numbers slot past
+            // the existing maximum, names keep their name behind it), and the
+            // prefix-aware reindex below then renumbers the WHOLE namespace by
+            // reading order - one lint converges instead of needing a second pass
+            result = applyFootnotePrefix(result, validPrefix);
+        }
+        if (options.reindex ?? true) {
+            result = reindexFootnotes(result, {
+                ...options.reindexOptions,
+                // matching-prefixed footnotes are numbered footnotes (QOL):
+                // reindex renumbers them within the namespace like plain ones.
+                // validPrefix is "" unless applyNotePrefix is on - both prefix
+                // behaviors ride the one flag
+                prefix: validPrefix,
+            });
+        }
+        return result;
+    });
 }
 
 // Replace only the changed middle of the document, so the cursor and the

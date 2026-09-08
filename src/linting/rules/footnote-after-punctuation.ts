@@ -1,13 +1,7 @@
 import { referenceOccurrences } from "../../parsing/footnote-grammar";
-import {
-    definitionLabelIn,
-    maskProtectedLines,
-    normalizeEol,
-    scanDocument,
-    restoreEol,
-    TrailingPunctuationChars,
-} from "../../parsing/markdown-scan";
+import { definitionLabelIn, TrailingPunctuationChars } from "../../parsing/markdown-scan";
 import { IgnoreType } from "../ignore-types";
+import { rewriteDocument } from "../rewrite-document";
 import { FootnoteRule } from "../rule";
 
 // Linter's "footnote after punctuation" as a pure transform. Policy pinned
@@ -78,30 +72,26 @@ function swapInSegment(original: string, masked: string): string {
  * inline code, and frontmatter are left alone.
  */
 export function footnoteAfterPunctuation(markdown: string): string {
-    const { text, eol } = normalizeEol(markdown);
-    const lines = text.split("\n");
     // document-aware masking: the comment portions of multi-line boundary
     // lines are masked while their live portions still get the swap
     // (bug-comment-boundary-lines)
-    const scan = scanDocument(lines);
-    const maskedLines = maskProtectedLines(lines, scan);
+    return rewriteDocument(markdown, (_text, { lines, scan, maskedLines }) => {
 
-    const result = lines.map((line, i) => {
-        if (scan.isProtected[i]) return line;
-        const masked = maskedLines[i];
-        // a definition's own "[^x]:" prefix must not be treated as a
-        // reference-before-colon - skip past it. Blockquoted/callout labels
-        // ("> [^1]: def.") are definitions too (C22): the swap used to
-        // mangle them into "> :[^1] def."
-        const prefixLength = definitionLabelIn(line)?.labelEnd ?? 0;
-        return (
-            line.slice(0, prefixLength) +
-            swapInSegment(line.slice(prefixLength), masked.slice(prefixLength))
-        );
+        const result = lines.map((line, i) => {
+            if (scan.isProtected[i]) return line;
+            const masked = maskedLines[i];
+            // a definition's own "[^x]:" prefix must not be treated as a
+            // reference-before-colon - skip past it. Blockquoted/callout labels
+            // ("> [^1]: def.") are definitions too (C22): the swap used to
+            // mangle them into "> :[^1] def."
+            const prefixLength = definitionLabelIn(line)?.labelEnd ?? 0;
+            return (
+                line.slice(0, prefixLength) +
+                swapInSegment(line.slice(prefixLength), masked.slice(prefixLength))
+            );
+        });
+        return result.join("\n");
     });
-    const joined = result.join("\n");
-    // byte-identical no-op on mixed-EOL notes (spec-mixed-eol-noop-rewrite)
-    return joined === text ? markdown : restoreEol(joined, eol);
 }
 
 /** Linter-shaped wrapper: id matches Linter's rule filename. */

@@ -3,12 +3,11 @@ import { referenceOccurrences } from "../../parsing/footnote-grammar";
 import {
     findDefinitionBlocks,
     maskProtectedLines,
-    normalizeEol,
     scanDocument,
     removeLineRanges,
-    restoreEol,
 } from "../../parsing/markdown-scan";
 import { IgnoreType } from "../ignore-types";
+import { rewriteDocument } from "../rewrite-document";
 import { rewriteFootnoteNames } from "../rewrite-footnote-names";
 import { FootnoteRule } from "../rule";
 import { orphanedDefinitionBlocks } from "./remove-orphaned-definitions";
@@ -126,104 +125,104 @@ function reindexOnce(
         name.startsWith(prefixFolded) &&
         /^\d+$/.test(name.slice(prefixFolded.length));
 
-    const { text, eol } = normalizeEol(markdown);
-    let lines = text.split("\n");
-    let scan = scanDocument(lines);
-    let maskedLines = maskProtectedLines(lines, scan);
-    let blocks = findDefinitionBlocks(lines, scan.isProtected, scan);
-    let referenceOrder = referenceAppearanceOrder(lines, maskedLines);
+    return rewriteDocument(markdown, (text, view) => {
+        // rebound below when orphan deletion rewrites the note mid-pass
+        let lines = view.lines;
+        let scan = view.scan;
+        let maskedLines = view.maskedLines;
+        let blocks = view.blocks;
+        let referenceOrder = referenceAppearanceOrder(lines, maskedLines);
 
-    if (!keepOrphans) {
-        // the shared reference-graph deletion: transitive chains of any
-        // depth die in THIS pass (the outer fixpoint used to expose one
-        // link per iteration and its cap returned mid-chain on 21+-deep
-        // chains - bug-reindex-orphan-cap), while definitions referencing
-        // each other in a cycle count as referenced and survive
-        const orphans = orphanedDefinitionBlocks(lines, scan);
-        if (orphans.length > 0) {
-            // cut the orphan blocks out, then re-derive everything - line
-            // numbers shifted, and a cut can even change fence pairing
-            lines = removeLineRanges(lines, orphans);
-            scan = scanDocument(lines);
-            maskedLines = maskProtectedLines(lines, scan);
-            blocks = findDefinitionBlocks(lines, scan.isProtected, scan);
-            referenceOrder = referenceAppearanceOrder(lines, maskedLines);
+        if (!keepOrphans) {
+            // the shared reference-graph deletion: transitive chains of any
+            // depth die in THIS pass (the outer fixpoint used to expose one
+            // link per iteration and its cap returned mid-chain on 21+-deep
+            // chains - bug-reindex-orphan-cap), while definitions referencing
+            // each other in a cycle count as referenced and survive
+            const orphans = orphanedDefinitionBlocks(lines, scan);
+            if (orphans.length > 0) {
+                // cut the orphan blocks out, then re-derive everything - line
+                // numbers shifted, and a cut can even change fence pairing
+                lines = removeLineRanges(lines, orphans);
+                scan = scanDocument(lines);
+                maskedLines = maskProtectedLines(lines, scan);
+                blocks = findDefinitionBlocks(lines, scan.isProtected, scan);
+                referenceOrder = referenceAppearanceOrder(lines, maskedLines);
+            }
         }
-    }
 
-    // referenced names first (by first reference appearance), then whatever
-    // orphaned definitions remain, in definition order
-    // all names are canonical (lowercased) here so case-variant references and
-    // definitions share one identity throughout ordering and numbering
-    const order = [...referenceOrder];
-    const seen = new Set(order);
-    for (const block of blocks) {
-        const name = block.name.toLowerCase();
-        if (!seen.has(name)) {
-            seen.add(name);
-            order.push(name);
+        // referenced names first (by first reference appearance), then whatever
+        // orphaned definitions remain, in definition order
+        // all names are canonical (lowercased) here so case-variant references and
+        // definitions share one identity throughout ordering and numbering
+        const order = [...referenceOrder];
+        const seen = new Set(order);
+        for (const block of blocks) {
+            const name = block.name.toLowerCase();
+            if (!seen.has(name)) {
+                seen.add(name);
+                order.push(name);
+            }
         }
-    }
 
-    // numbered names → their new number, in appearance order; the prefix
-    // namespace runs its own independent counter; named footnotes only
-    // consume a number when they're being renumbered too - and with an
-    // active prefix they renumber INTO its namespace (they're this note's
-    // footnotes), which also keeps the lint pipeline idempotent: a plain
-    // number here would be re-prefixed by the next apply-prefix pass
-    const renames = new Map<string, string>();
-    let nextNumber = 1;
-    let nextPrefixed = 1;
-    for (const name of order) {
-        if (isPrefixedNumbered(name)) {
-            renames.set(name, `${prefixOut}${nextPrefixed++}`);
-        } else if (/^\d+$/.test(name)) {
-            renames.set(name, String(nextNumber++));
-        } else if (renumberNamed) {
-            renames.set(
-                name,
-                prefixOut
-                    ? `${prefixOut}${nextPrefixed++}`
-                    : String(nextNumber++),
-            );
+        // numbered names → their new number, in appearance order; the prefix
+        // namespace runs its own independent counter; named footnotes only
+        // consume a number when they're being renumbered too - and with an
+        // active prefix they renumber INTO its namespace (they're this note's
+        // footnotes), which also keeps the lint pipeline idempotent: a plain
+        // number here would be re-prefixed by the next apply-prefix pass
+        const renames = new Map<string, string>();
+        let nextNumber = 1;
+        let nextPrefixed = 1;
+        for (const name of order) {
+            if (isPrefixedNumbered(name)) {
+                renames.set(name, `${prefixOut}${nextPrefixed++}`);
+            } else if (/^\d+$/.test(name)) {
+                renames.set(name, String(nextNumber++));
+            } else if (renumberNamed) {
+                renames.set(
+                    name,
+                    prefixOut
+                        ? `${prefixOut}${nextPrefixed++}`
+                        : String(nextNumber++),
+                );
+            }
         }
-    }
 
-    // ids matched case-insensitively; the map is complete, so swaps can't
-    // collide
-    const rewritten = lines.map((line, i) =>
-        scan.isProtected[i]
-            ? line
-            : rewriteFootnoteNames(line, maskedLines[i], (name) => renames.get(name.toLowerCase()) ?? null),
-    );
+        // ids matched case-insensitively; the map is complete, so swaps can't
+        // collide
+        const rewritten = lines.map((line, i) =>
+            scan.isProtected[i]
+                ? line
+                : rewriteFootnoteNames(line, maskedLines[i], (name) => renames.get(name.toLowerCase()) ?? null),
+        );
 
-    // permute definition blocks among their existing slots so they read in
-    // appearance order; a stable sort keeps duplicate definitions together
-    const orderIndex = new Map(order.map((name, i) => [name, i]));
-    const sorted = blocks
-        .map((block, i) => ({ block, i }))
-        .sort(
-            (a, b) =>
-                (orderIndex.get(a.block.name.toLowerCase()) ?? 0) -
-                    (orderIndex.get(b.block.name.toLowerCase()) ?? 0) || a.i - b.i,
-        )
-        .map((entry) => entry.block);
+        // permute definition blocks among their existing slots so they read in
+        // appearance order; a stable sort keeps duplicate definitions together
+        const orderIndex = new Map(order.map((name, i) => [name, i]));
+        const sorted = blocks
+            .map((block, i) => ({ block, i }))
+            .sort(
+                (a, b) =>
+                    (orderIndex.get(a.block.name.toLowerCase()) ?? 0) -
+                        (orderIndex.get(b.block.name.toLowerCase()) ?? 0) || a.i - b.i,
+            )
+            .map((entry) => entry.block);
 
-    const slotAtLine = new Map(blocks.map((block, i) => [block.start, i]));
-    const out: string[] = [];
-    for (let i = 0; i < lines.length; i++) {
-        const slot = slotAtLine.get(i);
-        if (slot === undefined) {
-            out.push(rewritten[i]);
-            continue;
+        const slotAtLine = new Map(blocks.map((block, i) => [block.start, i]));
+        const out: string[] = [];
+        for (let i = 0; i < lines.length; i++) {
+            const slot = slotAtLine.get(i);
+            if (slot === undefined) {
+                out.push(rewritten[i]);
+                continue;
+            }
+            const block = sorted[slot];
+            for (let j = block.start; j <= block.end; j++) out.push(rewritten[j]);
+            i = blocks[slot].end;
         }
-        const block = sorted[slot];
-        for (let j = block.start; j <= block.end; j++) out.push(rewritten[j]);
-        i = blocks[slot].end;
-    }
-    const joined = out.join("\n");
-    // byte-identical no-op on mixed-EOL notes (spec-mixed-eol-noop-rewrite)
-    return joined === text ? markdown : restoreEol(joined, eol);
+        return out.join("\n");
+    });
 }
 
 /** Linter-shaped wrapper: id matches Linter's rule filename. */

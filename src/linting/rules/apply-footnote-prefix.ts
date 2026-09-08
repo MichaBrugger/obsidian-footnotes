@@ -1,13 +1,8 @@
 import { footnotePrefixProblem } from "../../parsing/footnote-prefix";
 import { computeNextFootnoteNumber, referenceOccurrences } from "../../parsing/footnote-grammar";
-import {
-    findDefinitionBlocks,
-    maskProtectedLines,
-    normalizeEol,
-    scanDocument,
-    restoreEol,
-} from "../../parsing/markdown-scan";
+
 import { IgnoreType } from "../ignore-types";
+import { rewriteDocument } from "../rewrite-document";
 import { rewriteFootnoteNames } from "../rewrite-footnote-names";
 import { FootnoteRule } from "../rule";
 
@@ -30,72 +25,67 @@ export function applyFootnotePrefix(markdown: string, prefix: string): string {
     if (!prefix || footnotePrefixProblem(prefix) !== null) return markdown;
     const prefixFolded = prefix.toLowerCase();
 
-    const { text, eol } = normalizeEol(markdown);
-    const lines = text.split("\n");
     // document-aware masking: comment portions of multi-line boundary
     // lines are invisible, their live portions are not
-    const scan = scanDocument(lines);
-    const isProtected = scan.isProtected;
-    const maskedLines = maskProtectedLines(lines, scan);
-    const blocks = findDefinitionBlocks(lines, isProtected, scan);
+    return rewriteDocument(markdown, (text, { lines, scan, maskedLines, blocks }) => {
+        const isProtected = scan.isProtected;
 
-    // one scan collects both: distinct plain-numbered names by first reference
-    // appearance then orphaned definitions (numbers have no casing, so no
-    // folding needed for `order`), and every id in the note (folded) for
-    // the named-rename collision guard below
-    const order: string[] = [];
-    const seen = new Set<string>();
-    const existingIds = new Set<string>();
-    const record = (id: string) => {
-        existingIds.add(id.toLowerCase());
-        if (/^\d+$/.test(id) && !seen.has(id)) {
-            seen.add(id);
-            order.push(id);
+        // one scan collects both: distinct plain-numbered names by first reference
+        // appearance then orphaned definitions (numbers have no casing, so no
+        // folding needed for `order`), and every id in the note (folded) for
+        // the named-rename collision guard below
+        const order: string[] = [];
+        const seen = new Set<string>();
+        const existingIds = new Set<string>();
+        const record = (id: string) => {
+            existingIds.add(id.toLowerCase());
+            if (/^\d+$/.test(id) && !seen.has(id)) {
+                seen.add(id);
+                order.push(id);
+            }
+        };
+        for (let i = 0; i < lines.length; i++) {
+            if (isProtected[i]) continue;
+            // referenceOccurrences re-slices raw names - the rewrite below
+            // compares original ids (bug-masked-name-identity)
+            for (const { name } of referenceOccurrences(lines[i], maskedLines[i])) {
+                record(name);
+            }
         }
-    };
-    for (let i = 0; i < lines.length; i++) {
-        if (isProtected[i]) continue;
-        // referenceOccurrences re-slices raw names - the rewrite below
-        // compares original ids (bug-masked-name-identity)
-        for (const { name } of referenceOccurrences(lines[i], maskedLines[i])) {
-            record(name);
+        for (const block of blocks) {
+            record(block.name);
         }
-    }
-    for (const block of blocks) {
-        record(block.name);
-    }
 
-    // plain numbers continue after the highest footnote already carrying
-    // the prefix (the masked twin is already in hand - no re-mask, perf F1)
-    let nextNumber = computeNextFootnoteNumber(
-        text,
-        prefix,
-        maskedLines.join("\n"),
-    );
-    const numberedRenames = new Map<string, string>();
-    for (const name of order) {
-        numberedRenames.set(name, `${prefix}${nextNumber++}`);
-    }
+        // plain numbers continue after the highest footnote already carrying
+        // the prefix (the masked twin is already in hand - no re-mask, perf F1)
+        let nextNumber = computeNextFootnoteNumber(
+            text,
+            prefix,
+            maskedLines.join("\n"),
+        );
+        const numberedRenames = new Map<string, string>();
+        for (const name of order) {
+            numberedRenames.set(name, `${prefix}${nextNumber++}`);
+        }
 
-    // the new id for `id`, or null to leave it alone. Named ids keep each
-    // occurrence's own casing - ids are case-insensitive, so "[^Note]" and
-    // "[^note]:" still name one footnote after both gain the prefix.
-    const renameFor = (id: string): string | null => {
-        const numbered = numberedRenames.get(id);
-        if (numbered !== undefined) return numbered;
-        if (/^\d+$/.test(id)) return null; // masked/unsafe digit runs
-        const folded = id.toLowerCase();
-        if (folded.startsWith(prefixFolded)) return null; // already carries it
-        if (existingIds.has(prefixFolded + folded)) return null; // would merge two footnotes
-        return `${prefix}${id}`;
-    };
+        // the new id for `id`, or null to leave it alone. Named ids keep each
+        // occurrence's own casing - ids are case-insensitive, so "[^Note]" and
+        // "[^note]:" still name one footnote after both gain the prefix.
+        const renameFor = (id: string): string | null => {
+            const numbered = numberedRenames.get(id);
+            if (numbered !== undefined) return numbered;
+            if (/^\d+$/.test(id)) return null; // masked/unsafe digit runs
+            const folded = id.toLowerCase();
+            if (folded.startsWith(prefixFolded)) return null; // already carries it
+            if (existingIds.has(prefixFolded + folded)) return null; // would merge two footnotes
+            return `${prefix}${id}`;
+        };
 
-    const rewritten = lines.map((line, i) =>
-        isProtected[i] ? line : rewriteFootnoteNames(line, maskedLines[i], renameFor),
-    );
-    const joined = rewritten.join("\n");
-    // byte-identical no-op on mixed-EOL notes (spec-mixed-eol-noop-rewrite)
-    return joined === text ? markdown : restoreEol(joined, eol);
+        const rewritten = lines.map((line, i) =>
+            isProtected[i] ? line : rewriteFootnoteNames(line, maskedLines[i], renameFor),
+        );
+        return rewritten.join("\n");
+    });
 }
 
 /** Linter-shaped registry entry; the prefix comes in as the rule's option. */

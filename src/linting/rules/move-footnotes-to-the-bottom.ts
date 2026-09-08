@@ -1,13 +1,11 @@
 import {
-    findDefinitionBlocks,
     findLineRunEnd,
-    normalizeEol,
     protectedLines,
     scanDocument,
     removeLineRanges,
-    restoreEol,
 } from "../../parsing/markdown-scan";
 import { IgnoreType } from "../ignore-types";
+import { rewriteDocument } from "../rewrite-document";
 import { FootnoteRule } from "../rule";
 
 // Linter's "move footnotes to the bottom" as a pure transform, integrated
@@ -56,103 +54,102 @@ export function moveFootnoteDefinitionsToBottom(
     markdown: string,
     sectionHeading = "",
 ): string {
-    const { text, eol } = normalizeEol(markdown);
-    const lines = text.split("\n");
+    return rewriteDocument(markdown, (text, view) => {
+        const lines = view.lines;
 
-    // remember the document's trailing newlines; they go back on at the end
-    let trailingNewlines = 0;
-    while (lines.length > 1 && lines[lines.length - 1] === "") {
-        lines.pop();
-        trailingNewlines++;
-    }
-
-    const scan = scanDocument(lines);
-    const isProtected = scan.isProtected;
-    const blocks = findDefinitionBlocks(lines, isProtected, scan);
-    if (blocks.length === 0) return markdown;
-
-    // a line appended at EOF would itself be protected (an unclosed fence
-    // or comment runs to EOF) - relocating definitions into such a region
-    // would sever them from their references
-    if (scan.endsProtected) return markdown;
-
-    const definitions = blocks
-        .map((block) => lines.slice(block.start, block.end + 1).join("\n"))
-        .join("\n");
-
-    // everything that isn't moving, in place (removeLineRanges collapses
-    // the blank lines a cut leaves meeting each other)
-    const body = removeLineRanges(lines, blocks);
-    while (body.length > 0 && body[body.length - 1] === "") body.pop();
-
-    // the setting is markdown that can span MULTIPLE lines
-    // ("---\n## Footnotes"), so matching compares line runs - single-line
-    // comparison kept re-adding multi-line headings on every lint (bug
-    // reported 2026-07-17). findLineRunEnd is the ONE anchor matcher
-    // shared with buildDefinitionAppend's heading slot (fixed-point
-    // guarantee). The scan runs on the post-cut body: cutting whole
-    // definition blocks can't change fence pairing, so protection is
-    // re-derived safely.
-    let anchorEnd = -1;
-    if (sectionHeading) {
-        anchorEnd = findLineRunEnd(
-            body,
-            protectedLines(body),
-            sectionHeading.split("\n"),
-        );
-    }
-
-    if (anchorEnd !== -1) {
-        const out: string[] = [];
-        for (let i = 0; i <= anchorEnd; i++) {
-            // normalize the blank line above the heading run's start -
-            // same markdown block convention as everywhere else
-            const headingStart = anchorEnd - sectionHeading.split("\n").length + 1;
-            if (
-                i === headingStart &&
-                out.length > 0 &&
-                out[out.length - 1] !== ""
-            ) {
-                out.push("");
-            }
-            out.push(body[i]);
+        // remember the document's trailing newlines; they go back on at the end
+        let trailingNewlines = 0;
+        while (lines.length > 1 && lines[lines.length - 1] === "") {
+            lines.pop();
+            trailingNewlines++;
         }
-        out.push("", ...definitions.split("\n"));
-        // the rest of the note follows below the gathered definitions,
-        // separated by a blank line so it can't lazily continue the last
-        // definition (same rule as buildDefinitionAppend)
-        const rest = body.slice(anchorEnd + 1);
-        while (rest.length > 0 && rest[0] === "") rest.shift();
-        if (rest.length > 0) out.push("", ...rest);
-        const anchored = preserveLeadingThematicBreak(
+
+        // the scan runs AFTER the trailing-newline trim above (lazy view)
+        const { scan, blocks } = view;
+        const isProtected = scan.isProtected;
+        if (blocks.length === 0) return text;
+
+        // a line appended at EOF would itself be protected (an unclosed fence
+        // or comment runs to EOF) - relocating definitions into such a region
+        // would sever them from their references
+        if (scan.endsProtected) return text;
+
+        const definitions = blocks
+            .map((block) => lines.slice(block.start, block.end + 1).join("\n"))
+            .join("\n");
+
+        // everything that isn't moving, in place (removeLineRanges collapses
+        // the blank lines a cut leaves meeting each other)
+        const body = removeLineRanges(lines, blocks);
+        while (body.length > 0 && body[body.length - 1] === "") body.pop();
+
+        // the setting is markdown that can span MULTIPLE lines
+        // ("---\n## Footnotes"), so matching compares line runs - single-line
+        // comparison kept re-adding multi-line headings on every lint (bug
+        // reported 2026-07-17). findLineRunEnd is the ONE anchor matcher
+        // shared with buildDefinitionAppend's heading slot (fixed-point
+        // guarantee). The scan runs on the post-cut body: cutting whole
+        // definition blocks can't change fence pairing, so protection is
+        // re-derived safely.
+        let anchorEnd = -1;
+        if (sectionHeading) {
+            anchorEnd = findLineRunEnd(
+                body,
+                protectedLines(body),
+                sectionHeading.split("\n"),
+            );
+        }
+
+        if (anchorEnd !== -1) {
+            const out: string[] = [];
+            for (let i = 0; i <= anchorEnd; i++) {
+                // normalize the blank line above the heading run's start -
+                // same markdown block convention as everywhere else
+                const headingStart = anchorEnd - sectionHeading.split("\n").length + 1;
+                if (
+                    i === headingStart &&
+                    out.length > 0 &&
+                    out[out.length - 1] !== ""
+                ) {
+                    out.push("");
+                }
+                out.push(body[i]);
+            }
+            out.push("", ...definitions.split("\n"));
+            // the rest of the note follows below the gathered definitions,
+            // separated by a blank line so it can't lazily continue the last
+            // definition (same rule as buildDefinitionAppend)
+            const rest = body.slice(anchorEnd + 1);
+            while (rest.length > 0 && rest[0] === "") rest.shift();
+            if (rest.length > 0) out.push("", ...rest);
+            const anchored = preserveLeadingThematicBreak(
+                isProtected[0],
+                out.join("\n") + "\n".repeat(trailingNewlines),
+            );
+            return anchored;
+        }
+
+        const base = body.join("\n");
+        let headingPart = "";
+        if (sectionHeading !== "" && base !== "") {
+            // same layout rule as addFootnoteSectionHeader: a blank line always
+            // separates the heading from the body above it (markdown block
+            // convention; it also keeps a divider heading from turning the last
+            // body line into a setext heading)
+            headingPart = "\n\n" + sectionHeading;
+        }
+
+        const result =
+            base === ""
+                ? (sectionHeading !== "" ? sectionHeading + "\n\n" : "") +
+                  definitions
+                : base + headingPart + "\n\n" + definitions;
+        const rebuilt = preserveLeadingThematicBreak(
             isProtected[0],
-            out.join("\n") + "\n".repeat(trailingNewlines),
+            result + "\n".repeat(trailingNewlines),
         );
-        // byte-identical no-op on mixed-EOL notes (spec-mixed-eol-noop-rewrite)
-        return anchored === text ? markdown : restoreEol(anchored, eol);
-    }
-
-    const base = body.join("\n");
-    let headingPart = "";
-    if (sectionHeading !== "" && base !== "") {
-        // same layout rule as addFootnoteSectionHeader: a blank line always
-        // separates the heading from the body above it (markdown block
-        // convention; it also keeps a divider heading from turning the last
-        // body line into a setext heading)
-        headingPart = "\n\n" + sectionHeading;
-    }
-
-    const result =
-        base === ""
-            ? (sectionHeading !== "" ? sectionHeading + "\n\n" : "") +
-              definitions
-            : base + headingPart + "\n\n" + definitions;
-    const rebuilt = preserveLeadingThematicBreak(
-        isProtected[0],
-        result + "\n".repeat(trailingNewlines),
-    );
-    // byte-identical no-op on mixed-EOL notes (spec-mixed-eol-noop-rewrite)
-    return rebuilt === text ? markdown : restoreEol(rebuilt, eol);
+        return rebuilt;
+    });
 }
 
 /**

@@ -4,10 +4,10 @@ import {
     findDefinitionBlocks,
     normalizeEol,
     removeLineRanges,
-    restoreEol,
     scanDocument,
 } from "../../parsing/markdown-scan";
 import { IgnoreType } from "../ignore-types";
+import { rewriteDocument } from "../rewrite-document";
 import { FootnoteRule } from "../rule";
 
 // Duplicate footnote definitions - two or more "[^x]:" blocks for the same
@@ -66,67 +66,63 @@ export function duplicateFootnoteDefinitionNames(
  */
 export function mergeDuplicateFootnoteDefinitions(markdown: string): string {
     if (!markdown.includes("[^")) return markdown;
-    const { text, eol } = normalizeEol(markdown);
-    const lines = text.split("\n");
-    const scan = scanDocument(lines);
-    const blocks = findDefinitionBlocks(lines, scan.isProtected, scan);
+    return rewriteDocument(markdown, (text, { lines, scan, blocks }) => {
 
-    const groups = new Map<string, typeof blocks>();
-    for (const block of blocks) {
-        const folded = block.name.toLowerCase();
-        const group = groups.get(folded);
-        if (group) group.push(block);
-        else groups.set(folded, [block]);
-    }
-
-    // appended continuation lines per base block's END line, plus the
-    // duplicate ranges to cut
-    const appendAfter = new Map<number, string[]>();
-    const doomed: { start: number; end: number }[] = [];
-    for (const group of groups.values()) {
-        if (group.length < 2) continue;
-        const base = group[0];
-        const appended = appendAfter.get(base.end) ?? [];
-        for (const duplicate of group.slice(1)) {
-            const label = definitionLabelIn(lines[duplicate.start]);
-            const body = label
-                ? lines[duplicate.start].slice(label.labelEnd).trim()
-                : "";
-            if (body !== "") appended.push(`    ${body}`);
-            for (let i = duplicate.start + 1; i <= duplicate.end; i++) {
-                appended.push(lines[i]);
-            }
-            doomed.push({ start: duplicate.start, end: duplicate.end });
+        const groups = new Map<string, typeof blocks>();
+        for (const block of blocks) {
+            const folded = block.name.toLowerCase();
+            const group = groups.get(folded);
+            if (group) group.push(block);
+            else groups.set(folded, [block]);
         }
-        if (appended.length > 0) appendAfter.set(base.end, appended);
-    }
-    if (doomed.length === 0) return markdown;
 
-    // splice the appended lines into the base's last line BEFORE the cut -
-    // removeLineRanges treats lines as opaque strings, so a multi-line
-    // "line" rides through it and unfolds at the final join
-    const mutated = lines.slice();
-    for (const [end, appended] of appendAfter) {
-        mutated[end] = [mutated[end], ...appended].join("\n");
-    }
-    const out = removeLineRanges(mutated, doomed);
-    // cutting a duplicate at EOF can leave the blank line that used to
-    // separate it - never mint MORE trailing blank lines than the note had
-    let trailingBefore = 0;
-    for (let i = lines.length - 1; i >= 0 && lines[i] === ""; i--) {
-        trailingBefore++;
-    }
-    let trailingAfter = 0;
-    for (let i = out.length - 1; i >= 0 && out[i] === ""; i--) {
-        trailingAfter++;
-    }
-    while (trailingAfter > trailingBefore) {
-        out.pop();
-        trailingAfter--;
-    }
-    const result = out.join("\n");
-    // byte-identical no-op on mixed-EOL notes (spec-mixed-eol-noop-rewrite)
-    return result === text ? markdown : restoreEol(result, eol);
+        // appended continuation lines per base block's END line, plus the
+        // duplicate ranges to cut
+        const appendAfter = new Map<number, string[]>();
+        const doomed: { start: number; end: number }[] = [];
+        for (const group of groups.values()) {
+            if (group.length < 2) continue;
+            const base = group[0];
+            const appended = appendAfter.get(base.end) ?? [];
+            for (const duplicate of group.slice(1)) {
+                const label = definitionLabelIn(lines[duplicate.start]);
+                const body = label
+                    ? lines[duplicate.start].slice(label.labelEnd).trim()
+                    : "";
+                if (body !== "") appended.push(`    ${body}`);
+                for (let i = duplicate.start + 1; i <= duplicate.end; i++) {
+                    appended.push(lines[i]);
+                }
+                doomed.push({ start: duplicate.start, end: duplicate.end });
+            }
+            if (appended.length > 0) appendAfter.set(base.end, appended);
+        }
+        if (doomed.length === 0) return text;
+
+        // splice the appended lines into the base's last line BEFORE the cut -
+        // removeLineRanges treats lines as opaque strings, so a multi-line
+        // "line" rides through it and unfolds at the final join
+        const mutated = lines.slice();
+        for (const [end, appended] of appendAfter) {
+            mutated[end] = [mutated[end], ...appended].join("\n");
+        }
+        const out = removeLineRanges(mutated, doomed);
+        // cutting a duplicate at EOF can leave the blank line that used to
+        // separate it - never mint MORE trailing blank lines than the note had
+        let trailingBefore = 0;
+        for (let i = lines.length - 1; i >= 0 && lines[i] === ""; i--) {
+            trailingBefore++;
+        }
+        let trailingAfter = 0;
+        for (let i = out.length - 1; i >= 0 && out[i] === ""; i--) {
+            trailingAfter++;
+        }
+        while (trailingAfter > trailingBefore) {
+            out.pop();
+            trailingAfter--;
+        }
+        return out.join("\n");
+    });
 }
 
 /** Linter-shaped wrapper: id matches the settings toggle's rule. */
