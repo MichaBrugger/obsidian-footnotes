@@ -12,7 +12,7 @@ import {
     SelectionSpanNotice,
     trimSelectionEdges,
 } from "../src/commands/selection-footnote";
-import { footnoteNameProblem, isValidFootnoteName } from "../src/parsing/footnote-grammar";
+import { footnoteNameProblem } from "../src/parsing/footnote-grammar";
 import {
     inlineFootnoteSpanAt,
     sanitizeInlineFootnoteContent,
