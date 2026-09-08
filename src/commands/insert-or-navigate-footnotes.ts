@@ -10,7 +10,7 @@ import {
     insertInTableCell,
 } from "./create-footnote";
 import { docContext, referenceOccurrenceAtCursor } from "../editor/doc-context";
-import { inlineWrapLandsIntact, sanitizeInlineFootnoteContent } from "./inline-footnotes";
+import { inlineWrapLandsIntact, readInlineFootnoteFromClipboard } from "./inline-footnotes";
 import { ProtectedCreationNotice, simulatedMaskedLine } from "../editor/insertion-liveness";
 import { shouldJumpFromDefinitionToReference, shouldJumpFromReferenceToDefinition } from "./navigation";
 import { propertiesWidgetOwnsFocus, readingViewActive, viewEditor } from "../editor/obsidian-internals";
@@ -322,28 +322,11 @@ export async function pasteInlineFootnote(plugin: FootnotePlugin) {
             return;
         }
 
-        // read the clipboard BEFORE resolving positions - it's the only await,
-        // and everything position-dependent should happen after it
-        let raw: string;
-        try {
-            raw = await navigator.clipboard.readText();
-        } catch {
-            showNotice("Couldn't read the clipboard.");
-            return;
-        }
-        // re-check the view mode after the await: the user (or a script)
-        // can flip to Reading view while the clipboard prompt is up, and
-        // the editor API would then edit the hidden buffer (Kimi,
-        // 2026-08-11 review - same hazard the preamble guards against)
-        const viewAfterAwait =
-            plugin.app.workspace.getActiveViewOfType(MarkdownView);
-        if (!viewAfterAwait || readingViewActive(viewAfterAwait)) return;
-        const content = sanitizeInlineFootnoteContent(raw);
-        if (!content) {
-            showNotice("The clipboard is empty, so there is nothing to put in an inline footnote.");
-            return;
-        }
-        const text = `^[${content}]`;
+        // the clipboard read is the only await, and everything
+        // position-dependent happens after it (see the helper for the
+        // post-await Reading-view re-check)
+        const text = await readInlineFootnoteFromClipboard(plugin);
+        if (text === null) return;
         insertInlineText(plugin, text, text.length);
     });
 }

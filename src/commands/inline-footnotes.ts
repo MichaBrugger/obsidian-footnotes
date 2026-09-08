@@ -1,10 +1,13 @@
-import { Editor, EditorPosition } from "obsidian";
+import { Editor, EditorPosition, MarkdownView } from "obsidian";
+
+import type FootnotePlugin from "../main";
 
 import { docLines } from "../editor/doc-context";
 import { maskInlineRegions, maskedLineAt } from "../parsing/markdown-scan";
 import { TableCellEditor } from "../editor/table-cursor";
 
 import { showNotice } from "../editor/notice";
+import { readingViewActive } from "../editor/obsidian-internals";
 // Inline footnotes ("^[...]"): content sanitizing, the escape-aware span
 // scanner, and the two caret guards every command shares. Split out of the
 // all-in-one commands file 2026-08-11.
@@ -20,6 +23,38 @@ import { showNotice } from "../editor/notice";
  * closing "]", so it is doubled into a literal one. Empty/whitespace
  * input becomes "".
  */
+/**
+ * The paste keys' clipboard tail, shared by the single-caret and the
+ * multi-caret paste (it was copied between them, and this is the one
+ * duplicate where drift is dangerous): read the clipboard - the only
+ * await in either command - then re-check the view mode, because the
+ * user (or a script) can flip to Reading view while the clipboard prompt
+ * is up and the editor API would then edit the hidden buffer (2026-08-11
+ * review); then refuse an empty body. Returns the ready "^[…]" text, or
+ * null when the press is settled (the failure or emptiness already
+ * toasted, or the view is no longer editable). Callers must run every
+ * guard BEFORE this so a refused press never touches the clipboard.
+ */
+export async function readInlineFootnoteFromClipboard(
+    plugin: FootnotePlugin,
+): Promise<string | null> {
+    let raw: string;
+    try {
+        raw = await navigator.clipboard.readText();
+    } catch {
+        showNotice("Couldn't read the clipboard.");
+        return null;
+    }
+    const viewAfterAwait = plugin.app.workspace.getActiveViewOfType(MarkdownView);
+    if (!viewAfterAwait || readingViewActive(viewAfterAwait)) return null;
+    const content = sanitizeInlineFootnoteContent(raw);
+    if (!content) {
+        showNotice("The clipboard is empty, so there is nothing to put in an inline footnote.");
+        return null;
+    }
+    return `^[${content}]`;
+}
+
 export function sanitizeInlineFootnoteContent(raw: string): string {
     let text = raw.replace(/\s+/g, " ").trim();
     let depth = 0;

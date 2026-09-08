@@ -1,4 +1,4 @@
-import { Editor, EditorChange, EditorPosition, MarkdownView } from "obsidian";
+import { Editor, EditorChange, EditorPosition } from "obsidian";
 
 import type FootnotePlugin from "../main";
 import {
@@ -15,8 +15,8 @@ import { buildDefinitionAppend } from "./definition-append";
 import { DocContext, docContext, listExistingFootnoteDefinitions } from "../editor/doc-context";
 import {
     inlineFootnoteSpanAt,
-    sanitizeInlineFootnoteContent,
     inlineWrapLandsIntact,
+    readInlineFootnoteFromClipboard,
 } from "./inline-footnotes";
 import {
     ProtectedCreationNotice,
@@ -35,7 +35,6 @@ import {
     warnPrefilledReferenceIfInside,
     warnProtectedCaretIfInside,
 } from "./press-guards";
-import { readingViewActive } from "../editor/obsidian-internals";
 
 import { MultiCaretNestedNotice, showNotice } from "../editor/notice";
 // Multiple Alt-clicked carets get the SAME footnote at every one of them
@@ -279,25 +278,8 @@ export async function multiCaretPastePressHandled(
     if (targets === null) return false;
     if (targets === "handled") return true;
 
-    let raw: string;
-    try {
-        raw = await navigator.clipboard.readText();
-    } catch {
-        showNotice("Couldn't read the clipboard.");
-        return true;
-    }
-    // the view can flip to Reading view while the clipboard prompt is up -
-    // same post-await re-check as the single-caret paste path
-    const viewAfterAwait = plugin.app.workspace.getActiveViewOfType(MarkdownView);
-    if (!viewAfterAwait || readingViewActive(viewAfterAwait)) return true;
-    const content = sanitizeInlineFootnoteContent(raw);
-    if (!content) {
-        showNotice(
-            "The clipboard is empty, so there is nothing to put in an inline footnote.",
-        );
-        return true;
-    }
-    const text = `^[${content}]`;
+    const text = await readInlineFootnoteFromClipboard(plugin);
+    if (text === null) return true;
     // a pasted body is complete - nothing left to type into every wrapper
     // - so the press ends like every other multi-caret insertion: ONE
     // caret after the FIRST footnote (Jason's consistency ruling, extended
