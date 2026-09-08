@@ -5,8 +5,8 @@ combined sheets took too much undoing to track). Every sheet states the
 settings it needs, carries its own fixture text, and expects an undo
 (Ctrl+Z) between checks. Default settings unless a sheet says otherwise.
 
-- `A1-A23`: feature combos (insertion, popup, selection, multi-caret,
-  navigation, rename, tables, guards)
+- `A1-A24`: feature combos (insertion, popup, selection, multi-caret,
+  navigation, rename, tables, guards; A24 catalogs every refusal)
 - `L1-L17`: linting combos (rules solo and together, triggers, alerts,
   protected text, stability)
 - `P1`: phone and mobile-emulation checks — needs a beta release synced
