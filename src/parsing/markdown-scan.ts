@@ -150,21 +150,43 @@ function isFenceOpener(bareLine: string, delim: string): boolean {
 }
 
 /**
- * Whether the "$" at `i` sits inside a footnote-reference shape ("[^…]").
- * Jason verified live (2026-08-10): Obsidian tokenizes the bracket construct
- * first, so a dollar inside a reference renders as part of the footnote id -
- * it never opens or closes a math span. Nearest bracket wins: a "[" with a
+ * Whether the character at `i` sits inside a footnote-reference shape
+ * ("[^…]"). Obsidian tokenizes the bracket construct first, so a "$" inside
+ * a reference is footnote-id text, never a math opener or closer (Jason
+ * verified live 2026-08-10), and so is a backtick: "[^aa`a] [^bb#b]
+ * [^cc`c]" renders no code span and "[^bb#b]" is a live footnote, while
+ * pairing the two backticks used to swallow the middle reference into one
+ * merged name (his find 2026-09-08). Nearest bracket wins: a "[" with a
  * "^" behind it and no "]" in between means we're inside a reference.
  * The walk reads the MASKED-SO-FAR characters, not the raw line: a "[^"
  * fragment already claimed by a code span or comment is not a live bracket,
  * and used to falsely suppress math masking for the rest of the line
- * (bug-dollar-inside-masked-bracket) - a NUL therefore ends the walk.
+ * (bug-dollar-inside-masked-bracket) - a NUL therefore ends the walk, and
+ * the shape must also close with a "]" ahead of `i` (an unclosed "[^" is
+ * a bracket, not a reference).
+ * Being FOUND as a reference says nothing about validity: a name with a
+ * backtick is still invalid, and the lint now reports it by name.
  */
-function dollarInsideReference(chars: readonly string[], i: number): boolean {
+function insideReferenceShape(chars: readonly string[], i: number): boolean {
+    let opened = false;
     for (let j = i - 1; j >= 0; j--) {
         const c = chars[j];
         if (c === "\0" || c === "]") return false;
-        if (c === "[") return chars[j + 1] === "^";
+        if (c === "[") {
+            opened = chars[j + 1] === "^";
+            break;
+        }
+    }
+    if (!opened) return false;
+    // ... and the shape must CLOSE ahead: a "[^" with no "]" before the
+    // next "[", a masked stretch, or the end of the line is a bracket, not
+    // a reference - "`[^` $[^1].$" keeps its code span and its math (the
+    // backtick guard would otherwise never let that span close, and the
+    // dollar guard would then hide the math)
+    for (let k = i + 1; k < chars.length; k++) {
+        const c = chars[k];
+        if (c === "\0" || c === "[") return false;
+        if (c === "]") return true;
     }
     return false;
 }
@@ -243,6 +265,11 @@ export function maskLineRegions(
             continue;
         }
         if (c === "`") {
+            // a backtick inside "[^…]" is footnote-id text, not a code opener
+            if (insideReferenceShape(chars, i)) {
+                while (line[i] === "`") i++;
+                continue;
+            }
             const runStart = i;
             while (line[i] === "`") i++;
             const runLength = i - runStart;
@@ -257,7 +284,8 @@ export function maskLineRegions(
                 }
                 const candidate = j;
                 while (line[j] === "`") j++;
-                if (j - candidate === runLength) {
+                // a run inside "[^…]" can't close either (see the opener guard)
+                if (j - candidate === runLength && !insideReferenceShape(chars, candidate)) {
                     close = candidate;
                     break;
                 }
@@ -294,7 +322,7 @@ export function maskLineRegions(
         }
         if (c === "$") {
             // a dollar inside "[^…]" is footnote-id text, not math
-            if (dollarInsideReference(chars, i)) {
+            if (insideReferenceShape(chars, i)) {
                 i++;
                 continue;
             }
@@ -322,7 +350,7 @@ export function maskLineRegions(
                     j++;
                     continue;
                 }
-                if (line[j] === "$" && !dollarInsideReference(chars, j)) {
+                if (line[j] === "$" && !insideReferenceShape(chars, j)) {
                     close = j;
                     break;
                 }

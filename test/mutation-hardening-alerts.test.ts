@@ -294,5 +294,14 @@ describe("the invalid-name alert", () => {
         noticeLintAlerts(fakePlugin({}), "see [^ok]\n\n[^ok]: def");
         expect(anyMessageContaining("invalid name")).toBe(false);
     });
+
+    it("two backticked names on one line are two names, not one merged span (Jason's page, 2026-09-08)", () => {
+        noticeLintAlerts(fakePlugin({}), "x [^aa`a] [^bb#b] [^cc`c] y");
+        expect(
+            messageShown(
+                `This note has 3 footnotes with invalid names ("[^aa\`a]", "[^bb#b]", "[^cc\`c]"). ${InvalidNameCharacters}`,
+            ),
+        ).toBe(true);
+    });
 });
 

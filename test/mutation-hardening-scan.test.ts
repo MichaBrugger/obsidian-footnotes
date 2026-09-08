@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { referenceOccurrences } from "../src/parsing/footnote-grammar";
+
 import {
     definitionLabelIn,
     findDefinitionBlocks,
@@ -133,10 +135,10 @@ describe("isFenceOpener", () => {
     });
 });
 
-// dollarInsideReference is an internal (unexported) helper, so it is pinned
+// insideReferenceShape is an internal (unexported) helper, so it is pinned
 // indirectly through maskLineRegions, which is the only way its result is
 // observable through the public API.
-describe("dollarInsideReference (observed through maskLineRegions)", () => {
+describe("insideReferenceShape (observed through maskLineRegions)", () => {
     // line 147: the backward scan uses "j >= 0", so it must still inspect
     // index 0 itself - a mutant stopping at "j > 0" would skip the very
     // first character and miss a "[^" that starts the line, wrongly
@@ -154,6 +156,47 @@ describe("dollarInsideReference (observed through maskLineRegions)", () => {
     it("a bracket without a caret does not suppress math scanning", () => {
         const { masked } = maskLineRegions("[x$y$ done");
         expect(masked).toBe("[x" + NUL(3) + " done");
+    });
+});
+
+// Backticks inside a footnote-reference shape are literal, like dollars
+// (Jason's find 2026-09-08, verified live: Obsidian tokenizes "[^…]" before
+// it pairs backticks - "[^aa`a] [^bb#b] [^cc`c]" renders no code span and
+// "[^bb#b]" is a live footnote, while the scanner paired the two backticks
+// into one span and reported ONE merged name). Validity is a separate
+// question: a name with a backtick is still invalid; it is now FOUND so it
+// can be reported.
+describe("backticks inside a footnote reference are literal (2026-09-08)", () => {
+    const line = "x [^aa`a] [^bb#b] [^cc`c] y";
+
+    it("pairs no code span across two references", () => {
+        expect(maskLineRegions(line).masked).toBe(line);
+    });
+
+    it("so the reference finder sees all three names", () => {
+        expect(referenceOccurrences(line, maskLineRegions(line).masked).map((o) => o.name)).toEqual([
+            "aa`a",
+            "bb#b",
+            "cc`c",
+        ]);
+    });
+
+    it("a backtick inside a reference can't CLOSE a span opened outside it either", () => {
+        // the closer guard: the real closer is the last backtick, so the
+        // whole stretch is one code span (the dollar rule's twin)
+        const spanned = "`code [^a`b] end` tail";
+        expect(maskLineRegions(spanned).masked).toBe(NUL("`code [^a`b] end`".length) + " tail");
+    });
+
+    it("ordinary code spans still mask, reference-shaped content included", () => {
+        expect(maskLineRegions("a `[^x]` b").masked).toBe("a " + NUL(6) + " b");
+        expect(maskLineRegions("use `git log` and [^n`ote]").masked).toBe(
+            "use " + NUL("`git log`".length) + " and [^n`ote]",
+        );
+    });
+
+    it("a bracket without a caret does not protect its backtick", () => {
+        expect(maskLineRegions("[x`y`] z").masked).toBe("[x" + NUL(3) + "] z");
     });
 });
 
@@ -929,7 +972,7 @@ describe("findDefinitionBlocks", () => {
 // comment block.
 
 describe("round 2", () => {
-    describe("dollarInsideReference: reference-internal dollar must not leak into math scanning", () => {
+    describe("insideReferenceShape: reference-internal dollar must not leak into math scanning", () => {
         // line 261: the guard that skips a "$" sitting inside "[^…]" - both
         // the BlockStatement "{}" mutant (empties the skip body) and the
         // ConditionalExpression "false" mutant (never takes the skip branch)

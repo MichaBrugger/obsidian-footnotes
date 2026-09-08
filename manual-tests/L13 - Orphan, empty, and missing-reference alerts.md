@@ -22,6 +22,7 @@ hand-typed invalid name [^bad name] that no rule will touch.
 - [ ] The alert for `stray[^99]` says to write its definition or delete the reference
 - [ ] The empty `[^]` gets its own alert (it won't render); the bare prefix placeholder `[^3.]` counts as unfilled exactly like `[^]` (QOL 2026-08-07)
 - [ ] The invalid name gets its own alert: "This note has a footnote with an invalid name ("[^bad name]"). Footnote names can't contain spaces, backticks, brackets, or "#"." (2026-09-08; add a `[^c#d]` and the alert lists both)
+- [ ] Paste `x [^aa`a] [^bb#b] [^cc`c] y` on its own line and lint: the invalid-name alert lists THREE names (`[^aa`a]`, `[^bb#b]`, `[^cc`c]`), not one merged span (2026-09-08: backticks inside a reference are footnote-id text to Obsidian, not code openers; a backticked name stays invalid)
 - [ ] Add five stray references (`[^o1]` to `[^o5]`) with no definitions and lint: the missing-definition alert lists ALL five names, no "…" (2026-09-08)
 - [ ] `Delete orphaned references` ON + lint: `stray[^99]` is removed from the text, spacing healed (2026-08-10)
 - [ ] `Delete orphaned definitions` ON + lint: both orphan definitions are deleted (see L5 for the reindex interplay)
