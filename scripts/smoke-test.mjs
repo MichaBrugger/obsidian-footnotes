@@ -42,12 +42,18 @@ const CLI_CANDIDATES = process.env.OBSIDIAN_CLI
         : ["obsidian"];
 let cli = null;
 
+// The vault is named on EVERY call: without it the CLI follows whichever
+// vault window is focused, and a run started while the personal vault was
+// in front would put the scratch note there (the sanity check below used
+// to be the only guard; naming the vault makes the wrong-window case
+// impossible rather than merely detected, 2026-09-08).
+const VAULT_NAME = "Obsidian-Plugin-Sandbox";
 function ob(...args) {
     const candidates = cli ? [cli] : CLI_CANDIDATES;
     let lastErr;
     for (const candidate of candidates) {
         try {
-            const out = execFileSync(candidate, args, { encoding: "utf8" }).trim();
+            const out = execFileSync(candidate, [`vault=${VAULT_NAME}`, ...args], { encoding: "utf8" }).trim();
             cli = candidate;
             return out;
         } catch (e) {

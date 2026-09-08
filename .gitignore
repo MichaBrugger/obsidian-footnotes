@@ -30,3 +30,6 @@ stryker.log
 # coverage output and mutation-survivor working dumps
 coverage/
 survivors-*.json
+
+# README GIF recorder scratch frames
+scripts/readme-gifs/.frames/

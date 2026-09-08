@@ -42,7 +42,9 @@
   "knip": {
     "entry": [
       "scripts/generate-corpora.ts",
-      "scripts/strip-inkscape-icons.mjs"
+      "scripts/strip-inkscape-icons.mjs",
+      "scripts/readme-gifs/record.mjs",
+      "scripts/readme-gifs/*.js"
     ],
     "ignore": [
       "vitest.stryker.config.ts"
