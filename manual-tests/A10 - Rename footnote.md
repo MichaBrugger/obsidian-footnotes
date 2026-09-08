@@ -2,7 +2,7 @@
 footnote-prefix: p.
 ---
 
-# A10: rename footnote command (issue #36)
+# A10: rename footnote command (2026-08-12)
 
 Settings: defaults (the frontmatter prefix stays inert until the last
 check turns the prefix feature on). Fixture: two footnotes[^alpha]

@@ -58,7 +58,7 @@ import { showNotice } from "../editor/notice";
  * popup, and mint a second footnote (the 2026-07-16 regression class;
  * exactly this happened when the preamble was first extracted as a
  * value-returning helper - caught by the rapid-press smoke tests,
- * 2026-08-11). Exported for the Rename-footnote command (issue #36),
+ * 2026-08-11). Exported for the Rename-footnote command (2026-08-12),
  * which needs the same popup settling: renaming under an open popup would
  * strand its save against the old name.
  */

@@ -29,13 +29,29 @@ const STYLE_DEFAULTS = {
     "stroke-miterlimit": "4",
 };
 
+/**
+ * Remove every match of `pattern` until none is left: a single pass can
+ * leave a NEW match behind when removing one span joins the halves of
+ * another ("<!-<!-- -->-" collapses to "<!--"), which is how a stripped
+ * comment could re-form (CodeQL js/incomplete-multi-character-sanitization,
+ * 2026-09-08).
+ */
+function removeAll(text, pattern) {
+    let previous;
+    do {
+        previous = text;
+        text = text.replace(pattern, "");
+    } while (text !== previous);
+    return text;
+}
+
 function strip(svg) {
-    let out = svg
-        .replace(/<\?xml[^>]*\?>/g, "")
-        .replace(/<!--[\s\S]*?-->/g, "")
-        .replace(/<sodipodi:namedview[\s\S]*?<\/sodipodi:namedview>/g, "")
-        .replace(/<sodipodi:namedview[\s\S]*?\/>/g, "")
-        .replace(/<metadata[\s\S]*?<\/metadata>/g, "")
+    let out = svg.replace(/<\?xml[^>]*\?>/g, "");
+    out = removeAll(out, /<!--[\s\S]*?-->/g);
+    out = removeAll(out, /<sodipodi:namedview[\s\S]*?<\/sodipodi:namedview>/g);
+    out = removeAll(out, /<sodipodi:namedview[\s\S]*?\/>/g);
+    out = removeAll(out, /<metadata[\s\S]*?<\/metadata>/g);
+    out = out
         .replace(/\s(?:inkscape|sodipodi):[\w-]+="[^"]*"/g, "")
         .replace(/\sxmlns:(?:inkscape|sodipodi|svg)="[^"]*"/g, "")
         .replace(/\sxml:space="[^"]*"/g, "")

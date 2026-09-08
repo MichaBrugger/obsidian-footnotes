@@ -21,7 +21,7 @@ import { runOutsideTableCell } from "../editor/table-cursor";
 import { withEditableEditor } from "./insert-or-navigate-footnotes";
 
 import { nameAlreadyUsed, showNotice } from "../editor/notice";
-// Renaming a footnote (issue #36, Jason's calls 2026-08-12): with the
+// Renaming a footnote (Jason's calls 2026-08-12): with the
 // caret on a "[^name]" reference or a definition label, the Rename
 // footnote command opens a modal prefilled with the current name and
 // rewrites every masked-LIVE occurrence - references and definition

@@ -92,6 +92,16 @@ function readJson(code) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// A value embedded into code that the app will eval. JSON.stringify leaves
+// the U+2028/U+2029 line separators raw, and a raw one inside a JS string
+// literal is a syntax error (or worse) once evaluated - escape them so the
+// literal is always well-formed (CodeQL js/bad-code-sanitization, 2026-09-08).
+function jsLiteral(value) {
+    return JSON.stringify(value)
+        .replace(/\u2028/g, "\\u2028")
+        .replace(/\u2029/g, "\\u2029");
+}
+
 async function pollUntil(desc, code, predicate, timeoutMs = 6000) {
     const deadline = Date.now() + timeoutMs;
     let last;
@@ -100,7 +110,7 @@ async function pollUntil(desc, code, predicate, timeoutMs = 6000) {
         if (predicate(last)) return last;
         await sleep(250);
     }
-    throw new Error(`timed out waiting for ${desc}; last value: ${JSON.stringify(last)}`);
+    throw new Error(`timed out waiting for ${desc}; last value: ${jsLiteral(last)}`);
 }
 
 // ---------- vault helpers ----------
@@ -114,17 +124,17 @@ async function pollUntil(desc, code, predicate, timeoutMs = 6000) {
 const NOTE_PATH = `${NOTE}.md`;
 const EDITOR =
     `(() => { let leaf = null; app.workspace.iterateAllLeaves((l) => { ` +
-    `if (l.view && l.view.file && l.view.file.path === ${JSON.stringify(NOTE_PATH)} && l.view.editor) leaf = l; }); ` +
+    `if (l.view && l.view.file && l.view.file.path === ${jsLiteral(NOTE_PATH)} && l.view.editor) leaf = l; }); ` +
     `if (!leaf) throw new Error('smoke note is not open'); return leaf.view; })()`;
 // true only while the smoke note is the active tab - commands act on the
 // active view, so a press with another tab in front would edit that note
 const ACTIVE_IS_SMOKE =
     `(() => { const v = app.workspace.activeLeaf && app.workspace.activeLeaf.view; ` +
-    `return !!(v && v.file && v.file.path === ${JSON.stringify(NOTE_PATH)}); })()`;
+    `return !!(v && v.file && v.file.path === ${jsLiteral(NOTE_PATH)}); })()`;
 // open the smoke note in its own tab (reusing one if it is already open)
 // and make it the active tab
 const ACTIVATE_SMOKE =
-    `(async () => { const f = app.vault.getAbstractFileByPath(${JSON.stringify(NOTE_PATH)}); if (!f) return; ` +
+    `(async () => { const f = app.vault.getAbstractFileByPath(${jsLiteral(NOTE_PATH)}); if (!f) return; ` +
     `let leaf = null; app.workspace.iterateAllLeaves((l) => { if (l.view && l.view.file && l.view.file.path === f.path) leaf = l; }); ` +
     `if (!leaf) { leaf = app.workspace.getLeaf('tab'); await leaf.openFile(f); } ` +
     `app.workspace.setActiveLeaf(leaf, { focus: true }); })();`;
@@ -166,7 +176,7 @@ async function setupNote(content) {
     // brief wait lets its sync-back finish before the content is replaced
     action(`const v=${EDITOR}; v.editor.focus(); v.editor.setCursor({line:0,ch:0});`);
     await sleep(150);
-    action(`(${EDITOR}).editor.setValue(${JSON.stringify(content)});`);
+    action(`(${EDITOR}).editor.setValue(${jsLiteral(content)});`);
     await waitForEditorText(content);
     // the view's data buffer lags editor changes by a tick and the plugin
     // numbers footnotes from it; wait for it to sync so tests are stable
@@ -205,7 +215,7 @@ function resetSettings(overrides = {}) {
 
 async function waitForEditorText(expected) {
     await pollUntil(
-        `editor to contain ${JSON.stringify(expected)}`,
+        `editor to contain ${jsLiteral(expected)}`,
         `(${EDITOR}).editor ? (${EDITOR}).editor.getValue() : null`,
         (v) => v === expected,
     );
@@ -224,7 +234,7 @@ function setCursorAndRun(line, ch, commandId) {
 
 function setSettings(patch) {
     action(
-        `Object.assign(app.plugins.plugins['${PLUGIN_ID}'].settings, ${JSON.stringify(patch)});`,
+        `Object.assign(app.plugins.plugins['${PLUGIN_ID}'].settings, ${jsLiteral(patch)});`,
     );
 }
 
@@ -288,11 +298,11 @@ async function activateTableCell(line, outsideLine, landmark) {
         "table cell sub-editor open and focused on the target cell",
         `(() => { const v=${EDITOR}; const t=v.containerEl.querySelector('.markdown-source-view table'); ` +
         `const cc = t && t.querySelector('.cm-content'); ` +
-        `if (cc && cc.textContent.includes(${JSON.stringify(landmark)})) { ` +
+        `if (cc && cc.textContent.includes(${jsLiteral(landmark)})) { ` +
         `if (cc.contains(document.activeElement)) return true; cc.focus(); return false; } ` +
         `if (cc) { v.editor.setCursor({line:${outsideLine}, ch:0}); return false; } ` +
         `v.editor.cm.contentDOM.focus(); ` +
-        `const ch=v.editor.getLine(${line}).indexOf(${JSON.stringify(landmark)})+1; ` +
+        `const ch=v.editor.getLine(${line}).indexOf(${jsLiteral(landmark)})+1; ` +
         `v.editor.setCursor({line:${line}, ch}); return false; })()`,
         (v) => v === true,
     );
@@ -320,7 +330,7 @@ async function test(name, fn) {
 
 async function expectEditorText(expected) {
     await pollUntil(
-        `editor text ${JSON.stringify(expected)}`,
+        `editor text ${jsLiteral(expected)}`,
         `(${EDITOR}).editor.getValue()`,
         (v) => v === expected,
     );
@@ -426,9 +436,17 @@ async function main() {
     }
 
     // snapshot the settings - or, when a sidecar backup survived a killed
-    // run, treat THAT as the true pre-smoke state and heal it first
-    if (existsSync(SETTINGS_BACKUP)) {
-        savedSettings = JSON.parse(readFileSync(SETTINGS_BACKUP, "utf8"));
+    // run, treat THAT as the true pre-smoke state and heal it first. Read
+    // first and act on the outcome rather than checking existence and then
+    // reading (CodeQL js/file-system-race, 2026-09-08).
+    let backup = null;
+    try {
+        backup = readFileSync(SETTINGS_BACKUP, "utf8");
+    } catch (e) {
+        if (e.code !== "ENOENT") throw e;
+    }
+    if (backup !== null) {
+        savedSettings = JSON.parse(backup);
         console.log(
             "found settings backup from an interrupted run - restoring it before starting",
         );
@@ -494,7 +512,7 @@ async function main() {
         );
         const text = readJson(`(${EDITOR}).editor.getValue()`);
         if (text !== "Alpha bravo[^1] charlie\n\n[^1]: existing") {
-            throw new Error(`navigation changed the text: ${JSON.stringify(text)}`);
+            throw new Error(`navigation changed the text: ${jsLiteral(text)}`);
         }
     });
 
@@ -568,7 +586,7 @@ async function main() {
         );
         const cursor = readJson(`(${EDITOR}).editor.getCursor()`);
         if (!cursor || cursor.line !== 0) {
-            throw new Error(`cursor left line 0: ${JSON.stringify(cursor)}`);
+            throw new Error(`cursor left line 0: ${jsLiteral(cursor)}`);
         }
     });
 
@@ -582,7 +600,7 @@ async function main() {
         );
         const line0 = readJson(`(${EDITOR}).editor.getLine(0)`);
         if (line0 !== "Alpha bravo[^1] charlie") {
-            throw new Error(`toggle-close inserted an extra footnote: ${JSON.stringify(line0)}`);
+            throw new Error(`toggle-close inserted an extra footnote: ${jsLiteral(line0)}`);
         }
     });
 
@@ -683,7 +701,7 @@ async function main() {
             // ... and the caret never jumped to the definition line
             const cursor = readJson(`(${EDITOR}).editor.getCursor()`);
             if (!cursor || cursor.line !== 0) {
-                throw new Error(`caret at ${JSON.stringify(cursor)} - the popup fell back to the jump`);
+                throw new Error(`caret at ${jsLiteral(cursor)} - the popup fell back to the jump`);
             }
             await expectEditorText("Alpha[^1] bravo charlie\n\n[^1]: ");
         } finally {
@@ -773,7 +791,7 @@ async function main() {
             // exactly ONE toggle: still Reading view half a second later
             await sleep(500);
             const mode = readJson(`(${EDITOR}).getMode()`);
-            if (mode !== "preview") throw new Error(`mode is ${JSON.stringify(mode)} after the press: the toggle ran twice`);
+            if (mode !== "preview") throw new Error(`mode is ${jsLiteral(mode)} after the press: the toggle ran twice`);
         } finally {
             action(
                 `(async () => { const v=${EDITOR}; ` +
@@ -863,7 +881,7 @@ async function main() {
             (v) => typeof v === "string",
         );
         if (label !== "[^2]:") {
-            throw new Error(`popup bound to ${JSON.stringify(label)}, expected "[^2]:"`);
+            throw new Error(`popup bound to ${jsLiteral(label)}, expected "[^2]:"`);
         }
         // ... and the caret sits just past the NEW reference, so the popup
         // anchors there too - the lint's minimal-diff rewrite maps a caret
@@ -873,7 +891,7 @@ async function main() {
         const cursor = readJson(`(${EDITOR}).editor.getCursor()`);
         if (!cursor || cursor.line !== atRef.line || cursor.ch !== atRef.ch) {
             throw new Error(
-                `caret at ${JSON.stringify(cursor)} while the popup is up, expected just past [^2] at ${JSON.stringify(atRef)}`,
+                `caret at ${jsLiteral(cursor)} while the popup is up, expected just past [^2] at ${jsLiteral(atRef)}`,
             );
         }
         action(
@@ -889,7 +907,7 @@ async function main() {
         const after = readJson(`(${EDITOR}).editor.getCursor()`);
         if (!after || after.line !== atRef.line || after.ch !== atRef.ch) {
             throw new Error(
-                `caret at ${JSON.stringify(after)} after closing, expected just past [^2] at ${JSON.stringify(atRef)}`,
+                `caret at ${jsLiteral(after)} after closing, expected just past [^2] at ${jsLiteral(atRef)}`,
             );
         }
         await sleep(800);
@@ -928,7 +946,7 @@ async function main() {
         const cursor = readJson(`(${EDITOR}).editor.getCursor()`);
         const want = { line: 0, ch: "alpha[^cite]".length };
         if (!cursor || cursor.line !== want.line || cursor.ch !== want.ch) {
-            throw new Error(`caret at ${JSON.stringify(cursor)}, expected after the FIRST reference at ${JSON.stringify(want)}`);
+            throw new Error(`caret at ${jsLiteral(cursor)}, expected after the FIRST reference at ${jsLiteral(want)}`);
         }
         await sleep(800);
     });
@@ -963,7 +981,7 @@ async function main() {
         );
         const cursor = readJson(`(${EDITOR}).editor.getCursor()`);
         if (!cursor || cursor.ch !== 13) {
-            throw new Error(`caret moved to ${JSON.stringify(cursor)}, expected ch 13 (inside ^[])`);
+            throw new Error(`caret moved to ${jsLiteral(cursor)}, expected ch 13 (inside ^[])`);
         }
         // filled half: with text between the brackets, the second press is
         // the "done typing" hop past the closing bracket
@@ -977,7 +995,7 @@ async function main() {
         );
         const line = readJson(`(${EDITOR}).editor.getLine(0)`);
         if (line !== "Alpha bravo^[filled] charlie") {
-            throw new Error(`second press changed the text: ${JSON.stringify(line)}`);
+            throw new Error(`second press changed the text: ${jsLiteral(line)}`);
         }
     });
 
@@ -997,7 +1015,7 @@ async function main() {
         action(
             `(() => { window.__pasteCalls = 0; ` +
             `Object.defineProperty(navigator.clipboard, 'readText', ` +
-            `{ value: async () => { window.__pasteCalls++; return ${JSON.stringify("pasted\nsource")}; }, configurable: true }); ` +
+            `{ value: async () => { window.__pasteCalls++; return ${jsLiteral("pasted\nsource")}; }, configurable: true }); ` +
             `const v=${EDITOR}; v.editor.setCursor({line:0,ch:8}); ` +
             `app.commands.executeCommandById('${CMD_PASTE_INLINE}'); ` +
             `setTimeout(() => { delete navigator.clipboard.readText; }, 3000); })();`,
@@ -1008,7 +1026,7 @@ async function main() {
             // 0 calls = the command stalled before the clipboard (popup
             // settle, view lookup); undefined = the stub eval never ran
             const calls = readJson("window.__pasteCalls");
-            throw new Error(`${e.message} (readText calls: ${JSON.stringify(calls)})`);
+            throw new Error(`${e.message} (readText calls: ${jsLiteral(calls)})`);
         }
     });
 
@@ -1065,7 +1083,7 @@ async function main() {
         );
         const expected = "Alpha bravo[^1][^2] charlie delta\n\n[^1]: \n[^2]: ";
         if (!state || state.text !== expected) {
-            throw new Error(`stale save clobbered the note: ${JSON.stringify(state)}`);
+            throw new Error(`stale save clobbered the note: ${jsLiteral(state)}`);
         }
         if (state.cursor.line === 0 && state.cursor.ch === 0) {
             throw new Error("cursor was dumped at the start of the note");
@@ -1155,7 +1173,7 @@ async function main() {
         await sleep(2500); // outlive the embeds' own save debounce
         const errs = readJson("window.__popupErrs");
         if (errs && errs.length) {
-            throw new Error(`popup save chain crashed: ${JSON.stringify(errs)}`);
+            throw new Error(`popup save chain crashed: ${jsLiteral(errs)}`);
         }
     });
 
@@ -1199,15 +1217,15 @@ async function main() {
             `app.workspace.trigger('editor-menu', menu, v.editor, v); return items; })()`;
         const onReference = readJson(menuProbe(0, 13));
         if (!onReference || !onReference.includes("Rename footnote")) {
-            throw new Error(`no menu item on the reference: ${JSON.stringify(onReference)}`);
+            throw new Error(`no menu item on the reference: ${jsLiteral(onReference)}`);
         }
         const onLabel = readJson(menuProbe(2, 2));
         if (!onLabel || !onLabel.includes("Rename footnote")) {
-            throw new Error(`no menu item on the definition label: ${JSON.stringify(onLabel)}`);
+            throw new Error(`no menu item on the definition label: ${jsLiteral(onLabel)}`);
         }
         const onProse = readJson(menuProbe(0, 2));
         if (!onProse || onProse.includes("Rename footnote")) {
-            throw new Error(`menu item leaked onto plain prose: ${JSON.stringify(onProse)}`);
+            throw new Error(`menu item leaked onto plain prose: ${jsLiteral(onProse)}`);
         }
     });
 
@@ -1342,7 +1360,7 @@ async function main() {
         // the caret must land at the end of the LAST body line, ready to edit
         const cursor = readJson(`(${EDITOR}).editor.getCursor()`);
         if (cursor.line !== 6 || cursor.ch !== "    Second para body".length) {
-            throw new Error(`caret landed at ${JSON.stringify(cursor)}`);
+            throw new Error(`caret landed at ${jsLiteral(cursor)}`);
         }
     });
 
@@ -1367,7 +1385,7 @@ async function main() {
         );
         const value = readJson(`(${EDITOR}).editor.getValue()`);
         if (value !== "alpha bravo\ncharlie delta") {
-            throw new Error(`multi-range press edited the note: ${JSON.stringify(value)}`);
+            throw new Error(`multi-range press edited the note: ${jsLiteral(value)}`);
         }
     });
 
@@ -1515,7 +1533,7 @@ async function main() {
         // byte-exact setupNote wait would never match - set the content and
         // wait for the "()" landmark on both the editor and the data buffer
         await setupNote("table pending");
-        action(`(${EDITOR}).editor.setValue(${JSON.stringify(table)});`);
+        action(`(${EDITOR}).editor.setValue(${jsLiteral(table)});`);
         await pollUntil(
             "table content in editor",
             `(${EDITOR}).editor.getValue()`,
@@ -1559,7 +1577,7 @@ async function main() {
             "tail",
         ].join("\n");
         await setupNote("table pending");
-        action(`(${EDITOR}).editor.setValue(${JSON.stringify(table)});`);
+        action(`(${EDITOR}).editor.setValue(${jsLiteral(table)});`);
         await pollUntil(
             "table content in editor",
             `(${EDITOR}).editor.getValue()`,
@@ -1589,7 +1607,7 @@ async function main() {
         // the state the notice describes: reference stranded, definition gone
         const text = readJson(`(${EDITOR}).editor.getValue()`);
         if (!text.includes("[^1]") || text.includes("[^1]: ")) {
-            throw new Error(`unexpected post-undo state: ${JSON.stringify(text)}`);
+            throw new Error(`unexpected post-undo state: ${jsLiteral(text)}`);
         }
         // the second undo removes the reference and completes the revert
         action(`(${EDITOR}).editor.undo();`);
@@ -1674,7 +1692,7 @@ async function main() {
         );
         const text = readJson(`(${EDITOR}).editor.getValue()`);
         if (text !== note) {
-            throw new Error(`jump changed the text: ${JSON.stringify(text)}`);
+            throw new Error(`jump changed the text: ${jsLiteral(text)}`);
         }
     });
 
@@ -1823,7 +1841,7 @@ async function main() {
         await sleep(800);
         const text = readJson(`(${EDITOR}).editor.getValue()`);
         if (text !== "Beta[^2] alpha[^1] end.\n\n[^1]: one\n[^2]: two") {
-            throw new Error(`lint reindexed anyway: ${JSON.stringify(text)}`);
+            throw new Error(`lint reindexed anyway: ${jsLiteral(text)}`);
         }
     });
 
@@ -1841,7 +1859,7 @@ async function main() {
             "[^2]: def",
         ].join("\n");
         await setupNote("table pending");
-        action(`(${EDITOR}).editor.setValue(${JSON.stringify(table)});`);
+        action(`(${EDITOR}).editor.setValue(${jsLiteral(table)});`);
         await pollUntil(
             "table content in editor",
             `(${EDITOR}).editor.getValue()`,
@@ -1910,7 +1928,7 @@ async function main() {
         await sleep(800);
         const text = readJson(`(${EDITOR}).editor.getValue()`);
         if (text !== note) {
-            throw new Error(`save linted anyway: ${JSON.stringify(text)}`);
+            throw new Error(`save linted anyway: ${jsLiteral(text)}`);
         }
     });
 
@@ -1951,7 +1969,7 @@ async function main() {
         await sleep(3500); // well past the ~2s autosave debounce
         const text = readJson(`(${EDITOR}).editor.getValue()`);
         if (text !== note) {
-            throw new Error(`autosave linted: ${JSON.stringify(text)}`);
+            throw new Error(`autosave linted: ${jsLiteral(text)}`);
         }
     });
 
@@ -2058,11 +2076,11 @@ async function main() {
         // the caret stays put and nothing was inserted
         const cursor = readJson(`(${EDITOR}).editor.getCursor()`);
         if (!cursor || cursor.line !== 3 || cursor.ch !== 8) {
-            throw new Error(`caret moved: ${JSON.stringify(cursor)}`);
+            throw new Error(`caret moved: ${jsLiteral(cursor)}`);
         }
         const text = readJson(`(${EDITOR}).editor.getValue()`);
         if (text !== note) {
-            throw new Error(`the toast changed the text: ${JSON.stringify(text)}`);
+            throw new Error(`the toast changed the text: ${jsLiteral(text)}`);
         }
     });
 
@@ -2078,7 +2096,7 @@ async function main() {
         );
         const text = readJson(`(${EDITOR}).editor.getValue()`);
         if (text !== note) {
-            throw new Error(`hop changed the text: ${JSON.stringify(text)}`);
+            throw new Error(`hop changed the text: ${jsLiteral(text)}`);
         }
     });
 
@@ -2094,7 +2112,7 @@ async function main() {
         );
         const text = readJson(`(${EDITOR}).editor.getValue()`);
         if (text !== note) {
-            throw new Error(`navigation changed the text: ${JSON.stringify(text)}`);
+            throw new Error(`navigation changed the text: ${jsLiteral(text)}`);
         }
     });
 
@@ -2130,7 +2148,7 @@ async function main() {
         );
         const text = readJson(`(${EDITOR}).editor.getValue()`);
         if (text !== note) {
-            throw new Error(`insert still changed the text: ${JSON.stringify(text)}`);
+            throw new Error(`insert still changed the text: ${jsLiteral(text)}`);
         }
     });
 
@@ -2147,7 +2165,7 @@ async function main() {
         );
         const text = readJson(`(${EDITOR}).editor.getValue()`);
         if (text !== note) {
-            throw new Error(`canceled lint still changed text: ${JSON.stringify(text)}`);
+            throw new Error(`canceled lint still changed text: ${jsLiteral(text)}`);
         }
     });
 
@@ -2231,7 +2249,7 @@ async function main() {
         );
         const text = readJson(`(${EDITOR}).editor.getValue()`);
         if (text !== note) {
-            throw new Error(`navigation changed the text: ${JSON.stringify(text)}`);
+            throw new Error(`navigation changed the text: ${jsLiteral(text)}`);
         }
     });
 
@@ -2247,7 +2265,7 @@ async function main() {
             "| left \\| right[^note] |",
         ].join("\n");
         await setupNote("table pending");
-        action(`(${EDITOR}).editor.setValue(${JSON.stringify(table)});`);
+        action(`(${EDITOR}).editor.setValue(${jsLiteral(table)});`);
         await pollUntil(
             "table content in editor",
             `(${EDITOR}).editor.getValue()`,
@@ -2298,7 +2316,7 @@ async function main() {
         // alert only - the reference itself stays in the text
         const text = readJson(`(${EDITOR}).editor.getValue()`);
         if (!text.includes("[^stray]")) {
-            throw new Error(`alert mode removed the reference: ${JSON.stringify(text)}`);
+            throw new Error(`alert mode removed the reference: ${jsLiteral(text)}`);
         }
     });
 
@@ -2323,7 +2341,7 @@ async function main() {
         );
         const text = readJson(`(${EDITOR}).editor.getValue()`);
         if (!text.includes("[^stray]: unused")) {
-            throw new Error(`the kept orphan was altered: ${JSON.stringify(text)}`);
+            throw new Error(`the kept orphan was altered: ${jsLiteral(text)}`);
         }
     });
 
@@ -2365,7 +2383,7 @@ async function main() {
         );
         const text = readJson(`(${EDITOR}).editor.getValue()`);
         if (text !== note) {
-            throw new Error(`navigation duplicated the definition: ${JSON.stringify(text)}`);
+            throw new Error(`navigation duplicated the definition: ${jsLiteral(text)}`);
         }
     });
 
@@ -2421,7 +2439,7 @@ async function main() {
         );
         await pollUntil("editing view", `(${EDITOR}).getMode()`, (v) => v === "source");
         if (text !== created) {
-            throw new Error(`the popup close edited the hidden buffer: ${JSON.stringify(text)}`);
+            throw new Error(`the popup close edited the hidden buffer: ${jsLiteral(text)}`);
         }
     });
 

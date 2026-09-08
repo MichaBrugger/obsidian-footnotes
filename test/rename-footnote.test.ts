@@ -23,7 +23,7 @@ import {
 import { fakeEditor as sharedFakeEditor, FakeEditor } from "./helpers/fake-editor";
 import { fakePlugin as sharedFakePlugin } from "./helpers/fake-plugin";
 
-// Renaming a footnote (issue #36, Jason's calls 2026-08-12): every
+// Renaming a footnote (Jason's calls 2026-08-12): every
 // masked-live occurrence - references and definition labels - renames
 // case-insensitively in one planned transaction; a taken name refuses
 // (collision), invalid names refuse with the reason, and a name the
