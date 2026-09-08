@@ -8,6 +8,7 @@ import { resetNotices } from "./helpers/notices";
 import { fakePlugin as sharedFakePlugin } from "./helpers/fake-plugin";
 import FootnotePlugin from "../src/main";
 import {
+    absorbLeadingSpace,
     indentDefinitionBody,
     InlineSelectionNotice,
     SelectionCommandNotice,
@@ -702,7 +703,13 @@ describe("creation-command invariants over random documents", () => {
                     // window, and require the middle to PARSE as the
                     // conversion (an empty prefix+suffix would otherwise
                     // let any line match).
-                    const prefix = lines[trimmed.from.line].slice(0, trimmed.from.ch);
+                    // the reference attaches to the text before the
+                    // selection: the whitespace run in front of it is
+                    // replaced too (absorbLeadingSpace, 2026-09-08)
+                    const prefix = lines[trimmed.from.line].slice(
+                        0,
+                        absorbLeadingSpace(lines[trimmed.from.line], trimmed.from.ch),
+                    );
                     const suffix = lines[trimmed.to.line].slice(trimmed.to.ch);
                     const selText = spanText(lines, trimmed.from, trimmed.to);
                     const removedLines = trimmed.to.line - trimmed.from.line;

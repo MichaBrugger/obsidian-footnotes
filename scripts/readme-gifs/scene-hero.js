@@ -6,7 +6,8 @@
 (async () => {
     const G = window.__gif;
     window.__scene = { stage: "start" };
-    const saved = G.settingsSnapshot();
+    G.beginRun();
+    let saved = null;
     const NUM = "obsidian-footnotes:insert-autonumbered-footnote";
     const NAMED = "obsidian-footnotes:insert-named-footnote";
     const INLINE = "obsidian-footnotes:insert-inline-footnote";
@@ -14,6 +15,8 @@
     const T = 42; // ms per typed character in the note
     const P = 55; // ms per typed character in the popup
     try {
+        await G.pluginReady();
+        saved = G.settingsSnapshot();
         G.setSettings({
             enablePopupEditor: true,
             insertAtEndOfWord: true,
@@ -47,7 +50,10 @@
         await G.typeMain(", a third more than last season. Smith disputes the counting method", T);
         await G.sleep(300);
         await G.press(NAMED, ["Alt", "-"], "Insert / navigate named footnote");
-        await G.sleep(600);
+        // the command inserts its "[^]" after its own awaits - type the
+        // name only once the brackets are there
+        if (!(await G.waitFor(() => G.caretLine().includes("[^]")))) throw new Error("named skeleton did not appear");
+        await G.sleep(500);
         await G.typeMain("smith2024", 70);
         await G.sleep(400);
         await G.press(NAMED, ["Alt", "-"], "Press again to write the footnote");
@@ -63,7 +69,8 @@
         await G.typeMain(". The deeper zone", T);
         await G.sleep(300);
         await G.press(INLINE, ["Alt", "="], "Insert inline footnote");
-        await G.sleep(600);
+        if (!(await G.waitFor(() => G.caretLine().includes("^[]")))) throw new Error("inline skeleton did not appear");
+        await G.sleep(500);
         await G.typeMain("below 12 m, where visibility dropped", T);
         await G.sleep(400);
         await G.press(INLINE, ["Alt", "="], "Press again to hop out");
@@ -103,7 +110,7 @@
         } catch (_) {}
         window.__scene = { stage: "error", error: e.message };
     } finally {
-        G.setSettings(saved);
+        if (saved) G.setSettings(saved);
         G.restoreLeaf();
     }
 })();

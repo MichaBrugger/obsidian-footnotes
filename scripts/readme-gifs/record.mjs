@@ -53,8 +53,17 @@ if (vaultName !== VAULT_NAME) {
 ob("create", "name=Smoke Test - footnotes", "content=placeholder", "overwrite", "silent");
 copyFileSync(join(here, "inapp.js"), join(VAULT, ".gif-inapp.js"));
 copyFileSync(join(here, `scene-${scene}.js`), join(VAULT, ".gif-scene.js"));
-evalIn(`(async () => { new Function(await app.vault.adapter.read('.gif-inapp.js'))(); })(); 'fired'`);
+evalIn(`(async () => { window.__scene = null; new Function(await app.vault.adapter.read('.gif-inapp.js'))(); })(); 'fired'`);
 await sleep(600);
+// supersede any stale scene, then bring the window forward and insist on focus
+evalIn(`(() => { window.__gif.beginRun(); window.__gif.bringToFront(); })(); 'fired'`);
+await sleep(700);
+if (readJson("window.__gif.focused()") !== true) {
+    rmSync(join(VAULT, ".gif-inapp.js"), { force: true });
+    rmSync(join(VAULT, ".gif-scene.js"), { force: true });
+    console.error("the sandbox vault window is hidden; Obsidian throttles a hidden window and the take would crawl. Make it visible and rerun.");
+    process.exit(1);
+}
 evalIn(`(async () => { new Function(await app.vault.adapter.read('.gif-scene.js'))(); })(); 'fired'`);
 
 // 2. wait for the scene

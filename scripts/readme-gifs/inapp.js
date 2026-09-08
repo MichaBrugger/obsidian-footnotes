@@ -9,7 +9,41 @@
     const wc = remote.getCurrentWebContents();
     const NOTE_PATH = "Smoke Test - footnotes.md";
     const G = (window.__gif = window.__gif || {});
-    G.sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    // one scene at a time: a new scene bumps the run id, and every sleep of
+    // a superseded scene rejects, so a stale take can't keep typing into
+    // the note or overwrite the new take's frames (it happened when a
+    // background-throttled take was still crawling as the next one began)
+    G.run = G.run || 0;
+    G.sleep = (ms) => {
+        const run = G.run;
+        return new Promise((resolve, reject) =>
+            setTimeout(() => {
+                if (G.run !== run) return reject(new Error("superseded"));
+                // a take in a hidden window is garbage (throttled timers,
+                // typing racing the commands' own awaits): stop at once
+                if (G.recordingRun === run && document.hidden) {
+                    return reject(new Error("window was hidden during the take - keep the sandbox window visible and rerun"));
+                }
+                resolve();
+            }, ms),
+        );
+    };
+    G.beginRun = () => ++G.run;
+
+    // recording needs a FOCUSED window: Obsidian throttles timers and
+    // painting in the background, which turns a scene into a crawl
+    G.bringToFront = () => {
+        const w = remote.getCurrentWindow();
+        if (w.isMinimized()) w.restore();
+        w.setAlwaysOnTop(true);
+        w.show();
+        w.focus();
+        if (typeof w.moveTop === "function") w.moveTop();
+        w.setAlwaysOnTop(false);
+    };
+    // visible is what matters: Chromium throttles timers only for a hidden
+    // (minimized or fully occluded) window; API-driven typing needs no focus
+    G.focused = () => !document.hidden;
 
     G.view = () => {
         // the leaf activate() opened, once it has an editor; else any open one
@@ -45,11 +79,9 @@
         for (let i = 0; i < 50 && !(leaf.view && leaf.view.editor); i++) await G.sleep(100);
         if (!(leaf.view && leaf.view.editor)) throw new Error("smoke note view has no editor");
         G.leaf = leaf;
-        const w = remote.getCurrentWindow();
-        if (w.isMinimized()) w.restore();
-        w.show();
-        w.focus();
+        G.bringToFront();
         await G.sleep(400);
+        if (!G.focused()) throw new Error("window hidden - make the sandbox vault window visible and rerun");
         const v = leaf.view;
         await v.setState({ ...v.getState(), mode: "source", source: false }, { history: false });
         await G.sleep(200);
@@ -69,6 +101,16 @@
         await G.sleep(200);
     };
 
+    // a build just before a recording makes hot-reload cycle the plugin;
+    // wait until it is back before touching its settings
+    G.pluginReady = async () => {
+        for (let i = 0; i < 50; i++) {
+            const plugin = app.plugins.plugins["obsidian-footnotes"];
+            if (plugin && plugin.settings) return plugin;
+            await G.sleep(200);
+        }
+        throw new Error("footnote plugin not loaded");
+    };
     G.setSettings = (patch) => Object.assign(app.plugins.plugins["obsidian-footnotes"].settings, patch);
     G.settingsSnapshot = () => JSON.parse(JSON.stringify(app.plugins.plugins["obsidian-footnotes"].settings));
 
@@ -99,6 +141,7 @@
     };
 
     G.startRecording = (name, fps, mode, maxHeight) => {
+        G.recordingRun = G.run;
         G.name = name;
         G.frames = [];
         G.beginStyle();
@@ -118,6 +161,7 @@
     };
 
     G.stopRecording = async () => {
+        if (G.recordingRun !== G.run) return { skipped: true };
         if (G.timer) clearInterval(G.timer);
         G.timer = null;
         G.endStyle();
@@ -201,6 +245,11 @@
         G.key(keys, caption, ms);
         await G.sleep(380);
         app.commands.executeCommandById(id);
+    };
+    /** The text of the smoke note's caret line. */
+    G.caretLine = () => {
+        const v = G.view();
+        return v.editor.getLine(v.editor.getCursor().line);
     };
 
     G.typeMain = async (text, cps) => {

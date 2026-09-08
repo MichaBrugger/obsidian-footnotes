@@ -82,6 +82,7 @@ Sometimes you write something mid-sentence and realize it should be a footnote. 
 - The **named** hotkey asks you for a name first, then does the same under `[^yourname]`. Confirm with Enter, the Create button, or just press any footnote hotkey again.
 - The **inline** hotkey wraps the selection as `^[...]` right where it is (single-line selections only; for a multi-line selection it points you to the other two).
 - A selection that starts or ends mid-word grows to whole words first, plus one trailing punctuation mark, so a sloppy drag still produces a clean footnote. Turn **Expand selections to whole words** off in the settings if you want the exact selection.
+- The reference attaches to the text before the selection: converting the second of two sentences leaves `first sentence.[^2]`, never a stray space before the reference.
 - A selection that contains (or cuts through) an existing footnote refuses to convert: footnotes can't be nested inside other footnotes. Nesting is prevented throughout the plugin (it doesn't survive export to Pandoc/LaTeX and most markdown tools can't read it), and linting alerts you if a note already has hand-typed nesting.
 - Tables: text inside one cell converts; a selection that cuts through a table (a cell with its pipes, a row, part of the table) refuses. To move a whole table into a footnote, select it together with the text around it.
 

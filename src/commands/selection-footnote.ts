@@ -192,17 +192,22 @@ export function selectionPressHandled(
             return true;
         }
         const text = cellText.slice(from, to);
+        // the reference attaches to the text before the selection (see
+        // absorbLeadingSpace) - cell text carries no pipes, so only prose
+        // and the cell start can precede it
+        const replaceFrom = absorbLeadingSpace(cellText, from);
+        const lead = cellText.slice(replaceFrom, from);
         if (command === "inline") {
             const wrapped = `^[${sanitizeInlineFootnoteContent(text)}]`;
             // liveness refusal (with its own Notice) happens inside
-            replaceInTableCell(cell, wrapped, from, to, wrapped.length);
+            replaceInTableCell(cell, wrapped, replaceFrom, to, wrapped.length);
             return true;
         }
         if (command === "named") {
             new NameSelectionModal(plugin, doc, {
                 kind: "cell",
                 cell,
-                selection: { from, to, text },
+                selection: { from: replaceFrom, to, text, lead },
                 cursorPosition,
             }).open();
             return true;
@@ -211,7 +216,7 @@ export function selectionPressHandled(
             plugin,
             doc,
             cell,
-            { from, to, text },
+            { from: replaceFrom, to, text, lead },
             cursorPosition,
             autonumFootnoteId(plugin, doc),
         );
@@ -308,7 +313,16 @@ export function selectionPressHandled(
         showNotice(NestedFootnoteNotice, 8000);
         return true;
     }
-    const selection = { from: trimmed.from, to: trimmed.to, text };
+    // the reference attaches to the text before the selection: the
+    // whitespace run in front of the core is replaced too (absorbLeadingSpace)
+    const firstLine = doc.getLine(trimmed.from.line);
+    const replaceFrom = { line: trimmed.from.line, ch: absorbLeadingSpace(firstLine, trimmed.from.ch) };
+    const selection: ConvertedSelection = {
+        from: replaceFrom,
+        to: trimmed.to,
+        text,
+        lead: firstLine.slice(replaceFrom.ch, trimmed.from.ch),
+    };
     if (command === "inline") {
         convertMainSelectionToInline(plugin, doc, selection, ctx);
     } else if (command === "named") {
@@ -317,6 +331,35 @@ export function selectionPressHandled(
         convertMainSelection(plugin, doc, selection, ctx, autonumFootnoteId(plugin, doc, ctx));
     }
     return true;
+}
+
+/** A selection about to become a footnote: `[from, to)` is what the reference REPLACES, `text` is what moves into the footnote, and `lead` is the whitespace absorbed in front of the text (part of the replaced range, never of the body). */
+export interface ConvertedSelection {
+    from: EditorPosition;
+    to: EditorPosition;
+    text: string;
+    lead?: string;
+}
+
+/**
+ * Where the replacement of a selection should START so the new reference
+ * attaches to the text before it: a footnote reference never has a space
+ * in front of it (Jason's formatting ruling 2026-09-08, from the hero GIF -
+ * converting "range. The buoy log confirms this." left "range. [^2]"). The
+ * run of spaces/tabs right before `ch` is absorbed when it follows real
+ * prose on the same line; it stays when what precedes it is a list, task,
+ * heading, or quote marker, a table pipe, or nothing at all - stripping
+ * those would break the structure ("-[^1]") or do nothing useful.
+ */
+export function absorbLeadingSpace(line: string, ch: number): number {
+    const before = line.slice(0, ch);
+    const run = before.match(/[ \t]+$/);
+    if (!run) return ch;
+    const prose = before.slice(0, before.length - run[0].length);
+    if (prose === "") return ch;
+    if (/[|>]$/.test(prose)) return ch;
+    if (/^(?:>\s*)*(?:[-*+]|\d+[.)]|#{1,6}|(?:[-*+]|\d+[.)]) \[[ xX]\])$/.test(prose.trim())) return ch;
+    return ch - run[0].length;
 }
 
 /**
@@ -601,7 +644,7 @@ function namedSelectionProblem(
 export function convertSelectionToNamed(
     plugin: FootnotePlugin,
     doc: Editor,
-    selection: { from: EditorPosition; to: EditorPosition; text: string },
+    selection: ConvertedSelection,
     name: string,
 ): string | null {
     const ctx = docContext(doc);
@@ -609,7 +652,7 @@ export function convertSelectionToNamed(
     if (problem !== null) return problem;
     if (
         selection.to.line >= doc.lineCount() ||
-        rangeText(ctx.lines, selection.from, selection.to) !== selection.text
+        rangeText(ctx.lines, selection.from, selection.to) !== (selection.lead ?? "") + selection.text
     ) {
         showNotice(SelectionChangedNotice, 8000);
         return null;
@@ -623,14 +666,14 @@ export function convertCellSelectionToNamed(
     plugin: FootnotePlugin,
     doc: Editor,
     cell: TableCellEditor,
-    selection: { from: number; to: number; text: string },
+    selection: { from: number; to: number; text: string; lead?: string },
     name: string,
     cursorPosition?: EditorPosition,
 ): string | null {
     const problem = namedSelectionProblem(doc, name);
     if (problem !== null) return problem;
     const cellText = cell.state.doc.toString();
-    if (cellText.slice(selection.from, selection.to) !== selection.text) {
+    if (cellText.slice(selection.from, selection.to) !== (selection.lead ?? "") + selection.text) {
         showNotice(SelectionChangedNotice, 8000);
         return null;
     }
@@ -675,7 +718,7 @@ function normalizedMainSelection(
 function convertMainSelectionToInline(
     plugin: FootnotePlugin,
     doc: Editor,
-    selection: { from: EditorPosition; to: EditorPosition; text: string },
+    selection: ConvertedSelection,
     ctx: DocContext,
 ): void {
     const text = `^[${sanitizeInlineFootnoteContent(selection.text)}]`;
@@ -705,7 +748,7 @@ function convertMainSelectionToInline(
 function convertMainSelection(
     plugin: FootnotePlugin,
     doc: Editor,
-    selection: { from: EditorPosition; to: EditorPosition; text: string },
+    selection: ConvertedSelection,
     ctx: DocContext,
     footnoteId: string | null,
 ): void {
@@ -797,7 +840,7 @@ function convertCellSelection(
     plugin: FootnotePlugin,
     doc: Editor,
     cell: TableCellEditor,
-    selection: { from: number; to: number; text: string },
+    selection: { from: number; to: number; text: string; lead?: string },
     cursorPosition: EditorPosition | undefined,
     footnoteId: string | null,
 ): void {
@@ -831,12 +874,12 @@ function convertCellSelection(
 type NamedSelectionTarget =
     | {
           kind: "main";
-          selection: { from: EditorPosition; to: EditorPosition; text: string };
+          selection: ConvertedSelection;
       }
     | {
           kind: "cell";
           cell: TableCellEditor;
-          selection: { from: number; to: number; text: string };
+          selection: { from: number; to: number; text: string; lead?: string };
           cursorPosition?: EditorPosition;
       };
 

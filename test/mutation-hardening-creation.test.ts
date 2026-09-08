@@ -712,8 +712,8 @@ describe("the cell selection claim", () => {
         ).toBe(true);
         expect(dispatched).toEqual([
             {
-                changes: { from: 3, to: 7, insert: "^[word]" },
-                selection: { anchor: 3 + "^[word]".length },
+                changes: { from: 1, to: 7, insert: "^[word]" },
+                selection: { anchor: 1 + "^[word]".length },
             },
         ]);
     });
@@ -754,8 +754,8 @@ describe("the cell selection claim", () => {
         ).toBe(true);
         expect(dispatched).toEqual([
             {
-                changes: { from: 7, to: 11, insert: "^[word]" },
-                selection: { anchor: 7 + "^[word]".length },
+                changes: { from: 6, to: 11, insert: "^[word]" },
+                selection: { anchor: 6 + "^[word]".length },
             },
         ]);
     });
@@ -799,8 +799,8 @@ describe("the cell selection claim", () => {
         ).toBe(true);
         expect(dispatched).toEqual([
             {
-                changes: { from: 2, to: 5, insert: "^[$x$]" },
-                selection: { anchor: 2 + "^[$x$]".length },
+                changes: { from: 1, to: 5, insert: "^[$x$]" },
+                selection: { anchor: 1 + "^[$x$]".length },
             },
         ]);
     });
@@ -860,7 +860,7 @@ describe("the main-editor selection claim", () => {
         expect(
             selectionPressHandled(fakePlugin(doc), doc, null, "inline"),
         ).toBe(true);
-        expect(doc.lines).toEqual(["a ^[$x$] b"]);
+        expect(doc.lines).toEqual(["a^[$x$] b"]);
     });
 
     // L132 MethodExpression (the `.slice(fromCh, toCh)` dropped): code
@@ -873,7 +873,7 @@ describe("the main-editor selection claim", () => {
         expect(
             selectionPressHandled(fakePlugin(doc), doc, null, "inline"),
         ).toBe(true);
-        expect(doc.lines).toEqual(["`code` ^[word] here"]);
+        expect(doc.lines).toEqual(["`code`^[word] here"]);
     });
 
     // CONTRACT FLIP (hunt 2026-08-25,
@@ -1000,7 +1000,7 @@ describe("the numbered selection conversion", () => {
         expect(doc.lines).toEqual([
             "a [^",
             "9] b",
-            "tail [^1]",
+            "tail[^1]",
             "",
             "[^1]: word",
         ]);
@@ -1014,7 +1014,7 @@ describe("the numbered selection conversion", () => {
             head: { line: 1, ch: 9 },
         });
         selectionPressHandled(fakePlugin(doc), doc, null, "autonum");
-        expect(doc.lines).toEqual(["> [^q]: d", "tail [^1]", "[^1]: word"]);
+        expect(doc.lines).toEqual(["> [^q]: d", "tail[^1]", "[^1]: word"]);
     });
 
     // L267 BooleanLiteral, `center` -> false.
@@ -1062,8 +1062,8 @@ describe("the numbered cell selection conversion", () => {
         });
         expect(dispatched).toEqual([
             {
-                changes: { from: 6, to: 10, insert: "[^1]" },
-                selection: { anchor: 6 + "[^1]".length },
+                changes: { from: 5, to: 10, insert: "[^1]" },
+                selection: { anchor: 5 + "[^1]".length },
             },
         ]);
     });

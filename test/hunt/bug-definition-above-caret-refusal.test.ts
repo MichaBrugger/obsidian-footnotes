@@ -91,7 +91,7 @@ describe("bug: a definition block above the caret falsely refused creation", () 
             "[^1]: def",
             "[^2]: target",
             "",
-            "prose [^2] here",
+            "prose[^2] here",
         ]);
     });
 

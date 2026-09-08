@@ -28,6 +28,7 @@ import {
     SelectionCommandNotice,
     SelectionSpanNotice,
     TableSelectionNotice,
+    absorbLeadingSpace,
 } from "../src/commands/selection-footnote";
 import { ProtectedCreationNotice } from "../src/editor/insertion-liveness";
 import { commandHotkeys } from "../src/editor/obsidian-internals";
@@ -93,7 +94,7 @@ describe("the numbered key converts a selection", () => {
         await insertAutonumFootnote(fakePlugin(doc));
         // the first footnote gets its usual blank separator line
         expect(doc.lines).toEqual([
-            "The [^1] fox jumps",
+            "The[^1] fox jumps",
             "",
             "tail",
             "",
@@ -126,7 +127,7 @@ describe("the numbered key converts a selection", () => {
             { anchor: { line: 0, ch: 3 }, head: { line: 0, ch: 10 } },
         );
         await insertAutonumFootnote(fakePlugin(doc));
-        expect(doc.lines[0]).toBe("The [^1] fox jumps");
+        expect(doc.lines[0]).toBe("The[^1] fox jumps");
     });
 
     it("a REVERSED (head-before-anchor) selection converts the same", async () => {
@@ -136,7 +137,7 @@ describe("the numbered key converts a selection", () => {
             { anchor: { line: 0, ch: 9 }, head: { line: 0, ch: 4 } },
         );
         await insertAutonumFootnote(fakePlugin(doc));
-        expect(doc.lines[0]).toBe("The [^1] fox jumps");
+        expect(doc.lines[0]).toBe("The[^1] fox jumps");
     });
 
     it("a full-line drag (ending at ch 0 of the next line) converts the line", async () => {
@@ -170,8 +171,9 @@ describe("the inline key converts a selection", () => {
             { anchor: { line: 0, ch: 4 }, head: { line: 0, ch: 9 } },
         );
         await insertInlineFootnote(fakePlugin(doc));
-        expect(doc.lines).toEqual(["The ^[quick] fox jumps"]);
-        expect(doc.cursor).toEqual({ line: 0, ch: 4 + "^[quick]".length });
+        expect(doc.lines).toEqual(["The^[quick] fox jumps"]);
+        // the space before "quick" is absorbed, so the wrapper starts at 3
+        expect(doc.cursor).toEqual({ line: 0, ch: 3 + "^[quick]".length });
     });
 
     it("escapes an unbalanced bracket so the wrapper can't end early", async () => {
@@ -182,7 +184,7 @@ describe("the inline key converts a selection", () => {
             { anchor: { line: 0, ch: 4 }, head: { line: 0, ch: 9 } },
         );
         await insertInlineFootnote(fakePlugin(doc));
-        expect(doc.lines).toEqual(["pay ^[a \\] b] now"]);
+        expect(doc.lines).toEqual(["pay^[a \\] b] now"]);
     });
 });
 
@@ -203,7 +205,7 @@ describe("lint-on-footnote-creation covers selection conversions (parity, Jason'
         // lint then renumbered 5→1, 6→2 - exactly what a plain caret
         // insert with the same settings produces
         expect(doc.lines).toEqual([
-            "alpha[^1] [^2] fox",
+            "alpha[^1][^2] fox",
             "",
             "[^1]: five",
             "[^2]: quick",
@@ -505,7 +507,7 @@ describe("a multi-line selection converts into a multi-paragraph definition (202
         );
         await insertAutonumFootnote(fakePlugin(doc));
         expect(doc.lines).toEqual([
-            "keep this. [^1] keep too",
+            "keep this.[^1] keep too",
             "",
             "[^1]: move me",
             "    and me.",
@@ -600,7 +602,7 @@ describe("whole protected constructs travel INTO the footnote (2026-08-19)", () 
         );
         await insertAutonumFootnote(fakePlugin(doc));
         expect(doc.lines).toEqual([
-            "keep [^1] here",
+            "keep[^1] here",
             "",
             "[^1]: the `magic word`",
         ]);
@@ -612,7 +614,7 @@ describe("whole protected constructs travel INTO the footnote (2026-08-19)", () 
             head: { line: 0, ch: 5 },
         });
         await insertInlineFootnote(fakePlugin(doc));
-        expect(doc.lines).toEqual(["a ^[$x$] b"]);
+        expect(doc.lines).toEqual(["a^[$x$] b"]);
     });
 
     it("a whole $$ display-math block rides into the definition body", async () => {
@@ -944,7 +946,7 @@ describe("selections expand to whole words when the toggle is on (Jason's ask 20
             fakePlugin(doc, { expandSelectionToWholeWords: true }),
         );
         expect(doc.lines).toEqual([
-            "Bob loves Bill. [^1] Abbie likes Maddie.",
+            "Bob loves Bill.[^1] Abbie likes Maddie.",
             "",
             "[^1]: Lorem ipsum dolor sit.",
         ]);
@@ -961,7 +963,7 @@ describe("selections expand to whole words when the toggle is on (Jason's ask 20
             fakePlugin(doc, { expandSelectionToWholeWords: true }),
         );
         expect(doc.lines).toEqual([
-            "Bob loves Bill. Lorem ipsum [^1] Abbie likes Maddie.",
+            "Bob loves Bill. Lorem ipsum[^1] Abbie likes Maddie.",
             "",
             "[^1]: dolor sit.",
         ]);
@@ -978,7 +980,7 @@ describe("selections expand to whole words when the toggle is on (Jason's ask 20
             fakePlugin(doc, { expandSelectionToWholeWords: true }),
         );
         expect(doc.lines[0]).toBe(
-            "Bob loves Bill. Lorem [^1] sit. Abbie likes Maddie.",
+            "Bob loves Bill. Lorem[^1] sit. Abbie likes Maddie.",
         );
         expect(doc.lines[2]).toBe("[^1]: ipsum dolor");
     });
@@ -993,7 +995,7 @@ describe("selections expand to whole words when the toggle is on (Jason's ask 20
             fakePlugin(doc, { expandSelectionToWholeWords: true }),
         );
         expect(doc.lines).toEqual([
-            "Bob loves Bill. ^[Lorem ipsum dolor sit.] Abbie likes Maddie.",
+            "Bob loves Bill.^[Lorem ipsum dolor sit.] Abbie likes Maddie.",
         ]);
     });
 
@@ -1047,7 +1049,7 @@ describe("selections expand to whole words when the toggle is on (Jason's ask 20
         );
         // "ord her" expands to "word here." - words whole, punctuation taken
         expect(dispatched[0]?.changes).toEqual({
-            from: 6,
+            from: 5,
             to: 16,
             insert: "[^1]",
         });
@@ -1083,8 +1085,8 @@ describe("selections inside an actively edited table cell", () => {
         expect(handled).toBe(true);
         expect(dispatched).toEqual([
             {
-                changes: { from: 6, to: 10, insert: "^[word]" },
-                selection: { anchor: 6 + "^[word]".length },
+                changes: { from: 5, to: 10, insert: "^[word]" },
+                selection: { anchor: 5 + "^[word]".length },
             },
         ]);
     });
@@ -1105,8 +1107,8 @@ describe("selections inside an actively edited table cell", () => {
         expect(handled).toBe(true);
         expect(dispatched).toEqual([
             {
-                changes: { from: 6, to: 10, insert: "[^1]" },
-                selection: { anchor: 6 + "[^1]".length },
+                changes: { from: 5, to: 10, insert: "[^1]" },
+                selection: { anchor: 5 + "[^1]".length },
             },
         ]);
         expect(doc.lines[doc.lines.length - 1]).toBe("[^1]: word");
@@ -1263,7 +1265,7 @@ describe("the block zoo converts (2026-08-19)", () => {
         );
         await insertInlineFootnote(fakePlugin(doc));
         expect(doc.lines).toEqual([
-            "see ^[![alt](https://x.org/p.png)] here",
+            "see^[![alt](https://x.org/p.png)] here",
         ]);
     });
 
@@ -1591,7 +1593,7 @@ describe("partial-table selections refuse (Jason's ruling 2026-09-04)", () => {
             head: { line: 0, ch: 10 },
         });
         await insertAutonumFootnote(fakePlugin(doc));
-        expect(doc.lines[0]).toBe("pick [^1] here");
+        expect(doc.lines[0]).toBe("pick[^1] here");
         expect(noticed(TableSelectionNotice)).toBe(false);
     });
 
@@ -1606,3 +1608,110 @@ describe("partial-table selections refuse (Jason's ruling 2026-09-04)", () => {
         expect(noticed(TableSelectionNotice)).toBe(false);
     });
 });
+
+// ---------------------------------------------------------------------------
+// the reference attaches to the text before the selection (Jason's
+// formatting ruling 2026-09-08, from the hero GIF: converting the second of
+// two sentences left "range. [^2]"). The whitespace run in front of the
+// selected text is replaced along with it; the body never carries it.
+// ---------------------------------------------------------------------------
+
+describe("the reference attaches to the preceding text (2026-09-08)", () => {
+    it("a whole trailing sentence: the reference lands right after the previous period", async () => {
+        const line = "Temperatures stayed in range. The buoy log confirms this independently.";
+        const from = line.indexOf("The buoy");
+        const doc = fakeEditor([line], { line: 0, ch: from }, {
+            anchor: { line: 0, ch: from },
+            head: { line: 0, ch: line.length },
+        });
+        await insertAutonumFootnote(fakePlugin(doc));
+        expect(doc.lines).toEqual([
+            "Temperatures stayed in range.[^1]",
+            "",
+            "[^1]: The buoy log confirms this independently.",
+        ]);
+    });
+
+    it("mid-sentence: the reference attaches to the word before, the text after keeps its space", async () => {
+        const line = "The survey counted 412 colonies along the transect.";
+        const from = line.indexOf("412");
+        const to = line.indexOf(" along");
+        const doc = fakeEditor([line], { line: 0, ch: from }, {
+            anchor: { line: 0, ch: from },
+            head: { line: 0, ch: to },
+        });
+        await insertAutonumFootnote(fakePlugin(doc));
+        expect(doc.lines[0]).toBe("The survey counted[^1] along the transect.");
+        expect(doc.lines[2]).toBe("[^1]: 412 colonies");
+    });
+
+    it("the inline key attaches the same way", async () => {
+        const line = "Temperatures stayed in range. The buoy log confirms this.";
+        const from = line.indexOf("The buoy");
+        const doc = fakeEditor([line], { line: 0, ch: from }, {
+            anchor: { line: 0, ch: from },
+            head: { line: 0, ch: line.length },
+        });
+        await insertInlineFootnote(fakePlugin(doc));
+        expect(doc.lines).toEqual(["Temperatures stayed in range.^[The buoy log confirms this.]"]);
+    });
+
+    it("the named modal path replaces the absorbed space too, and its note-changed guard understands that", () => {
+        const line = "Temperatures stayed in range. The buoy log confirms this.";
+        const from = line.indexOf("The buoy");
+        const doc = fakeEditor([line], { line: 0, ch: from });
+        const problem = convertSelectionToNamed(
+            fakePlugin(doc),
+            doc,
+            { from: { line: 0, ch: from - 1 }, to: { line: 0, ch: line.length }, text: "The buoy log confirms this.", lead: " " },
+            "buoy",
+        );
+        expect(problem).toBeNull();
+        expect(doc.lines).toEqual([
+            "Temperatures stayed in range.[^buoy]",
+            "",
+            "[^buoy]: The buoy log confirms this.",
+        ]);
+    });
+
+    it("a selection with spaces on both sides: the leading one is absorbed, the trailing one stays with the prose", async () => {
+        const line = "The paragraph wants to move this aside for later readers.";
+        const from = line.indexOf(" move");
+        const to = line.indexOf("aside");
+        const doc = fakeEditor([line], { line: 0, ch: from }, {
+            anchor: { line: 0, ch: from },
+            head: { line: 0, ch: to },
+        });
+        await insertAutonumFootnote(fakePlugin(doc, { expandSelectionToWholeWords: false }));
+        expect(doc.lines[0]).toBe("The paragraph wants to[^1] aside for later readers.");
+        expect(doc.lines[2]).toBe("[^1]: move this");
+    });
+
+    it("structure in front stays put: list, task, quote, heading markers and a table pipe", () => {
+        expect(absorbLeadingSpace("- item text", 2)).toBe(2);
+        expect(absorbLeadingSpace("1. item text", 3)).toBe(3);
+        expect(absorbLeadingSpace("- [ ] task text", 6)).toBe(6);
+        expect(absorbLeadingSpace("> quoted text", 2)).toBe(2);
+        expect(absorbLeadingSpace("## Heading text", 3)).toBe(3);
+        expect(absorbLeadingSpace("| a | b |", 6)).toBe(6);
+        expect(absorbLeadingSpace("    indented", 4)).toBe(4);
+        expect(absorbLeadingSpace("word here", 0)).toBe(0);
+    });
+
+    it("prose in front is absorbed, tabs included, inside a quote or list item too", () => {
+        expect(absorbLeadingSpace("range. The buoy", 7)).toBe(6);
+        expect(absorbLeadingSpace("range.\t\tThe buoy", 8)).toBe(6);
+        expect(absorbLeadingSpace("> quoted prose here", 15)).toBe(14);
+        expect(absorbLeadingSpace("- item prose here", 13)).toBe(12);
+    });
+
+    it("a multi-line selection starting mid-line attaches its first line the same way", async () => {
+        const doc = fakeEditor(["Intro sentence. First moved line", "second moved line"], { line: 0, ch: 16 }, {
+            anchor: { line: 0, ch: 16 },
+            head: { line: 1, ch: 17 },
+        });
+        await insertAutonumFootnote(fakePlugin(doc));
+        expect(doc.lines[0]).toBe("Intro sentence.[^1]");
+    });
+});
+
