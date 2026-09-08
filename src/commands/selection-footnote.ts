@@ -220,6 +220,15 @@ export function selectionPressHandled(
 
     const resolved = normalizedMainSelection(doc);
     if (resolved === null) return false;
+    // the paste key never converts a selection, however many ranges there
+    // are - its body is the clipboard - so it redirects to the converting
+    // keys BEFORE the one-stretch check (Jason's A9 report 2026-09-08: two
+    // Alt-dragged ranges used to get the "one continuous stretch" toast,
+    // which sends the user somewhere the paste key still won't go)
+    if (command === "paste") {
+        showNotice(SelectionCommandNotice, 8000);
+        return true;
+    }
     if (resolved === "multi") {
         showNotice(SelectionSpanNotice, 8000);
         return true;
@@ -247,10 +256,6 @@ export function selectionPressHandled(
             line: trimmed.to.line,
             ch: endOfWordOffset(doc.getLine(trimmed.to.line), trimmed.to.ch),
         };
-    }
-    if (command === "paste") {
-        showNotice(SelectionCommandNotice, 8000);
-        return true;
     }
     // the inline key only converts within one line - a line-spanning
     // selection redirects to the definition-backed keys (2026-08-20)

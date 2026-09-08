@@ -651,6 +651,26 @@ describe("selections that refuse", () => {
         expect(noticed(SelectionSpanNotice)).toBe(true);
     });
 
+    it("multiple ranges on the PASTE key get the paste redirect, not the one-stretch toast (A9 report, 2026-09-08)", async () => {
+        // the paste key never converts a selection, however many ranges
+        // there are - its body is the clipboard - so the redirect to the
+        // converting keys is the only message that helps
+        vi.stubGlobal("navigator", {
+            clipboard: { readText: () => Promise.resolve("clip") },
+        });
+        const before = ["alpha beta gamma"];
+        const doc = fakeEditor(before, { line: 0, ch: 0 });
+        (doc as unknown as { listSelections: () => unknown }).listSelections =
+            () => [
+                { anchor: { line: 0, ch: 0 }, head: { line: 0, ch: 5 } },
+                { anchor: { line: 0, ch: 6 }, head: { line: 0, ch: 10 } },
+            ];
+        await pasteInlineFootnote(fakePlugin(doc));
+        expect(doc.lines).toEqual(before);
+        expect(noticed(SelectionCommandNotice)).toBe(true);
+        expect(noticed(SelectionSpanNotice)).toBe(false);
+    });
+
     it("multiple CARETS now insert the SAME footnote at every one (2026-08-22)", async () => {
         // superseded behavior: extras used to be ignored (2026-08-21) -
         // Jason's ask upgraded this to same-reference-everywhere; the full
