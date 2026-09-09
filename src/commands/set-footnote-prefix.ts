@@ -42,15 +42,28 @@ export class SetFootnotePrefixModal extends ValidatedTextModal {
         // processFrontMatter edits the FILE, and a pending autosave of a
         // stale buffer would silently overwrite the property right after
         // (races lost intermittently until pinned by the smoke suite)
-        const view = this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
-        if (view?.file === this.file) await view.save();
-        await this.plugin.app.fileManager.processFrontMatter(
-            this.file,
-            (frontmatter: Record<string, unknown>) => {
-                if (prefix) frontmatter["footnote-prefix"] = prefix;
-                else delete frontmatter["footnote-prefix"];
-            },
-        );
+        try {
+            const view = this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
+            if (view?.file === this.file) await view.save();
+            await this.plugin.app.fileManager.processFrontMatter(
+                this.file,
+                (frontmatter: Record<string, unknown>) => {
+                    if (prefix) frontmatter["footnote-prefix"] = prefix;
+                    else delete frontmatter["footnote-prefix"];
+                },
+            );
+        } catch {
+            // the write can reject: malformed YAML in the note's frontmatter
+            // (YAMLParseError) or the file gone from disk under the open
+            // modal (ENOENT) - both confirmed live by Jason, 2026-09-08
+            // (review A7). Enter and the button call submit() fire-and-
+            // forget, so an unhandled rejection left the modal open with
+            // nothing but a console error; say so on the modal's own line
+            this.showProblem(
+                "Couldn't write the footnote-prefix property. Check that the note still exists and that its frontmatter is valid YAML.",
+            );
+            return;
+        }
         // a prefix is TEXT even when it looks numeric ("2.") - without an
         // explicit type, Obsidian infers one from occurrences and can
         // register the property as a number (reported 2026-08-12)
