@@ -263,7 +263,31 @@ export async function openFootnotePopup(
     // saving on every popup would cost disk latency and churn the user's
     // sync.
     if (mdView.data !== (await plugin.app.vault.cachedRead(file))) {
+        // The embed resolves "#[^id]" through the metadata cache, which is
+        // re-indexed a moment AFTER the save. When the id already existed
+        // before this press - the creation lint renumbered an older
+        // footnote out of the way, so the new footnote took its number -
+        // the stale cache resolved the subpath at once, to the OLD
+        // definition's position, and the popup showed a slice of the note
+        // from there (Jason's report, sheet 04, 2026-09-09: ".)", a blank
+        // line, then both definitions). So: listen for this file's cache
+        // change before saving, then wait for it, with a cap in case the
+        // cache has nothing new to report.
+        const reindexed = new Promise<void>((resolve) => {
+            let done = false;
+            const finish = () => {
+                if (done) return;
+                done = true;
+                plugin.app.metadataCache.offref(ref);
+                resolve();
+            };
+            const ref = plugin.app.metadataCache.on("changed", (changed) => {
+                if (changed.path === file.path) finish();
+            });
+            win.setTimeout(finish, 2000);
+        });
         await mdView.save();
+        await reindexed;
     }
     if (popupClosed()) return;
 

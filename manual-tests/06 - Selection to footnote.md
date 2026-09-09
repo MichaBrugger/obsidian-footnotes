@@ -48,6 +48,7 @@ Fixture lines: `one two three` for the multi-selection checks; `some code words 
 - [ ] Select any text inside the fence below: the protected-text toast
 - [ ] Select from the line ABOVE the fence to just its opening `` ``` `` line (cutting the block in half): the same toast
 - [ ] Select from the line above the fence through its closing `` ``` `` line (the whole block): it converts; the fence rides into the definition indented, and renders as code inside the footnote
+- [ ] Select the fence ALONE (opening `` ``` `` through closing `` ``` ``): it converts with an EMPTY label line (`[^n]: ` then the fence indented below it), renders as code, and with `Lint on footnote creation` ON the lint changes nothing else: `[^d]` keeps its definition, no waiting notice, the caret lands in the new footnote (2026-09-09: the opener used to land on the label line and its closer then swallowed the rest of the note as code)
 - [ ] Select only whitespace anywhere: the press behaves like a plain insert at the caret
 - [ ] Any multi-line selection + INLINE hotkey: "Inline footnotes are single-line. Use the numbered or named footnote command to convert a multi-line selection." (ruling 2026-08-20)
 

@@ -2,7 +2,7 @@ import { Editor, EditorChange, EditorPosition } from "obsidian";
 
 import type FootnotePlugin from "../main";
 import { safeInsertionCh } from "./insertion-liveness";
-import { TrailingPunctuationChars } from "../parsing/markdown-scan";
+import { referenceLandingAfter } from "../parsing/markdown-scan";
 import {
     EditorWithCm,
     VaultWithConfig,
@@ -65,15 +65,6 @@ export function moveCursorAndSetJumpPoint(
     }
 }
 
-/** Whether `c` is a trailing punctuation mark. The list is
- * TrailingPunctuationChars in markdown-scan (ASCII and CJK marks), shared
- * with the lint rule. The empty string is refused explicitly, because
- * `"…".includes("")` is true, and reading `text[i]` past the end of a line
- * gives undefined at some call sites. */
-function isTrailingPunctuation(c: string | undefined): boolean {
-    return !!c && TrailingPunctuationChars.includes(c);
-}
-
 // What counts as a word character in the walks below: any unicode letter,
 // number, or mark. Marks include combining accents, which belong to the
 // word they follow, matching the grapheme-aware `wordAt`. The walks step by
@@ -110,8 +101,8 @@ export function comparePositions(a: EditorPosition, b: EditorPosition): number {
 /**
  * The end-of-word adjustment worked out on plain text: starting at
  * `offset`, the end of the word under the cursor (or just before it), plus
- * one trailing punctuation mark. An offset with no word touching it comes
- * back unchanged.
+ * the closing marks and punctuation after it. An offset with no word
+ * touching it comes back unchanged.
  *
  * This is `adjustFootnotePosition`'s job done for table cells, where the
  * main editor's `wordAt` cannot see the cell editor's text.
@@ -135,8 +126,9 @@ export function endOfWordOffset(text: string, offset: number): number {
         if (!isWordCp(cp)) break;
         end += (cp as number) > 0xffff ? 2 : 1;
     }
-    if (isTrailingPunctuation(text[end])) end++;
-    return end;
+    // then past the closing marks and punctuation that follow the word
+    // (the landing convention, referenceLandingAfter)
+    return referenceLandingAfter(text, end);
 }
 
 /**
@@ -182,11 +174,14 @@ export function adjustFootnotePosition(
     if (plugin.settings.insertAtEndOfWord) {
         const endOfWordUnderCursor = doc.wordAt(cursorPosition)?.to;
         if (endOfWordUnderCursor) {
-            // the insertion point is the end of the word; step past one
-            // trailing punctuation mark as well
-            const nextChar = lineText.charAt(endOfWordUnderCursor.ch);
-            if (isTrailingPunctuation(nextChar)) endOfWordUnderCursor.ch++;
-            cursorPosition = endOfWordUnderCursor;
+            // the insertion point is the end of the word, then past the
+            // closing marks and punctuation that follow it (the landing
+            // convention, referenceLandingAfter: a note on the last word of
+            // "some bravo". lands after the quote and the full stop)
+            cursorPosition = {
+                line: endOfWordUnderCursor.line,
+                ch: referenceLandingAfter(lineText, endOfWordUnderCursor.ch),
+            };
         }
     }
     const ch = safeInsertionCh(lineText, cursorPosition.ch);

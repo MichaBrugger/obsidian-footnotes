@@ -456,7 +456,15 @@ export function createAutonumFootnote(
         ) {
             return true;
         }
-        const definition = buildDefinitionAppend(doc, footnoteId, isFirstFootnote, plugin, ctx);
+        // The cell editor has written the reference back into the row by
+        // now, and when that row is the note's LAST line the append point
+        // moved with it. The context built before the press still holds
+        // the old row, so the append was landing four characters short of
+        // the row's new end - inside the reference - and the table widget
+        // then normalised the mess away (Jason's report, sheet 07,
+        // 2026-09-09: "only [^ is inserted and the last pipe disappears").
+        // So the note is read again here.
+        const definition = buildDefinitionAppend(doc, footnoteId, isFirstFootnote, plugin, docContext(doc));
         // The blank line that keeps a "---" first line from reading as
         // frontmatter travels in the same edit (see buildDefinitionAppend).
         // It is inserted above the table, outside the cell's own editor,

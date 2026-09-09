@@ -33,6 +33,7 @@ Caret on the orphan definition at the very bottom, press any footnote hotkey:
 Obsidian renders only the LAST definition of a duplicated footnote (verified live 2026-08-12).
 
 - [ ] The hotkey on this reference dup here[^dup] jumps to the LAST `[^dup]:` definition, the one that renders
+- [ ] With `Edit footnotes in a popup` ON, the same press still JUMPS to the last definition instead of opening the popup (2026-09-09: Obsidian's own lookup hands the popup the FIRST definition, so a duplicated footnote skips the popup); turn the popup back OFF
 
 Filler so the jumps travel; scroll matters here.
 

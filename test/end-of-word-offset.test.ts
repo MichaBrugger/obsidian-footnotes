@@ -20,8 +20,16 @@ describe("endOfWordOffset", () => {
         expect(endOfWordOffset("Sit, dolor", 1)).toBe(4);
     });
 
-    it("hops over only one punctuation mark, not a run", () => {
-        expect(endOfWordOffset("wait... what", 2)).toBe(5);
+    // the landing convention (2026-09-09): the whole run of punctuation and
+    // closing marks after the word, the same walk the lint rule makes, so
+    // the two features agree ("wait... what" lands after the ellipsis)
+    it("hops over the whole run of punctuation after the word", () => {
+        expect(endOfWordOffset("wait... what", 2)).toBe(7);
+    });
+
+    it("hops over closing quotes and brackets and the punctuation after them", () => {
+        expect(endOfWordOffset('say "hello". next', 6)).toBe('say "hello".'.length);
+        expect(endOfWordOffset("see (this)! next", 6)).toBe("see (this)!".length);
     });
 
     // ! and ? are in the lint transform's punctuation set; skipping only

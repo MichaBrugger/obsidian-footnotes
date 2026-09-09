@@ -23,6 +23,7 @@ this note counts as idle once it has been saved.
 - [ ] Type a definition and PAUSE about 2 s with the popup still open: the text appears in the note's definition line below (live propagation, matching Obsidian's stock hover editor; deliberate, 2026-08-08)
 - [ ] Known accepted quirk (the stock hover editor has it too): after typing AND undoing inside the popup, an undo in the main editor may bring the text back once; a second undo settles it
 - [ ] With `Lint on footnote creation` ON: the note is already linted the moment the popup appears (2026-08-27); switch to Reading view with the popup up: it closes and nothing edits the note text any further (check in source view)
+- [ ] With `Lint on footnote creation` still ON, create a footnote in the word "Fixture" at the top, BEFORE the existing `[^1]`: the new footnote becomes `[^1]` and the old one `[^2]`, and the popup shows the NEW, empty definition, not a slice of the note starting at ".)" (2026-09-09: the popup used to bind before Obsidian had re-indexed the renumbered note)
 - [ ] Vim users: the Esc that exits insert mode inside the popup does NOT also close the popup; a second Esc closes it
 - [ ] With this note idle (saved), create a footnote NAMED `name` (the decoy above carries `[^name]: fake` in backticks): the popup appears immediately, no 2-second invisible stall and no silent fall-back to the jump (2026-08-26: the pre-open buffer check matched the decoy in the stale buffer and skipped saving the new definition to disk)
 

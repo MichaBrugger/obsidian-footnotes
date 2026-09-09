@@ -126,7 +126,7 @@ Creating or visiting a footnote opens its definition text in a small editor righ
 
 Writing and revising can leave footnotes messy. The **Lint footnotes** command cleans up the whole note in one pass:
 
-- **Move footnote references after punctuation**: Moves references that sit before punctuation to sit after it (`word[^1].` becomes `word.[^1]`).
+- **Move footnote references after punctuation**: Moves references that sit before punctuation, or inside closing quotation marks, brackets, or emphasis, to sit after them (`word[^1].` becomes `word.[^1]`, and `"quote[^1]".` becomes `"quote".[^1]`), the placement every major style guide recommends.
 - **Gather definitions**: Moves every footnote definition under your specified footnote section heading, or to the bottom of the note.
 - **Fix definitions hidden by a missing blank line**: a `[^1]:` line typed directly under a paragraph is plain text to Obsidian, and its footnote never shows. The linter inserts the blank line it needs (or, with the rule off, alerts you about it).
 - **Alert/delete orphans**: Orphans are footnote references without a definition or definitions without a reference. You choose whether the plugin alerts you or deletes orphans.
@@ -158,7 +158,7 @@ Notes without the property keep normal `[^1]`, `[^2]`, … numbering. A prefix f
 
 ## Other settings
 
-- **Insert footnote reference at end of word** *(on by default)*: pressing the hotkey mid-word places the reference at the end of the word, past any trailing punctuation, so you don't have to aim.
+- **Insert footnote reference at end of word** *(on by default)*: pressing the hotkey mid-word places the reference at the end of the word, past any closing quotation marks, brackets, or emphasis and the punctuation after them, so you don't have to aim.
 - **Expand selections to whole words** *(on by default)*: the selection twin of the above; a selection converted into a footnote grows to whole words first.
 - **Enable section heading** *(off by default)*: automatically adds a heading (e.g. `# Footnotes`) above your footnote definitions. The heading text is fully customizable, can span multiple lines, and if it already exists in the note it's reused instead of duplicated.
 - **Trim blank lines** *(on by default)*: removes stray blank lines from the end of the note when the first footnote is added.

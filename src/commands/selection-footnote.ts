@@ -551,7 +551,22 @@ function selectionCutsTable(
 ): boolean {
     const rows = tableRowLines(ctx.lines, ctx.scan.isProtected);
     if (!rows[from.line] && !rows[to.line]) return false;
-    if (from.line !== to.line) return true;
+    if (from.line !== to.line) {
+        // A table held whole, edge to edge on its first and last rows,
+        // converts: the table then starts on the line after the label,
+        // indented (Jason's ruling, sheet 07, 2026-09-09; it used to be
+        // refused on the grounds that a table cannot begin on the label
+        // line).
+        const wholeTable =
+            rows[from.line] &&
+            rows[to.line] &&
+            from.ch === 0 &&
+            to.ch === ctx.lines[to.line].length &&
+            !rows[from.line - 1] &&
+            !rows[to.line + 1] &&
+            rows.slice(from.line, to.line + 1).every(Boolean);
+        return !wholeTable;
+    }
     return !tableRowCellSpans(ctx.lines[from.line] ?? "").some(
         (span) => span.from <= from.ch && to.ch <= span.to,
     );
@@ -729,12 +744,35 @@ function replacementReclassifiesDoc(
  * continuation indent instead of sitting ragged (Jason's ask, 2026-08-21).
  */
 function indentDefinitionBody(text: string): string {
-    return text
+    // A first line that is itself a block construct - a code fence opener,
+    // a table row, a heading, a list item, a quote, a rule, a math block -
+    // cannot share the label line: "[^1]: ```" is the literal text "```"
+    // to Obsidian, and the fence's closer on the continuation line below
+    // then opens an unclosed fence that swallows the rest of the note
+    // (Jason's report, sheet 06, 2026-09-09: converting a selected code
+    // block turned every definition below it into code). Such a body
+    // starts on the line after the label, indented like the rest.
+    const body = startsWithBlockConstruct(text) ? `\n${text}` : text;
+    return body
         .split("\n")
         .map((line, i) =>
             i === 0 ? line : line.trim() === "" ? "    " : `    ${line}`,
         )
         .join("\n");
+}
+
+/** Whether the first line of a selection is a construct that has to start at the beginning of its own line. */
+function startsWithBlockConstruct(text: string): boolean {
+    const first = text.split("\n")[0];
+    return (
+        /^ {0,3}(?:`{3,}|~{3,})/.test(first) ||
+        /^ {0,3}\|/.test(first) ||
+        /^ {0,3}#{1,6}(?:\s|$)/.test(first) ||
+        /^ {0,3}(?:[-+*]|\d{1,9}[.)])(?:\s|$)/.test(first) ||
+        /^ {0,3}>/.test(first) ||
+        /^ {0,3}([-*_])(?: *\1){2,} *$/.test(first) ||
+        /^ {0,3}\$\$/.test(first)
+    );
 }
 
 /**

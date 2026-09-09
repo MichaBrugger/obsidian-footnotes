@@ -185,11 +185,18 @@ export function shouldJumpFromReferenceToDefinition(
 
     // a reference with no definition line falls through to the steps that
     // create one. Names are compared ignoring case.
-    if (!idListIncludes(listExistingFootnoteDefinitions(doc, ctx), footnoteName)) {
+    const definitions = listExistingFootnoteDefinitions(doc, ctx);
+    if (!idListIncludes(definitions, footnoteName)) {
         return false;
     }
 
-    if (popupEditingAvailable(plugin)) {
+    // A footnote defined more than once: Obsidian renders the LAST
+    // definition, and the jump below goes there, but the popup's embed is
+    // resolved by Obsidian's own subpath lookup, which finds the FIRST one
+    // (Jason's report, sheet 05, 2026-09-09). Rather than open the popup on
+    // the definition that does not render, the press jumps; the duplicate
+    // lint alert already says how to fix the note.
+    if (popupRouteFor(plugin, definitions, footnoteName)) {
         // the popup's fallback callback runs LATER, by which time its save
         // may have edited the document, so it must build a FRESH reading of
         // the document rather than reuse this one
@@ -199,4 +206,19 @@ export function shouldJumpFromReferenceToDefinition(
         return true;
     }
     return jumpToFootnoteDefinition(footnoteName, cursorPosition, plugin, doc, ctx);
+}
+
+/** Whether a press on `name`'s reference takes the popup route: the popup is on and can bind, and the footnote is defined exactly once (see shouldJumpFromReferenceToDefinition). */
+export function popupRouteFor(plugin: FootnotePlugin, definitions: readonly string[], name: string): boolean {
+    return popupEditingAvailable(plugin) && !definedMoreThanOnce(definitions, name);
+}
+
+/** Whether `name` (any casing) has more than one definition in the list listExistingFootnoteDefinitions returns. */
+export function definedMoreThanOnce(definitions: readonly string[], name: string): boolean {
+    const folded = name.toLowerCase();
+    let seen = 0;
+    for (const definition of definitions) {
+        if (definition.toLowerCase() === folded && ++seen > 1) return true;
+    }
+    return false;
 }

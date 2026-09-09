@@ -1525,6 +1525,75 @@ async function main() {
         if (state.cursor.ch === 0) throw new Error("cursor was dumped at the start");
     });
 
+    await test("popup shows the NEW definition when the creation lint renumbers an older footnote out of its way (2026-09-09)", async () => {
+        // Jason's report, sheet 04: creating a footnote BEFORE the existing
+        // [^1] with the creation lint on made the new one [^1] and the old
+        // one [^2]; the metadata cache still held the OLD [^1] position, so
+        // the popup's embed showed a slice of the note from there
+        resetSettings({
+            enablePopupEditor: true,
+            lintOnFootnoteCreation: true,
+            insertAtEndOfWord: false,
+        });
+        await setupNote("Fixture reference to navigate from: jump me[^1] now.)\n\n[^1]: the definition");
+        setCursorAndRun(0, 8, CMD_AUTONUM); // inside "reference", before the existing [^1]
+        await pollUntil(
+            "popup open and bound to the renumbered new footnote",
+            `document.querySelector('.footnote-shortcut-popup-label')?.textContent ?? null`,
+            (v) => v === "[^1]:",
+        );
+        await expectEditorText("Fixture [^1]reference to navigate from: jump me[^2] now.)\n\n[^1]: \n[^2]: the definition");
+        const popupText = await pollUntil(
+            "popup editor content",
+            `document.querySelector('.footnote-shortcut-popup .cm-content')?.textContent ?? null`,
+            (v) => typeof v === "string",
+        );
+        if (popupText.includes("the definition") || popupText.includes(".)")) {
+            throw new Error(`popup shows the wrong slice of the note: ${jsLiteral(popupText)}`);
+        }
+        action(
+            `document.querySelectorAll('.footnote-shortcut-popup').forEach((el) => ` +
+            `el.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true})));`,
+        );
+        await sleep(800);
+        await expectEditorText("Fixture [^1]reference to navigate from: jump me[^2] now.)\n\n[^1]: \n[^2]: the definition");
+    });
+
+    await test("a duplicated footnote jumps to its LAST definition instead of opening the popup (2026-09-09)", async () => {
+        resetSettings({ enablePopupEditor: true });
+        await setupNote("dup here[^dup] and one[^one]\n\n[^one]: single\n[^dup]: body\n[^dup]: another body");
+        setCursorAndRun(0, 10, CMD_AUTONUM); // inside [^dup]
+        await sleep(1200);
+        const popup = readJson(`!!document.querySelector('.footnote-shortcut-popup')`);
+        if (popup) throw new Error("the popup opened on a duplicated footnote");
+        const cursor = readJson(`(${EDITOR}).editor.getCursor()`);
+        if (cursor.line !== 4) throw new Error(`caret on line ${cursor.line}, expected the LAST [^dup]: line (4)`);
+    });
+
+    await test("a note that is only a table: a footnote from its last cell lands whole and the table survives (2026-09-09)", async () => {
+        await requireVisibleWindow();
+        // Jason's report, sheet 07: with the table as the note's last line,
+        // the definition append was built from a context read BEFORE the
+        // cell edit, so it landed four characters short of the row's new
+        // end - inside the reference - and the table widget normalised the
+        // remains ("only [^ is inserted and the last pipe disappears")
+        resetSettings();
+        // the row stays the note's last non-blank line; the trailing newline
+        // gives the shared cell activation a line outside the table to park on
+        const table = ["| AAA | BBB |", "| --- | --- |", "| CCC | DDD |", ""].join("\n");
+        await setupNote("table pending");
+        action(`(${EDITOR}).editor.setValue(${jsLiteral(table)});`);
+        await pollUntil("table content in editor", `(${EDITOR}).editor.getValue()`, (v) => typeof v === "string" && v.includes("DDD"));
+        await pollUntil("table content in data buffer", `(${EDITOR}).data`, (v) => typeof v === "string" && v.includes("DDD"));
+        await activateTableCell(2, 3, "DDD");
+        action(`app.commands.executeCommandById('${CMD_AUTONUM}');`);
+        await pollUntil(
+            "the reference in the cell and the definition below the table",
+            `(${EDITOR}).editor.getValue()`,
+            (v) => typeof v === "string" && /\| CCC +\| DDD\[\^1\] +\|\n+\[\^1\]: $/.test(v),
+        );
+    });
+
     await test("footnote lands at the caret inside an actively edited table cell", async () => {
         await requireVisibleWindow();
         // regression (reported 2026-07-14): running the command while a

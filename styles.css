@@ -12,7 +12,11 @@
     border-radius: var(--radius-m);
     box-shadow: var(--shadow-s);
     display: flex;
-    align-items: flex-start;
+    /* the label's baseline follows the first line of the body: a body
+       that starts with a heading is taller than the label, and top
+       alignment left the label sitting half a line above it (Jason's
+       report, sheet 06, 2026-09-09) */
+    align-items: baseline;
     gap: 0.4em;
 }
 

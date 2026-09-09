@@ -88,7 +88,7 @@ after the heading
 Image links, both flavors:
 
 before the images
-![alt text](https://example.org/pic.png)
+![alt text](https://theindex.moe/img/karenneko.gif)
 ![[some vault image.png]]
 after the images
 
@@ -106,6 +106,7 @@ after the table
 
 - [ ] Converts; the footnote renders the table
 - [ ] The indented table inside the definition doesn't confuse later lints (run Lint: nothing rewrites it)
+- [ ] Undo. Select the table ALONE, edge to edge (first pipe to last pipe), and again with only the blank lines around it: both convert, the table starting on the line under an empty `[^n]: ` label, and it renders inside the footnote (Jason's ruling 2026-09-09; a partial table still refuses)
 
 Fenced code and `$$` math (text shape pinned by units; rendering check only):
 

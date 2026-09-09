@@ -25,6 +25,47 @@ const DefinitionStart = /^ {0,3}\[\^([^[\]]+)\]:/;
  * first forced it here is gone, but no better shared home turned up.
  */
 export const TrailingPunctuationChars = ".,;:!?。，、；：！？";
+
+/**
+ * The closing marks a footnote reference also steps past: closing quotes
+ * (straight, curly, and the CJK corner brackets), closing brackets of every
+ * kind, and the markers that close bold, italics, highlight, and
+ * strikethrough. Together with TrailingPunctuationChars they make up the
+ * landing convention below.
+ */
+export const ClosingMarkChars = "\"'’”)]}」』）】〕》〉*_~=";
+
+/**
+ * Where a footnote reference belongs after the word ending at `end`: past
+ * every closing mark and punctuation character that follows, so a note on
+ * the last word of a quoted, bracketed, or emphasized phrase lands OUTSIDE
+ * the phrase and after its punctuation:
+ *
+ *     This is "some bravo".   ->   This is "some bravo".[^1]
+ *     see (bravo).            ->   see (bravo).[^1]
+ *     This is **some bravo**. ->   This is **some bravo**.[^1]
+ *
+ * That is the Chicago Manual of Style's rule, the one every major style
+ * guide shares (Jason's ask, sheet 01, 2026-09-09). A markdown link's
+ * "(url)" tail right after a "]" is stepped over whole, so the reference
+ * never splits "[text](url)". A space, a letter, or an opening bracket
+ * (the start of a following reference) ends the walk.
+ */
+export function referenceLandingAfter(text: string, end: number): number {
+    let at = end;
+    for (;;) {
+        if (at >= text.length) return at;
+        const c = text[at];
+        if (c === "]" && text[at + 1] === "(") {
+            const close = text.indexOf(")", at + 2);
+            if (close === -1) return at + 1;
+            at = close + 1;
+            continue;
+        }
+        if (!ClosingMarkChars.includes(c) && !TrailingPunctuationChars.includes(c)) return at;
+        at++;
+    }
+}
 // An indented line is a continuation line: it belongs to the definition
 // above it. The exception is a line that is itself a label indented one to
 // three spaces, which starts the NEXT definition (that is DefinitionStart

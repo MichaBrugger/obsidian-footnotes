@@ -1,5 +1,5 @@
 import { referenceOccurrences } from "../../parsing/footnote-grammar";
-import { definitionLabelIn, TrailingPunctuationChars } from "../../parsing/markdown-scan";
+import { ClosingMarkChars, definitionLabelIn, referenceLandingAfter, TrailingPunctuationChars } from "../../parsing/markdown-scan";
 import { rewriteDocument } from "../rewrite-document";
 import { FootnoteRule } from "../rule";
 
@@ -16,7 +16,11 @@ const PunctuationClass = TrailingPunctuationChars.replace(
     /[.*+?^${}()|[\]\\-]/g,
     "\\$&",
 );
-const SinglePunctuation = new RegExp(`[${PunctuationClass}]`);
+// A reference that already sits after punctuation OR after a closing mark
+// (a quote, a bracket, an emphasis marker) is where the convention puts it.
+const AlreadyPlacedAfter = new RegExp(
+    `[${PunctuationClass}${ClosingMarkChars.replace(/[.*+?^${}()|[\]\\-]/g, "\\$&")}]`,
+);
 
 // Swap each run of references with the run of punctuation after it, within
 // one stretch of a line.
@@ -51,22 +55,21 @@ function swapInSegment(original: string, masked: string): string {
         const start = occurrences[k].start;
         const end = occurrences[last].end;
         k = last + 1;
-        // The run of punctuation immediately after it. Taking both sides as
-        // whole runs is what lets one pass finish the job, so running the
-        // lint again changes nothing: "[^1][^2]?!" moves in one go.
-        let punctuationEnd = end;
-        while (
-            punctuationEnd < masked.length &&
-            SinglePunctuation.test(masked[punctuationEnd])
-        ) {
-            punctuationEnd++;
-        }
+        // The run of punctuation AND closing marks immediately after it,
+        // the same walk the insert commands use (referenceLandingAfter:
+        // "bravo[^1]". becomes "bravo".[^1], **bold[^1]** becomes
+        // **bold**[^1], and a link's "(url)" tail is stepped over whole).
+        // Taking both sides as whole runs is what lets one pass finish the
+        // job, so running the lint again changes nothing: "[^1][^2]?!"
+        // moves in one go.
+        const punctuationEnd = referenceLandingAfter(masked, end);
         if (punctuationEnd === end) continue;
-        // A run of references that already comes AFTER punctuation is where
-        // it should be. Any punctuation after it belongs to the next
-        // clause, and moving the references again would walk them further
-        // and further from the words they belong to.
-        if (start > 0 && SinglePunctuation.test(masked[start - 1])) continue;
+        // A run of references that already comes AFTER punctuation or a
+        // closing mark is where it should be. Any punctuation after it
+        // belongs to the next clause, and moving the references again
+        // would walk them further and further from the words they belong
+        // to.
+        if (start > 0 && AlreadyPlacedAfter.test(masked[start - 1])) continue;
         out +=
             original.slice(copied, start) +
             original.slice(end, punctuationEnd) +

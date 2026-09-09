@@ -412,8 +412,16 @@ describe("adjustFootnotePosition", () => {
     // happen. line 128 "-> false" drops it too, and "ch++" -> "ch--" hops
     // BACKWARD into the word. The second "." also pins that exactly ONE
     // mark is consumed, not the run.
-    it("hops exactly one trailing punctuation mark past the word's end", () => {
-        expect(adjust("word.. rest", 1, true)).toEqual({ line: 3, ch: 5 });
+    // the landing convention (2026-09-09): the whole run of punctuation and
+    // closing marks after the word is consumed, so a "ch++" -> "ch--"
+    // mutant still hops backward into the word, and a dropped walk leaves
+    // the caret at the word's end
+    it("hops the whole run of trailing punctuation past the word's end", () => {
+        expect(adjust("word.. rest", 1, true)).toEqual({ line: 3, ch: 6 });
+    });
+
+    it("hops a closing quote and the full stop after it", () => {
+        expect(adjust('"word". rest', 2, true)).toEqual({ line: 3, ch: 7 });
     });
 
     it("does not hop a non-punctuation character after the word", () => {
