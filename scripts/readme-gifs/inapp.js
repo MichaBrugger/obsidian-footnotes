@@ -114,11 +114,56 @@
     G.setSettings = (patch) => Object.assign(app.plugins.plugins["obsidian-footnotes"].settings, patch);
     G.settingsSnapshot = () => JSON.parse(JSON.stringify(app.plugins.plugins["obsidian-footnotes"].settings));
 
-    // recording-only cosmetics: no inline title, no line-number gutter
+    // recording-only cosmetics: no inline title, no line-number gutter, and a
+    // caret that is always drawn - CodeMirror hides it whenever the editor is
+    // not focused (the recording window rarely is) and blinks it otherwise,
+    // so half the frames of the navigation take had no cursor at all
     G.beginStyle = () => {
         if (document.getElementById("gif-style")) return;
         const st = document.head.createEl("style", { attr: { id: "gif-style" } });
-        st.textContent = ".inline-title { display: none !important; } .cm-gutters { display: none !important; }";
+        st.textContent = [
+            ".inline-title { display: none !important; }",
+            ".cm-gutters { display: none !important; }",
+            ".cm-editor .cm-cursor { display: block !important; border-left-width: 2px !important; }",
+            ".cm-editor .cm-cursorLayer { animation: none !important; }",
+            // the PRIMARY caret is the browser's own (CodeMirror only draws the
+            // secondary ones), and it blinks and vanishes with focus, so hide
+            // it and paint a steady one ourselves right before each frame
+            ".cm-editor .cm-content { caret-color: transparent !important; }",
+        ].join(" ");
+    };
+    /** A steady 2px caret at the primary selection head of the editor being typed into. */
+    G.paintCaret = () => {
+        let el = document.getElementById("gif-caret");
+        const hide = () => {
+            if (el) el.style.display = "none";
+        };
+        try {
+            const v = G.view();
+            if (!v) return hide();
+            const pop = G.popupEditor();
+            const target = pop && pop.hasFocus ? pop : v.editor.cm;
+            const active = document.activeElement;
+            // focus in a dialog or elsewhere: no caret, like the real thing
+            if (!active || !target.contentDOM.contains(active)) return hide();
+            const range = target.state.selection.main;
+            if (!range.empty) return hide();
+            const c = target.coordsAtPos(range.head);
+            if (!c) return hide();
+            if (!el) {
+                el = document.body.createDiv({ attr: { id: "gif-caret" } });
+                Object.assign(el.style, { position: "fixed", width: "2px", background: "var(--text-normal)", zIndex: "99998", pointerEvents: "none" });
+            }
+            Object.assign(el.style, { display: "block", left: c.left + "px", top: c.top + "px", height: c.bottom - c.top + "px" });
+        } catch (_) {
+            hide();
+        }
+    };
+    /** Park a caret at each position (Alt+click by hand); the first one is the main selection. */
+    G.setCarets = (positions) => {
+        const v = G.view();
+        v.editor.focus();
+        v.editor.setSelections(positions.map((p) => ({ anchor: p, head: p })), 0);
     };
     G.endStyle = () => document.getElementById("gif-style")?.remove();
 
@@ -152,6 +197,7 @@
             if (busy) return;
             busy = true;
             try {
+                G.paintCaret();
                 const img = await wc.capturePage(G.rect);
                 G.frames.push({ t: performance.now() - G.t0, png: img.toPNG() });
             } finally {
@@ -165,6 +211,7 @@
         if (G.timer) clearInterval(G.timer);
         G.timer = null;
         G.endStyle();
+        document.getElementById("gif-caret")?.remove();
         document.querySelectorAll(".gif-key-overlay").forEach((e) => e.remove());
         const dir = ".footnote-capture/" + G.name;
         if (!(await app.vault.adapter.exists(".footnote-capture"))) await app.vault.adapter.mkdir(".footnote-capture");
