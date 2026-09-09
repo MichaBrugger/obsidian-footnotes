@@ -185,8 +185,17 @@ const headBlockWithReference = (doc: string): boolean => {
     const head = /^---\r?\n([\s\S]*?)\r?\n(?:---|\.\.\.)(?:\r?\n|$)/.exec(doc);
     return head !== null && head[1].includes("[^");
 };
+// ... and from documents whose footnote-prefix property carries a "$":
+// the apply-prefix rule MINTS dollar names from plain ones ("[^1]" under
+// prefix "a$" becomes "[^a$1]"), which is the same micromark disagreement
+// one rename later (found the day the generators started offering the
+// regex-special prefixes, 2026-09-09)
+const dollarPrefix = (doc: string): boolean => /footnote-prefix:[^\n]*\$/.test(doc);
 const oracleDocArb = docArb.filter(
-    (doc) => !/\[\^[^\]\n]*\$/.test(doc) && !headBlockWithReference(doc),
+    (doc) =>
+        !/\[\^[^\]\n]*\$/.test(doc) &&
+        !dollarPrefix(doc) &&
+        !headBlockWithReference(doc),
 );
 
 describe("differential oracle over random documents", () => {
