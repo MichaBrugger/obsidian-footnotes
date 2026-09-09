@@ -139,7 +139,7 @@ Each rule can be toggled individually in **Settings → Footnote Shortcut → Li
 - **Lint on save**: lints the note whenever you press <kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<kbd>S</kbd> (vim users: `:w` works too).
 - **Lint on footnote creation**: lints the note right after you create a new footnote.
 
-The linter also watches for problems it can't fix by itself and tells you about them, naming every footnote involved: an empty `[^]` reference you never named, references with no definition or definitions nothing uses (while the delete toggles are off), duplicate definitions (while merging is off), names a footnote can't have (spaces, backticks, brackets, `#`), and footnotes nested inside another footnote's definition.
+The linter also watches for problems it can't fix by itself and tells you about them, naming every footnote involved: an empty `[^]` reference you never named, references with no definition or definitions nothing uses (while the delete toggles are off), a definition typed directly under a paragraph with no blank line above it (Obsidian shows it as plain text; add the blank line), duplicate definitions (while merging is off), names a footnote can't have (spaces, backticks, brackets, `#`), and footnotes nested inside another footnote's definition.
 
 ## For chapter notes: per-note footnote prefix
 

@@ -62,12 +62,15 @@ describe("a label directly under a prose line is prose, not a definition", () =>
         expect(orphanedFootnoteDefinitionNames("> para\n>\n> [^q]: after a quote blank")).toEqual(["q"]);
     });
 
-    it("the lint leaves the note alone and treats the reference as unresolved", () => {
+    it("the lint leaves the note alone and never deletes the reference", () => {
         const doc = "a[^1]\npara\n[^1]: mid";
         expect(lintFootnotes(doc)).toBe(doc);
-        expect(orphanedFootnoteReferenceNames(doc)).toEqual(["1"]);
-        // deletion removes the live reference and leaves the prose line as it is
-        expect(removeOrphanedFootnoteReferences(doc)).toBe("a\npara\n[^1]: mid");
+        // a reference pointing at a lazy label is NOT an orphan: the fix is a
+        // blank line (the lazy-definition alert says so), never a deletion
+        expect(orphanedFootnoteReferenceNames(doc)).toEqual([]);
+        expect(removeOrphanedFootnoteReferences(doc)).toBe(doc);
+        // a reference with no label anywhere still is one
+        expect(orphanedFootnoteReferenceNames("a[^1]\npara\n[^2]: mid")).toEqual(["1"]);
     });
 
     it("the press-side definition list agrees", () => {

@@ -2,6 +2,7 @@ import type FootnotePlugin from "../main";
 import { footnotePrefix, footnotePrefixProblem } from "../parsing/footnote-prefix";
 import {
     definitionLabelIn,
+    definitionStartLines,
     DocumentScan,
     findDefinitionBlocks,
     maskProtectedLines,
@@ -11,6 +12,7 @@ import {
 import {
     footnoteNameProblem,
     InvalidNameCharacters,
+    quotedDefinitionLabel,
     quotedReference,
     referenceOccurrences,
     referenceText,
@@ -18,7 +20,10 @@ import {
 import { inlineFootnoteSpanAt } from "../commands/inline-footnotes";
 import { duplicateFootnoteDefinitionNames } from "./rules/merge-duplicate-definitions";
 import { orphanedFootnoteDefinitionNames } from "./rules/remove-orphaned-definitions";
-import { orphanedFootnoteReferenceNames } from "./rules/remove-orphaned-references";
+import {
+    lazyDefinitionLabelNames,
+    orphanedFootnoteReferenceNames,
+} from "./rules/remove-orphaned-references";
 
 import { addReferenceOrDeleteDefinition, showNotice } from "../editor/notice";
 // The post-lint alert tail: every lint entry point reports what the rules
@@ -97,6 +102,29 @@ function noticeEmptyReferences(
 /** `"[^a]", "[^b]", "[^c]"` - EVERY name spelled out, each in quotes like every other toast that names a footnote (Jason's consistency ask 2026-09-04). The list used to stop at three with an ellipsis; the user needs the whole list to fix them (his L-series pass, 2026-09-08). */
 function referenceList(names: string[]): string {
     return names.map(quotedReference).join(", ");
+}
+
+/** `"[^a]:", "[^b]:"` - the label form, for the one alert whose fix is on the label LINE. */
+function labelList(names: string[]): string {
+    return names.map(quotedDefinitionLabel).join(", ");
+}
+
+// a "[^x]:" directly under a prose line is lazy paragraph text to Obsidian
+// (the prose-label rule, 2026-09-09): the definition the user typed is one
+// blank line short of existing. The generic missing-definition alert would
+// say "write its definition", the wrong advice, so these names get their
+// own alert and drop out of that one (the orphan rule exempts them from
+// the alert and from deletion alike). Never silent, like every alert.
+function noticeLazyDefinitions(lines: string[], scan: DocumentScan, masked: string[]) {
+    const starts = definitionStartLines(lines, scan, (i) => masked[i]);
+    const names = lazyDefinitionLabelNames(lines, scan, masked, starts);
+    if (names.length === 0) return;
+    showNotice(
+        names.length === 1
+            ? `This note has a footnote definition that Obsidian reads as plain text because there is no blank line above it (${labelList(names)}). Add a blank line above it.`
+            : `This note has ${names.length} footnote definitions that Obsidian reads as plain text because there is no blank line above them (${labelList(names)}). Add a blank line above each.`,
+        8000,
+    );
 }
 
 // the alert half of "Delete orphaned references": while the toggle is off,
@@ -274,6 +302,7 @@ export function noticeLintAlerts(plugin: FootnotePlugin, markdown: string) {
     const masked = maskProtectedLines(lines, scan);
     noticeEmptyReferences(markdown, prefix, masked);
     noticeOrphanedReferences(plugin, markdown, prefix, { lines, masked });
+    noticeLazyDefinitions(lines, scan, masked);
     noticeOrphanedDefinitions(plugin, markdown, { lines, scan });
     noticeDuplicateDefinitions(plugin, markdown, { lines, scan });
     noticeNestedFootnotes(lines, scan, masked);

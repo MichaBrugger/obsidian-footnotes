@@ -44,8 +44,8 @@ export function invalidPrefixMessage(opener: string, prefix: string, problem: st
     return `${opener}this note's footnote-prefix ("${prefix}") is invalid. ${problem}`;
 }
 
-/** A quoted footnote reference exactly as the toasts spell it: `"[^name]"`, the empty `"[^]"` and bare-prefix `"[^2.]"` placeholders included. */
-const QuotedReference = /"\[\^[^"\]]*\]"/g;
+/** A quoted footnote reference exactly as the toasts spell it: `"[^name]"`, the empty `"[^]"` and bare-prefix `"[^2.]"` placeholders included - and the quoted label `"[^name]:"` the lazy-definition alert uses. */
+const QuotedReference = /"\[\^[^"\]]*\]:?"/g;
 
 /** The message split into runs: `nowrap` runs are quoted references that must not break across lines. */
 export function noticeSegments(message: string): { text: string; nowrap: boolean }[] {

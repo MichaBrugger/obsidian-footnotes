@@ -5,6 +5,7 @@ import {
 } from "../../parsing/footnote-grammar";
 import {
     definitionStartLines,
+    DocumentScan,
     maskProtectedLines,
     normalizeEol,
     scanDocument,
@@ -37,14 +38,45 @@ function definitionNamesFolded(lines: string[], masked: string[], starts: boolea
     return names;
 }
 
+/**
+ * Names on label-shaped lines that are NOT definitions: a "[^x]:" directly
+ * under a prose line is lazy paragraph text to Obsidian
+ * (definitionStartLines), one blank line short of the definition the user
+ * meant. First-appearance order, first-seen casing, protected lines
+ * skipped. Exported for the lint alert that names them; here, a reference
+ * pointing at one is not an orphan to delete - the fix is a blank line,
+ * and deleting the reference would be data loss (2026-09-09).
+ */
+export function lazyDefinitionLabelNames(
+    lines: string[],
+    scan: DocumentScan,
+    masked: string[],
+    starts: boolean[],
+): string[] {
+    const names: string[] = [];
+    const seen = new Set<string>();
+    for (let i = 0; i < lines.length; i++) {
+        if (scan.isProtected[i] || starts[i]) continue;
+        const hit = definitionLabelWithName(lines[i], masked[i]);
+        if (!hit) continue;
+        const folded = hit.name.toLowerCase();
+        if (seen.has(folded)) continue;
+        seen.add(folded);
+        names.push(hit.name);
+    }
+    return names;
+}
+
 /** Whether this reference occurrence is an orphan the setting should act on. */
 function isOrphan(
     name: string,
     definitions: Set<string>,
+    lazyLabels: Set<string>,
     orphanSafeFolded: string,
 ): boolean {
     const folded = name.toLowerCase();
     if (definitions.has(folded)) return false;
+    if (lazyLabels.has(folded)) return false;
     if (!isValidFootnoteName(name)) return false;
     if (orphanSafeFolded !== "" && folded === orphanSafeFolded) return false;
     return true;
@@ -68,10 +100,10 @@ export function orphanedFootnoteReferenceNames(
     const lines = precomputed?.lines ?? normalizeEol(markdown).text.split("\n");
     const scan = scanDocument(lines);
     const masked = precomputed?.masked ?? maskProtectedLines(lines, scan);
-    const definitions = definitionNamesFolded(
-        lines,
-        masked,
-        definitionStartLines(lines, scan, (i) => masked[i]),
+    const starts = definitionStartLines(lines, scan, (i) => masked[i]);
+    const definitions = definitionNamesFolded(lines, masked, starts);
+    const lazyLabels = new Set(
+        lazyDefinitionLabelNames(lines, scan, masked, starts).map((n) => n.toLowerCase()),
     );
     const orphanSafeFolded = orphanSafePrefix.toLowerCase();
 
@@ -79,7 +111,7 @@ export function orphanedFootnoteReferenceNames(
     const seen = new Set<string>();
     for (let i = 0; i < masked.length; i++) {
         for (const { name } of referenceOccurrences(lines[i], masked[i])) {
-            if (!isOrphan(name, definitions, orphanSafeFolded)) continue;
+            if (!isOrphan(name, definitions, lazyLabels, orphanSafeFolded)) continue;
             const folded = name.toLowerCase();
             if (!seen.has(folded)) {
                 seen.add(folded);
@@ -105,10 +137,10 @@ export function removeOrphanedFootnoteReferences(
     const lines = text.split("\n");
     const scan = scanDocument(lines);
     const masked = maskProtectedLines(lines, scan);
-    const definitions = definitionNamesFolded(
-        lines,
-        masked,
-        definitionStartLines(lines, scan, (i) => masked[i]),
+    const starts = definitionStartLines(lines, scan, (i) => masked[i]);
+    const definitions = definitionNamesFolded(lines, masked, starts);
+    const lazyLabels = new Set(
+        lazyDefinitionLabelNames(lines, scan, masked, starts).map((n) => n.toLowerCase()),
     );
     const orphanSafeFolded = orphanSafePrefix.toLowerCase();
 
@@ -121,7 +153,7 @@ export function removeOrphanedFootnoteReferences(
             line,
             masked[i],
         )) {
-            if (!isOrphan(name, definitions, orphanSafeFolded)) continue;
+            if (!isOrphan(name, definitions, lazyLabels, orphanSafeFolded)) continue;
             result += line.slice(copied, start);
             copied = end;
             // seam: a space directly after the cut collapses when the cut

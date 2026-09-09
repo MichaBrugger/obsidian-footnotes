@@ -21,6 +21,10 @@ body[^fence], and dup here[^dup].
 
 x [^aa`a] [^bb#b] [^cc`c] y
 
+A definition one blank line short, lima[^lz] here:
+prose line
+[^lz]: no blank line above me
+
 ## Orphans, strays, and empties
 
 - [ ] An alert names the definitions nothing references (`lost`, `31`), and they stay in the note
@@ -28,6 +32,11 @@ x [^aa`a] [^bb#b] [^cc`c] y
 - [ ] The empty `[^]` gets its own alert (it won't render); the bare prefix placeholder `[^3.]` counts as unfilled exactly like `[^]` (QOL 2026-08-07)
 - [ ] `Delete orphaned references` ON + lint: every stray reference is removed from the text, spacing healed (2026-08-10)
 - [ ] `Delete orphaned definitions` ON + lint: both orphan definitions are deleted (the reindex interplay is sheet 20's)
+
+## A definition one blank line short (2026-09-09)
+
+- [ ] The lazy-definition alert: "This note has a footnote definition that Obsidian reads as plain text because there is no blank line above it ("[^lz]:"). Add a blank line above it." (Reading view shows `[^lz]: no blank line above me` as plain text); `lz` is NOT in the missing-definition alert
+- [ ] `Delete orphaned references` ON + lint: `lima[^lz]` keeps its reference (the fix is the blank line, not a deletion)
 
 ## Invalid names
 

@@ -148,6 +148,11 @@ export function quotedReference(name: string): string {
     return `"[^${name}]"`;
 }
 
+/** The definition label as an alert quotes it when the LABEL LINE is the thing to fix: `"[^name]:"`. */
+export function quotedDefinitionLabel(name: string): string {
+    return `"[^${name}]:"`;
+}
+
 export function isValidFootnoteName(name: string): boolean {
     return name.length > 0 && !/[\s`]/.test(name);
 }
