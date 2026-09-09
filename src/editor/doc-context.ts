@@ -135,7 +135,11 @@ export function referenceOccurrenceAtCursor(
     }
     ctx ??= docContext(doc);
     const target = occurrenceAtCursor(
-        referenceOccurrences(lineText, ctx.maskedLine(cursorPosition.line)),
+        referenceOccurrences(
+            lineText,
+            ctx.maskedLine(cursorPosition.line),
+            ctx.definitionStarts()[cursorPosition.line],
+        ),
         cursorPosition.ch,
     );
     return target === null ? null : { target, ctx };

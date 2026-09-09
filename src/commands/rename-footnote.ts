@@ -52,7 +52,11 @@ export function renameTargetAtCursor(
     const lineText = doc.getLine(cursorPosition.line);
     if (!lineText.includes("[^")) return null;
     const occurrence = occurrenceAtCursor(
-        referenceOccurrences(lineText, ctx.maskedLine(cursorPosition.line)),
+        referenceOccurrences(
+            lineText,
+            ctx.maskedLine(cursorPosition.line),
+            ctx.definitionStarts()[cursorPosition.line],
+        ),
         cursorPosition.ch,
     );
     if (occurrence !== null) return occurrence.name;
@@ -141,7 +145,7 @@ export function planFootnoteRename(
             ctx.lines.some(
                 (lineText, line) =>
                     lineText.includes("[^") &&
-                    referenceOccurrences(lineText, ctx.maskedLine(line)).some(
+                    referenceOccurrences(lineText, ctx.maskedLine(line), starts[line]).some(
                         (occurrence) =>
                             occurrence.name.toLowerCase() === newFolded,
                     ),
@@ -157,6 +161,7 @@ export function planFootnoteRename(
         for (const occurrence of referenceOccurrences(
             lineText,
             ctx.maskedLine(line),
+            starts[line],
         )) {
             if (occurrence.name.toLowerCase() !== oldFolded) continue;
             changes.push({
@@ -226,8 +231,10 @@ function renameSurvives(
     // footnote used on forty lines cost forty-one scans (review B4)
     const simulatedScan = scanDocument(simulated);
     const simulatedMasked = maskProtectedLines(simulated, simulatedScan);
+    const startsBefore = ctx.definitionStarts();
+    const startsAfter = definitionStartLines(simulated, simulatedScan, (i) => simulatedMasked[i]);
     for (const line of referenceLines) {
-        const before = referenceOccurrences(ctx.lines[line], ctx.maskedLine(line));
+        const before = referenceOccurrences(ctx.lines[line], ctx.maskedLine(line), startsBefore[line]);
         const expected: { start: number; name: string }[] = [];
         let shift = 0;
         for (const occurrence of before) {
@@ -238,7 +245,7 @@ function renameSurvives(
             });
             if (renamed) shift += newName.length - occurrence.name.length;
         }
-        const after = referenceOccurrences(simulated[line], simulatedMasked[line]);
+        const after = referenceOccurrences(simulated[line], simulatedMasked[line], startsAfter[line]);
         if (after.length !== expected.length) return false;
         for (let i = 0; i < expected.length; i++) {
             if (
@@ -251,7 +258,6 @@ function renameSurvives(
     }
     // every renamed label (quoted ones are not blocks) must still read as a
     // live definition under the new name
-    const startsAfter = definitionStartLines(simulated, simulatedScan, (i) => simulatedMasked[i]);
     for (const line of labelLines) {
         if (!startsAfter[line]) return false;
         const hit = definitionLabelWithName(simulated[line], simulatedMasked[line]);

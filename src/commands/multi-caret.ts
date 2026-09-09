@@ -21,10 +21,10 @@ import {
 import {
     ProtectedCreationNotice,
     simulateChanges,
-    simulatedAnchor,
+    simulatedAnchors,
     verifyLiveFootnoteInsertion,
 } from "../editor/insertion-liveness";
-import { maskedLineAt } from "../parsing/markdown-scan";
+import { maskProtectedLines, scanDocument } from "../parsing/markdown-scan";
 import {
     autonumFootnoteId,
     createMatchingFootnoteDefinition,
@@ -364,11 +364,13 @@ function insertSkeletonAtEveryCaret(
 ): void {
     const changes: EditorChange[] = targets.map((pos) => ({ from: pos, text }));
     const simulated = simulateChanges(ctx.lines, changes);
-    const anchors = targets.map((_, index) =>
-        simulatedAnchor(ctx.lines, changes, index, simulated),
-    );
+    // one resolution pass and one masked twin for every caret, like
+    // verifyLiveFootnoteInsertion (the per-anchor form re-resolved and
+    // rescanned the whole note once per caret; second review 2026-09-09)
+    const anchors = simulatedAnchors(ctx.lines, changes, targets.map((_, index) => index), simulated);
+    const simulatedMasked = maskProtectedLines(simulated, scanDocument(simulated));
     const everyLive = anchors.every((anchor) =>
-        insertionLandsIntact(maskedLineAt(simulated, anchor.line), anchor.ch, text),
+        insertionLandsIntact(simulatedMasked[anchor.line], anchor.ch, text),
     );
     if (!everyLive) {
         showNotice(ProtectedCreationNotice, 8000);

@@ -392,7 +392,7 @@ export function absorbLeadingSpace(line: string, ch: number): number {
  * when nothing but whitespace is selected. Also normalizes the full-line
  * drag (ending at ch 0 of the next line) back onto the dragged line.
  */
-export function trimSelectionEdges(
+function trimSelectionEdges(
     doc: Editor,
     from: EditorPosition,
     to: EditorPosition,
@@ -628,7 +628,7 @@ function replacementReclassifiesDoc(
  * treat whitespace-only as blank), but visually flush with the
  * continuation indent (Jason's ask, 2026-08-21).
  */
-export function indentDefinitionBody(text: string): string {
+function indentDefinitionBody(text: string): string {
     return text
         .split("\n")
         .map((line, i) =>

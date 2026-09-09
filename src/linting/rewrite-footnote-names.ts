@@ -6,19 +6,23 @@ import { definitionLabelWithName } from "../parsing/markdown-scan";
  * line is one, renamed through `resolve` (null = keep this name). The
  * one walk the apply-prefix and reindex rules used to carry separately
  * (duplicated-logic audit, 2026-09-05): references are spliced by their
- * masked-aware occurrences, so copies inside code spans stay; the label
- * sits at column 0, where referenceOccurrences never looks, so it is
- * re-matched and rewritten on its own. `masked` is the line's
- * document-aware masked twin.
+ * masked-aware occurrences, so copies inside code spans stay; a real
+ * label is not among them (referenceOccurrences excludes it when
+ * `labelIsDefinition`), so it is re-matched and rewritten on its own;
+ * a LAZY label's "[^x]" is a reference and renames in the first pass.
+ * `masked` is the line's document-aware masked twin.
  */
 export function rewriteFootnoteNames(
     line: string,
     masked: string,
     resolve: (name: string) => string | null,
+    // false when the line's label-shaped start is lazy text: its "[^x]" is
+    // then renamed as the reference it is, and the label pass stays out
+    labelIsDefinition = true,
 ): string {
     let result = "";
     let copied = 0;
-    for (const { name, start, end } of referenceOccurrences(line, masked)) {
+    for (const { name, start, end } of referenceOccurrences(line, masked, labelIsDefinition)) {
         const newName = resolve(name);
         if (newName === null) continue;
         result += line.slice(copied, start) + referenceText(newName);
@@ -29,7 +33,7 @@ export function rewriteFootnoteNames(
     // occurrences above - it renames here. Nothing precedes a label but
     // its marker/indent, which the reference pass never touches, so the
     // label's raw offsets still hold in `result`
-    const hit = definitionLabelWithName(line, masked);
+    const hit = labelIsDefinition ? definitionLabelWithName(line, masked) : null;
     if (hit) {
         const newName = resolve(hit.name);
         if (newName !== null) {

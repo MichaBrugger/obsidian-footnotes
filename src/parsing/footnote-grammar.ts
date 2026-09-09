@@ -33,11 +33,19 @@ export const ExtractNameFromFootnote = /(\[\^)([^[\]]+)(?=\])/;
  * marker still reads as a reference here and is excluded one level up, in
  * referenceOccurrences, which knows the line's label.
  */
-export function footnoteReferenceMatches(line: string): RegExpMatchArray[] {
+export function footnoteReferenceMatches(
+    line: string,
+    // false for a line whose label-shaped start is LAZY paragraph text
+    // (definitionStartLines): its "[^x]" then IS a live reference, as
+    // Obsidian renders it (second review 2026-09-09; the unconditional
+    // exclusion let orphan-definition deletion destroy the real
+    // definition such a reference pointed at)
+    labelIsDefinition = true,
+): RegExpMatchArray[] {
     const matches: RegExpMatchArray[] = [];
     for (const match of line.matchAll(AllReferences)) {
         const start = match.index;
-        if (start === 0 && line[match[0].length] === ":") continue;
+        if (labelIsDefinition && start === 0 && line[match[0].length] === ":") continue;
         // a backslash-escaped "[" is literal text per CommonMark - the
         // "reference" is prose the user typed on purpose (bug-escaped-marker)
         if (escapedAt(line, start)) continue;
@@ -72,6 +80,10 @@ export interface ReferenceOccurrence {
 export function referenceOccurrences(
     line: string,
     masked: string,
+    // whether the line's label-shaped start is a real definition
+    // (definitionStartLines says so); callers holding the starts pass
+    // theirs, so a LAZY label's "[^x]" counts as the live reference it is
+    labelIsDefinition = true,
 ): ReferenceOccurrence[] {
     const occurrences: ReferenceOccurrence[] = [];
     // the line's own definition label defines, it never references - at
@@ -80,9 +92,9 @@ export function referenceOccurrences(
     // count a quoted orphan's label as the first reference and hand it
     // number 1 (review A3, 2026-09-08); the exclusion lives here, in the
     // one home of "every reference on this line", so no rule can disagree
-    const label = definitionLabelIn(masked);
+    const label = labelIsDefinition ? definitionLabelIn(masked) : null;
     const labelStart = label ? label.nameStart - 2 : -1;
-    for (const match of footnoteReferenceMatches(masked)) {
+    for (const match of footnoteReferenceMatches(masked, labelIsDefinition)) {
         const start = match.index ?? 0;
         if (start === labelStart) continue;
         const end = start + match[0].length;

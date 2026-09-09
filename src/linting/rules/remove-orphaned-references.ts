@@ -92,15 +92,15 @@ export function orphanedFootnoteReferenceNames(
     orphanSafePrefix = "",
     // the post-lint alerts share ONE normalize/scan/mask across all three
     // alert helpers (2026-08-11 review perf item); direct callers omit it
-    precomputed?: { lines: string[]; masked: string[] },
+    precomputed?: { lines: string[]; masked: string[]; scan?: DocumentScan; starts?: boolean[] },
 ): string[] {
     // no "[^" anywhere means no references (and no orphans) - this alert
     // scan runs on every lint (perf F4)
     if (!markdown.includes("[^")) return [];
     const lines = precomputed?.lines ?? normalizeEol(markdown).text.split("\n");
-    const scan = scanDocument(lines);
+    const scan = precomputed?.scan ?? scanDocument(lines);
     const masked = precomputed?.masked ?? maskProtectedLines(lines, scan);
-    const starts = definitionStartLines(lines, scan, (i) => masked[i]);
+    const starts = precomputed?.starts ?? definitionStartLines(lines, scan, (i) => masked[i]);
     const definitions = definitionNamesFolded(lines, masked, starts);
     const lazyLabels = new Set(
         lazyDefinitionLabelNames(lines, scan, masked, starts).map((n) => n.toLowerCase()),
@@ -110,7 +110,7 @@ export function orphanedFootnoteReferenceNames(
     const names: string[] = [];
     const seen = new Set<string>();
     for (let i = 0; i < masked.length; i++) {
-        for (const { name } of referenceOccurrences(lines[i], masked[i])) {
+        for (const { name } of referenceOccurrences(lines[i], masked[i], starts[i])) {
             if (!isOrphan(name, definitions, lazyLabels, orphanSafeFolded)) continue;
             const folded = name.toLowerCase();
             if (!seen.has(folded)) {
@@ -152,6 +152,7 @@ export function removeOrphanedFootnoteReferences(
         for (const { name, start, end } of referenceOccurrences(
             line,
             masked[i],
+            starts[i],
         )) {
             if (!isOrphan(name, definitions, lazyLabels, orphanSafeFolded)) continue;
             result += line.slice(copied, start);
@@ -185,6 +186,14 @@ export function removeOrphanedFootnoteReferences(
     const scanAfter = scanDocument(out);
     for (let i = 0; i < lines.length; i++) {
         if (scan.isProtected[i] !== scanAfter.isProtected[i]) return markdown;
+    }
+    // the same promise for the prose-label rule: blanking the line above a
+    // lazy label would promote it into a live definition (second review
+    // 2026-09-09), a reclassification this deletion must not make
+    const maskedAfter = maskProtectedLines(out, scanAfter);
+    const startsAfter = definitionStartLines(out, scanAfter, (i) => maskedAfter[i]);
+    for (let i = 0; i < lines.length; i++) {
+        if (starts[i] !== startsAfter[i]) return markdown;
     }
     return restoreEol(out.join("\n"), eol);
 }

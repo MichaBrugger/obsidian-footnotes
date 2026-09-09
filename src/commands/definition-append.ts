@@ -51,9 +51,17 @@ export function buildDefinitionAppend(
     // would overlap), and a section heading the selection swallows is no
     // slot to append under (property find 2026-09-09: a drag across the
     // "# Footnotes" heading with the setting on wrote the definition into
-    // the middle of the selection and glued the paragraph's tail to it)
+    // the middle of the selection and glued the paragraph's tail to it).
+    // Honored where a slot can fall inside the span: the heading slot
+    // (skipped when the heading is swallowed) and the walk up from an
+    // unclosed tail. The other two branches cannot land inside it - the
+    // caller refuses a selection that overlaps a definition block, and the
+    // EOF append sits at or after the span's end.
     avoid?: { from: EditorPosition; to: EditorPosition },
 ): { change: EditorChange; cursor: EditorPosition; prepend?: EditorChange } {
+    // every read goes through `ctx` (never `doc`): a cell branch dispatches
+    // a cell edit between building the context and calling this, and two
+    // sources for one document is how those drift (second review 2026-09-09)
     const lines = ctx.lines;
     const isProtected = ctx.scan.isProtected;
     const blocks = ctx.blocks();
@@ -76,7 +84,7 @@ export function buildDefinitionAppend(
         if (needsSeparator(lastLine)) text += "\n";
         return {
             change: {
-                from: { line: lastLine, ch: doc.getLine(lastLine).length },
+                from: { line: lastLine, ch: lines[lastLine].length },
                 text,
             },
             cursor,
@@ -121,7 +129,7 @@ export function buildDefinitionAppend(
             if (needsSeparator(fromLine)) slotText += "\n";
             return {
                 change: {
-                    from: { line: fromLine, ch: doc.getLine(fromLine).length },
+                    from: { line: fromLine, ch: lines[fromLine].length },
                     text: slotText,
                 },
                 cursor,
@@ -129,7 +137,7 @@ export function buildDefinitionAppend(
         }
     }
 
-    let fromLine = doc.lastLine();
+    let fromLine = lines.length - 1;
     let to: EditorPosition | undefined;
     if (ctx.scan.endsProtected) {
         // the note ends inside an UNCLOSED fence/comment/math (2026-08-11
@@ -157,23 +165,23 @@ export function buildDefinitionAppend(
             };
         }
     } else if (plugin.settings.enableRemoveBlankLastLines) {
-        while (fromLine > 0 && doc.getLine(fromLine).length === 0) {
+        while (fromLine > 0 && lines[fromLine].length === 0) {
             fromLine--;
         }
-        to = { line: doc.lastLine(), ch: doc.getLine(doc.lastLine()).length };
+        to = { line: lines.length - 1, ch: lines[lines.length - 1].length };
     }
-    const from = { line: fromLine, ch: doc.getLine(fromLine).length };
+    const from = { line: fromLine, ch: lines[fromLine].length };
 
     let text = `\n[^${footnoteId}]: `;
     if (isFirstFootnote) {
         let heading = addFootnoteSectionHeader(plugin);
         // the heading carries its own blank line above; a blank insertion
         // line (trimming off, note ends empty) already supplies it
-        if (heading && doc.getLine(fromLine).trim() === "") {
+        if (heading && lines[fromLine].trim() === "") {
             heading = heading.slice(1);
         }
         text = heading + "\n" + text;
-    } else if (doc.getLine(fromLine).trim() !== "") {
+    } else if (lines[fromLine].trim() !== "") {
         // not the first footnote, yet no column-0 block to append under
         // (the note's only definitions are blockquoted): the label would
         // land directly under a prose line, which Obsidian reads as lazy

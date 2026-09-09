@@ -115,8 +115,7 @@ function labelList(names: string[]): string {
 // say "write its definition", the wrong advice, so these names get their
 // own alert and drop out of that one (the orphan rule exempts them from
 // the alert and from deletion alike). Never silent, like every alert.
-function noticeLazyDefinitions(lines: string[], scan: DocumentScan, masked: string[]) {
-    const starts = definitionStartLines(lines, scan, (i) => masked[i]);
+function noticeLazyDefinitions(lines: string[], scan: DocumentScan, masked: string[], starts: boolean[]) {
     const names = lazyDefinitionLabelNames(lines, scan, masked, starts);
     if (names.length === 0) return;
     showNotice(
@@ -133,7 +132,7 @@ function noticeOrphanedReferences(
     plugin: FootnotePlugin,
     markdown: string,
     prefix: string,
-    precomputed: { lines: string[]; masked: string[] },
+    precomputed: { lines: string[]; masked: string[]; scan: DocumentScan; starts: boolean[] },
 ) {
     if (plugin.settings.lintDeleteOrphanedReferences) return;
     const names = orphanedFootnoteReferenceNames(markdown, prefix, precomputed);
@@ -151,7 +150,7 @@ function noticeOrphanedReferences(
 function noticeOrphanedDefinitions(
     plugin: FootnotePlugin,
     markdown: string,
-    precomputed: { lines: string[]; scan: DocumentScan },
+    precomputed: { lines: string[]; scan: DocumentScan; masked: string[]; starts: boolean[] },
 ) {
     if (plugin.settings.lintDeleteOrphanedDefinitions) return;
     const names = orphanedFootnoteDefinitionNames(markdown, precomputed);
@@ -196,6 +195,7 @@ export function invalidFootnoteNames(
     lines: string[],
     scan: DocumentScan,
     masked: string[],
+    starts: boolean[] = definitionStartLines(lines, scan, (i) => masked[i]),
 ): string[] {
     const names: string[] = [];
     const seen = new Set<string>();
@@ -206,14 +206,14 @@ export function invalidFootnoteNames(
         names.push(name);
     };
     for (let i = 0; i < lines.length; i++) {
-        for (const { name } of referenceOccurrences(lines[i], masked[i])) consider(name);
+        for (const { name } of referenceOccurrences(lines[i], masked[i], starts[i])) consider(name);
     }
-    for (const block of findDefinitionBlocks(lines, scan)) consider(block.name);
+    for (const block of findDefinitionBlocks(lines, scan, masked, starts)) consider(block.name);
     return names;
 }
 
-function noticeInvalidNames(lines: string[], scan: DocumentScan, masked: string[]) {
-    const names = invalidFootnoteNames(lines, scan, masked);
+function noticeInvalidNames(lines: string[], scan: DocumentScan, masked: string[], starts: boolean[]) {
+    const names = invalidFootnoteNames(lines, scan, masked, starts);
     if (names.length === 0) return;
     showNotice(
         names.length === 1
@@ -289,10 +289,12 @@ function noticeNestedFootnotes(
 }
 
 // every lint entry point calls this with the POST-lint text, so the alerts
-// fire whether or not the rules changed anything. ONE normalize/scan/mask
-// is shared by all the alerts (2026-08-11 review perf item: the alerts
-// each re-derived it - ~40% of a lint's wall time, felt on every creation
-// with lint-on-footnote-creation enabled).
+// fire whether or not the rules changed anything. ONE normalize, scan,
+// masked twin, and definition-start pass is shared by all the alerts
+// (2026-08-11 review perf item: the alerts each re-derived it - ~40% of a
+// lint's wall time, felt on every creation with lint-on-footnote-creation
+// enabled; the starts joined the bundle 2026-09-09, when the prose-label
+// rule had quietly added seven re-derivations).
 export function noticeLintAlerts(plugin: FootnotePlugin, markdown: string) {
     // every alert's own raw gate requires a "[^" (all its needles carry one)
     if (!markdown.includes("[^")) return;
@@ -300,11 +302,12 @@ export function noticeLintAlerts(plugin: FootnotePlugin, markdown: string) {
     const lines = normalizeEol(markdown).text.split("\n");
     const scan = scanDocument(lines);
     const masked = maskProtectedLines(lines, scan);
+    const starts = definitionStartLines(lines, scan, (i) => masked[i]);
     noticeEmptyReferences(markdown, prefix, masked);
-    noticeOrphanedReferences(plugin, markdown, prefix, { lines, masked });
-    noticeLazyDefinitions(lines, scan, masked);
-    noticeOrphanedDefinitions(plugin, markdown, { lines, scan });
+    noticeOrphanedReferences(plugin, markdown, prefix, { lines, masked, scan, starts });
+    noticeLazyDefinitions(lines, scan, masked, starts);
+    noticeOrphanedDefinitions(plugin, markdown, { lines, scan, masked, starts });
     noticeDuplicateDefinitions(plugin, markdown, { lines, scan });
     noticeNestedFootnotes(lines, scan, masked);
-    noticeInvalidNames(lines, scan, masked);
+    noticeInvalidNames(lines, scan, masked, starts);
 }

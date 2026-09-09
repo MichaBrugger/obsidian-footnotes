@@ -49,13 +49,15 @@ export interface ReindexOptions {
 function referenceAppearanceOrder(
     lines: string[],
     maskedLines: string[],
+    starts: boolean[],
 ): string[] {
     const order: string[] = [];
     const seen = new Set<string>();
     for (let i = 0; i < lines.length; i++) {
         // protected lines are all-NUL in the masked twin - no matches;
-        // referenceOccurrences re-slices raw names (bug-masked-name-identity)
-        for (const { name } of referenceOccurrences(lines[i], maskedLines[i])) {
+        // referenceOccurrences re-slices raw names (bug-masked-name-identity);
+        // a lazy label's own "[^x]" is a reference and takes its slot here
+        for (const { name } of referenceOccurrences(lines[i], maskedLines[i], starts[i])) {
             const id = name.toLowerCase();
             if (!seen.has(id)) {
                 seen.add(id);
@@ -134,8 +136,9 @@ function reindexOnce(
         let lines = view.lines;
         let scan = view.scan;
         let maskedLines = view.maskedLines;
+        let starts = view.definitionStarts;
         let blocks = view.blocks;
-        let referenceOrder = referenceAppearanceOrder(lines, maskedLines);
+        let referenceOrder = referenceAppearanceOrder(lines, maskedLines, starts);
 
         if (!keepOrphans) {
             // the shared reference-graph deletion: transitive chains of any
@@ -150,8 +153,9 @@ function reindexOnce(
                 lines = removeLineRanges(lines, orphans);
                 scan = scanDocument(lines);
                 maskedLines = maskProtectedLines(lines, scan);
-                blocks = findDefinitionBlocks(lines, scan);
-                referenceOrder = referenceAppearanceOrder(lines, maskedLines);
+                starts = definitionStartLines(lines, scan, (i) => maskedLines[i]);
+                blocks = findDefinitionBlocks(lines, scan, maskedLines, starts);
+                referenceOrder = referenceAppearanceOrder(lines, maskedLines, starts);
             }
         }
 
@@ -172,7 +176,6 @@ function reindexOnce(
         // outside the column-0 blocks (C22): an orphan among them still
         // needs a place in the order, or the number it holds could be
         // handed to a renumbered live footnote (review A3, 2026-09-08)
-        const starts = definitionStartLines(lines, scan, (i) => maskedLines[i]);
         for (let i = 0; i < lines.length; i++) {
             if (scan.isProtected[i] || !starts[i]) continue;
             const hit = definitionLabelWithName(lines[i], maskedLines[i]);
@@ -213,7 +216,7 @@ function reindexOnce(
         const rewritten = lines.map((line, i) =>
             scan.isProtected[i]
                 ? line
-                : rewriteFootnoteNames(line, maskedLines[i], (name) => renames.get(name.toLowerCase()) ?? null),
+                : rewriteFootnoteNames(line, maskedLines[i], (name) => renames.get(name.toLowerCase()) ?? null, starts[i]),
         );
 
         // permute definition blocks among their existing slots so they read in

@@ -321,7 +321,7 @@ export function maskLineRegions(
 
     const chars = line.split("");
     const shapes = new ReferenceShapeIndex(line);
-    const insideReferenceShape = (_chars: readonly string[], at: number) => shapes.inside(at);
+    const insideReferenceShape = (at: number) => shapes.inside(at);
     const blot = (from: number, to: number) => {
         for (let k = from; k < to; k++) chars[k] = "\0";
         shapes.blotted(to);
@@ -362,7 +362,7 @@ export function maskLineRegions(
         }
         if (c === "`") {
             // a backtick inside "[^…]" is footnote-id text, not a code opener
-            if (insideReferenceShape(chars, i)) {
+            if (insideReferenceShape(i)) {
                 while (line[i] === "`") i++;
                 continue;
             }
@@ -381,7 +381,7 @@ export function maskLineRegions(
                 const candidate = j;
                 while (line[j] === "`") j++;
                 // a run inside "[^…]" can't close either (see the opener guard)
-                if (j - candidate === runLength && !insideReferenceShape(chars, candidate)) {
+                if (j - candidate === runLength && !insideReferenceShape(candidate)) {
                     close = candidate;
                     break;
                 }
@@ -418,7 +418,7 @@ export function maskLineRegions(
         }
         if (c === "$") {
             // a dollar inside "[^…]" is footnote-id text, not math
-            if (insideReferenceShape(chars, i)) {
+            if (insideReferenceShape(i)) {
                 i++;
                 continue;
             }
@@ -446,7 +446,7 @@ export function maskLineRegions(
                     j++;
                     continue;
                 }
-                if (line[j] === "$" && !insideReferenceShape(chars, j)) {
+                if (line[j] === "$" && !insideReferenceShape(j)) {
                     close = j;
                     break;
                 }
@@ -1043,17 +1043,25 @@ export function definitionStartLines(
     // (indented content still continues it; anything else closes it)
     type Open = "none" | "paragraph" | "definition" | "definition-gap";
     let open = "none" as Open;
+    let previousDepth = 0;
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
+        const { depth } = blockquoteDepth(line);
+        // a deeper blockquote marker opens a container: a quote interrupts
+        // a paragraph ("prose" / "> [^1]: quoted" is a definition, ground
+        // truth 2026-09-09), while a SHALLOWER line is a lazy continuation
+        if (depth > previousDepth) open = "none";
+        previousDepth = depth;
         if (scan.isProtected[i]) {
             // a protected line INSIDE a definition's content (an indented
             // fence or math block, a comment run the continuation opened)
-            // keeps the definition open, exactly as the block walker absorbs
-            // it; a column-0 construct ends whatever was open
+            // keeps the definition open - the block walker's own absorb
+            // rule, four-space indent or a region flag; a column-0
+            // construct ends whatever was open
             const inDefinition = open === "definition" || open === "definition-gap";
             open =
                 inDefinition &&
-                (IndentedContent.test(line) ||
+                (/^ {4}/.test(line) ||
                     scan.startsInComment[i] ||
                     scan.startsInMath[i] ||
                     scan.startsInFence[i])
@@ -1084,6 +1092,10 @@ export function definitionStartLines(
         if (
             /^ {0,3}#{1,6}(?:\s|$)/.test(bare) ||
             /^ {0,3}([-*_])(?: *\1){2,} *$/.test(bare) ||
+            // a setext "===" underline turns the paragraph above into a
+            // heading, so the paragraph is over ("H" / "===" / "[^1]: real"
+            // is a definition, ground truth 2026-09-09)
+            (open === "paragraph" && /^ {0,3}=+ *$/.test(bare)) ||
             // a callout's title line ("> [!note]- Title") is not paragraph
             // text: a label right under it is a definition (ground truth
             // 2026-09-09), while a label under the callout's BODY is not

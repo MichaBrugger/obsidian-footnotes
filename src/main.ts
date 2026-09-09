@@ -334,22 +334,25 @@ function migrateSettingsToV1(
     lintOnFileChange?: unknown;
     tidyOnFileChange?: unknown;
   };
-  if (withTidyKeys.tidyFixPunctuation !== undefined) {
+  // typeof guards, like migrateSettingsToV2's: the tidy* keys are unknown
+  // to parseSavedSettings, so a mistyped one would otherwise land on its
+  // lint* name as a truthy string (second review 2026-09-09)
+  if (typeof withTidyKeys.tidyFixPunctuation === "boolean") {
     withTidyKeys.lintFixPunctuation = withTidyKeys.tidyFixPunctuation;
-    delete withTidyKeys.tidyFixPunctuation;
   }
-  if (withTidyKeys.tidyMoveToBottom !== undefined) {
+  delete withTidyKeys.tidyFixPunctuation;
+  if (typeof withTidyKeys.tidyMoveToBottom === "boolean") {
     withTidyKeys.lintMoveToBottom = withTidyKeys.tidyMoveToBottom;
-    delete withTidyKeys.tidyMoveToBottom;
   }
-  if (withTidyKeys.tidyReindex !== undefined) {
+  delete withTidyKeys.tidyMoveToBottom;
+  if (typeof withTidyKeys.tidyReindex === "boolean") {
     withTidyKeys.lintReindex = withTidyKeys.tidyReindex;
-    delete withTidyKeys.tidyReindex;
   }
-  if (withTidyKeys.tidyOnSave !== undefined) {
+  delete withTidyKeys.tidyReindex;
+  if (typeof withTidyKeys.tidyOnSave === "boolean") {
     withTidyKeys.lintOnSave = withTidyKeys.tidyOnSave;
-    delete withTidyKeys.tidyOnSave;
   }
+  delete withTidyKeys.tidyOnSave;
   // the lint-on-focused-file-change trigger was replaced by lint on
   // footnote creation (2026-08-05) - its saved keys are dropped rather
   // than carried over, since the semantics are different

@@ -37,12 +37,15 @@ interface ReferenceScan {
 function scanReferences(
     lines: string[],
     scan: DocumentScan,
+    // the alert tail hands over the twin and the starts it already holds
+    precomputedMasked?: string[],
+    precomputedStarts?: boolean[],
 ): ReferenceScan {
-    const blocks = findDefinitionBlocks(lines, scan);
-
     // document-aware masked twin: protected lines are all-NUL (no matches),
     // and comment portions of boundary lines are invisible
-    const maskedLines = maskProtectedLines(lines, scan);
+    const maskedLines = precomputedMasked ?? maskProtectedLines(lines, scan);
+    const starts = precomputedStarts ?? definitionStartLines(lines, scan, (i) => maskedLines[i]);
+    const blocks = findDefinitionBlocks(lines, scan, maskedLines, starts);
 
     // C22 follow-through (parallel-review probe, 2026-08-10): a
     // blockquoted/callout label ("> [^x]: …") is a LIVE definition - as a
@@ -50,14 +53,15 @@ function scanReferences(
     // and NO definition label of either shape counts as a reference (a
     // label defines; treating it as a reference kept orphans alive)
     const labelStartAt = new Array<number>(lines.length).fill(-1);
-    const starts = definitionStartLines(lines, scan, (i) => maskedLines[i]);
     for (let i = 0; i < lines.length; i++) {
-        if (scan.isProtected[i]) continue;
+        if (scan.isProtected[i] || !starts[i]) continue;
         const hit = definitionLabelWithName(lines[i], maskedLines[i]);
         if (!hit) continue;
-        // a label-shaped prefix never counts as a reference, live or lazy
+        // a real label's prefix is not a reference; a LAZY label's "[^x]"
+        // is one (it renders as such), and it keeps the definition it
+        // points at alive - only real starts are recorded here
         labelStartAt[i] = hit.label.nameStart - 2;
-        if (hit.label.quoted && starts[i]) {
+        if (hit.label.quoted) {
             blocks.push({
                 name: hit.name,
                 start: i,
@@ -80,6 +84,7 @@ function scanReferences(
         for (const { name: raw, start } of referenceOccurrences(
             lines[i],
             maskedLines[i],
+            starts[i],
         )) {
             // column-0 labels are excluded by footnoteReferenceMatches;
             // blockquoted ones read as mid-line references - skip them here
@@ -137,7 +142,7 @@ export function orphanedFootnoteDefinitionNames(
     markdown: string,
     // the post-lint alerts share ONE normalize/scan pass across all three
     // alert helpers (2026-08-11 review perf item); direct callers omit it
-    precomputed?: { lines: string[]; scan: DocumentScan },
+    precomputed?: { lines: string[]; scan: DocumentScan; masked?: string[]; starts?: boolean[] },
 ): string[] {
     // no "[^" anywhere means no definitions (and no orphans) - this alert
     // scan runs on every lint (perf F4)
@@ -146,6 +151,8 @@ export function orphanedFootnoteDefinitionNames(
     const referenceScan = scanReferences(
         lines,
         precomputed?.scan ?? scanDocument(lines),
+        precomputed?.masked,
+        precomputed?.starts,
     );
     const referenced = new Set(referenceScan.liveRefs.keys());
     for (const refs of referenceScan.blockRefs) {

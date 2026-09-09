@@ -9,7 +9,7 @@ import {
     createMatchingFootnoteDefinition,
     insertInTableCell,
 } from "./create-footnote";
-import { docContext, referenceOccurrenceAtCursor } from "../editor/doc-context";
+import { DocContext, docContext, referenceOccurrenceAtCursor } from "../editor/doc-context";
 import { insertionLandsIntact, readInlineFootnoteFromClipboard } from "./inline-footnotes";
 import { ProtectedCreationNotice, simulatedMaskedLine } from "../editor/insertion-liveness";
 import { shouldJumpFromDefinitionToReference, shouldJumpFromReferenceToDefinition } from "./navigation";
@@ -182,6 +182,8 @@ export function navigateReferenceIfInside(
     plugin: FootnotePlugin,
     doc: Editor,
     cell: TableCellEditor | null,
+    // the press's own context, so this step does not build a second one
+    ctx?: DocContext,
 ): boolean {
     const cursorPosition = resolvedCaret(doc, cell);
     const lineText = doc.getLine(cursorPosition.line);
@@ -190,7 +192,7 @@ export function navigateReferenceIfInside(
     // inserting an inline footnote is fine (perf F1, #41 semantics; see
     // referenceOccurrenceAtCursor). The one context it builds past the
     // gate serves the rest of the press.
-    const hit = referenceOccurrenceAtCursor(lineText, cursorPosition, doc);
+    const hit = referenceOccurrenceAtCursor(lineText, cursorPosition, doc, ctx);
     if (hit === null) return false;
 
     if (shouldJumpFromReferenceToDefinition(lineText, cursorPosition, plugin, doc, hit.ctx))
@@ -274,7 +276,7 @@ export async function insertInlineFootnote(plugin: FootnotePlugin) {
             return;
         }
         // inside a real reference, navigate instead of nesting "^[]"
-        if (navigateReferenceIfInside(plugin, doc, cell)) return;
+        if (navigateReferenceIfInside(plugin, doc, cell, ctx)) return;
         // creation in code/math/comment/frontmatter is blocked outright
         if (warnProtectedCaretIfInside(doc, cell, cursorPosition, ctx)) return;
 
@@ -312,7 +314,7 @@ export async function pasteInlineFootnote(plugin: FootnotePlugin) {
         ) {
             return;
         }
-        if (navigateReferenceIfInside(plugin, doc, pasteCell)) return;
+        if (navigateReferenceIfInside(plugin, doc, pasteCell, pasteCtx)) return;
         // creation in code/math/comment/frontmatter is blocked outright -
         // before the clipboard await, so a blocked press never reads it
         if (warnProtectedCaretIfInside(doc, pasteCell, pastePosition, pasteCtx)) {

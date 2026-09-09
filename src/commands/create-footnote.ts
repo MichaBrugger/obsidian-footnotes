@@ -130,10 +130,12 @@ export function referenceOrdinalAtCursor(
 ): number {
     const wanted = footnoteId.toLowerCase();
     let ordinal = 0;
+    const ordinalStarts = ctx.definitionStarts();
     for (let line = 0; line <= cursor.line && line < ctx.lines.length; line++) {
         for (const occurrence of referenceOccurrences(
             ctx.lines[line],
             ctx.maskedLine(line),
+            ordinalStarts[line],
         )) {
             if (occurrence.name.toLowerCase() !== wanted) continue;
             if (line === cursor.line) {
@@ -159,10 +161,12 @@ export function positionAfterReference(
 ): EditorPosition | null {
     const wanted = footnoteId.toLowerCase();
     let seen = 0;
+    const restoreStarts = ctx.definitionStarts();
     for (let line = 0; line < ctx.lines.length; line++) {
         for (const occurrence of referenceOccurrences(
             ctx.lines[line],
             ctx.maskedLine(line),
+            restoreStarts[line],
         )) {
             if (occurrence.name.toLowerCase() !== wanted) continue;
             if (seen === ordinal) return { line, ch: occurrence.end };

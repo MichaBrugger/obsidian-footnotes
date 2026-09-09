@@ -80,8 +80,9 @@ export function shouldJumpFromDefinitionToReference(
         // line's own label, column 0 or blockquoted (jumping to a
         // blockquoted duplicate's label was a phantom target; parallel-
         // review probe 2026-08-10, exclusion centralized 2026-09-08)
+        const useStarts = ctx.definitionStarts();
         for (let i = 0; i < masked.length; i++) {
-            for (const use of referenceOccurrences(lines[i], masked[i])) {
+            for (const use of referenceOccurrences(lines[i], masked[i], useStarts[i])) {
                 if (use.name.toLowerCase() !== name) continue;
                 const newCursorPos = { line: i, ch: use.end };
                 moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos, plugin, undefined, true);

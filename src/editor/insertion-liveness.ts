@@ -4,6 +4,7 @@ import { NoFootnoteCreated } from "./notice";
 import { docLines } from "./doc-context";
 import { escapedAt, referenceOccurrences } from "../parsing/footnote-grammar";
 import {
+    definitionStartLines,
     findDefinitionBlocks,
     maskedLineAt,
     maskProtectedLines,
@@ -168,7 +169,7 @@ export function simulatedAnchor(
 }
 
 /** Every requested landing from ONE resolution pass: the per-anchor form re-joined and re-resolved the whole document once per reference (review B4, 2026-09-09). */
-function simulatedAnchors(
+export function simulatedAnchors(
     lines: string[],
     changes: EditorChange[],
     anchorIndices: number[],
@@ -243,10 +244,12 @@ export function verifyLiveFootnoteInsertion(opts: {
     // one masked twin from the scan already taken - maskedLineAt would rescan
     // the whole simulated document once per reference (review B4)
     const simulatedMasked = maskProtectedLines(simulated, simulatedScan);
+    const simulatedStarts = definitionStartLines(simulated, simulatedScan, (i) => simulatedMasked[i]);
     const everyReferenceLive = anchors.every((anchor) =>
         referenceOccurrences(
             simulated[anchor.line],
             simulatedMasked[anchor.line],
+            simulatedStarts[anchor.line],
         ).some(
             (occurrence) =>
                 occurrence.start === anchor.ch &&

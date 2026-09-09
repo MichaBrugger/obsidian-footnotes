@@ -71,7 +71,7 @@ function namesIn(lines: string[]): { defined: Map<string, string>; referenced: S
             const hit = definitionLabelWithName(lines[i], masked[i]);
             if (hit) defined.set(hit.name.toLowerCase(), hit.name);
         }
-        for (const occurrence of referenceOccurrences(lines[i], masked[i])) {
+        for (const occurrence of referenceOccurrences(lines[i], masked[i], starts[i])) {
             referenced.add(occurrence.name.toLowerCase());
         }
     }

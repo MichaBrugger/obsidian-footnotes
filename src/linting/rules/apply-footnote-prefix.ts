@@ -27,7 +27,7 @@ export function applyFootnotePrefix(markdown: string, prefix: string): string {
 
     // document-aware masking: comment portions of multi-line boundary
     // lines are invisible, their live portions are not
-    return rewriteDocument(markdown, (text, { lines, scan, maskedLines, blocks }) => {
+    return rewriteDocument(markdown, (text, { lines, scan, maskedLines, blocks, definitionStarts }) => {
         const isProtected = scan.isProtected;
 
         // one scan collects both: distinct plain-numbered names by first reference
@@ -48,7 +48,7 @@ export function applyFootnotePrefix(markdown: string, prefix: string): string {
             if (isProtected[i]) continue;
             // referenceOccurrences re-slices raw names - the rewrite below
             // compares original ids (bug-masked-name-identity)
-            for (const { name } of referenceOccurrences(lines[i], maskedLines[i])) {
+            for (const { name } of referenceOccurrences(lines[i], maskedLines[i], definitionStarts[i])) {
                 record(name);
             }
         }
@@ -82,7 +82,7 @@ export function applyFootnotePrefix(markdown: string, prefix: string): string {
         };
 
         const rewritten = lines.map((line, i) =>
-            isProtected[i] ? line : rewriteFootnoteNames(line, maskedLines[i], renameFor),
+            isProtected[i] ? line : rewriteFootnoteNames(line, maskedLines[i], renameFor, definitionStarts[i]),
         );
         return rewritten.join("\n");
     });

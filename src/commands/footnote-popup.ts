@@ -331,7 +331,7 @@ export async function openFootnotePopup(
         // Element, not HTMLElement: an SVG icon is a common outside-click
         // target and must still dismiss; a non-Element target (none seen
         // from the UI) must not throw on closest() - the keydown handler
-        // below already checks its target the same way (review A8)
+        // below narrows its target the same way (review A8)
         const target = evt.target instanceof Element ? evt.target : null;
         if (!target) return;
         if (containerEl.contains(target)) return;
@@ -361,7 +361,7 @@ export async function openFootnotePopup(
     // insert must not also close); anything else means "close me".
     const onDocKeydown = (evt: KeyboardEvent) => {
         if (evt.key !== "Escape") return;
-        const target = evt.target as Node | null;
+        const target = evt.target instanceof Node ? evt.target : null;
         const inPopup = !!target && containerEl.contains(target);
         if (!inPopup && !(target && mdView.containerEl.contains(target))) return;
         const focused = inPopup

@@ -52,7 +52,10 @@ export class SetFootnotePrefixModal extends ValidatedTextModal {
                     else delete frontmatter["footnote-prefix"];
                 },
             );
-        } catch {
+        } catch (error: unknown) {
+            // which of the two documented causes fired matters for a bug
+            // report; the toast stays plain
+            console.debug("Footnote Shortcut: the footnote-prefix write failed", error);
             // the write can reject: malformed YAML in the note's frontmatter
             // (YAMLParseError) or the file gone from disk under the open
             // modal (ENOENT) - both confirmed live by Jason, 2026-09-08
