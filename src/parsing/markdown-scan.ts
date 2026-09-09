@@ -215,29 +215,62 @@ function isFenceOpener(bareLine: string, delim: string): boolean {
  * a bracket, not a reference).
  * Being FOUND as a reference says nothing about validity: a name with a
  * backtick is still invalid, and the lint now reports it by name.
+ *
+ * Answered from two state tables over the masked-so-far characters
+ * instead of walking outward from every candidate: the outward walk ran
+ * to the start of the line whenever no bracket or NUL lay behind the
+ * candidate, and the closing-candidate loops asked it once per dollar or
+ * backtick, so a long line of prices masked in quadratic time (8000
+ * characters: 344 ms per mask, and a lint masks the note about ten
+ * times; review B1, 2026-09-09). The tables are rebuilt lazily after a
+ * blot, since a fresh NUL is a wall for both walks.
  */
-function insideReferenceShape(chars: readonly string[], i: number): boolean {
-    let opened = false;
-    for (let j = i - 1; j >= 0; j--) {
-        const c = chars[j];
-        if (c === "\0" || c === "]") return false;
-        if (c === "[") {
-            opened = chars[j + 1] === "^";
-            break;
+class ReferenceShapeIndex {
+    private before: boolean[] | null = null;
+    private after: boolean[] | null = null;
+
+    constructor(private readonly chars: readonly string[]) {}
+
+    /** Forget the tables: a blot wrote NULs the walks must now stop at. */
+    invalidate(): void {
+        this.before = null;
+        this.after = null;
+    }
+
+    inside(i: number): boolean {
+        if (this.before === null || this.after === null) this.build();
+        return (this.before as boolean[])[i] && (this.after as boolean[])[i];
+    }
+
+    private build(): void {
+        const chars = this.chars;
+        const n = chars.length;
+        // before[j]: walking back from j, the nearest of "[", "]", NUL is a
+        // "[" followed by "^" (the original backward walk, run forward once)
+        const before = new Array<boolean>(n);
+        let opened = false;
+        for (let j = 0; j < n; j++) {
+            before[j] = opened;
+            const c = chars[j];
+            if (c === "\0" || c === "]") opened = false;
+            else if (c === "[") opened = chars[j + 1] === "^";
         }
+        // after[j]: walking forward from j + 1, a "]" comes before any "[",
+        // NUL, or the end of the line - the shape must CLOSE ahead: an
+        // unclosed "[^" is a bracket, not a reference ("`[^` $[^1].$" keeps
+        // its code span and its math; the backtick guard would otherwise
+        // never let that span close, and the dollar guard would hide the math)
+        const after = new Array<boolean>(n);
+        let closes = false;
+        for (let j = n - 1; j >= 0; j--) {
+            after[j] = closes;
+            const c = chars[j];
+            if (c === "\0" || c === "[") closes = false;
+            else if (c === "]") closes = true;
+        }
+        this.before = before;
+        this.after = after;
     }
-    if (!opened) return false;
-    // ... and the shape must CLOSE ahead: a "[^" with no "]" before the
-    // next "[", a masked stretch, or the end of the line is a bracket, not
-    // a reference - "`[^` $[^1].$" keeps its code span and its math (the
-    // backtick guard would otherwise never let that span close, and the
-    // dollar guard would then hide the math)
-    for (let k = i + 1; k < chars.length; k++) {
-        const c = chars[k];
-        if (c === "\0" || c === "[") return false;
-        if (c === "]") return true;
-    }
-    return false;
 }
 
 /**
@@ -276,8 +309,11 @@ export function maskLineRegions(
     }
 
     const chars = line.split("");
+    const shapes = new ReferenceShapeIndex(chars);
+    const insideReferenceShape = (_chars: readonly string[], at: number) => shapes.inside(at);
     const blot = (from: number, to: number) => {
         for (let k = from; k < to; k++) chars[k] = "\0";
+        shapes.invalidate();
     };
     let i = 0;
 
