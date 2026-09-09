@@ -25,7 +25,6 @@ The plugin adds its commands **without hotkeys**, so assign your own right after
 
 Of the plugin's 7 commands, the ones you'll press constantly deserve hotkeys. I personally use:
 
-
 | Command                               | Recommended hotkey                           |
 | ------------------------------------- | -------------------------------------------- |
 | Insert / navigate numbered footnote   | <kbd>Alt</kbd>+<kbd>0</kbd>                  |
