@@ -343,7 +343,16 @@ export interface ConvertedSelection {
     from: EditorPosition;
     to: EditorPosition;
     text: string;
-    lead?: string;
+    /** the whitespace absorbed before the selection (absorbLeadingSpace), "" when none - the replacement starts at `from` and the note-changed guards compare `lead + text` */
+    lead: string;
+}
+
+/** The cell-editor twin of ConvertedSelection: offsets into the cell's own text. */
+export interface CellSelection {
+    from: number;
+    to: number;
+    text: string;
+    lead: string;
 }
 
 /**
@@ -657,7 +666,7 @@ export function convertSelectionToNamed(
     if (problem !== null) return problem;
     if (
         selection.to.line >= doc.lineCount() ||
-        rangeText(ctx.lines, selection.from, selection.to) !== (selection.lead ?? "") + selection.text
+        rangeText(ctx.lines, selection.from, selection.to) !== selection.lead + selection.text
     ) {
         showNotice(SelectionChangedNotice, 8000);
         return null;
@@ -671,14 +680,14 @@ export function convertCellSelectionToNamed(
     plugin: FootnotePlugin,
     doc: Editor,
     cell: TableCellEditor,
-    selection: { from: number; to: number; text: string; lead?: string },
+    selection: CellSelection,
     name: string,
     cursorPosition?: EditorPosition,
 ): string | null {
     const problem = namedSelectionProblem(doc, name);
     if (problem !== null) return problem;
     const cellText = cell.state.doc.toString();
-    if (cellText.slice(selection.from, selection.to) !== (selection.lead ?? "") + selection.text) {
+    if (cellText.slice(selection.from, selection.to) !== selection.lead + selection.text) {
         showNotice(SelectionChangedNotice, 8000);
         return null;
     }
@@ -846,7 +855,7 @@ function convertCellSelection(
     plugin: FootnotePlugin,
     doc: Editor,
     cell: TableCellEditor,
-    selection: { from: number; to: number; text: string; lead?: string },
+    selection: CellSelection,
     cursorPosition: EditorPosition | undefined,
     footnoteId: string | null,
 ): void {
@@ -885,7 +894,7 @@ type NamedSelectionTarget =
     | {
           kind: "cell";
           cell: TableCellEditor;
-          selection: { from: number; to: number; text: string; lead?: string };
+          selection: CellSelection;
           cursorPosition?: EditorPosition;
       };
 

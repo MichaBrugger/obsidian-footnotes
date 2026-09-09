@@ -227,6 +227,7 @@ describe("lint-on-footnote-creation covers selection conversions (parity, Jason'
                 from: { line: 0, ch: 10 },
                 to: { line: 0, ch: 15 },
                 text: "quick",
+                lead: "",
             },
             "note",
         );
@@ -292,6 +293,7 @@ describe("the creation lint relands the caret on the seeded definition (A8 repor
                 from: selected.anchor,
                 to: selected.head,
                 text: "move this aside",
+                lead: "",
             },
             "note",
         );
@@ -345,6 +347,7 @@ describe("the named key converts a selection through its modal (2026-08-13)", ()
                 from: { line: 0, ch: 4 },
                 to: { line: 0, ch: 9 },
                 text: "quick",
+                lead: "",
             },
             "Speed2026",
         );
@@ -366,6 +369,7 @@ describe("the named key converts a selection through its modal (2026-08-13)", ()
                 from: { line: 0, ch: 16 },
                 to: { line: 0, ch: 21 },
                 text: "quick",
+                lead: "",
             },
             "lost",
         );
@@ -383,7 +387,7 @@ describe("the named key converts a selection through its modal (2026-08-13)", ()
         const problem = convertSelectionToNamed(
             fakePlugin(doc),
             doc,
-            { from: { line: 0, ch: 4 }, to: { line: 0, ch: 9 }, text: "quick" },
+            { from: { line: 0, ch: 4 }, to: { line: 0, ch: 9 }, text: "quick", lead: "" },
             "Taken",
         );
         expect(problem).toBe('"[^Taken]" is already used by another footnote.');
@@ -418,7 +422,7 @@ describe("the named key converts a selection through its modal (2026-08-13)", ()
             doc,
             // captured before the note changed: the span no longer reads
             // "quick"
-            { from: { line: 0, ch: 4 }, to: { line: 0, ch: 9 }, text: "quick" },
+            { from: { line: 0, ch: 4 }, to: { line: 0, ch: 9 }, text: "quick", lead: "" },
             "fine",
         );
         expect(problem).toBeNull();
@@ -563,6 +567,7 @@ describe("a multi-line selection converts into a multi-paragraph definition (202
                 from: { line: 0, ch: 0 },
                 to: { line: 1, ch: 8 },
                 text: "para one\npara two",
+                lead: "",
             },
             "Smith2019",
         );
@@ -584,6 +589,7 @@ describe("a multi-line selection converts into a multi-paragraph definition (202
                 from: { line: 0, ch: 0 },
                 to: { line: 1, ch: 8 },
                 text: "para one\npara two",
+                lead: "",
             },
             "fine",
         );
@@ -1292,6 +1298,7 @@ describe("the block zoo converts (2026-08-19)", () => {
                 from: { line: 0, ch: 5 },
                 to: { line: 1, ch: 8 },
                 text: "> quoted\n- listed",
+                lead: "",
             },
             "zoo",
         );
