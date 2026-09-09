@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { fakeEditor } from "../helpers/fake-editor";
-import { fakePlugin } from "../helpers/fake-plugin";
-
-import { buildDefinitionAppend } from "../../src/commands/definition-append";
 import { scanDocument } from "../../src/parsing/markdown-scan";
 
 // Review B2 (2026-09-09): when a note ends inside an unclosed fence,
@@ -12,7 +8,9 @@ import { scanDocument } from "../../src/parsing/markdown-scan";
 // re-scan the prefix once per line, quadratic on a long note with the
 // opener near the top. scanDocument now records endsProtectedAt[i], the
 // answer the prefix probe used to compute, during the one walk it already
-// makes. The first spec is the equivalence proof against the old probe.
+// makes. The first spec is the equivalence proof against the old probe; the
+// timing pin lives in test/perf/ends-protected-at.perf.test.ts (excluded
+// from Stryker's instrumented dry run, which is several times slower).
 
 const DOCS = [
     ["prose[^9]?", "", "```", "code"],
@@ -44,16 +42,5 @@ describe("scanDocument.endsProtectedAt", () => {
         expect(scan.endsProtectedAt[3]).toBe(false);
         expect(scan.endsProtectedAt[4]).toBe(true);
         expect(scan.endsProtected).toBe(true);
-    });
-
-    it("the append above an unclosed opener near the top of a long note is fast", () => {
-        const lines = ["prose[^9]?", "", "text <!-- opens here"];
-        for (let i = 0; i < 3000; i++) lines.push(`hidden line ${i}`);
-        const doc = fakeEditor(lines, { cursor: { line: 0, ch: 0 }, wholeDoc: true });
-        const started = performance.now();
-        const { change } = buildDefinitionAppend(doc, "1", false, fakePlugin());
-        const took = performance.now() - started;
-        expect(change.from).toEqual({ line: 0, ch: "prose[^9]?".length });
-        expect(took).toBeLessThan(150);
     });
 });
