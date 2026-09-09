@@ -4,7 +4,7 @@ import type FootnotePlugin from "../main";
 import { comparePositions } from "../editor/cursor-motion";
 import { DocContext, docContext } from "../editor/doc-context";
 import { definitionLabel } from "../parsing/footnote-grammar";
-import { findDefinitionBlocks, findLineRunEnd, scanDocument } from "../parsing/markdown-scan";
+import { findLineRunEnd, scanDocument } from "../parsing/markdown-scan";
 
 // Where a new footnote definition lands: the section-heading setting and
 // the append edit both creation paths share. Split out of the all-in-one

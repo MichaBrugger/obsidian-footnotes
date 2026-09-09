@@ -14,7 +14,7 @@ import {
     referenceOccurrences,
 } from "../parsing/footnote-grammar";
 import { openFootnotePopup, popupEditingAvailable } from "./footnote-popup";
-import { definitionLabelIn, findDefinitionBlocks } from "../parsing/markdown-scan";
+import { definitionLabelIn } from "../parsing/markdown-scan";
 
 import { addReferenceOrDeleteDefinition, showNotice } from "../editor/notice";
 // The jump half of the decision cascade: definition → first reference,

@@ -26,7 +26,6 @@ import {
     verifyLiveFootnoteInsertion,
 } from "../editor/insertion-liveness";
 import {
-    findDefinitionBlocks,
     maskInlineRegions,
     maskedLineAt,
     scanDocument,

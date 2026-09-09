@@ -13,7 +13,6 @@ import {
 } from "../editor/insertion-liveness";
 import { DocContext, docLines } from "../editor/doc-context";
 import {
-    findDefinitionBlocks,
     maskInlineRegions,
     maskedLineAt,
 } from "../parsing/markdown-scan";
