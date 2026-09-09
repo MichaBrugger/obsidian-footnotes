@@ -400,6 +400,7 @@ describe("the named key converts a selection through its modal (2026-08-13)", ()
             from: { line: 0, ch: 4 },
             to: { line: 0, ch: 9 },
             text: "quick",
+            lead: "",
         };
         expect(
             convertSelectionToNamed(fakePlugin(doc), doc, selection, "bad name"),
@@ -436,7 +437,7 @@ describe("the named key converts a selection through its modal (2026-08-13)", ()
         const problem = convertSelectionToNamed(
             fakePlugin(doc),
             doc,
-            { from: { line: 0, ch: 0 }, to: { line: 0, ch: 1 }, text: ">" },
+            { from: { line: 0, ch: 0 }, to: { line: 0, ch: 1 }, text: ">", lead: "" },
             "dead",
         );
         expect(problem).toBeNull();
@@ -1159,7 +1160,7 @@ describe("selections inside an actively edited table cell", () => {
             fakePlugin(doc),
             doc,
             cell,
-            { from: 6, to: 10, text: "word" },
+            { from: 6, to: 10, text: "word", lead: "" },
             "src",
             { line: 0, ch: 8 },
         );
