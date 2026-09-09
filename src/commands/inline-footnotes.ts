@@ -13,17 +13,6 @@ import { readingViewActive } from "../editor/obsidian-internals";
 // all-in-one commands file 2026-08-11.
 
 /**
- * Clipboard text made safe as the body of an inline footnote. Inline
- * footnotes are single-line, so whitespace runs (including newlines)
- * collapse to one space and the result is trimmed. Balanced brackets pass
- * through (pasted markdown links keep working); if any bracket is
- * unbalanced - which would end the ^[...] early and corrupt the note -
- * every bare bracket is escaped instead (pre-escaped \[ and \] keep their
- * meaning). A dangling trailing backslash would escape the wrapper's own
- * closing "]", so it is doubled into a literal one. Empty/whitespace
- * input becomes "".
- */
-/**
  * The paste keys' clipboard tail, shared by the single-caret and the
  * multi-caret paste (it was copied between them, and this is the one
  * duplicate where drift is dangerous): read the clipboard - the only
@@ -55,6 +44,17 @@ export async function readInlineFootnoteFromClipboard(
     return `^[${content}]`;
 }
 
+/**
+ * Clipboard text made safe as the body of an inline footnote. Inline
+ * footnotes are single-line, so whitespace runs (including newlines)
+ * collapse to one space and the result is trimmed. Balanced brackets pass
+ * through (pasted markdown links keep working); if any bracket is
+ * unbalanced - which would end the ^[...] early and corrupt the note -
+ * every bare bracket is escaped instead (pre-escaped \[ and \] keep their
+ * meaning). A dangling trailing backslash would escape the wrapper's own
+ * closing "]", so it is doubled into a literal one. Empty/whitespace
+ * input becomes "".
+ */
 export function sanitizeInlineFootnoteContent(raw: string): string {
     let text = raw.replace(/\s+/g, " ").trim();
     let depth = 0;
@@ -86,17 +86,6 @@ export function sanitizeInlineFootnoteContent(raw: string): string {
 }
 
 /**
- * Whether a freshly inserted inline-footnote wrapper at `at` survives
- * INTACT on the masked simulated line: the span must open exactly at the
- * wrapper's "^" AND close on the wrapper's own "]". The close check
- * exists because an open-only check accepted a wrap whose closing
- * bracket an emergent "$…$" pair swallowed - the bracket walk then
- * latched onto an unrelated later "]" and the rendered line was math
- * eating prose (hunt 2026-08-25, bug-inline-wrap-close-swallowed). The
- * ONE landing predicate for every inline-wrap writer: caret insert,
- * paste, multi-caret skeletons, cell writes, selection conversion.
- */
-/**
  * The born-dead rule in one place (duplicated-logic audit, 2026-09-05):
  * does `text`, written at `at` on the MASKED simulated line, still read
  * as what it is? An inline footnote must survive as an intact span
@@ -111,6 +100,17 @@ export function insertionLandsIntact(masked: string, at: number, text: string): 
         : masked.slice(at, at + text.length) === text;
 }
 
+/**
+ * Whether a freshly inserted inline-footnote wrapper at `at` survives
+ * INTACT on the masked simulated line: the span must open exactly at the
+ * wrapper's "^" AND close on the wrapper's own "]". The close check
+ * exists because an open-only check accepted a wrap whose closing
+ * bracket an emergent "$…$" pair swallowed - the bracket walk then
+ * latched onto an unrelated later "]" and the rendered line was math
+ * eating prose (hunt 2026-08-25, bug-inline-wrap-close-swallowed). The
+ * ONE landing predicate for every inline-wrap writer: caret insert,
+ * paste, multi-caret skeletons, cell writes, selection conversion.
+ */
 export function inlineWrapLandsIntact(
     masked: string,
     at: number,

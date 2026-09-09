@@ -173,22 +173,6 @@ export function positionAfterReference(
 }
 
 /**
- * The shared creation tail of the popup path: lint FIRST, then open the
- * popup editor bound to the new definition. The lint used to be deferred
- * to the popup's teardown settle, which left the note visibly unlinted
- * the whole time the popup was up (Jason's ask 2026-08-27); linting
- * before the popup BINDS also retires the hazard the deferral existed
- * for - a mid-popup rename of the bound id - because the popup opens on
- * the POST-lint id (lintAfterFootnoteCreation returns the relocated
- * name; see its contract). The fallback (embed registry unavailable, or
- * a late failure) jumps to the definition instead - by NAME, since the
- * pre-lint `definitionCursor` coordinates may be stale after the lint
- * moved or renumbered the definition; the raw coordinates remain as the
- * last resort when even the name lookup fails. Every definition-backed
- * insertion reaches here through landDefinitionBackedInsertion below
- * (2026-08-25 unification).
- */
-/**
  * The next numbered id under the note's active prefix, or null when
  * the prefix is invalid (its Notice already explained why). The prefix
  * comes from the frontmatter-only editor read (joining the lines
@@ -212,6 +196,22 @@ export function autonumFootnoteId(
 // Stryker disable all: popup handoff against the live workspace - smoke-test
 // territory, unreachable from units (coverage-verified by the 2026-08-12
 // re-baseline: every mutant in this function was no-coverage)
+/**
+ * The shared creation tail of the popup path: lint FIRST, then open the
+ * popup editor bound to the new definition. The lint used to be deferred
+ * to the popup's teardown settle, which left the note visibly unlinted
+ * the whole time the popup was up (Jason's ask 2026-08-27); linting
+ * before the popup BINDS also retires the hazard the deferral existed
+ * for - a mid-popup rename of the bound id - because the popup opens on
+ * the POST-lint id (lintAfterFootnoteCreation returns the relocated
+ * name; see its contract). The fallback (embed registry unavailable, or
+ * a late failure) jumps to the definition instead - by NAME, since the
+ * pre-lint `definitionCursor` coordinates may be stale after the lint
+ * moved or renumbered the definition; the raw coordinates remain as the
+ * last resort when even the name lookup fails. Every definition-backed
+ * insertion reaches here through landDefinitionBackedInsertion below
+ * (2026-08-25 unification).
+ */
 function openPopupForNewDefinition(
     plugin: FootnotePlugin,
     doc: Editor,
