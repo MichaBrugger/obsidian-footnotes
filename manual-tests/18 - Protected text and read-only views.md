@@ -95,7 +95,7 @@ mid-line `%%` pairs only within its own line. The plugin matches this.
 
 Hidden reference, live definition: november[^n1] here.
 %%
-A commented paragraph with a hidden reference[^n2].
+A commented paragraph with a hidden reference[^n2] in it.
 %%
 
 Dead definition: oscar[^o1] here.
@@ -105,13 +105,15 @@ Dead definition: oscar[^o1] here.
 
 Inline comment with a hidden reference: papa %%hidden[^n3]%% here.
 
-Numbering counts hidden references: romeo[^1] %%hidden[^2]%% sierra[^3].
+Numbering counts hidden references: romeo[^1] %%hidden[^2]%% sierra[^3] here.
 
-%% a comment-only line is still a paragraph line %%
-[^p9]: a label right under a comment line (lazy), tango[^p9]
+A comment-only line is still a paragraph line, tango[^p9] here:
+%% a comment-only line %%
+[^p9]: a label right under a comment line (lazy)
 
-<!-- an HTML comment line is a block -->
-[^h1]: a label right under an HTML comment line (a definition), uniform[^h1]
+An HTML comment line is a block, uniform[^h1] here:
+<!-- an HTML comment line -->
+[^h1]: a label right under an HTML comment line (a definition)
 
 [^n1]: november
 [^n2]: the hidden reference's definition: it renders, with no visible marker
@@ -120,7 +122,7 @@ Numbering counts hidden references: romeo[^1] %%hidden[^2]%% sierra[^3].
 [^2]: the hidden second reference's definition
 [^3]: sierra
 
-- [ ] Reading view: `[^n1]`, `[^h1]`, `[^1]`, `[^3]` render as footnotes; the `n2`, `n3`, and `2` entries appear in the footnote list (each with a back-arrow) though no marker is visible for them; `sierra` shows as `[3]`, not `[2]`; `oscar[^o1]` renders as plain text; the `[^p9]:` line renders as plain text
+- [ ] Reading view: `[^n1]`, `[^h1]`, `[^1]`, `[^3]` render as footnotes; the `n2`, `n3`, and `2` entries appear in the footnote list (each with a back-arrow) though no marker is visible for them; `sierra` shows as `[3]`, not `[2]`; `oscar[^o1]` renders as plain text; `tango[^p9]` renders as plain text and the `[^p9]:` line reads as prose
 - [ ] Hotkey inside the hidden `[^n2]` (Source mode or Live Preview): navigates to its definition (or opens the popup), exactly like a visible reference
-- [ ] **Lint footnotes** (defaults): the missing-definition alert names `o1` (its only definition is commented out); `[^p9]:` gets its blank line (its `tango` reference then renders); nothing is inserted or moved inside either `%%` block, and the commented `[^o1]:` line is untouched; `[^h1]:` was never touched (it was a definition all along); with Reindex on, `[^2]`'s hidden reference keeps its number (nothing renumbers in this section)
+- [ ] **Lint footnotes** (defaults): the missing-definition alert names `o1` (its only definition is commented out); `[^p9]:` becomes a definition (a blank line above it, then gathered to the bottom with the others; `tango[^p9]` renders after that); `[^h1]:` gathers too (it was a definition all along); nothing is inserted or moved inside either `%%` block, and the commented `[^o1]:` line is untouched; the hidden `[^n2]`, `[^n3]`, `[^2]` references are left where they are and nothing renumbers (the hidden `[^2]` holds its number)
 - [ ] Undo, turn `Delete orphaned definitions` ON, lint again: the `n2`, `n3`, and `2` definitions SURVIVE (referenced from inside comments); undo and turn it back OFF

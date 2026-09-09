@@ -25,7 +25,7 @@ between checks. Default settings unless a sheet says otherwise.
 | 15 | Footnote prefix and the linter (apply-prefix rule) |
 | 16 | A note whose footnote-prefix property is invalid |
 | 17 | Tricky footnote names: backticks, dollars, case, `#`, CJK |
-| 18 | Protected text and read-only views: creation guards, Reading view, lint |
+| 18 | Protected text and read-only views: creation guards, Reading view, lint, Obsidian `%%` comments |
 | 19 | Refusals catalog: every toast and inline reason, quoted exactly |
 | 20 | Lint rules alone and together: one fixture, seven fences |
 | 21 | Lint stability: the definition-on-line-one shape |
