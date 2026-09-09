@@ -43,7 +43,9 @@ function documentView(lines: string[]): DocumentView {
             return masked;
         },
         get blocks() {
-            if (blocks === null) blocks = findDefinitionBlocks(lines, this.scan.isProtected, this.scan);
+            if (blocks === null) {
+                blocks = findDefinitionBlocks(lines, this.scan.isProtected, this.scan, this.maskedLines);
+            }
             return blocks;
         },
     };

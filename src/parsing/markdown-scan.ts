@@ -114,6 +114,43 @@ export function definitionLabelIn(
 }
 
 /**
+ * The definition label on `line`, matched against its MASKED twin but
+ * with the name re-sliced from the RAW line - the label-side twin of
+ * referenceOccurrences below, carrying the same bug-masked-name-identity
+ * invariant: a code span inside the name masks to NULs, and a NUL-bearing
+ * name can never equal the raw reference it must pair with. The label's
+ * positions index into both twins (masking preserves indices). Null when
+ * the masked line carries no label. (rename-footnote keeps its own
+ * raw-gate-first variant: it needs the RAW label's positions before the
+ * masked twin exists, then masked-confirms liveness.)
+ */
+export function definitionLabelWithName(line: string, masked: string) {
+    const label = definitionLabelIn(masked);
+    // Stryker disable next-line ConditionalExpression: a label visible on the masked twin is always visible at the SAME positions on the raw line (masking only writes NULs, and NULs can't spell "[^" or "]:"), so forcing the fallback is behavior-identical - the fast path is perf
+    if (label) return { label, name: line.slice(label.nameStart, label.nameEnd) };
+    // The masked twin can LOSE a real label: a backtick inside the NAME
+    // pairing with one in the body ("[^a`b]: c`d") masks the label's own
+    // "]:" to NULs, so DefinitionStart no longer matches - yet GFM carves
+    // the label BEFORE inline tokenizing and renders a definition named
+    // "a`b" (hunt 2026-08-25, micromark-verified;
+    // bug-code-span-name-hides-definition). Re-check the RAW line, but
+    // only when the label's own opening "[^" survived masking: a masked
+    // opener means the label starts inside a protected region (a fence
+    // line, an open math/comment run) where a definition-shaped string is
+    // plain text, not a label.
+    const raw = definitionLabelIn(line);
+    if (!raw) return null;
+    const bracketAt = raw.nameStart - 2;
+    if (
+        masked.slice(bracketAt, raw.nameStart) !==
+        line.slice(bracketAt, raw.nameStart)
+    ) {
+        return null;
+    }
+    return { label: raw, name: line.slice(raw.nameStart, raw.nameEnd) };
+}
+
+/**
  * The first exact, fully unprotected occurrence of `runLines` in `lines`,
  * as the index of the run's LAST line - or -1. The section-heading setting
  * is markdown that can span multiple lines ("---\n## Footnotes"), so both
@@ -900,7 +937,7 @@ export function removeLineRanges(
     return out;
 }
 
-/** Every definition with its continuation lines (indented lines, plus blank runs that lead to more indented lines). Pass the full `scan` when available: a continuation can OPEN a multi-line comment/math region ("    $$") or a definition-content fence ("    ```", 2026-08-25), and only the scan's startsIn* facts let the walk absorb that construct's protected interior instead of splitting the block in half (Sol bug #3, 2026-08-10). */
+/** Every definition with its continuation lines (indented lines, plus blank runs that lead to more indented lines). Pass the full `scan` when available: a continuation can OPEN a multi-line comment/math region ("    $$") or a definition-content fence ("    ```", 2026-08-25), and only the scan's startsIn* facts let the walk absorb that construct's protected interior instead of splitting the block in half (Sol bug #3, 2026-08-10). Labels are read through the MASKED twin, like every other definition reader: a comment CLOSER line ("[^2]: two -->") is unprotected for the sake of its live suffix, but the label inside the comment is not a definition (review A1, 2026-09-08 - move-to-bottom used to drag the "-->" away and unclose the comment). Pass `maskedLines` when the twin is already at hand; otherwise only the label-shaped lines are masked, one at a time. */
 export function findDefinitionBlocks(
     lines: string[],
     isProtected: boolean[],
@@ -908,7 +945,15 @@ export function findDefinitionBlocks(
         DocumentScan,
         "startsInComment" | "startsInMath" | "startsInFence"
     >,
+    maskedLines?: string[],
 ): DefinitionBlock[] {
+    const maskedAt = (j: number): string => {
+        if (maskedLines) return maskedLines[j];
+        return maskLineRegions(lines[j], {
+            comment: scan?.startsInComment[j] ?? false,
+            math: scan?.startsInMath[j] ?? false,
+        }).masked;
+    };
     // a protected line the walk may absorb into an open block: the
     // interior/closer of a comment, math, or fence region whose opener
     // was a continuation already absorbed into this block (a region open
@@ -929,8 +974,10 @@ export function findDefinitionBlocks(
     const blocks: DefinitionBlock[] = [];
     for (let i = 0; i < lines.length; i++) {
         if (isProtected[i]) continue;
-        const match = lines[i].match(DefinitionStart);
-        if (!match) continue;
+        // raw gate first (most lines are prose), then the masked read
+        if (!DefinitionStart.test(lines[i])) continue;
+        const hit = definitionLabelWithName(lines[i], maskedAt(i));
+        if (!hit) continue;
 
         let end = i;
         let j = i + 1;
@@ -962,7 +1009,7 @@ export function findDefinitionBlocks(
                 break;
             }
         }
-        blocks.push({ name: match[1], start: i, end });
+        blocks.push({ name: hit.name, start: i, end });
         i = end;
     }
     return blocks;
