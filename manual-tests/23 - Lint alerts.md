@@ -4,11 +4,13 @@ footnote-prefix: 3.
 
 # 23: what the linter alerts about instead of fixing
 
-Settings: all lint rules ON; the Orphans toggles and `Merge duplicate
+Settings: all lint rules ON except `Reindex` OFF (the alerts speak
+about the post-lint text, and reindex would rename the numbered
+fixtures before they are named); the Orphans toggles and `Merge duplicate
 definitions` start OFF (alerts, not deletions; orphans are never
 silent, 2026-08-10). For the `[^3.]` placeholder check: `Per-note
 footnote prefix` ON (the frontmatter above carries `3.`) with the
-`Apply footnote prefix` lint rule OFF, so nothing gets renamed. Undo
+`Apply the note's footnote prefix` lint rule OFF, so nothing gets renamed. Undo
 between checks. Every fixture is already in this note, so ONE run of
 **Lint footnotes** raises every alert below at once.
 

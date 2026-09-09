@@ -11,6 +11,8 @@ footnotes written "before" the prefix existed, one already-prefixed
 footnote, and one named footnote.
 
 Run **Lint footnotes** on the mess, compare with the fence, then undo.
+The fence shows the shape; the definitions land at the very bottom of
+this note, below the checklist.
 
 b[^2] a[^1] pre[^2=5] n[^note] end
 

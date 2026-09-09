@@ -12,12 +12,15 @@ import { inlineFootnoteSpanAt, sanitizeInlineFootnoteContent } from "../src/comm
 import { endOfWordOffset } from "../src/editor/cursor-motion";
 import { footnoteReferenceMatches } from "../src/parsing/footnote-grammar";
 import { lintFootnotes, LintOptions } from "../src/linting/linter";
+import { lazyDefinitionLabelNames } from "../src/linting/rules/remove-orphaned-references";
 import {
+    definitionStartLines,
     findDefinitionBlocks,
     maskProtectedLines,
     maskedLineAt,
     normalizeEol,
     protectedLines,
+    scanDocument,
 } from "../src/parsing/markdown-scan";
 
 // Property-based tests (fast-check, adopted 2026-08-10): instead of
@@ -191,11 +194,23 @@ const headBlockWithReference = (doc: string): boolean => {
 // one rename later (found the day the generators started offering the
 // regex-special prefixes, 2026-09-09)
 const dollarPrefix = (doc: string): boolean => /footnote-prefix:[^\n]*\$/.test(doc);
+// ... and from documents with a label directly under a prose line: Obsidian
+// reads it as lazy paragraph text (the prose-label rule, 2026-09-09) while
+// micromark's GFM footnotes let a definition interrupt a paragraph, so the
+// two parsers disagree before the lint ever runs
+const hasLazyLabel = (doc: string): boolean => {
+    const lines = normalizeEol(doc).text.split("\n");
+    const scan = scanDocument(lines);
+    const masked = maskProtectedLines(lines, scan);
+    const starts = definitionStartLines(lines, scan, (i) => masked[i]);
+    return lazyDefinitionLabelNames(lines, scan, masked, starts).length > 0;
+};
 const oracleDocArb = docArb.filter(
     (doc) =>
         !/\[\^[^\]\n]*\$/.test(doc) &&
         !dollarPrefix(doc) &&
-        !headBlockWithReference(doc),
+        !headBlockWithReference(doc) &&
+        !hasLazyLabel(doc),
 );
 
 describe("differential oracle over random documents", () => {

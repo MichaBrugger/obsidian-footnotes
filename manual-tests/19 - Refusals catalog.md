@@ -81,7 +81,7 @@ after the table
 
 ## Popup (setting ON)
 
-- [ ] Numbered key with the popup ON: no refusal (control). Then press inside `[^#jump]`: the key JUMPS to its definition at once, no popup, no "Waiting for Obsidian to index the new footnote..." notice (the popup can't bind an id containing `#`)
+- [ ] Numbered key with the popup ON: no refusal (control). Then press inside `[^#jump]`: the key JUMPS to its definition at once, no popup, no "Waiting for Obsidian to index the new footnote…" notice (the popup can't bind an id containing `#`)
 
 ## Lint alerts (reported, not refused)
 
@@ -91,11 +91,11 @@ merging OFF, ONE run of **Lint footnotes** on this note raises all of
 these at once. Spot-check that each names its footnotes in quotes and
 never splits a quoted name across lines:
 
-- [ ] "This note has a footnote reference with no definition ("[^lost]"). Write its definition or delete the reference."
-- [ ] "This note has a footnote definition nothing references ("[^unused]"). Add a "[^unused]" reference in the text, or delete the definition."
-- [ ] "This note defines "[^d]" more than once. Obsidian renders only the last definition. Merge them, or turn on "Merge duplicate definitions"."
-- [ ] "This note has an unnamed footnote reference ("[^]"). Give it a name or delete it."
-- [ ] "This note has 2 footnotes with invalid names ("[^bad name]", "[^#tag]"). Footnote names can't contain spaces, backticks, brackets, or "#"." (2026-09-08; `[^#jump]` has a definition, so it is a working-but-unfindable footnote and is listed too if the linter counts it: note which)
+- [ ] `This note has a footnote reference with no definition ("[^lost]"). Write its definition or delete the reference.`
+- [ ] `This note has a footnote definition nothing references ("[^unused]"). Add a "[^unused]" reference in the text, or delete the definition.` (the messages in this section are in code spans on purpose: written bare, their quoted names would be live references in this very note)
+- [ ] `This note defines "[^d]" more than once. Obsidian renders only the last definition. Merge them, or turn on "Merge duplicate definitions".`
+- [ ] `This note has an unnamed footnote reference ("[^]"). Give it a name or delete it.`
+- [ ] `This note has 3 footnotes with invalid names ("[^bad name]", "[^#tag]", "[^#jump]"). Footnote names can't contain spaces, backticks, brackets, or "#".` (2026-09-08; `[^#jump]` renders but Obsidian cannot find it, so it is listed too)
 - [ ] Any alert that lists footnotes lists EVERY one, never an ellipsis (2026-09-08)
 
 [^1]: the plain definition

@@ -151,7 +151,7 @@ describe("the orphaned-reference alert", () => {
         ).toBe(true);
     });
 
-    it("plural, naming them all up to three", () => {
+    it("plural, naming them all", () => {
         noticeLintAlerts(fakePlugin({}), "see [^a] [^b] [^c]");
         expect(
             messageShown(

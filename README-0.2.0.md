@@ -149,7 +149,7 @@ To fix this, turn on **Per-note footnote prefix** and give each chapter its own 
 
 1. Run the **Set footnote prefix** command and enter a prefix, e.g. `2-` for chapter 2 (this saves a `footnote-prefix` property in the note).
 2. From then on, the numbered command inserts `[^2-1]`, `[^2-2]`, … and the named command starts new references with the prefix (`[^2-]`) filled in.
-3. The linter understands prefixes too: it renumbers `[^2-x]` footnotes within their own namespace, and can also convert a note's existing plain footnotes to carry the prefix (**Apply footnote prefix**, off by default).
+3. The linter understands prefixes too: it renumbers `[^2-x]` footnotes within their own namespace, and can also convert a note's existing plain footnotes to carry the prefix (**Apply the note's footnote prefix**, on by default).
 
 Notes without the property keep normal `[^1]`, `[^2]`, … numbering. A prefix follows the same rules as a footnote name and can't end in a digit, as then `[^2-1]` and `[^21]` would be indistinguishable.
 

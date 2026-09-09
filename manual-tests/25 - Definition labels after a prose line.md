@@ -1,8 +1,8 @@
 # 25: definition labels directly after a prose line (2026-09-09)
 
-Settings: defaults, all lint rules ON, popup OFF. Every fixture is
-already in this note. The first three checks only read; undo after each
-lint.
+Settings: defaults (both Orphans toggles and `Merge duplicate
+definitions` OFF), popup OFF. Every fixture is already in this note.
+The first three checks only read; undo after each lint.
 
 The rule (Obsidian's, matched by the plugin since 2026-09-09): a
 footnote definition cannot interrupt a paragraph. A `[^x]:` line
@@ -75,10 +75,10 @@ Inside a quote after a blank quote line, kilo[^c5] here:
 
 ## The plugin agrees
 
-- [ ] Hotkey inside `[^p1]` (and any of the seven prose fixtures): the caret is on prose, so the press INSERTS a new footnote right there (undo it); it does not jump to the label line
+- [ ] Hotkey inside `[^p1]` (and any of the seven prose fixtures): the reference has no definition, so the press APPENDS a real `[^p1]:` definition at the bottom (the note then holds the lazy label AND a real definition; undo it); it never jumps to the label line
 - [ ] Hotkey on the `[^p1]:` line: a plain insert as well; Rename footnote with the caret there: "Place the cursor on a footnote reference or definition to rename it."
 - [ ] Hotkey inside `[^c1]` through `[^c5]`: navigates to the definition (or opens the popup); on their label lines it jumps back to the reference
-- [ ] **Lint footnotes**: the seven prose fixtures stay exactly where they are; ONE alert names all seven labels: "This note has 7 footnote definitions that Obsidian reads as plain text because there is no blank line above them ("[^p1]:", "[^p2]:", "[^l1]:", "[^q1]:", "[^cb]:", "[^d2]:", "[^d1]:"). Add a blank line above each." (label order = first appearance); the missing-definition alert does NOT list them; the five controls gather at the bottom as usual
+- [ ] **Lint footnotes**: the seven prose fixtures stay exactly where they are; ONE alert names all seven labels: "This note has 7 footnote definitions that Obsidian reads as plain text because there is no blank line above them ("[^p1]:", "[^p2]:", "[^l1]:", "[^q1]:", "[^cb]:", "[^d2]:", "[^d1]:"). Add a blank line above each." (label order = first appearance); the missing-definition alert does NOT list them; the three column-0 controls gather at the bottom as usual, while `[^c4]` and `[^c5]` stay inside their callout and quote (quoted definitions are never moved)
 - [ ] Undo, turn `Delete orphaned references` ON, lint again: the seven references SURVIVE (a reference pointing at a lazy label is not an orphan; the same alert repeats), the label lines stay untouched, the controls are unaffected
 - [ ] Add a blank line above `[^p1]: after a paragraph` by hand and lint: `p1` leaves the alert, its definition gathers at the bottom, and the reference renders
 - [ ] Undo. Put the caret at the end of `> callout body` above and press the numbered hotkey: the new definition lands at the bottom under a blank line (never glued to the line above it), and Reading view shows it as a footnote

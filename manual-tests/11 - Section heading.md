@@ -13,7 +13,9 @@ Insert into this sentence twice.
 - [ ] The first footnote creates `# Footnotes` above its definition at the note's end, with a blank line separating the heading from the text above
 - [ ] The second footnote appends below the first definition, no second heading
 
-Then undo both and run **Lint footnotes** TWICE on the fixture below:
+Then undo both and run **Lint footnotes** TWICE on the fixture below (the
+fences show the shape; the gathered definitions land at the very bottom
+of this note, below the checklists):
 
 body[^2] text[^1] end
 

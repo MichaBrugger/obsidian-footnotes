@@ -5,11 +5,12 @@ between checks. Every fixture is already in this note.
 
 ## Insertion basics
 
-Insert into this sentence for the first three checks.
+Insert into this sentence for the first two checks. The third uses the
+existing reference here[^1] and its definition at the bottom.
 
-- [ ] The first footnote inserted lands its definition at the very bottom of the note
+- [ ] The first footnote inserted lands its definition at the very bottom of the note, right below the existing `[^1]:` line
 - [ ] A second insertion numbers sequentially and appends its definition right below the first
-- [ ] With the caret immediately AFTER an existing reference's `]`, the hotkey inserts a consecutive new footnote instead of navigating
+- [ ] With the caret immediately AFTER the existing `[^1]`'s closing `]`, the hotkey inserts a consecutive new footnote instead of navigating
 
 ## Insert at end of word ON (the default)
 
@@ -26,3 +27,5 @@ Turn `Insert footnote at end of word` OFF and reuse the fixture line:
 
 - [ ] Numbered hotkey mid-"bravo": the reference lands exactly at the caret, mid-word
 - [ ] Same for the named and inline hotkeys
+
+[^1]: the existing definition

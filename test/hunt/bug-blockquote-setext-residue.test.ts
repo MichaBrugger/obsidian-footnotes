@@ -8,7 +8,12 @@ import { reindexFootnotes } from "../../src/linting/rules/re-index-footnotes";
 // Root cause: the pinned setext fix's adjacency regex can't match "> ---".
 
 describe("fixed 2026-08-10: orphan deletion and setext headings inside a blockquote", () => {
-    it("does not create a setext heading inside a blockquote when deleting an orphan", () => {
+    // Since the prose-label rule (2026-09-09) the label directly under the
+    // quote line is lazy paragraph text, so the shape this pinned cannot be
+    // built any more: nothing is deleted. The lazy line's "[^9]" is a live
+    // reference (to nothing) and is renumbered in appearance order; the
+    // line stays between the quote and its "> ---".
+    it("a label directly under the quote line is prose: nothing is deleted", () => {
         const input = [
             "> closing words[^1]",
             "[^9]: orphan",
@@ -16,10 +21,8 @@ describe("fixed 2026-08-10: orphan deletion and setext headings inside a blockqu
             "",
             "[^1]: used",
         ].join("\n");
-        const output = reindexFootnotes(input, {
-            keepOrphanedDefinitions: false,
-        });
-
-        expect(output).not.toContain("> closing words[^1]\n> ---");
+        expect(reindexFootnotes(input, { keepOrphanedDefinitions: false })).toBe(
+            input.replace("[^9]: orphan", "[^2]: orphan"),
+        );
     });
 });

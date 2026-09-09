@@ -1,6 +1,6 @@
 # Testing
 
-Four layers, four commands:
+Five layers, four commands and one by hand:
 
 | Layer | Command | What it covers | Needs Obsidian running? |
 | --- | --- | --- | --- |
@@ -8,6 +8,7 @@ Four layers, four commands:
 | Static analysis | `npm run lint`, `npm run knip` | Type-aware lint rules; dead exports/files/dependencies | No |
 | Mutation (Stryker) | `npm run mutation` | Whether the suite actually notices logic changes | No |
 | Smoke (integration) | `npm run test:smoke` | The real plugin inside the real app | Yes |
+| Manual (by hand) | `manual-tests/0 - How to use.md` | 25 theme sheets run as live notes: rendering, popups, feel; `compat-tests/` for other plugins | Yes |
 
 ## Unit tests — `npm test`
 
@@ -181,4 +182,5 @@ Notes for writing new smoke tests:
 - Before committing anything that touches editor behavior: `npm run
   test:smoke`.
 - Before a release: all of the above, a property soak (`FC_NUM_RUNS`),
-  and `npm run mutation`.
+  `npm run mutation`, and the manual sheets (`manual-tests/0 - How to
+  use.md`, mirrored into the sandbox vault's "Footnote Tests" folder).

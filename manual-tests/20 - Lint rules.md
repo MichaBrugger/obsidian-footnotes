@@ -26,7 +26,7 @@ Tail prose keeps the definitions from being at the bottom already.
 
 ## A. All rules on (the defaults: punctuation, move to bottom, reindex; orphans kept; renumber named OFF)
 
-- [ ] Matches; the orphan alert names `9` and `lost`; the second lint says "No linting needed."
+- [ ] Matches; the orphan alert names `3` and `lost` (the alerts describe the post-lint text, where the kept orphan was renumbered); the second lint says "No linting needed."
 
 ```
 Beta[^1] alpha,[^2] named[^note] end. 中文句子。[^j1] and mixed wait？![^j2] Para[^m] cite.

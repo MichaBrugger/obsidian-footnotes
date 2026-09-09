@@ -18,6 +18,7 @@ name[^arXiv:2026.0717], and a dotted name[^named-footnote.1].
 
 > [!note] A callout
 > body[^cq] here
+>
 > [^cq]: callout definition
 
 ## Orphan definitions (QOL 2026-08-07)

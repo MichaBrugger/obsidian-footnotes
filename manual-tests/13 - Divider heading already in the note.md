@@ -18,6 +18,6 @@ reference here[^9] has its definition at the very bottom.
 
 - [ ] Inserting a footnote into the sentence at the top slots its definition under the pair above, no duplicate divider + heading at the end
 - [ ] A blank line separates the new definition from the prose below it
-- [ ] Undo, then run **Lint footnotes**: the stray `[^9]: nine` definition moves UP under the mid-note pair; linting again shows "No linting needed."
+- [ ] Undo, then run **Lint footnotes**: the stray definition (renumbered to `[^2]: nine` by reindex on the way) moves UP under the mid-note pair; linting again shows "No linting needed."
 
 [^9]: nine

@@ -38,7 +38,7 @@ Switch this note to Reading view:
 - [ ] Pressing any footnote hotkey does nothing: no toast, and flipping back to editing view shows NO stray `[^]` or `^[]` anywhere (presses used to edit the hidden buffer invisibly)
 - [ ] The footnote commands are missing from the command palette while in Reading view; **Set footnote prefix** stays available (a frontmatter edit is fine there)
 
-## Lint and autonumber leave protected regions alone
+## Lint and the numbered command leave protected regions alone
 
 Run **Lint footnotes** once, check, undo.
 
@@ -82,4 +82,4 @@ Real refs to lint: swap me[^s1].
 - [ ] Lint: everything inside the math, the indented block, the comment, BOTH fences, the inline-code fakes, the escape, the inline footnote, and this note's frontmatter decoy is byte-for-byte untouched; only `swap me[^s1].` swaps to `swap me.[^s1]`
 - [ ] The refs BEFORE the comment opener and AFTER its closer (`[^c1]`, `[^c3]`) are LIVE: they renumber/swap like normal text; the blockquoted `[^q1]` renumbers too
 - [ ] The quoted fence above ended when its blockquote did: this checklist text is live, not phantom code
-- [ ] Autonumber in the prose: none of `[^9]`, `[^8]`, `[^7]`, `[^90]`, `[^c2]`, `[^f1]`, `[^f2]`, `[^88]`, the escaped `[^9]`, or the inline `^[...]` content reserve numbers
+- [ ] The numbered command in the prose: none of `[^9]`, `[^8]`, `[^7]`, `[^90]`, `[^c2]`, `[^f1]`, `[^f2]`, `[^88]`, the escaped `[^9]`, or the inline `^[...]` content reserve numbers

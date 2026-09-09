@@ -17,7 +17,7 @@ reference here[^9] has its definition at the very bottom.
 
 - [ ] Inserting a footnote into the sentence at the top slots its definition under the heading above, no duplicate `# Footnotes` at the end
 - [ ] A blank line separates the new definition from the prose below it, so the prose does NOT render as part of the footnote (bug fixed 2026-07-20)
-- [ ] Undo, then run **Lint footnotes**: the stray `[^9]: nine` definition at the bottom moves UP under the mid-note heading; the section stays exactly where it is
+- [ ] Undo, then run **Lint footnotes**: the stray definition at the bottom (renumbered to `[^2]: nine` by reindex on the way) moves UP under the mid-note heading; the section stays exactly where it is
 - [ ] Nothing gets dragged to the bottom of the note, and linting again shows "No linting needed."
 
 [^9]: nine

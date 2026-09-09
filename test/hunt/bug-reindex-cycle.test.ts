@@ -8,7 +8,9 @@ import { lintFootnotes } from "../../src/linting/linter";
 // Root cause: one reindexOnce pass's renames + block permutation change the nested references' appearance order in a way the next pass "corrects" a third of the way around, so the fixpoint loop never converges.
 
 describe("fixed 2026-08-10: reindex cycles on definition blocks split by a reference line", () => {
-    const CYCLIC = "[^2]: a [^1]\nx[^3]\n[^1]: b\n[^3]: c [^2]";
+    // blank lines between the blocks: a label directly under a prose line
+    // is lazy text since 2026-09-09, and this cycle needs three real blocks
+    const CYCLIC = "[^2]: a [^1]\n\nx[^3]\n\n[^1]: b\n[^3]: c [^2]";
 
     it("reindex is idempotent (f(f(doc)) === f(doc))", () => {
         const once = reindexFootnotes(CYCLIC);
