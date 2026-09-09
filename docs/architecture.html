@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<!-- Claude: drafted 2026-09-09 as a plain-language map of the plugin structure. Regenerate or edit by hand when the layers change; the counts are as of commit 6f2cbd0. -->
+<!-- Claude: drafted 2026-09-09 as a plain-language map of the plugin structure. Regenerate or edit by hand when the layers change; the counts are as of the end of 2026-09-09 (commit 80c3cc9 and the page's own commit). -->
 <title>Footnote Shortcut Anatomy</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -436,7 +436,7 @@
   <p class="eyebrow">Footnote Shortcut · plugin structure</p>
   <h1>What the plugin is made of, one layer at a time</h1>
   <p class="lede">Four layers of source code stacked so that each one only leans on the layer below it, wrapped in a testing scaffold that is bigger than the plugin itself. This page walks the stack from the bottom up.</p>
-  <p class="stamp">Claude: drafted 2026-09-09 from a read of the code at commit 6f2cbd0 (version 0.2.0-beta.12, including the lazy-definition fix rule and the Obsidian comment scanner update of 2026-09-09). Terms follow CONTEXT.md: a <em>reference</em> is the <code>[^1]</code> in your text, a <em>definition</em> is the <code>[^1]: …</code> line that holds the note.</p>
+  <p class="stamp">Claude: drafted 2026-09-09 from a read of the code and kept current through that day's commits (version 0.2.0-beta.12): the lazy-definition fix rule, the Obsidian comment scanner update, the rewrite of every source comment for a non-programmer, the lint scan memo, the pipeline-order test, and the removal of the unused <code>ignoreTypes</code> field. Terms follow CONTEXT.md: a <em>reference</em> is the <code>[^1]</code> in your text, a <em>definition</em> is the <code>[^1]: …</code> line that holds the note.</p>
   <div class="legend">
     <span>Colour key, used on every figure and heading:</span>
     <span class="chip l-parsing">parsing</span>
@@ -451,8 +451,8 @@
 </header>
 
 <div class="stats">
-  <div class="stat" style="--st: var(--commands)"><div class="n">40</div><div class="l">source files, 10,731 lines</div></div>
-  <div class="stat" style="--st: var(--scaffold)"><div class="n">160</div><div class="l">test files (69 of them are pinned bugs)</div></div>
+  <div class="stat" style="--st: var(--commands)"><div class="n">39</div><div class="l">source files, 12,279 lines (about 39% of them comments)</div></div>
+  <div class="stat" style="--st: var(--scaffold)"><div class="n">162</div><div class="l">test files (69 of them are pinned bugs)</div></div>
   <div class="stat" style="--st: var(--commands)"><div class="n">7</div><div class="l">commands you can bind to a key</div></div>
   <div class="stat" style="--st: var(--linting)"><div class="n">8</div><div class="l">lint rules, run in a fixed order</div></div>
 </div>
@@ -484,31 +484,31 @@
   </div>
   <div class="gap"><span>loads</span></div>
   <div class="band l-plumbing">
-    <div><span class="name">plumbing</span><span class="count">main.ts + settings.ts · 2 files · 619 lines</span></div>
+    <div><span class="name">plumbing</span><span class="count">main.ts + settings.ts · 2 files · 678 lines</span></div>
     <div class="what">Registers the 7 commands and 6 icons, loads and migrates settings, installs the save hook and the vim hook, and puts it all back on unload.</div>
     <div class="uses"><span class="lbl">leans on</span><span class="chip l-commands">commands</span><span class="chip l-linting">linting</span><span class="chip l-editor">editor</span><span class="chip l-parsing">parsing</span></div>
   </div>
   <div class="gap"><span>calls</span></div>
   <div class="band l-commands">
-    <div><span class="name">commands/</span><span class="count">13 files · 4,570 lines</span></div>
+    <div><span class="name">commands/</span><span class="count">13 files · 5,090 lines</span></div>
     <div class="what">The press: claims, guards, jumps, create, the popup, rename, the prefix modal. Everything you can trigger from a key.</div>
     <div class="uses"><span class="lbl">leans on</span><span class="chip l-linting">linting</span><span class="chip l-editor">editor</span><span class="chip l-parsing">parsing</span></div>
   </div>
   <div class="gap"><span>calls (one function: lint right after creating a footnote)</span></div>
   <div class="band l-linting">
-    <div><span class="name">linting/</span><span class="count">15 files · 2,530 lines</span></div>
-    <div class="what">The 8 rules, the pipeline that runs them in order, the shared rename engine, and the alerts.</div>
+    <div><span class="name">linting/</span><span class="count">14 files · 3,010 lines</span></div>
+    <div class="what">The 8 rules, the pipeline that runs them in order, the shared rewrite engine (with its scan memo), the shared rename engine, and the alerts.</div>
     <div class="uses"><span class="lbl">leans on</span><span class="chip l-editor">editor</span><span class="chip l-parsing">parsing</span></div>
   </div>
   <div class="gap"><span>calls</span></div>
   <div class="band l-editor">
-    <div><span class="name">editor/</span><span class="count">7 files · 1,300 lines</span></div>
+    <div><span class="name">editor/</span><span class="count">7 files · 1,490 lines</span></div>
     <div class="what">Helpers between the note and the live editor: DocContext, caret motion, table cells, the insertion rehearsal, notices, and the quarantine for undocumented Obsidian internals.</div>
     <div class="uses"><span class="lbl">leans on</span><span class="chip l-parsing">parsing</span></div>
   </div>
   <div class="gap"><span>calls</span></div>
   <div class="band l-parsing">
-    <div><span class="name">parsing/</span><span class="count">3 files · 1,700 lines</span></div>
+    <div><span class="name">parsing/</span><span class="count">3 files · 2,010 lines</span></div>
     <div class="what">The scanner, the masked twin, the footnote grammar, the prefix reader. Pure text in, facts out. The scanner itself imports nothing.</div>
     <div class="uses"><span class="lbl">leans on</span><span class="chip l-obsidian">nothing</span></div>
   </div>
@@ -516,7 +516,7 @@
 <p class="figcaption"><b>Figure 1.</b> Each band lists the layers it imports from, taken from the real import statements. Reading top to bottom, every "leans on" chip points further down the stack. Small exceptions are noted below.</p>
 </div>
 <div class="prose">
-<p>The biggest file in the plugin, <code>parsing/markdown-scan.ts</code> at 1,307 lines, imports <strong>nothing at all</strong>. It is pure text logic: give it lines, get back facts about those lines. That is why it can be tested thousands of times per second without Obsidian running, and why the mutation tester can chew on it.</p>
+<p>The biggest file in the plugin, <code>parsing/markdown-scan.ts</code> at 1,518 lines, imports <strong>nothing at all</strong>. It is pure text logic: give it lines, get back facts about those lines. That is why it can be tested thousands of times per second without Obsidian running, and why the mutation tester can chew on it.</p>
 <p>A few imports do point the wrong way, and they are worth knowing about because they are where the layers leak. The prefix reader in parsing imports the notice helper and the plugin class. The linter imports the popup and navigation from commands, because lint on save has to close an open popup first. The lint alerts import the inline-footnote helper. None of these is a bug, but each one is a reason the "parsing is pure" claim is true of the scanner and grammar, not the whole folder.</p>
 </div>
 </section>
@@ -668,7 +668,7 @@
 <p><code>commands/definition-append.ts</code> decides placement in three steps: right after the last existing definition block if there is one; otherwise under the section heading if that setting is on and the heading exists; otherwise at the end of the note, stepping back over trailing blank lines and over any unclosed code fence or math block so the definition never lands inside dead text.</p>
 
 <h3>Selection conversion</h3>
-<p>The 1,000-line <code>selection-footnote.ts</code> handles one thing: turning highlighted text into a footnote. It is long because the refusals are many. It trims whitespace edges, optionally widens to whole words, then refuses selections that cut through a table, cut through protected text, or touch any existing footnote (the plugin never nests footnotes, by decision, see ADR-0001). For the named command it has to open a modal to ask for a name, and that modal steals the plugin's own hotkeys so pressing the key again submits it instead of opening a second one.</p>
+<p>The 1,140-line <code>selection-footnote.ts</code> handles one thing: turning highlighted text into a footnote. It is long because the refusals are many. It trims whitespace edges, optionally widens to whole words, then refuses selections that cut through a table, cut through protected text, or touch any existing footnote (the plugin never nests footnotes, by decision, see ADR-0001). For the named command it has to open a modal to ask for a name, and that modal steals the plugin's own hotkeys so pressing the key again submits it instead of opening a second one.</p>
 
 <h3>The popup</h3>
 <p>The at-cursor editor for a definition is not a custom editor. It is Obsidian's own embed renderer, the thing that draws <code>![[note#heading]]</code>, pointed at a subpath of the form <code>#[^id]</code> and switched into editable mode. This trick means the popup is a real Obsidian editor with real behaviour, and it means the plugin depends on an undocumented internal. Because embeds resolve through the metadata cache, the popup can only open once the cache has caught up with your edit, which is what <code>popup-retry.ts</code> waits for: it listens for cache changes, polls slowly as a fallback, shows a "waiting" notice after a second, and gives up after twenty by jumping to the definition instead.</p>
@@ -681,7 +681,7 @@
 <section data-layer="linting">
 <div class="prose">
 <h2><sup>4</sup>Lint: the cleanup pipeline</h2>
-<p>A lint rule is a function that takes the note as a string and returns the note as a string. Eight of them exist. The linter runs the enabled ones in a fixed order, hand-written in <code>linting/linter.ts</code>, and the result replaces the note in a single editor transaction, so one undo reverts the whole lint.</p>
+<p>A lint rule is a function that takes the note as a string and returns the note as a string. Eight of them exist. The linter runs the enabled ones in a fixed order, hand-written in <code>linting/linter.ts</code> with a reason at each step, and the result replaces the note in a single editor transaction, so one undo reverts the whole lint. It reaches each rule through that rule's entry in the catalogue in <code>rules/index.ts</code>, and a test watches those calls and fails if the catalogue's order and the linter's ever differ, so the catalogue can be trusted as a description of the pipeline.</p>
 </div>
 <div class="figure">
 <div class="pipe">
@@ -750,7 +750,7 @@
 <p>This is where most of the file count lives, and why the repo feels much larger than a 10,000-line plugin. Each layer catches a different kind of mistake, and each is coloured here by the part of the plugin it mostly protects.</p>
 </div>
 <div class="layers">
-  <div class="layer t1"><span class="k">1</span><span class="t">Unit and property tests</span><span class="c">npm test · 160 files</span><span class="d">76 feature specs, 69 bug pins, 12 spec rulings, 2 timing pins. Plus the properties: random documents are generated, linted, and checked for invariants like "no NUL leaks", "protected text is byte-identical", and a differential oracle that parses each document with an independent Markdown parser before and after and demands the same footnote structure. When a property finds a bug, the shrunk counterexample becomes a permanent pin in <span class="mono">test/hunt/</span>.</span></div>
+  <div class="layer t1"><span class="k">1</span><span class="t">Unit and property tests</span><span class="c">npm test · 162 files</span><span class="d">78 feature specs, 69 bug pins, 12 spec rulings, 2 timing pins. Plus the properties: random documents are generated, linted, and checked for invariants like "no NUL leaks", "protected text is byte-identical", and a differential oracle that parses each document with an independent Markdown parser before and after and demands the same footnote structure. When a property finds a bug, the shrunk counterexample becomes a permanent pin in <span class="mono">test/hunt/</span>.</span></div>
   <div class="layer t2"><span class="k">2</span><span class="t">Static analysis</span><span class="c">npm run lint · npm run knip</span><span class="d">Type-aware ESLint with the official plugin guidelines, and knip for dead exports and unused dependencies, kept at zero findings.</span></div>
   <div class="layer t3"><span class="k">3</span><span class="t">Mutation testing</span><span class="c">npm run mutation</span><span class="d">Stryker makes small deliberate breakages in the pure modules (all of parsing and linting, the non-DOM parts of the rest) and checks that some test fails. A surviving mutant is a logic change nobody would notice. Local only, before a release; it needs its own slower vitest config because per-mutant bookkeeping breaks under shared workers.</span></div>
   <div class="layer t4"><span class="k">4</span><span class="t">Smoke tests</span><span class="c">npm run test:smoke · 2,527-line script</span><span class="d">Drives the real plugin inside the real app through the Obsidian CLI: deploys the build, makes a scratch note, moves the caret, fires commands, reads the editor back. The only layer that can catch Obsidian changing under the plugin, so the popup and table cells live here.</span></div>
@@ -777,10 +777,11 @@
 <h2><sup>7</sup>Where the complexity actually comes from</h2>
 <p>It is fair to ask whether ten thousand lines is too many for footnotes. Here is an honest accounting of what the lines are paying for.</p>
 <ul>
-  <li><strong>Obsidian's Markdown has terrain.</strong> Code, math, both kinds of comment, frontmatter, blockquotes, lists, tables, lazy labels, setext headings. Each one is a rule in the scanner, and each rule interacts with the others (a fence inside a blockquote closes when the quote ends). Roughly a third of the plugin is this terrain.</li>
+  <li><strong>Obsidian's Markdown has terrain.</strong> Code, math, both kinds of comment, frontmatter, blockquotes, lists, tables, lazy labels, setext headings. Each one is a rule in the scanner, and each rule interacts with the others (a fence inside a blockquote closes when the quote ends). The parsing folder alone is a sixth of the plugin by lines, and every layer above it carries guards for the same terrain.</li>
   <li><strong>The plugin promises never to eat your text.</strong> That promise is why every insertion is rehearsed first, why lint refuses edits that would reclassify a line, why destructive rules are off and alert instead, and why selection conversion has more refusals than conversions.</li>
   <li><strong>Two features sit on undocumented ground.</strong> Table-cell editing and the popup both work by reaching into Obsidian internals, and each needs a recovery path for when those internals misbehave.</li>
   <li><strong>The tests outnumber the code by design.</strong> Bug pins accumulate, properties are expensive to write well, and the smoke script is a small program of its own.</li>
+  <li><strong>About 39% of the source lines are comments.</strong> On 2026-09-09 every comment was rewritten in plain language, with the point first, the reason second, and the history (rulings, dates, issue numbers) kept. That added roughly 1,500 lines and no code. The line counts on this page include them.</li>
 </ul>
 <p>What is <em>not</em> a good reason and could be simplified later: lint rescanning the note once per rule instead of sharing one view; and the rule registry in <code>rules/index.ts</code> listing the rules in the same order the linter hard-codes, without the linter ever reading it, so the two could drift. (Both were dealt with on 2026-09-09: the shared rewrite engine now remembers one scan across rules that see the same text, the linter calls each rule through its registry entry and a test pins the two orders together, and the unused <code>ignoreTypes</code> field was removed.)</p>
 </div>
@@ -789,7 +790,7 @@
 <section>
 <div class="prose">
 <h2><sup>8</sup>Which files to open for which problem</h2>
-<p>You rarely need more than two or three files at a time. This is the lookup table. The dot in front of each file is its layer.</p>
+<p>You rarely need more than two or three files at a time. This is the lookup table. The dot in front of each file is its layer. Whichever file you open, read its header comment first: since 2026-09-09 every file explains, in plain language, what it is for and the terms it uses.</p>
 </div>
 <div class="table-wrap">
 <table>
@@ -832,8 +833,9 @@
     linter.ts               order, triggers, the single transaction
     rules/                  the eight rules
     lint-alerts.ts          the notices
-    rewrite-document.ts, rewrite-footnote-names.ts   shared engines</span>
-<span class="l-scaffold">test/                     160 files: specs, hunt/ pins, properties, helpers
+    rewrite-document.ts     the shared rewrite engine and its scan memo
+    rewrite-footnote-names.ts   the shared rename engine</span>
+<span class="l-scaffold">test/                     162 files: specs, hunt/ pins, properties, helpers
 scripts/smoke-test.mjs    drives the real app
 manual-tests/             25 sheets   ·   compat-tests/   2 sheets
 docs/adr/                 the two standing decisions
