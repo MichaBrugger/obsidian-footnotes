@@ -12,6 +12,7 @@ import { inlineFootnoteSpanAt, sanitizeInlineFootnoteContent } from "../src/comm
 import { endOfWordOffset } from "../src/editor/cursor-motion";
 import { footnoteReferenceMatches } from "../src/parsing/footnote-grammar";
 import { lintFootnotes, LintOptions } from "../src/linting/linter";
+import { fixLazyDefinitions } from "../src/linting/rules/fix-lazy-definitions";
 import { lazyDefinitionLabelNames } from "../src/linting/rules/remove-orphaned-references";
 import {
     definitionStartLines,
@@ -45,6 +46,7 @@ const soakIt = (name: string, fn: () => void) => { it(name, fn, SOAK_TIMEOUT); }
 
 const optionsArb: fc.Arbitrary<LintOptions> = fc.record({
     fixPunctuation: fc.boolean(),
+    fixLazyDefinitions: fc.boolean(),
     moveDefinitionsToBottom: fc.boolean(),
     reindex: fc.boolean(),
     reindexOptions: fc.record({
@@ -300,8 +302,13 @@ describe("lint invariants over random documents", () => {
         fc.assert(
             fc.property(docArb, keepingOptionsArb, (doc, options) => {
                 const out = lintFootnotes(doc, options);
-                expect(definitionCount(out)).toBe(definitionCount(doc));
-                expect(referenceCount(out)).toBe(referenceCount(doc));
+                // the hidden-definition fix (on by default) turns lazy labels
+                // into definitions and retires the labels' own references, so
+                // the conserved baseline is the note AFTER that fix - every
+                // other keeping option only moves and renames
+                const baseline = options.fixLazyDefinitions === false ? doc : fixLazyDefinitions(doc);
+                expect(definitionCount(out)).toBe(definitionCount(baseline));
+                expect(referenceCount(out)).toBe(referenceCount(baseline));
             }),
         );
     });

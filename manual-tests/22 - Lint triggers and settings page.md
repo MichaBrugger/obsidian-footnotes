@@ -40,7 +40,8 @@ definition is created. Insert a NEW numbered footnote into the word
 ## The Linting settings page
 
 - [ ] The **Orphans and duplicates** section sits between Rules and Reindexing, holding `Delete orphaned references`, `Delete orphaned definitions`, `Merge duplicate definitions` (all OFF by default; off = the lint ALERTS about that kind)
+- [ ] The **Rules** group holds four toggles: punctuation, move definitions, `Fix definitions hidden by a missing blank line` (ON by default; off = the lint ALERTS about those labels, see sheet 25), and the prefix rule
 - [ ] `Renumber named footnotes` is greyed out while `Reindex` is off
 - [ ] `Apply the note's footnote prefix` is greyed out while the prefix feature is off (main tab); the Orphans toggles are never greyed
-- [ ] Turn OFF all three rules AND Reindex AND both Orphans toggles, run **Lint footnotes**: "All lint rules are turned off in the plugin settings, so there is nothing to lint." (not the misleading "No linting needed."); Ctrl+S with lint-on-save says the same (2026-08-10)
+- [ ] Turn OFF all four rules AND Reindex AND the three Orphans-and-duplicates toggles, run **Lint footnotes**: "All lint rules are turned off in the plugin settings, so there is nothing to lint." (not the misleading "No linting needed."); Ctrl+S with lint-on-save says the same (2026-08-10)
 - [ ] With the community Linter plugin ENABLED, the page shows a "Using the Linter plugin?" note about turning off Linter's own footnote rules; with Linter disabled, the note is hidden (2026-08-08)

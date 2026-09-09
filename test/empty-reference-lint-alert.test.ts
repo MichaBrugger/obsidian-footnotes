@@ -60,6 +60,7 @@ function pluginWithLintSettings(
     return {
         settings: {
             lintFixPunctuation: false,
+            lintFixLazyDefinitions: false,
             lintMoveToBottom: false,
             lintReindex: false,
             lintApplyPrefix: false,

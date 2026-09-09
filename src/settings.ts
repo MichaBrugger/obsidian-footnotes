@@ -26,6 +26,8 @@ export interface FootnotePluginSettings {
     /** Linting merges later duplicate definitions of a footnote into the first one as continuation lines (Obsidian renders only the last definition otherwise); while off, duplicates are kept and alerted about. Same never-silent contract as the orphan toggles (Jason, 2026-08-12). */
     lintMergeDuplicateDefinitions: boolean;
     lintFixPunctuation: boolean;
+    /** Linting inserts the blank line a definition needs when its label sits directly under a prose line (Obsidian reads it as plain text otherwise); while off, the lazy-definition alert speaks instead (Jason, 2026-09-09). */
+    lintFixLazyDefinitions: boolean;
     lintMoveToBottom: boolean;
     lintReindex: boolean;
     lintApplyPrefix: boolean;
@@ -53,6 +55,7 @@ export const DEFAULT_SETTINGS: FootnotePluginSettings = {
     lintDeleteOrphanedDefinitions: false,
     lintMergeDuplicateDefinitions: false,
     lintFixPunctuation: true,
+    lintFixLazyDefinitions: true,
     lintMoveToBottom: true,
     lintReindex: true,
     lintApplyPrefix: true,
@@ -159,6 +162,11 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                                 name: "Move definitions to existing footnote section heading, or to bottom",
                                 desc: "The lint command gathers all footnote definitions under the note's existing section heading, or at the end of the note when there is none.",
                                 control: { type: "toggle", key: "lintMoveToBottom" },
+                            },
+                            {
+                                name: "Fix definitions hidden by a missing blank line",
+                                desc: "Linting inserts the blank line a footnote definition needs when its \"[^7]:\" line sits directly under a paragraph, list item, quote line, or table (Obsidian reads such a line as plain text and shows no footnote). While off, linting alerts you about them instead.",
+                                control: { type: "toggle", key: "lintFixLazyDefinitions" },
                             },
                             {
                                 name: "Apply the note's footnote prefix",

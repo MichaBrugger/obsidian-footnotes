@@ -17,6 +17,7 @@ import {
 import { AppWithCommands, AppWithPlugins, readingViewActive, viewEditor, WindowWithVim } from "../editor/obsidian-internals";
 import { activeTableCellEditor, nestedSubEditorOwnsFocus, runOutsideTableCell } from "../editor/table-cursor";
 import { applyFootnotePrefix } from "./rules/apply-footnote-prefix";
+import { fixLazyDefinitions } from "./rules/fix-lazy-definitions";
 import { footnoteAfterPunctuation } from "./rules/footnote-after-punctuation";
 import { moveFootnoteDefinitionsToBottom } from "./rules/move-footnotes-to-the-bottom";
 import { reindexFootnotes, ReindexOptions } from "./rules/re-index-footnotes";
@@ -56,6 +57,7 @@ export function lintOptionsFromSettings(
     return {
         sectionHeading,
         fixPunctuation: plugin.settings.lintFixPunctuation,
+        fixLazyDefinitions: plugin.settings.lintFixLazyDefinitions,
         moveDefinitionsToBottom: plugin.settings.lintMoveToBottom,
         reindex: plugin.settings.lintReindex,
         reindexOptions: reindexOptionsFromSettings(plugin),
@@ -76,6 +78,8 @@ export interface LintOptions {
     sectionHeading?: string;
     /** Run footnoteAfterPunctuation (default on). */
     fixPunctuation?: boolean;
+    /** Run fixLazyDefinitions (default on): a "[^x]:" directly under a prose line gets the blank line that makes it a definition. Off, the lazy-definition alert reports such lines instead. */
+    fixLazyDefinitions?: boolean;
     /** Run moveFootnoteDefinitionsToBottom (default on). */
     moveDefinitionsToBottom?: boolean;
     /** Run reindexFootnotes (default on). */
@@ -103,7 +107,15 @@ export function lintFootnotes(
     // original endings are restored a single time on the way out
     return rewriteDocument(markdown, (text) => {
         let result = text;
-        // duplicates merge FIRST of all: every rule below then sees one
+        // hidden definitions FIRST of all: a "[^x]:" directly under a prose
+        // line is lazy paragraph text until the blank line above it exists,
+        // and every rule below - the duplicate merge, both orphan rules, the
+        // move, prefixing, reindex - must judge the definition the user
+        // meant, not the prose line Obsidian sees (Jason, 2026-09-09)
+        if (options.fixLazyDefinitions ?? true) {
+            result = fixLazyDefinitions(result);
+        }
+        // duplicates merge next: every rule below then sees one
         // definition block per name - orphan deletion judges one block, move
         // gathers one, reindex permutes one - and a second pass has no
         // duplicates left, so the pipeline stays idempotent
@@ -236,6 +248,7 @@ export function lintRulesAllDisabled(plugin: FootnotePlugin): boolean {
     const s = plugin.settings;
     return (
         !s.lintFixPunctuation &&
+        !s.lintFixLazyDefinitions &&
         !s.lintMoveToBottom &&
         !s.lintReindex &&
         !(s.enableFootnotePrefix && s.lintApplyPrefix) &&

@@ -128,6 +128,7 @@ Writing and revising can leave footnotes messy. The **Lint footnotes** command c
 
 - **Move footnote references after punctuation**: Moves references that sit before punctuation to sit after it (`word[^1].` becomes `word.[^1]`).
 - **Gather definitions**: Moves every footnote definition under your specified footnote section heading, or to the bottom of the note.
+- **Fix definitions hidden by a missing blank line**: a `[^1]:` line typed directly under a paragraph is plain text to Obsidian, and its footnote never shows. The linter inserts the blank line it needs (or, with the rule off, alerts you about it).
 - **Alert/delete orphans**: Orphans are footnote references without a definition or definitions without a reference. You choose whether the plugin alerts you or deletes orphans.
 - **Merge duplicate definitions**: if you accidentally have multiple definitions for the same footnote name, the plugin can alert you or merge them into one.
 - **Reindex**: renumbers footnotes `1, 2, 3…` in the order they appear and reorders their definitions to match. Named footnotes keep their names (or get numbers too, if you enable **Renumber named footnotes**).

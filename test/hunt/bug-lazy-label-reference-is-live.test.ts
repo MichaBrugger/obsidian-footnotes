@@ -57,7 +57,10 @@ describe("a lazy label's own reference is live", () => {
         const doc = "prose\n[^1]: lazy body\n\n[^1]: real body";
         expect(orphanedFootnoteDefinitionNames(doc)).toEqual([]);
         expect(removeOrphanedFootnoteDefinitions(doc)).toBe(doc);
-        expect(lintFootnotes(doc, { removeOrphanedDefinitions: true })).toBe(doc);
+        // fixLazyDefinitions off: this pins the lazy semantics themselves (on,
+        // the fix promotes the label and orphan deletion then removes both
+        // unreferenced definitions - test/fix-lazy-definitions.test.ts)
+        expect(lintFootnotes(doc, { removeOrphanedDefinitions: true, fixLazyDefinitions: false })).toBe(doc);
     });
 
     it("reserves its number in the reindex order", () => {

@@ -1188,3 +1188,18 @@ export function findDefinitionBlocks(
     }
     return blocks;
 }
+
+/** Lines whose label-shaped start is NOT a definition start - lazy paragraph text to Obsidian (the prose-label rule); protected lines never count. `masked` and `starts` are the document's masked twin and definitionStartLines. */
+export function lazyDefinitionLabelLines(
+    lines: string[],
+    scan: DocumentScan,
+    masked: string[],
+    starts: boolean[],
+): number[] {
+    const out: number[] = [];
+    for (let i = 0; i < lines.length; i++) {
+        if (scan.isProtected[i] || starts[i]) continue;
+        if (definitionLabelWithName(lines[i], masked[i])) out.push(i);
+    }
+    return out;
+}

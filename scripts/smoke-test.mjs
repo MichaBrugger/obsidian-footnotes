@@ -2337,6 +2337,25 @@ async function main() {
         await expectEditorText("Keep[^1] drop end\n\n[^1]: one");
     });
 
+    await test("lint fixes a definition hidden by a missing blank line and gathers it (2026-09-09)", async () => {
+        resetSettings({ lintReindex: false }); // the fix toggle defaults to on
+        await setupNote("Alpha[^1] here.\n[^1]: def\n\nTail.");
+        setCursorAndRun(0, 0, CMD_LINT);
+        await expectEditorText("Alpha[^1] here.\n\nTail.\n\n[^1]: def");
+    });
+
+    await test("with the fix off, lint leaves the hidden definition and alerts instead (2026-09-09)", async () => {
+        resetSettings({ lintReindex: false, lintFixLazyDefinitions: false });
+        await setupNote("Alpha[^1] here.\n[^1]: def\n\nTail.");
+        setCursorAndRun(0, 0, CMD_LINT);
+        await pollUntil(
+            "the lazy-definition alert",
+            `[...document.querySelectorAll('.notice')].map(n => n.textContent).join('|')`,
+            (v) => typeof v === "string" && v.includes("reads as plain text") && v.includes("[^1]:"),
+        );
+        await expectEditorText("Alpha[^1] here.\n[^1]: def\n\nTail.");
+    });
+
     await test("lint alerts about kept orphaned definitions (2026-08-10)", async () => {
         resetSettings(); // orphaned-definition deletion defaults to off
         await setupNote("plain text[^1]\n\n[^1]: used\n[^stray]: unused");

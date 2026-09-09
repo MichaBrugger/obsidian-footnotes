@@ -6,10 +6,11 @@ import {
 import {
     definitionStartLines,
     DocumentScan,
+    lazyDefinitionLabelLines,
     maskProtectedLines,
     normalizeEol,
-    scanDocument,
     restoreEol,
+    scanDocument,
 } from "../../parsing/markdown-scan";
 import { IgnoreType } from "../ignore-types";
 import { FootnoteRule } from "../rule";
@@ -55,8 +56,7 @@ export function lazyDefinitionLabelNames(
 ): string[] {
     const names: string[] = [];
     const seen = new Set<string>();
-    for (let i = 0; i < lines.length; i++) {
-        if (scan.isProtected[i] || starts[i]) continue;
+    for (const i of lazyDefinitionLabelLines(lines, scan, masked, starts)) {
         const hit = definitionLabelWithName(lines[i], masked[i]);
         if (!hit) continue;
         const folded = hit.name.toLowerCase();

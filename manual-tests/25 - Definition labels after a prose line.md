@@ -1,8 +1,9 @@
 # 25: definition labels directly after a prose line (2026-09-09)
 
 Settings: defaults (both Orphans toggles and `Merge duplicate
-definitions` OFF), popup OFF. Every fixture is already in this note.
-The first three checks only read; undo after each lint.
+definitions` OFF, `Fix definitions hidden by a missing blank line` ON),
+popup OFF. Every fixture is already in this note. The first three checks
+only read; undo after each lint.
 
 The rule (Obsidian's, matched by the plugin since 2026-09-09): a
 footnote definition cannot interrupt a paragraph. A `[^x]:` line
@@ -24,6 +25,7 @@ para line
 After a paragraph line, reference after it:
 para line
 [^p2]: after a paragraph again
+
 use it here[^p2].
 
 After a list item, bravo[^l1] here:
@@ -78,7 +80,17 @@ Inside a quote after a blank quote line, kilo[^c5] here:
 - [ ] Hotkey inside `[^p1]` (and any of the seven prose fixtures): the reference has no definition, so the press APPENDS a real `[^p1]:` definition at the bottom (the note then holds the lazy label AND a real definition; undo it); it never jumps to the label line
 - [ ] Hotkey on the `[^p1]:` line: a plain insert as well; Rename footnote with the caret there: "Place the cursor on a footnote reference or definition to rename it."
 - [ ] Hotkey inside `[^c1]` through `[^c5]`: navigates to the definition (or opens the popup); on their label lines it jumps back to the reference
+- [ ] **Lint footnotes** (the fix toggle ON, its default): every one of the seven prose fixtures gets the line it was missing, six lines in all (a blank above `[^p1]:`, `[^p2]:`, `[^l1]:`, `[^q1]:`, `[^d2]:`; a bare `>` above `> [^cb]:` inside the callout; `[^d1]:` needs nothing once `[^d2]:` above it is a definition); the six column-0 ones then gather at the bottom together with the three column-0 controls, `[^cb]` stays inside its callout, `[^c4]` and `[^c5]` stay put (quoted definitions are never moved); NO lazy-definition alert; Reading view now renders all twelve as footnotes
+- [ ] Lint again without undoing: "No linting needed."
+- [ ] Undo, turn `Move definitions to existing footnote section heading, or to bottom` OFF, lint: the seven labels stay where they are, each one line further down; undo and turn it back ON
+
+## With the fix toggle OFF (the alert)
+
+Turn `Fix definitions hidden by a missing blank line` OFF for this section
+and back ON at the end.
+
 - [ ] **Lint footnotes**: the seven prose fixtures stay exactly where they are; ONE alert names all seven labels: "This note has 7 footnote definitions that Obsidian reads as plain text because there is no blank line above them ("[^p1]:", "[^p2]:", "[^l1]:", "[^q1]:", "[^cb]:", "[^d2]:", "[^d1]:"). Add a blank line above each." (label order = first appearance); the missing-definition alert does NOT list them; the three column-0 controls gather at the bottom as usual, while `[^c4]` and `[^c5]` stay inside their callout and quote (quoted definitions are never moved)
-- [ ] Undo, turn `Delete orphaned references` ON, lint again: the seven references SURVIVE (a reference pointing at a lazy label is not an orphan; the same alert repeats), the label lines stay untouched, the controls are unaffected
+- [ ] Undo, turn `Delete orphaned references` ON, lint again: the seven references SURVIVE (a reference pointing at a lazy label is not an orphan; the same alert repeats), the label lines stay untouched, the controls are unaffected; turn it back OFF
 - [ ] Add a blank line above `[^p1]: after a paragraph` by hand and lint: `p1` leaves the alert, its definition gathers at the bottom, and the reference renders
 - [ ] Undo. Put the caret at the end of `> callout body` above and press the numbered hotkey: the new definition lands at the bottom under a blank line (never glued to the line above it), and Reading view shows it as a footnote
+- [ ] Turn `Fix definitions hidden by a missing blank line` back ON

@@ -64,7 +64,10 @@ describe("a label directly under a prose line is prose, not a definition", () =>
 
     it("the lint leaves the note alone and never deletes the reference", () => {
         const doc = "a[^1]\npara\n[^1]: mid";
-        expect(lintFootnotes(doc)).toBe(doc);
+        // with the hidden-definition fix off (on, the lint inserts the blank
+        // line itself - test/fix-lazy-definitions.test.ts); this pins the
+        // lazy semantics the fix is built on
+        expect(lintFootnotes(doc, { fixLazyDefinitions: false })).toBe(doc);
         // a reference pointing at a lazy label is NOT an orphan: the fix is a
         // blank line (the lazy-definition alert says so), never a deletion
         expect(orphanedFootnoteReferenceNames(doc)).toEqual([]);
