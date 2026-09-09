@@ -230,9 +230,7 @@ export default class FootnotePlugin extends Plugin {
   }
 
   async loadSettings() {
-    const saved = (await this.loadData()) as
-      | Partial<FootnotePluginSettings>
-      | null;
+    const saved = parseSavedSettings(await this.loadData());
     this.settings = Object.assign({}, DEFAULT_SETTINGS, saved);
 
     // One-shot legacy migrations, gated by settingsVersion: some of them
@@ -261,6 +259,30 @@ export default class FootnotePlugin extends Plugin {
   async saveSettings() {
     await this.saveData(this.settings);
   }
+}
+
+/**
+ * The saved data.json, trusted only where a value's type matches its
+ * default's: a hand edit or a sync merge can leave `"lintReindex": "no"`,
+ * which the old cast let straight into plugin.settings, where every
+ * `if (settings.lintReindex)` read the string as truthy - the toggle showed
+ * ON and the lint renumbered (review A9, Jason confirmed live 2026-09-08).
+ * A mistyped value falls back to the default. Keys the defaults do not
+ * know pass through untouched: the one-time migrations below read (and
+ * delete) legacy keys from them.
+ */
+function parseSavedSettings(saved: unknown): Partial<FootnotePluginSettings> {
+  if (typeof saved !== "object" || saved === null) return {};
+  const defaultTypes = new Map(
+    Object.entries(DEFAULT_SETTINGS).map(([key, value]) => [key, typeof value]),
+  );
+  const parsed: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(saved)) {
+    const expected = defaultTypes.get(key);
+    if (expected !== undefined && typeof value !== expected) continue;
+    parsed[key] = value;
+  }
+  return parsed as Partial<FootnotePluginSettings>;
 }
 
 // ---- one-time settings migrations, one function per version bump ----
