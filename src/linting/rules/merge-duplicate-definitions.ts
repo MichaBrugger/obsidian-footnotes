@@ -25,8 +25,11 @@ import { FootnoteRule } from "../rule";
 
 /**
  * Distinct names defined more than once (first-appearance order, first-seen
- * casing) - the alert's list. Only column-0 definition BLOCKS count;
- * blockquoted labels are out of scope, like everywhere in the orphan family.
+ * casing) - the alert's list. Only column-0 definition BLOCKS count. A
+ * blockquoted label IS a live definition to the orphan rules (C22), but
+ * merging into or out of a quoted block would need quote-aware
+ * continuation lines, so duplicates involving one are neither merged nor
+ * reported here.
  */
 export function duplicateFootnoteDefinitionNames(
     markdown: string,
