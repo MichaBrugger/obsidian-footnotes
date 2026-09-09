@@ -1,5 +1,8 @@
 import { footnotePrefixProblem } from "../../parsing/footnote-prefix";
-import { referenceOccurrences } from "../../parsing/footnote-grammar";
+import {
+    definitionLabelWithName,
+    referenceOccurrences,
+} from "../../parsing/footnote-grammar";
 import {
     findDefinitionBlocks,
     maskProtectedLines,
@@ -159,6 +162,20 @@ function reindexOnce(
         const seen = new Set(order);
         for (const block of blocks) {
             const name = block.name.toLowerCase();
+            if (!seen.has(name)) {
+                seen.add(name);
+                order.push(name);
+            }
+        }
+        // blockquoted/callout labels are live single-line definitions
+        // outside the column-0 blocks (C22): an orphan among them still
+        // needs a place in the order, or the number it holds could be
+        // handed to a renumbered live footnote (review A3, 2026-09-08)
+        for (let i = 0; i < lines.length; i++) {
+            if (scan.isProtected[i]) continue;
+            const hit = definitionLabelWithName(lines[i], maskedLines[i]);
+            if (!hit?.label.quoted) continue;
+            const name = hit.name.toLowerCase();
             if (!seen.has(name)) {
                 seen.add(name);
                 order.push(name);

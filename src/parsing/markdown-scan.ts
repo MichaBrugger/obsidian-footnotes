@@ -100,9 +100,7 @@ function blockquoteDepth(line: string): { depth: number; rest: string } {
  * code span inside the name masks to NULs). Null when the line carries no
  * label.
  */
-export function definitionLabelIn(
-    line: string,
-): { nameStart: number; nameEnd: number; labelEnd: number } | null {
+export function definitionLabelIn(line: string): DefinitionLabel | null {
     const prefix = line.match(BlockquotePrefix)?.[0].length ?? 0;
     const match = line.slice(prefix).match(DefinitionStart);
     if (!match) return null;
@@ -110,7 +108,16 @@ export function definitionLabelIn(
         nameStart: prefix + 2,
         nameEnd: prefix + 2 + match[1].length,
         labelEnd: prefix + match[0].length,
+        quoted: prefix > 0,
     };
+}
+
+/** Where a definition label sits on its line: the name's span, the end of the whole "[^name]:" label, and whether a blockquote/callout marker precedes it (a quoted label is a live single-line definition but never part of a column-0 definition BLOCK, C22). */
+export interface DefinitionLabel {
+    nameStart: number;
+    nameEnd: number;
+    labelEnd: number;
+    quoted: boolean;
 }
 
 /**

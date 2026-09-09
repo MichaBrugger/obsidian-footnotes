@@ -29,6 +29,9 @@ export const ExtractNameFromFootnote = /(\[\^)([^[\]]+)(?=\])/;
  * whole point. Pass the line already code-masked when code must be ignored.
  * Footnote ids are case-insensitive in Obsidian, but casing is preserved
  * here - callers fold case only when comparing identities.
+ * This is the RAW gate (cheap, per keystroke); a label behind a blockquote
+ * marker still reads as a reference here and is excluded one level up, in
+ * referenceOccurrences, which knows the line's label.
  */
 export function footnoteReferenceMatches(line: string): RegExpMatchArray[] {
     const matches: RegExpMatchArray[] = [];
@@ -71,8 +74,17 @@ export function referenceOccurrences(
     masked: string,
 ): ReferenceOccurrence[] {
     const occurrences: ReferenceOccurrence[] = [];
+    // the line's own definition label defines, it never references - at
+    // column 0 (footnoteReferenceMatches already skips it) or behind a
+    // blockquote/callout marker ("> [^9]: quoted", C22). Reindex used to
+    // count a quoted orphan's label as the first reference and hand it
+    // number 1 (review A3, 2026-09-08); the exclusion lives here, in the
+    // one home of "every reference on this line", so no rule can disagree
+    const label = definitionLabelIn(masked);
+    const labelStart = label ? label.nameStart - 2 : -1;
     for (const match of footnoteReferenceMatches(masked)) {
         const start = match.index ?? 0;
+        if (start === labelStart) continue;
         const end = start + match[0].length;
         occurrences.push({ name: line.slice(start + 2, end - 1), start, end });
     }

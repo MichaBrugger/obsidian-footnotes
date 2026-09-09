@@ -54,7 +54,7 @@ function scanReferences(
         const hit = definitionLabelWithName(lines[i], maskedLines[i]);
         if (!hit) continue;
         labelStartAt[i] = hit.label.nameStart - 2;
-        if (hit.label.nameStart > 2) {
+        if (hit.label.quoted) {
             blocks.push({
                 name: hit.name,
                 start: i,

@@ -115,6 +115,7 @@ describe("definitionLabelIn", () => {
             nameStart: prefix + 2,
             nameEnd: prefix + 2 + "abc".length,
             labelEnd: prefix + "[^abc]:".length,
+            quoted: true,
         });
     });
 });

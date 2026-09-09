@@ -60,13 +60,12 @@ export function shouldJumpFromDefinitionToReference(
     } else {
         // a blockquoted/callout label ("> [^x]: …", C22) is a definition
         // too, but never part of a column-0 definition BLOCK - match the
-        // caret's masked line (nameStart > 2 means a blockquote prefix
-        // precedes the label)
+        // caret's masked line
         const hit = definitionLabelWithName(
             lineText,
             ctx.maskedLine(cursorPosition.line),
         );
-        if (hit && hit.label.nameStart > 2) {
+        if (hit?.label.quoted) {
             definitionName = hit.name;
         }
     }
@@ -76,18 +75,13 @@ export function shouldJumpFromDefinitionToReference(
         const name = definitionName.toLowerCase();
         const masked = ctx.maskedLines();
 
-        // find the FIRST reference use of this footnote. footnoteReferenceMatches
-        // skips a definition's own column-0 label; blockquoted labels read
-        // as mid-line references, so they are skipped here - a label
-        // ANYWHERE defines, it doesn't reference, and jumping to a
-        // blockquoted duplicate's label was a phantom target
-        // (parallel-review probe, 2026-08-10)
+        // find the FIRST reference use of this footnote. A label ANYWHERE
+        // defines, it doesn't reference - referenceOccurrences skips the
+        // line's own label, column 0 or blockquoted (jumping to a
+        // blockquoted duplicate's label was a phantom target; parallel-
+        // review probe 2026-08-10, exclusion centralized 2026-09-08)
         for (let i = 0; i < masked.length; i++) {
-            const lineLabel = definitionLabelIn(masked[i]);
             for (const use of referenceOccurrences(lines[i], masked[i])) {
-                if (lineLabel && use.start === lineLabel.nameStart - 2) {
-                    continue;
-                }
                 if (use.name.toLowerCase() !== name) continue;
                 const newCursorPos = { line: i, ch: use.end };
                 moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos, plugin, undefined, true);

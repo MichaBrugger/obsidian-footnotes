@@ -1,5 +1,5 @@
 import { definitionLabel, referenceOccurrences, referenceText } from "../parsing/footnote-grammar";
-import { DefinitionStart } from "../parsing/markdown-scan";
+import { definitionLabelWithName } from "../parsing/markdown-scan";
 
 /**
  * `line` with every live reference, and its definition label when the
@@ -25,11 +25,18 @@ export function rewriteFootnoteNames(
         copied = end;
     }
     result += line.slice(copied);
-    const definition = line.match(DefinitionStart);
-    if (definition) {
-        const newName = resolve(definition[1]);
+    // the line's own label (column 0 or blockquoted) is not among the
+    // occurrences above - it renames here. Nothing precedes a label but
+    // its marker/indent, which the reference pass never touches, so the
+    // label's raw offsets still hold in `result`
+    const hit = definitionLabelWithName(line, masked);
+    if (hit) {
+        const newName = resolve(hit.name);
         if (newName !== null) {
-            result = definitionLabel(newName) + result.slice(definition[0].length);
+            result =
+                result.slice(0, hit.label.nameStart - 2) +
+                definitionLabel(newName) +
+                result.slice(hit.label.labelEnd);
         }
     }
     return result;

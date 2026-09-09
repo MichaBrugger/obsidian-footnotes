@@ -15,6 +15,7 @@ import { removeOrphanedFootnoteReferences } from "../../src/linting/rules/remove
 describe("wide-gap nested quote markers (bug-wide-gap-quote-markers)", () => {
     it("a 4-space gap still reaches the definition label", () => {
         expect(definitionLabelIn(">    > [^1]: x")).toEqual({
+            quoted: true,
             nameStart: 9,
             nameEnd: 10,
             labelEnd: 12,
