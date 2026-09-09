@@ -55,44 +55,102 @@ export interface DocumentView {
     trimTrailingBlankLines(): number;
 }
 
-function documentView(lines: string[]): DocumentView {
-    let scan: DocumentScan | null = null;
-    let masked: string[] | null = null;
-    let blocks: DefinitionBlock[] | null = null;
-    let starts: boolean[] | null = null;
+/** The pieces a view works out from its lines, each null until asked for. */
+interface Derived {
+    scan: DocumentScan | null;
+    masked: string[] | null;
+    starts: boolean[] | null;
+    blocks: DefinitionBlock[] | null;
+}
+
+// A one-entry memo shared by every view built while one outer
+// rewriteDocument call is running (Jason, 2026-09-09: "if it's free, do
+// it"). The lint pipeline hands the note through eight rules in a row, and
+// each rule builds its own view of the text it receives. On a clean note
+// most rules hand their text back unchanged, so the next rule receives the
+// identical string and used to scan it all over again. Now a view whose
+// text matches the memo starts with the previous view's finished pieces.
+//
+// The memo is keyed on the exact text, so a rule that changed anything
+// gets a fresh scan as before. The rules themselves are untouched: still
+// markdown in, markdown out. The memo is dropped when the outermost call
+// returns, so no note is kept in memory after a lint, and a rule run on its
+// own (as the tests do) behaves exactly as it did before.
+let memoText: string | null = null;
+let memoDerived: Derived | null = null;
+let depth = 0;
+
+function documentView(text: string, lines: string[]): DocumentView {
+    const d: Derived =
+        memoText === text && memoDerived !== null
+            ? { ...memoDerived }
+            : { scan: null, masked: null, starts: null, blocks: null };
+    // whether anything has been read through THIS view yet (the trim guard)
+    let read = false;
+    // once trimmed, the pieces describe a shorter note than `text`, so they
+    // must not be offered to the next view under this text
+    let trimmed = false;
+    const publish = () => {
+        if (!trimmed) {
+            memoText = text;
+            memoDerived = { ...d };
+        }
+    };
     return {
         lines,
         trimTrailingBlankLines() {
-            if (scan !== null || masked !== null || starts !== null || blocks !== null) {
+            if (read) {
                 throw new Error("trimTrailingBlankLines must run before the view is scanned");
             }
-            let trimmed = 0;
+            let count = 0;
             while (lines.length > 1 && lines[lines.length - 1] === "") {
                 lines.pop();
-                trimmed++;
+                count++;
             }
-            return trimmed;
+            // pieces inherited from the memo describe the untrimmed note, so
+            // they are only kept when the trim removed nothing (move-to-bottom
+            // trims every time, and usually there is nothing to remove)
+            if (count > 0) {
+                d.scan = null;
+                d.masked = null;
+                d.starts = null;
+                d.blocks = null;
+                trimmed = true;
+            }
+            return count;
         },
         get scan() {
-            if (scan === null) scan = scanDocument(lines);
-            return scan;
+            read = true;
+            if (d.scan === null) {
+                d.scan = scanDocument(lines);
+                publish();
+            }
+            return d.scan;
         },
         get maskedLines() {
-            if (masked === null) masked = maskProtectedLines(lines, this.scan);
-            return masked;
+            read = true;
+            if (d.masked === null) {
+                d.masked = maskProtectedLines(lines, this.scan);
+                publish();
+            }
+            return d.masked;
         },
         get definitionStarts() {
-            if (starts === null) {
+            read = true;
+            if (d.starts === null) {
                 const masked = this.maskedLines;
-                starts = definitionStartLines(lines, this.scan, (i) => masked[i]);
+                d.starts = definitionStartLines(lines, this.scan, (i) => masked[i]);
+                publish();
             }
-            return starts;
+            return d.starts;
         },
         get blocks() {
-            if (blocks === null) {
-                blocks = findDefinitionBlocks(lines, this.scan, this.maskedLines, this.definitionStarts);
+            read = true;
+            if (d.blocks === null) {
+                d.blocks = findDefinitionBlocks(lines, this.scan, this.maskedLines, this.definitionStarts);
+                publish();
             }
-            return blocks;
+            return d.blocks;
         },
     };
 }
@@ -110,6 +168,16 @@ export function rewriteDocument(
     rewrite: (text: string, view: DocumentView) => string,
 ): string {
     const { text, eol } = normalizeEol(markdown);
-    const result = rewrite(text, documentView(text.split("\n")));
-    return result === text ? markdown : restoreEol(result, eol);
+    depth++;
+    try {
+        const result = rewrite(text, documentView(text, text.split("\n")));
+        return result === text ? markdown : restoreEol(result, eol);
+    } finally {
+        // the outermost call is over: forget the memo so the note is not
+        // kept alive, and so the next lint starts clean
+        if (--depth === 0) {
+            memoText = null;
+            memoDerived = null;
+        }
+    }
 }
