@@ -1,0 +1,847 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<!-- Claude: drafted 2026-09-09 as a plain-language map of the plugin structure. Regenerate or edit by hand when the layers change; the counts are as of commit 6f2cbd0. -->
+<title>Footnote Shortcut Anatomy</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --ground: #F6F7F9;
+    --surface: #FFFFFF;
+    --ink: #1B1F27;
+    --muted: #5B6270;
+    --rule: #D6DAE1;
+    --rule-strong: #AEB5C2;
+    --code-bg: #EEF0F4;
+    --blot: #C9CED8;
+
+    /* layer colors: one hue per source layer, used everywhere that layer is named */
+    --parsing: #0E7C7B;      --parsing-soft: #DDF3F2;
+    --editor: #B26A00;       --editor-soft: #FBEBD0;
+    --commands: #2F4FC4;     --commands-soft: #E3E8FB;
+    --linting: #7A35D6;      --linting-soft: #EDE3FC;
+    --plumbing: #B8395E;     --plumbing-soft: #FBE1E9;
+    --scaffold: #5C7A1E;     --scaffold-soft: #E8F1D5;
+    --obsidian: #4B5563;     --obsidian-soft: #E5E7EB;
+
+    /* semantic state */
+    --on: #1E8449;           --on-soft: #DDF4E5;
+    --off: #C0392B;          --off-soft: #FBE0DC;
+    --neutral: #5B6270;      --neutral-soft: #ECEEF2;
+
+    --accent: var(--commands);
+    --accent-ink: #2A418F;
+    --accent-soft: var(--commands-soft);
+
+    --font-display: "Newsreader", Georgia, "Times New Roman", serif;
+    --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+    --font-mono: "IBM Plex Mono", Consolas, "Courier New", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #14171C;
+      --surface: #1C2027;
+      --ink: #E7E9EE;
+      --muted: #9AA3B2;
+      --rule: #2C323C;
+      --rule-strong: #414957;
+      --code-bg: #232830;
+      --blot: #3A414D;
+      --parsing: #5ED3CF;    --parsing-soft: #12302F;
+      --editor: #F2B35A;     --editor-soft: #3A2A10;
+      --commands: #93A8F7;   --commands-soft: #1F2747;
+      --linting: #C7A8FF;    --linting-soft: #2C1F45;
+      --plumbing: #F291B0;   --plumbing-soft: #3F1E2B;
+      --scaffold: #B9D96B;   --scaffold-soft: #27321A;
+      --obsidian: #B0B7C3;   --obsidian-soft: #2A2F38;
+      --on: #63D98F;         --on-soft: #16301F;
+      --off: #F08C8C;        --off-soft: #3B1C1C;
+      --neutral: #9AA3B2;    --neutral-soft: #262B33;
+      --accent-ink: #A9B8F8;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #14171C;
+    --surface: #1C2027;
+    --ink: #E7E9EE;
+    --muted: #9AA3B2;
+    --rule: #2C323C;
+    --rule-strong: #414957;
+    --code-bg: #232830;
+    --blot: #3A414D;
+    --parsing: #5ED3CF;    --parsing-soft: #12302F;
+    --editor: #F2B35A;     --editor-soft: #3A2A10;
+    --commands: #93A8F7;   --commands-soft: #1F2747;
+    --linting: #C7A8FF;    --linting-soft: #2C1F45;
+    --plumbing: #F291B0;   --plumbing-soft: #3F1E2B;
+    --scaffold: #B9D96B;   --scaffold-soft: #27321A;
+    --obsidian: #B0B7C3;   --obsidian-soft: #2A2F38;
+    --on: #63D98F;         --on-soft: #16301F;
+    --off: #F08C8C;        --off-soft: #3B1C1C;
+    --neutral: #9AA3B2;    --neutral-soft: #262B33;
+    --accent-ink: #A9B8F8;
+  }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 17px;
+    line-height: 1.6;
+    margin: 0;
+    padding: 0 1.25rem 5rem;
+  }
+  .page { max-width: 62rem; margin: 0 auto; }
+  .prose { max-width: 42rem; }
+
+  header { padding: 3.5rem 0 1.5rem; }
+  .eyebrow {
+    font-size: 0.78rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 0.75rem;
+  }
+  h1 {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: clamp(2.4rem, 5vw, 3.4rem);
+    line-height: 1.05;
+    margin: 0 0 1rem;
+    text-wrap: balance;
+    letter-spacing: -0.01em;
+  }
+  .lede { font-size: 1.2rem; line-height: 1.5; max-width: 40rem; margin: 0; }
+  .stamp { margin-top: 1.25rem; font-size: 0.85rem; color: var(--muted); }
+
+  /* every section carries its layer color on the short rule and the number */
+  section { margin-top: 3.5rem; padding-top: 1.5rem; --sec: var(--rule-strong); --sec-soft: var(--neutral-soft); }
+  section[data-layer="parsing"]  { --sec: var(--parsing);  --sec-soft: var(--parsing-soft); }
+  section[data-layer="editor"]   { --sec: var(--editor);   --sec-soft: var(--editor-soft); }
+  section[data-layer="commands"] { --sec: var(--commands); --sec-soft: var(--commands-soft); }
+  section[data-layer="linting"]  { --sec: var(--linting);  --sec-soft: var(--linting-soft); }
+  section[data-layer="plumbing"] { --sec: var(--plumbing); --sec-soft: var(--plumbing-soft); }
+  section[data-layer="scaffold"] { --sec: var(--scaffold); --sec-soft: var(--scaffold-soft); }
+  section::before {
+    content: "";
+    display: block;
+    width: 6rem;
+    height: 3px;
+    background: var(--sec);
+    margin-bottom: 1.5rem;
+    border-radius: 2px;
+  }
+  h2 {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 1.9rem;
+    line-height: 1.15;
+    margin: 0 0 0.75rem;
+    text-wrap: balance;
+  }
+  h2 sup {
+    font-family: var(--font-body);
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--sec);
+    background: var(--sec-soft);
+    padding: 0.1rem 0.45rem;
+    border-radius: 999px;
+    vertical-align: super;
+    margin-right: 0.45rem;
+    letter-spacing: 0.02em;
+  }
+  h3 { font-weight: 600; font-size: 1.05rem; margin: 2rem 0 0.5rem; }
+  p { margin: 0 0 1rem; }
+  strong { font-weight: 600; }
+  em { font-family: var(--font-display); font-size: 1.05em; }
+  a { color: var(--accent-ink); }
+
+  code, .mono { font-family: var(--font-mono); font-size: 0.86em; }
+  code { background: var(--code-bg); padding: 0.08em 0.35em; border-radius: 3px; }
+  pre {
+    font-family: var(--font-mono);
+    font-size: 0.84rem;
+    line-height: 1.55;
+    background: var(--code-bg);
+    padding: 1rem 1.2rem;
+    border-radius: 4px;
+    overflow-x: auto;
+    margin: 0;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; }
+  pre .l-parsing  { color: var(--parsing); }
+  pre .l-editor   { color: var(--editor); }
+  pre .l-commands { color: var(--commands); }
+  pre .l-linting  { color: var(--linting); }
+  pre .l-plumbing { color: var(--plumbing); }
+  pre .l-scaffold { color: var(--scaffold); }
+
+  ul, ol { padding-left: 1.3rem; margin: 0 0 1rem; }
+  li { margin-bottom: 0.4rem; }
+  li::marker { color: var(--muted); }
+
+  .figure {
+    margin: 1.5rem 0 2rem;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 1.25rem 1.25rem 0.9rem;
+    overflow-x: auto;
+  }
+  .figcaption { font-size: 0.86rem; color: var(--muted); margin-top: 0.9rem; max-width: 48rem; }
+  .figcaption b { color: var(--ink); font-weight: 600; }
+
+  /* chips and dots that name a layer or a state */
+  .chip {
+    display: inline-block;
+    font-size: 0.74rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+    white-space: nowrap;
+    line-height: 1.5;
+  }
+  .chip.l-parsing  { background: var(--parsing-soft);  color: var(--parsing); }
+  .chip.l-editor   { background: var(--editor-soft);   color: var(--editor); }
+  .chip.l-commands { background: var(--commands-soft); color: var(--commands); }
+  .chip.l-linting  { background: var(--linting-soft);  color: var(--linting); }
+  .chip.l-plumbing { background: var(--plumbing-soft); color: var(--plumbing); }
+  .chip.l-scaffold { background: var(--scaffold-soft); color: var(--scaffold); }
+  .chip.l-obsidian { background: var(--obsidian-soft); color: var(--obsidian); }
+  .pill {
+    display: inline-block;
+    font-size: 0.74rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    padding: 0.1rem 0.55rem;
+    border-radius: 999px;
+    white-space: nowrap;
+    border: 1px solid transparent;
+  }
+  .pill.on  { background: var(--on-soft);  color: var(--on);  border-color: var(--on); }
+  .pill.off { background: var(--off-soft); color: var(--off); border-color: var(--off); border-style: dashed; }
+  .dot {
+    display: inline-block;
+    width: 0.6em; height: 0.6em;
+    border-radius: 50%;
+    margin-right: 0.4em;
+    vertical-align: 0.05em;
+  }
+  .dot.l-parsing  { background: var(--parsing); }
+  .dot.l-editor   { background: var(--editor); }
+  .dot.l-commands { background: var(--commands); }
+  .dot.l-linting  { background: var(--linting); }
+  .dot.l-plumbing { background: var(--plumbing); }
+  .dot.l-scaffold { background: var(--scaffold); }
+  .legend { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; font-size: 0.85rem; color: var(--muted); margin: 0.5rem 0 1rem; align-items: center; }
+
+  table { border-collapse: collapse; width: 100%; font-size: 0.95rem; font-variant-numeric: tabular-nums; }
+  .table-wrap { overflow-x: auto; margin: 1rem 0 1.5rem; }
+  th, td { text-align: left; vertical-align: top; padding: 0.6rem 0.75rem 0.6rem 0; border-bottom: 1px solid var(--rule); }
+  th {
+    font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--muted); font-weight: 600; border-bottom: 1px solid var(--rule-strong);
+  }
+  td.open { white-space: nowrap; }
+  td.open .mono { display: block; margin-bottom: 0.2rem; }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 1.5rem 0 2rem;
+  }
+  .stat { background: var(--surface); padding: 1rem 1.1rem; border-top: 3px solid var(--st, var(--rule-strong)); }
+  .stat .n { font-family: var(--font-display); font-size: 2rem; line-height: 1; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--st, var(--ink)); }
+  .stat .l { font-size: 0.82rem; color: var(--muted); margin-top: 0.35rem; }
+
+  /* Figure 1: the layer stack */
+  .stack { display: grid; gap: 0; min-width: 36rem; }
+  .band {
+    display: grid;
+    grid-template-columns: 11rem 1fr 15rem;
+    gap: 0 1.25rem;
+    align-items: start;
+    padding: 0.8rem 1rem 0.8rem 1.1rem;
+    border-left: 5px solid var(--bc);
+    background: var(--bs);
+    border-radius: 0 4px 4px 0;
+  }
+  .band .name { font-weight: 600; color: var(--bc); }
+  .band .count { font-family: var(--font-mono); font-size: 0.76rem; color: var(--muted); display: block; margin-top: 0.15rem; }
+  .band .what { font-size: 0.92rem; }
+  .band .uses { font-size: 0.78rem; color: var(--muted); display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; }
+  .band .uses .lbl { margin-right: 0.15rem; }
+  .band.l-obsidian { --bc: var(--obsidian); --bs: var(--obsidian-soft); }
+  .band.l-plumbing { --bc: var(--plumbing); --bs: var(--plumbing-soft); }
+  .band.l-commands { --bc: var(--commands); --bs: var(--commands-soft); }
+  .band.l-linting  { --bc: var(--linting);  --bs: var(--linting-soft); }
+  .band.l-editor   { --bc: var(--editor);   --bs: var(--editor-soft); }
+  .band.l-parsing  { --bc: var(--parsing);  --bs: var(--parsing-soft); }
+  .stack .gap {
+    display: grid;
+    grid-template-columns: 11rem 1fr;
+    align-items: center;
+    height: 1.6rem;
+    font-size: 0.78rem;
+    color: var(--muted);
+    padding-left: 1.1rem;
+  }
+  .stack .gap::before { content: "↓"; font-size: 1rem; color: var(--rule-strong); }
+
+  /* Figure 3: the ladder */
+  .ladder { display: grid; grid-template-columns: 6.5rem 1fr 1fr; gap: 0.35rem 0.9rem; min-width: 40rem; align-items: stretch; }
+  .ladder .head { font-size: 0.74rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 600; padding-bottom: 0.2rem; border-bottom: 1px solid var(--rule-strong); }
+  .ladder .kind { align-self: center; }
+  .ladder .q {
+    padding: 0.55rem 0.8rem;
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    background: var(--ground);
+    font-size: 0.95rem;
+  }
+  .ladder .q.step { border-style: dashed; color: var(--muted); font-style: italic; }
+  .ladder .y {
+    padding: 0.55rem 0.8rem;
+    border-radius: 4px;
+    font-size: 0.92rem;
+    background: var(--ys);
+    border-left: 4px solid var(--yc);
+  }
+  .ladder .y small { display: block; font-size: 0.72rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--yc); font-weight: 600; margin-bottom: 0.1rem; }
+  .ladder .no { grid-column: 2 / 4; font-size: 0.74rem; color: var(--muted); padding-left: 0.8rem; line-height: 1.1; }
+  .ladder .no::before { content: "↓ no, keep going  "; color: var(--rule-strong); font-weight: 600; }
+  .ladder .no.last::before { content: "↓ live, keep going  "; }
+  .y.r-close   { --yc: var(--obsidian); --ys: var(--obsidian-soft); }
+  .y.r-refuse  { --yc: var(--off);      --ys: var(--off-soft); }
+  .y.r-edit    { --yc: var(--on);       --ys: var(--on-soft); }
+  .y.r-move    { --yc: var(--parsing);  --ys: var(--parsing-soft); }
+  .y.r-warn    { --yc: var(--editor);   --ys: var(--editor-soft); }
+  .chip.k-pre    { background: var(--obsidian-soft); color: var(--obsidian); }
+  .chip.k-claim  { background: var(--linting-soft);  color: var(--linting); }
+  .chip.k-guard  { background: var(--editor-soft);   color: var(--editor); }
+  .chip.k-jump   { background: var(--parsing-soft);  color: var(--parsing); }
+  .chip.k-create { background: var(--on-soft);       color: var(--on); }
+
+  /* Figure 4: the pipeline */
+  .pipe { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: stretch; }
+  .step {
+    flex: 1 1 11rem;
+    min-width: 10rem;
+    border: 2px solid var(--sc);
+    background: var(--ss);
+    border-radius: 4px;
+    padding: 0.6rem 0.75rem;
+    font-size: 0.9rem;
+    position: relative;
+  }
+  .step.on  { --sc: var(--on);  --ss: var(--on-soft); }
+  .step.off { --sc: var(--off); --ss: var(--off-soft); border-style: dashed; }
+  .step.tail { --sc: var(--rule-strong); --ss: var(--surface); }
+  .step .k { font-family: var(--font-display); font-size: 1.3rem; color: var(--sc); line-height: 1; }
+  .step .t { font-weight: 600; margin: 0.25rem 0 0.2rem; }
+  .step .s { font-size: 0.78rem; color: var(--muted); }
+  .pipe-note { font-size: 0.85rem; color: var(--muted); margin-top: 0.75rem; }
+  .flow-arrow { align-self: center; color: var(--rule-strong); font-size: 1.4rem; flex: 0 0 auto; }
+
+  /* Figure 2: masked twin */
+  .twin {
+    font-family: var(--font-mono);
+    font-size: 0.86rem;
+    line-height: 1.9;
+    display: grid;
+    grid-template-columns: 7rem 1fr;
+    gap: 0.25rem 1rem;
+    align-items: baseline;
+    white-space: nowrap;
+  }
+  .twin .lbl { font-family: var(--font-body); font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+  .twin .blot { background: var(--blot); color: transparent; border-radius: 2px; }
+  .twin .hit { background: var(--on-soft); color: var(--on); border-radius: 2px; font-weight: 500; }
+  .twin .fake { color: var(--off); }
+  .twin .idx { color: var(--muted); font-size: 0.72rem; letter-spacing: 0.15em; }
+
+  /* test layers */
+  .layers { display: grid; gap: 0.5rem; margin: 1.5rem 0 2rem; }
+  .layer {
+    display: grid;
+    grid-template-columns: 2.2rem 1fr auto;
+    gap: 0 1rem;
+    align-items: baseline;
+    padding: 0.85rem 1rem;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-left: 5px solid var(--lc);
+    border-radius: 4px;
+  }
+  .layer .k { font-family: var(--font-display); font-size: 1.4rem; color: var(--lc); }
+  .layer .t { font-weight: 600; }
+  .layer .d { color: var(--muted); font-size: 0.92rem; grid-column: 2; }
+  .layer .c { font-family: var(--font-mono); font-size: 0.8rem; color: var(--lc); white-space: nowrap; }
+  .layer.t1 { --lc: var(--scaffold); }
+  .layer.t2 { --lc: var(--parsing); }
+  .layer.t3 { --lc: var(--linting); }
+  .layer.t4 { --lc: var(--commands); }
+  .layer.t5 { --lc: var(--plumbing); }
+
+  .callout {
+    border-left: 4px solid var(--sec);
+    background: var(--sec-soft);
+    padding: 0.9rem 1.1rem;
+    margin: 1.25rem 0 1.5rem;
+    border-radius: 0 4px 4px 0;
+  }
+  .callout p:last-child { margin-bottom: 0; }
+
+  .four { counter-reset: sentence; list-style: none; padding: 0; margin: 1.25rem 0 1.5rem; display: grid; gap: 0.75rem; }
+  .four li {
+    display: grid;
+    grid-template-columns: 1.6rem 1fr;
+    gap: 0.6rem;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-left: 5px solid var(--fc);
+    border-radius: 4px;
+    padding: 0.85rem 1rem;
+    font-size: 1.02rem;
+  }
+  .four li::before { counter-increment: sentence; content: counter(sentence); font-family: var(--font-display); font-size: 1.3rem; color: var(--fc); line-height: 1.2; }
+  .four li b { color: var(--fc); }
+  .four li.f-parsing  { --fc: var(--parsing); }
+  .four li.f-commands { --fc: var(--commands); }
+  .four li.f-linting  { --fc: var(--linting); }
+  .four li.f-scaffold { --fc: var(--scaffold); }
+
+  @media (max-width: 640px) {
+    body { font-size: 16px; }
+    .layer { grid-template-columns: 2rem 1fr; }
+    .layer .c { grid-column: 2; white-space: normal; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+<header>
+  <p class="eyebrow">Footnote Shortcut · plugin structure</p>
+  <h1>What the plugin is made of, one layer at a time</h1>
+  <p class="lede">Four layers of source code stacked so that each one only leans on the layer below it, wrapped in a testing scaffold that is bigger than the plugin itself. This page walks the stack from the bottom up.</p>
+  <p class="stamp">Claude: drafted 2026-09-09 from a read of the code at commit 6f2cbd0 (version 0.2.0-beta.12, including the lazy-definition fix rule and the Obsidian comment scanner update of 2026-09-09). Terms follow CONTEXT.md: a <em>reference</em> is the <code>[^1]</code> in your text, a <em>definition</em> is the <code>[^1]: …</code> line that holds the note.</p>
+  <div class="legend">
+    <span>Colour key, used on every figure and heading:</span>
+    <span class="chip l-parsing">parsing</span>
+    <span class="chip l-editor">editor helpers</span>
+    <span class="chip l-commands">commands</span>
+    <span class="chip l-linting">linting</span>
+    <span class="chip l-plumbing">plumbing</span>
+    <span class="chip l-scaffold">tests and tooling</span>
+    <span class="pill on">on by default</span>
+    <span class="pill off">off by default</span>
+  </div>
+</header>
+
+<div class="stats">
+  <div class="stat" style="--st: var(--commands)"><div class="n">40</div><div class="l">source files, 10,731 lines</div></div>
+  <div class="stat" style="--st: var(--scaffold)"><div class="n">160</div><div class="l">test files (69 of them are pinned bugs)</div></div>
+  <div class="stat" style="--st: var(--commands)"><div class="n">7</div><div class="l">commands you can bind to a key</div></div>
+  <div class="stat" style="--st: var(--linting)"><div class="n">8</div><div class="l">lint rules, run in a fixed order</div></div>
+</div>
+
+<section>
+<div class="prose">
+<h2><sup>0</sup>The whole thing in four sentences</h2>
+<ol class="four">
+  <li class="f-parsing"><span><b>Parsing</b> reads your note once and tells everyone else what is real: which lines are protected (code, math, comments, frontmatter), which <code>[^x]:</code> lines are true definitions, and where each definition block starts and ends.</span></li>
+  <li class="f-commands"><span><b>A press</b> of a hotkey falls down a fixed ladder of questions (is there a selection? several carets? is the caret already on a footnote?) and the first rung that applies handles it. Nothing is written until a rehearsal proves the new footnote would actually work.</span></li>
+  <li class="f-linting"><span><b>Lint</b> is eight small text-in, text-out functions run in a fixed order inside one undo step. Anything lint refuses to fix on its own, it tells you about in a notice.</span></li>
+  <li class="f-scaffold"><span><b>Everything outside <code>src/</code></b> exists to prove those three sentences stay true after every change: unit tests, random-document properties, mutation testing, a script that drives the real app, and 25 manual sheets.</span></li>
+</ol>
+<p>If you remember only this list, you can find your way around. The rest of the page fills in each sentence.</p>
+</div>
+</section>
+
+<section data-layer="commands">
+<div class="prose">
+<h2><sup>1</sup>The map: who is allowed to call whom</h2>
+<p>The source folder has four sub-folders and two files at the top. The rule that keeps it sane is simple: <strong>a layer only leans on the layers below it</strong>. The bottom layer knows nothing about Obsidian. The top layer is the only part Obsidian talks to.</p>
+</div>
+<div class="figure">
+<div class="stack">
+  <div class="band l-obsidian">
+    <div><span class="name">Obsidian app</span><span class="count">the host</span></div>
+    <div class="what">Hotkeys, the editor, the right-click menu, the settings tab. Loads exactly one file of the plugin.</div>
+    <div class="uses"><span class="lbl">talks to</span><span class="chip l-plumbing">plumbing</span></div>
+  </div>
+  <div class="gap"><span>loads</span></div>
+  <div class="band l-plumbing">
+    <div><span class="name">plumbing</span><span class="count">main.ts + settings.ts · 2 files · 619 lines</span></div>
+    <div class="what">Registers the 7 commands and 6 icons, loads and migrates settings, installs the save hook and the vim hook, and puts it all back on unload.</div>
+    <div class="uses"><span class="lbl">leans on</span><span class="chip l-commands">commands</span><span class="chip l-linting">linting</span><span class="chip l-editor">editor</span><span class="chip l-parsing">parsing</span></div>
+  </div>
+  <div class="gap"><span>calls</span></div>
+  <div class="band l-commands">
+    <div><span class="name">commands/</span><span class="count">13 files · 4,570 lines</span></div>
+    <div class="what">The press: claims, guards, jumps, create, the popup, rename, the prefix modal. Everything you can trigger from a key.</div>
+    <div class="uses"><span class="lbl">leans on</span><span class="chip l-linting">linting</span><span class="chip l-editor">editor</span><span class="chip l-parsing">parsing</span></div>
+  </div>
+  <div class="gap"><span>calls (one function: lint right after creating a footnote)</span></div>
+  <div class="band l-linting">
+    <div><span class="name">linting/</span><span class="count">15 files · 2,530 lines</span></div>
+    <div class="what">The 8 rules, the pipeline that runs them in order, the shared rename engine, and the alerts.</div>
+    <div class="uses"><span class="lbl">leans on</span><span class="chip l-editor">editor</span><span class="chip l-parsing">parsing</span></div>
+  </div>
+  <div class="gap"><span>calls</span></div>
+  <div class="band l-editor">
+    <div><span class="name">editor/</span><span class="count">7 files · 1,300 lines</span></div>
+    <div class="what">Helpers between the note and the live editor: DocContext, caret motion, table cells, the insertion rehearsal, notices, and the quarantine for undocumented Obsidian internals.</div>
+    <div class="uses"><span class="lbl">leans on</span><span class="chip l-parsing">parsing</span></div>
+  </div>
+  <div class="gap"><span>calls</span></div>
+  <div class="band l-parsing">
+    <div><span class="name">parsing/</span><span class="count">3 files · 1,700 lines</span></div>
+    <div class="what">The scanner, the masked twin, the footnote grammar, the prefix reader. Pure text in, facts out. The scanner itself imports nothing.</div>
+    <div class="uses"><span class="lbl">leans on</span><span class="chip l-obsidian">nothing</span></div>
+  </div>
+</div>
+<p class="figcaption"><b>Figure 1.</b> Each band lists the layers it imports from, taken from the real import statements. Reading top to bottom, every "leans on" chip points further down the stack. Small exceptions are noted below.</p>
+</div>
+<div class="prose">
+<p>The biggest file in the plugin, <code>parsing/markdown-scan.ts</code> at 1,307 lines, imports <strong>nothing at all</strong>. It is pure text logic: give it lines, get back facts about those lines. That is why it can be tested thousands of times per second without Obsidian running, and why the mutation tester can chew on it.</p>
+<p>A few imports do point the wrong way, and they are worth knowing about because they are where the layers leak. The prefix reader in parsing imports the notice helper and the plugin class. The linter imports the popup and navigation from commands, because lint on save has to close an open popup first. The lint alerts import the inline-footnote helper. None of these is a bug, but each one is a reason the "parsing is pure" claim is true of the scanner and grammar, not the whole folder.</p>
+</div>
+</section>
+
+<section data-layer="parsing">
+<div class="prose">
+<h2><sup>2</sup>Parsing: reading the note</h2>
+<p>Everything above this layer asks it the same three questions. <em>Is this spot protected? Is this line a real definition? Where does this definition block end?</em> The answers are harder than they look because Obsidian's Markdown has a lot of places where <code>[^1]</code> is just text.</p>
+
+<h3>Protected text and the masked twin</h3>
+<p>A code block, an inline code span, a math span, an HTML comment (<code>&lt;!-- --&gt;</code>), and the frontmatter are all places where footnote syntax means nothing. The scanner walks the whole note once and marks every such region. Then it builds the <strong>masked twin</strong>: a copy of the note where every protected character is replaced by a blank placeholder (a NUL byte) of the same width.</p>
+</div>
+<div class="figure">
+<div class="twin">
+  <span class="lbl">raw line</span>
+  <span>See <span class="hit">[^1]</span> and `not <span class="fake">[^2]</span>` and $x^<span class="fake">[^3]</span>$ here.</span>
+  <span class="lbl">masked twin</span>
+  <span>See <span class="hit">[^1]</span> and <span class="blot">`not [^2]`</span> and <span class="blot">$x^[^3]$</span> here.</span>
+  <span class="lbl">column</span>
+  <span class="idx">0····5····10···15···20···25···30···35···40···45</span>
+</div>
+<p class="figcaption"><b>Figure 2.</b> The twin is the same length as the original, so column 4 on the twin is column 4 on the raw line. Every search for a reference runs against the twin, then the name is sliced back out of the raw line. Only the green <code>[^1]</code> survives; the two red ones are <em>fakes</em>.</p>
+</div>
+<div class="prose">
+<p>Why a same-length copy instead of just deleting the protected parts? Because every position the scanner finds has to be handed to the editor as a line and column to edit. Keeping the widths identical means nobody has to translate coordinates. It also means a footnote name that contains a code span masks into NULs and can never accidentally equal a real name, which is a whole family of bugs the tests pin.</p>
+
+<h3>Obsidian's own comments are the odd one out</h3>
+<p>Obsidian's <code>%% %%</code> comments are hidden in Reading view, but Obsidian still <em>parses</em> them. Checked against the live app on about eighty shapes: a reference inside a comment binds to its definition and takes a number in order of appearance (only its superscript is hidden), while a definition inside a block comment is dead. So these comments are deliberately not protected and not masked. The scanner records them with a separate flag that only the definition readers consult: no definition may start inside a block comment, and the lint alert never reports a label there. A <code>%%</code> at the start of a line with no partner on that line opens a block that runs to the next <code>%%</code> anywhere later; a mid-line pair is an inline comment and pairs only within its own line. This is the September 9 scanner change, pinned by 29 checks.</p>
+
+<h3>Definition starts and the lazy label</h3>
+<p>A line that looks like <code>[^1]: text</code> is usually a definition. But if it sits directly under a line of prose with no blank line between, Obsidian treats it as a continuation of that paragraph, plain text with a live <code>[^1]</code> reference in it. The project calls this a <strong>lazy label</strong>. The scanner decides which label lines are real definition starts and which are lazy, and every command and every rule asks it rather than guessing. This rule diverges from the GitHub-flavoured Markdown reference parser, which is why the test suite's cross-check against that parser deliberately skips documents with a lazy label. As of September 9 there is a lint rule that repairs the situation by inserting the missing blank line (section 4); with it switched off, lint alerts about the label instead. One nuance the same ground-truth session settled: a line holding an HTML comment counts as a block, so a label directly under it is a real definition, whereas a line holding an inline <code>%% %%</code> comment is a paragraph line, so a label under it stays lazy.</p>
+<p>Once the real starts are known, the scanner expands each into a <strong>definition block</strong>: the label line plus any four-space-indented continuation lines and the blank lines between them. Blocks are the unit that gets moved to the bottom, merged, or jumped to.</p>
+
+<h3>DocContext: scan once per press</h3>
+<p>A hotkey press builds one <code>DocContext</code> in <code>editor/doc-context.ts</code>. It runs the scanner exactly once and then answers every later question from cache: the masked version of a line, the list of definition starts, the list of blocks. The whole cascade of decisions in the next section shares that one object, so a press costs one walk over the note no matter how many questions it asks.</p>
+<p>Lint is different, and this is one of the few real inefficiencies in the code: each rule takes a string and returns a string, so each rule re-scans the note for itself. A comment in the scanner estimates about ten scans per lint run. Fine for a note, noticeable for a book-length one.</p>
+
+<h3>The prefix reader</h3>
+<p>The third parsing file reads the <code>footnote-prefix</code> property out of the frontmatter with a hand-written reader rather than a real YAML parser, on purpose, so it can run on every keystroke without asking Obsidian's metadata cache. It also enforces two odd rules that come from Obsidian itself: a prefix may not end in a digit (it would collide with plain numbering on reindex) and may not contain <code>#</code> (it breaks Obsidian's footnote hover preview).</p>
+</div>
+</section>
+
+<section data-layer="commands">
+<div class="prose">
+<h2><sup>3</sup>Commands: what happens when you press the key</h2>
+<p>Obsidian sees seven commands. Four of them share one piece of machinery, the <strong>cascade</strong>, and that machinery is most of the commands folder.</p>
+</div>
+<div class="table-wrap">
+<table>
+  <tr><th>Command</th><th>What it does</th><th>Lives in</th></tr>
+  <tr><td>Insert / navigate numbered footnote</td><td>The main key. Mints <code>[^N]</code> and its definition, or jumps, or converts, depending on where the caret is.</td><td><span class="dot l-commands"></span><span class="mono">insert-or-navigate-footnotes.ts</span></td></tr>
+  <tr><td>Insert / navigate named footnote</td><td>Same cascade, but the first press plants an empty <code>[^]</code> for you to type a name into; the second press, still inside it, adds the definition.</td><td><span class="dot l-commands"></span><span class="mono">insert-or-navigate-footnotes.ts</span></td></tr>
+  <tr><td>Insert inline footnote</td><td>Plants <code>^[ ]</code> with the caret inside. Pressing again inside a filled one hops out.</td><td><span class="dot l-commands"></span><span class="mono">inline-footnotes.ts</span></td></tr>
+  <tr><td>Insert inline footnote from clipboard</td><td>Same, with the clipboard as the body. Every guard runs before the clipboard is read.</td><td><span class="dot l-commands"></span><span class="mono">inline-footnotes.ts</span></td></tr>
+  <tr><td>Rename footnote</td><td>Modal to rename the footnote under the caret everywhere at once. Also in the right-click menu.</td><td><span class="dot l-commands"></span><span class="mono">rename-footnote.ts</span></td></tr>
+  <tr><td>Set footnote prefix</td><td>Modal that writes the <code>footnote-prefix</code> property. Works in Reading view too.</td><td><span class="dot l-commands"></span><span class="mono">set-footnote-prefix.ts</span></td></tr>
+  <tr><td>Lint footnotes</td><td>Runs the whole cleanup pipeline (section 4).</td><td><span class="dot l-linting"></span><span class="mono">linting/linter.ts</span></td></tr>
+</table>
+</div>
+
+<div class="prose">
+<h3>The cascade</h3>
+<p>The project's vocabulary for this is worth learning because the code and the tests use it verbatim. A <strong>press</strong> is one invocation. A <strong>claim</strong> is an early handler that takes the whole press (a selection, or several carets). A <strong>guard</strong> refuses a press with a toast instead of editing. A <strong>jump</strong> moves the caret between a reference and its definition. Only if none of those apply does the press <strong>create</strong> anything. The order below is load-bearing; the code comments say so and the rapid-press tests enforce it.</p>
+</div>
+<div class="figure">
+<div class="legend">
+  <span class="chip k-pre">preamble</span>
+  <span class="chip k-claim">claim</span>
+  <span class="chip k-guard">guard</span>
+  <span class="chip k-jump">jump</span>
+  <span class="chip k-create">create</span>
+  <span style="margin-left:auto">Outcome colour: <span class="pill off">refuses</span> <span class="pill on">edits the note</span></span>
+</div>
+<div class="ladder">
+  <div class="head">Kind</div><div class="head">Question asked, in order</div><div class="head">If yes</div>
+
+  <div class="kind"><span class="chip k-pre">preamble</span></div>
+  <div class="q">Is the name-the-footnote modal open?</div>
+  <div class="y r-close"><small>consumes the press</small>Submit the modal, as if you pressed Enter.</div>
+  <div class="no"></div>
+
+  <div class="kind"><span class="chip k-pre">preamble</span></div>
+  <div class="q">Is a popup open?</div>
+  <div class="y r-close"><small>consumes the press</small>Close the popup.</div>
+  <div class="no"></div>
+
+  <div class="kind"><span class="chip k-pre">preamble</span></div>
+  <div class="q">Reading view, or does the Properties panel have focus?</div>
+  <div class="y r-refuse"><small>refuses</small>Toast. Editing here would write to a hidden buffer.</div>
+  <div class="no"></div>
+
+  <div class="kind"></div>
+  <div class="q step">Build one DocContext: scan the note once. Everything below reads from it.</div>
+  <div></div>
+  <div class="no"></div>
+
+  <div class="kind"><span class="chip k-claim">claim</span></div>
+  <div class="q">Is text selected?</div>
+  <div class="y r-edit"><small>edits</small>Convert the selection into a footnote, or explain why this key cannot for this selection.</div>
+  <div class="no"></div>
+
+  <div class="kind"><span class="chip k-claim">claim</span></div>
+  <div class="q">Two or more carets?</div>
+  <div class="y r-edit"><small>edits, all or nothing</small>The same footnote at every caret in one transaction. One bad caret refuses the lot.</div>
+  <div class="no"></div>
+
+  <div class="kind"><span class="chip k-guard">guard</span></div>
+  <div class="q">Caret in an empty <code>[^]</code>, or inside an inline footnote?</div>
+  <div class="y r-warn"><small>warns or hops</small>Empty placeholder: warn. Filled inline footnote: hop the caret out past the bracket.</div>
+  <div class="no"></div>
+
+  <div class="kind"><span class="chip k-jump">jump</span></div>
+  <div class="q">Caret on a definition line, or its continuation?</div>
+  <div class="y r-move"><small>moves the caret</small>Jump to the first reference. If nothing references it, say so instead.</div>
+  <div class="no"></div>
+
+  <div class="kind"><span class="chip k-jump">jump</span></div>
+  <div class="q">Caret in a reference that already has a definition?</div>
+  <div class="y r-move"><small>moves the caret</small>Open the popup on that definition, or jump to the end of its block.</div>
+  <div class="no"></div>
+
+  <div class="kind"><span class="chip k-create">create</span></div>
+  <div class="q">Caret in a reference with no definition yet?</div>
+  <div class="y r-edit"><small>edits</small>Append the missing definition. This is why a second press mid-typing continues the footnote instead of nesting one.</div>
+  <div class="no"></div>
+
+  <div class="kind"><span class="chip k-guard">guard</span></div>
+  <div class="q">Caret in protected text, or inside another footnote's definition body?</div>
+  <div class="y r-refuse"><small>refuses</small>Toast. No footnotes in code or math, and never a footnote inside a footnote.</div>
+  <div class="no"></div>
+
+  <div class="kind"><span class="chip k-create">create</span></div>
+  <div class="q">Rehearse the edit on a copy: would the new reference and definition still be live?</div>
+  <div class="y r-refuse"><small>born dead: refuses</small>The insertion would be swallowed by a backslash, or would close an open math span. Nothing is written.</div>
+  <div class="no last"></div>
+
+  <div class="kind"><span class="chip k-create">create</span></div>
+  <div class="q step">Otherwise: the press reaches the bottom of the ladder.</div>
+  <div class="y r-edit"><small>edits</small>Insert the reference and its definition, lint, then land in the popup or jump to the definition.</div>
+</div>
+<p class="figcaption"><b>Figure 3.</b> The numbered-footnote press, top to bottom. The first three rungs are the shared preamble in <code>withEditableEditor</code>; the rest is <code>run()</code>. Each rung either handles the press or passes it down. The inline and rename commands reuse the preamble and the first few rungs.</p>
+</div>
+
+<div class="prose">
+<h3>Rehearsing before writing</h3>
+<p>The "born dead" check is the idea that explains a lot of the code's size. Inserting <code>[^3]</code> at a spot can be swallowed by a backslash before it, or can accidentally close an open <code>$</code> math span so the whole thing becomes math. So <code>editor/insertion-liveness.ts</code> applies the planned edit to a copy of the note, re-scans, and checks that the new reference and definition still count as live footnotes. If not, the press is refused. Multi-caret presses do this for every caret and refuse the entire batch if one would die.</p>
+
+<h3>Where the definition lands</h3>
+<p><code>commands/definition-append.ts</code> decides placement in three steps: right after the last existing definition block if there is one; otherwise under the section heading if that setting is on and the heading exists; otherwise at the end of the note, stepping back over trailing blank lines and over any unclosed code fence or math block so the definition never lands inside dead text.</p>
+
+<h3>Selection conversion</h3>
+<p>The 1,000-line <code>selection-footnote.ts</code> handles one thing: turning highlighted text into a footnote. It is long because the refusals are many. It trims whitespace edges, optionally widens to whole words, then refuses selections that cut through a table, cut through protected text, or touch any existing footnote (the plugin never nests footnotes, by decision, see ADR-0001). For the named command it has to open a modal to ask for a name, and that modal steals the plugin's own hotkeys so pressing the key again submits it instead of opening a second one.</p>
+
+<h3>The popup</h3>
+<p>The at-cursor editor for a definition is not a custom editor. It is Obsidian's own embed renderer, the thing that draws <code>![[note#heading]]</code>, pointed at a subpath of the form <code>#[^id]</code> and switched into editable mode. This trick means the popup is a real Obsidian editor with real behaviour, and it means the plugin depends on an undocumented internal. Because embeds resolve through the metadata cache, the popup can only open once the cache has caught up with your edit, which is what <code>popup-retry.ts</code> waits for: it listens for cache changes, polls slowly as a fallback, shows a "waiting" notice after a second, and gives up after twenty by jumping to the definition instead.</p>
+
+<h3>Table cells</h3>
+<p>When you edit a table cell in Live Preview, Obsidian opens a hidden second editor just for that cell, and the main editor's caret position goes stale. <code>editor/table-cursor.ts</code> finds the real caret through the focused DOM element and maps cell coordinates back to note coordinates. Every write into an active cell goes through the cell's own editor, because writing to the main editor at the same time corrupts the table (issue #28). This is why table undo is two steps and why there is a separate notice that says so.</p>
+</div>
+</section>
+
+<section data-layer="linting">
+<div class="prose">
+<h2><sup>4</sup>Lint: the cleanup pipeline</h2>
+<p>A lint rule is a function that takes the note as a string and returns the note as a string. Eight of them exist. The linter runs the enabled ones in a fixed order, hand-written in <code>linting/linter.ts</code>, and the result replaces the note in a single editor transaction, so one undo reverts the whole lint.</p>
+</div>
+<div class="figure">
+<div class="pipe">
+  <div class="step on"><div class="k">1</div><div class="t">Fix definitions hidden by a missing blank line</div><div class="s">inserts the blank line above a lazy label</div></div>
+  <div class="step off"><div class="k">2</div><div class="t">Merge duplicate definitions</div><div class="s">folds later copies into the first</div></div>
+  <div class="step off"><div class="k">3</div><div class="t">Delete orphaned definitions</div><div class="s">nothing points at them</div></div>
+  <div class="step on"><div class="k">4</div><div class="t">Reference after punctuation</div><div class="s"><code>word[^1].</code> becomes <code>word.[^1]</code></div></div>
+  <div class="step on"><div class="k">5</div><div class="t">Move definitions to the bottom</div><div class="s">under the heading, or at the end</div></div>
+  <div class="step off"><div class="k">6</div><div class="t">Delete orphaned references</div><div class="s">then step 5 runs again to heal blank lines</div></div>
+  <div class="step on"><div class="k">7</div><div class="t">Apply the prefix</div><div class="s">only when the prefix feature is on and valid</div></div>
+  <div class="step on"><div class="k">8</div><div class="t">Reindex 1, 2, 3</div><div class="s">by first use, definitions reordered to match</div></div>
+  <div class="step tail"><div class="k">→</div><div class="t">One editor transaction</div><div class="s">one undo reverts the whole lint</div></div>
+  <div class="step tail"><div class="k">→</div><div class="t">Lint alerts</div><div class="s">notices about what was left alone</div></div>
+</div>
+<p class="figcaption"><b>Figure 4.</b> Runtime order, left to right and wrapping. <span class="pill on">green</span> rules are on by default. <span class="pill off">red dashed</span> rules delete or merge your text, so they are off by default and become alerts instead. The alerts run on the finished text.</p>
+</div>
+
+<div class="table-wrap">
+<table>
+  <tr><th>Rule</th><th>Default</th><th>What it does</th></tr>
+  <tr><td>Fix definitions hidden by a missing blank line</td><td><span class="pill on">on</span></td><td>A <code>[^x]:</code> line typed directly under a paragraph, list item, quote line, or table row is plain text to Obsidian. This inserts the blank line above it (a bare <code>&gt;</code> inside a quote or callout), one label at a time from the top, re-reading after each because one blank often promotes the labels below it too. Added 2026-09-09.</td></tr>
+  <tr><td>Merge duplicate definitions</td><td><span class="pill off">off</span></td><td>Folds later <code>[^x]:</code> duplicates into the first as indented lines. Obsidian only renders the last one, so duplicates silently hide text.</td></tr>
+  <tr><td>Delete orphaned definitions</td><td><span class="pill off">off</span></td><td>Removes definitions nothing points at, following chains (a definition only referenced from another orphan dies with it).</td></tr>
+  <tr><td>Reference after punctuation</td><td><span class="pill on">on</span></td><td><code>word[^1].</code> becomes <code>word.[^1]</code>.</td></tr>
+  <tr><td>Move definitions to the bottom</td><td><span class="pill on">on</span></td><td>Gathers every definition block under the section heading, or at the end, keeping their order.</td></tr>
+  <tr><td>Delete orphaned references</td><td><span class="pill off">off</span></td><td>Removes <code>[^5]</code> when no <code>[^5]:</code> exists. Refuses outright if the deletion would change how any other line is classified.</td></tr>
+  <tr><td>Apply the prefix</td><td><span class="pill on">on</span></td><td>Renames un-prefixed footnotes to carry the note's prefix. Only acts when the prefix feature is enabled and the prefix is valid.</td></tr>
+  <tr><td>Reindex</td><td><span class="pill on">on</span></td><td>Renumbers 1, 2, 3 in order of first use and reorders the definitions to match. Named footnotes keep their names unless a separate toggle says otherwise.</td></tr>
+</table>
+</div>
+
+<div class="prose">
+<h3>Why the order matters</h3>
+<p>The blank-line fix runs before everything so that every later rule judges the definition you meant, not the prose line Obsidian saw: move-to-bottom gathers it, the orphan and duplicate rules see an ordinary orphan or duplicate, reindex numbers it. Merging next means every later rule sees one block per name. Definitions are deleted before references because deleting a reference can never orphan a definition, but the reverse order could flip verdicts between passes. Orphaned references are judged after the move so the geometry-based refusal guard sees the settled layout. Reindex goes last because it is the only rule that changes names, and it needs the prefix resolved first so it can number prefixed and plain footnotes in their own namespaces.</p>
+<p>Reindex has its own inner loop. Reordering definition blocks can change the first-use order of references nested in continuation lines, which calls for another pass. It repeats up to thirty times until nothing changes. Some documents never settle (a three-way cycle exists in the tests), so it detects the repeat and picks a canonical member of the cycle rather than rewriting your file forever on every save.</p>
+
+<h3>Three ways lint gets triggered</h3>
+<ul>
+  <li><strong>The command.</strong> Closes any open popup, then runs the pipeline.</li>
+  <li><strong>On save.</strong> The plugin wraps Obsidian's own save command so lint runs just before the write. Vim's <code>:w</code> bypasses that command entirely, so a second hook redefines vim's write command to route through it.</li>
+  <li><strong>After creating a footnote.</strong> Runs before the popup opens so you never see un-linted text, and returns the possibly renumbered name so the caret can find the footnote again.</li>
+</ul>
+<p>All three refuse to run in Reading view, while a popup or table cell owns focus, or when the note's prefix is invalid (reindexing would then collide prefixed and plain numbers).</p>
+
+<div class="callout">
+<p><strong>Never silent.</strong> Every rule that can destroy text is off by default, and when it is off the same condition becomes an alert instead (ADR-0002). So "Footnotes linted" followed by three notices is the design working, not a contradiction. The alerts module shares one scan across all its checks and reports empty placeholders, orphans, lazy labels, duplicates, nesting, and invalid names.</p>
+</div>
+
+<h3>Two undo safety nets that are unrelated</h3>
+<p>The first is the single-transaction lint above. The second, <code>editor/undo-orphan-notice.ts</code>, watches the editor's own undo. When a table-cell footnote was created across two editors, one undo removes the definition and strands the reference; the extension notices this and shows "Undo again to remove the reference too", then dismisses itself once the orphan is gone.</p>
+</div>
+</section>
+
+<section data-layer="plumbing">
+<div class="prose">
+<h2><sup>5</sup>Plumbing: main.ts, settings, and the danger zone</h2>
+<p><code>main.ts</code> is the only file Obsidian loads. On load it registers the seven commands and six hand-drawn icons, installs the save hook and the vim hook, registers the undo-orphan extension, wires the right-click rename entry, and runs settings migrations. On unload it puts everything back.</p>
+<p><code>settings.ts</code> holds the settings interface, the defaults, and the settings tab, written against the declarative settings API in Obsidian 1.13. The migrations live in <code>main.ts</code>: version 1 renamed every <code>tidy*</code> key to <code>lint*</code> when the feature was renamed, and version 2 flipped the polarity of the orphan-definition toggle. Loading also type-checks every saved key against the defaults and drops mismatches, so a hand-edited <code>"no"</code> cannot be read as true.</p>
+<p><span class="dot l-editor"></span><code>editor/obsidian-internals.ts</code> is the deliberate quarantine for everything undocumented: the raw CodeMirror view behind the editor, the embed registry the popup hijacks, the property type manager, the hotkey manager (so the name modal can read your real key bindings), vim's internal state (so Escape in the popup can tell insert mode from normal mode), and the command executor. Every access is optional-chained so a future Obsidian release degrades a feature rather than crashing the plugin. Anything that touches this file is smoke-test territory, not unit-test territory, because a mocked test would only encode the plugin's own assumptions.</p>
+</div>
+</section>
+
+<section data-layer="scaffold">
+<div class="prose">
+<h2><sup>6</sup>The scaffold: five ways of checking</h2>
+<p>This is where most of the file count lives, and why the repo feels much larger than a 10,000-line plugin. Each layer catches a different kind of mistake, and each is coloured here by the part of the plugin it mostly protects.</p>
+</div>
+<div class="layers">
+  <div class="layer t1"><span class="k">1</span><span class="t">Unit and property tests</span><span class="c">npm test · 160 files</span><span class="d">76 feature specs, 69 bug pins, 12 spec rulings, 2 timing pins. Plus the properties: random documents are generated, linted, and checked for invariants like "no NUL leaks", "protected text is byte-identical", and a differential oracle that parses each document with an independent Markdown parser before and after and demands the same footnote structure. When a property finds a bug, the shrunk counterexample becomes a permanent pin in <span class="mono">test/hunt/</span>.</span></div>
+  <div class="layer t2"><span class="k">2</span><span class="t">Static analysis</span><span class="c">npm run lint · npm run knip</span><span class="d">Type-aware ESLint with the official plugin guidelines, and knip for dead exports and unused dependencies, kept at zero findings.</span></div>
+  <div class="layer t3"><span class="k">3</span><span class="t">Mutation testing</span><span class="c">npm run mutation</span><span class="d">Stryker makes small deliberate breakages in the pure modules (all of parsing and linting, the non-DOM parts of the rest) and checks that some test fails. A surviving mutant is a logic change nobody would notice. Local only, before a release; it needs its own slower vitest config because per-mutant bookkeeping breaks under shared workers.</span></div>
+  <div class="layer t4"><span class="k">4</span><span class="t">Smoke tests</span><span class="c">npm run test:smoke · 2,527-line script</span><span class="d">Drives the real plugin inside the real app through the Obsidian CLI: deploys the build, makes a scratch note, moves the caret, fires commands, reads the editor back. The only layer that can catch Obsidian changing under the plugin, so the popup and table cells live here.</span></div>
+  <div class="layer t5"><span class="k">5</span><span class="t">Manual sheets</span><span class="c">manual-tests/ · 25 sheets</span><span class="d">Theme sheets run as live notes for rendering, popups, and feel; mirrored into the sandbox vault's "Footnote Tests" folder. Two more sheets in <span class="mono">compat-tests/</span> check coexistence with other footnote plugins.</span></div>
+</div>
+<div class="prose">
+<p>Continuous integration on GitHub runs only layers 1 and 2 plus the build. The rest is a pre-release ritual you run by hand.</p>
+
+<h3>Why there are 69 bug files</h3>
+<p>The standing rule is that every bug found gets a failing test before it is fixed, and the test stays forever as a regression pin. That many pins means that many bugs were found and fixed that way, most of them by the adversarial hunts and the property suite. They are not clutter you need to read; they are a ratchet. Delete one and the bug it pins can come back unnoticed.</p>
+
+<h3>Things that look like duplicates but are not</h3>
+<ul>
+  <li><strong>Two READMEs.</strong> <code>README-0.2.0.md</code> is the draft that replaces <code>README.md</code> when 0.2.0 ships.</li>
+  <li><strong>Three manifests.</strong> <code>manifest.json</code> is the shipped 0.1.3, <code>manifest-beta.json</code> is the in-flight beta, and <code>versions.json</code> maps each release to the minimum Obsidian version, which Obsidian's installer requires.</li>
+  <li><strong>Two vitest configs.</strong> The fast one shares workers; the Stryker one isolates per file because mutation coverage tracking needs it.</li>
+  <li><strong><code>survivors-scan-round2.json</code>.</strong> A saved snapshot from one mutation run, not live tooling.</li>
+</ul>
+</div>
+</section>
+
+<section>
+<div class="prose">
+<h2><sup>7</sup>Where the complexity actually comes from</h2>
+<p>It is fair to ask whether ten thousand lines is too many for footnotes. Here is an honest accounting of what the lines are paying for.</p>
+<ul>
+  <li><strong>Obsidian's Markdown has terrain.</strong> Code, math, both kinds of comment, frontmatter, blockquotes, lists, tables, lazy labels, setext headings. Each one is a rule in the scanner, and each rule interacts with the others (a fence inside a blockquote closes when the quote ends). Roughly a third of the plugin is this terrain.</li>
+  <li><strong>The plugin promises never to eat your text.</strong> That promise is why every insertion is rehearsed first, why lint refuses edits that would reclassify a line, why destructive rules are off and alert instead, and why selection conversion has more refusals than conversions.</li>
+  <li><strong>Two features sit on undocumented ground.</strong> Table-cell editing and the popup both work by reaching into Obsidian internals, and each needs a recovery path for when those internals misbehave.</li>
+  <li><strong>The tests outnumber the code by design.</strong> Bug pins accumulate, properties are expensive to write well, and the smoke script is a small program of its own.</li>
+</ul>
+<p>What is <em>not</em> a good reason and could be simplified later: lint rescanning the note once per rule instead of sharing one view; the rule registry in <code>rules/index.ts</code> listing the rules in the same order the linter hard-codes, without the linter ever reading it, so the two can drift; and the <code>ignoreTypes</code> field on each rule, which documents what a rule skips without wiring anything.</p>
+</div>
+</section>
+
+<section>
+<div class="prose">
+<h2><sup>8</sup>Which files to open for which problem</h2>
+<p>You rarely need more than two or three files at a time. This is the lookup table. The dot in front of each file is its layer.</p>
+</div>
+<div class="table-wrap">
+<table>
+  <tr><th>When the problem is…</th><th>Open</th><th>Check with</th></tr>
+  <tr><td>A line is being read as code, protected, or a definition when it should not be (or the reverse)</td><td class="open"><span class="mono"><span class="dot l-parsing"></span>parsing/markdown-scan.ts</span></td><td>Ground truth from the real app: <span class="mono">Obsidian.com eval</span> and the metadata cache's sections; then <span class="mono">test/properties.test.ts</span></td></tr>
+  <tr><td>The hotkey did the wrong thing for where the caret was</td><td class="open"><span class="mono"><span class="dot l-commands"></span>commands/insert-or-navigate-footnotes.ts</span><span class="mono"><span class="dot l-commands"></span>commands/press-guards.ts</span><span class="mono"><span class="dot l-commands"></span>commands/navigation.ts</span></td><td>The cascade tests and <span class="mono">test/command-properties.test.ts</span></td></tr>
+  <tr><td>A new definition landed in the wrong place</td><td class="open"><span class="mono"><span class="dot l-commands"></span>commands/definition-append.ts</span></td><td>Unit tests</td></tr>
+  <tr><td>Converting a selection refused or mangled something</td><td class="open"><span class="mono"><span class="dot l-commands"></span>commands/selection-footnote.ts</span></td><td><span class="mono">test/selection-to-footnote.test.ts</span> and the selection properties</td></tr>
+  <tr><td>Lint changed something it should not have, or left something alone</td><td class="open"><span class="mono"><span class="dot l-linting"></span>linting/linter.ts</span> for order and triggers<span class="mono"><span class="dot l-linting"></span>linting/rules/&lt;the rule&gt;.ts</span><span class="mono"><span class="dot l-linting"></span>linting/lint-alerts.ts</span></td><td><span class="mono">test/rule-examples.test.ts</span> runs every rule's worked examples</td></tr>
+  <tr><td>The popup will not open or behaves oddly</td><td class="open"><span class="mono"><span class="dot l-commands"></span>commands/footnote-popup.ts</span><span class="mono"><span class="dot l-commands"></span>commands/popup-retry.ts</span><span class="mono"><span class="dot l-editor"></span>editor/obsidian-internals.ts</span></td><td>Smoke tests only; unit tests cannot see this</td></tr>
+  <tr><td>Anything inside a table cell</td><td class="open"><span class="mono"><span class="dot l-editor"></span>editor/table-cursor.ts</span></td><td>Smoke tests</td></tr>
+  <tr><td>A setting is missing, mis-migrated, or the tab looks wrong</td><td class="open"><span class="mono"><span class="dot l-plumbing"></span>settings.ts</span> for the tab<span class="mono"><span class="dot l-plumbing"></span>main.ts</span> for migrations</td><td>Unit tests for the migrations</td></tr>
+  <tr><td>A word or a term is being used inconsistently</td><td class="open"><span class="mono"><span class="dot l-scaffold"></span>CONTEXT.md</span></td><td>It is the enforced vocabulary</td></tr>
+</table>
+</div>
+<div class="prose">
+<p>The folder tree, trimmed to what you would actually open and coloured by layer:</p>
+<pre><code>src/
+<span class="l-plumbing">  main.ts                 plugin entry: commands, hooks, migrations
+  settings.ts             settings tab and defaults</span>
+<span class="l-parsing">  parsing/                reads the note, knows nothing about Obsidian
+    markdown-scan.ts        the scanner and the masked twin
+    footnote-grammar.ts     what a reference and a definition look like
+    footnote-prefix.ts      the frontmatter prefix reader</span>
+<span class="l-editor">  editor/                 helpers that sit between the note and the editor
+    doc-context.ts          one scan per press, cached
+    insertion-liveness.ts   the born-dead rehearsal
+    table-cursor.ts         table-cell sub-editors
+    cursor-motion.ts        caret placement and jump points
+    obsidian-internals.ts   the undocumented-API quarantine
+    notice.ts               toast messages
+    undo-orphan-notice.ts   "undo again" watcher</span>
+<span class="l-commands">  commands/               the press
+    insert-or-navigate-footnotes.ts   the cascade
+    create-footnote.ts, definition-append.ts, navigation.ts, press-guards.ts
+    selection-footnote.ts, multi-caret.ts, inline-footnotes.ts
+    footnote-popup.ts, popup-retry.ts
+    rename-footnote.ts, set-footnote-prefix.ts, validated-text-modal.ts</span>
+<span class="l-linting">  linting/                the cleanup
+    linter.ts               order, triggers, the single transaction
+    rules/                  the eight rules
+    lint-alerts.ts          the notices
+    rewrite-document.ts, rewrite-footnote-names.ts   shared engines</span>
+<span class="l-scaffold">test/                     160 files: specs, hunt/ pins, properties, helpers
+scripts/smoke-test.mjs    drives the real app
+manual-tests/             25 sheets   ·   compat-tests/   2 sheets
+docs/adr/                 the two standing decisions
+CONTEXT.md                the vocabulary</span></code></pre>
+</div>
+</section>
+
+</div>
+
+</body>
+</html>
