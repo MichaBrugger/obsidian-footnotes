@@ -17,7 +17,9 @@ import { fakePlugin as sharedFakePlugin } from "./helpers/fake-plugin";
 const fakePlugin = sharedFakePlugin({ enablePopupEditor: false });
 
 describe("definitions inside blockquotes/callouts (C22)", () => {
-    const CALLOUT = ["> [!note]", "> body[^1] here", "> [^1]: def"];
+    // the ">" blank line matters: a label directly under the body line is
+    // lazy paragraph text to Obsidian (ground truth 2026-09-09)
+    const CALLOUT = ["> [!note]", "> body[^1] here", ">", "> [^1]: def"];
 
     it("a callout definition is listed", () => {
         const doc = fakeEditor(CALLOUT, { wholeDoc: true });
@@ -33,14 +35,14 @@ describe("definitions inside blockquotes/callouts (C22)", () => {
             doc,
         );
         expect(handled).toBe(true);
-        expect(doc.moves).toEqual([{ line: 2, ch: CALLOUT[2].length }]);
+        expect(doc.moves).toEqual([{ line: 3, ch: CALLOUT[3].length }]);
     });
 
     it("pressing on the callout definition jumps back to the first reference", () => {
         const doc = fakeEditor(CALLOUT, { wholeDoc: true });
         const handled = shouldJumpFromDefinitionToReference(
-            CALLOUT[2],
-            { line: 2, ch: 5 },
+            CALLOUT[3],
+            { line: 3, ch: 5 },
             fakePlugin,
             doc,
         );
@@ -63,7 +65,7 @@ describe("definitions inside blockquotes/callouts (C22)", () => {
     });
 
     it("references whose only definition is blockquoted are not orphans", () => {
-        const doc = "> quoted[^1]\n> [^1]: def\nplain[^1] too";
+        const doc = "> quoted[^1]\n>\n> [^1]: def\n\nplain[^1] too";
         expect(removeOrphanedFootnoteReferences(doc)).toBe(doc);
     });
 });

@@ -60,6 +60,9 @@ export function renameTargetAtCursor(
     if (!label || cursorPosition.ch >= label.labelEnd) return null;
     const maskedLabel = definitionLabelIn(ctx.maskedLine(cursorPosition.line));
     if (!maskedLabel) return null;
+    // a label directly under a prose line is lazy paragraph text, not a
+    // definition (definitionStartLines)
+    if (!ctx.definitionStarts()[cursorPosition.line]) return null;
     return lineText.slice(label.nameStart, label.nameEnd);
 }
 

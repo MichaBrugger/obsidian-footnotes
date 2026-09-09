@@ -1,6 +1,7 @@
 import { Editor, EditorPosition } from "obsidian";
 
 import {
+    definitionStartLines,
     DocumentScan,
     maskLineRegions,
     maskProtectedLines,
@@ -47,6 +48,8 @@ export interface DocContext {
     maskedLine(i: number): string;
     /** The whole masked twin, memoized. */
     maskedLines(): string[];
+    /** Which lines start a live definition (definitionStartLines), memoized. */
+    definitionStarts(): boolean[];
 }
 
 /** Names of all footnote definitions ("[^x]: …" lines) in document order, one per line at most. Code blocks don't count. */
@@ -60,7 +63,9 @@ export function listExistingFootnoteDefinitions(
     //blockquote/callout ones ("> [^x]: …", C22) - and list their names
     const lines = ctx.lines;
     const masked = ctx.maskedLines();
+    const starts = ctx.definitionStarts();
     for (let i = 0; i < lines.length; i++) {
+        if (!starts[i]) continue;
         // definitionLabelWithName owns the masked-match/raw-re-slice
         // invariant (a code span inside the name masks to NULs)
         const hit = definitionLabelWithName(lines[i], masked[i]);
@@ -94,7 +99,10 @@ export function docContext(doc: Editor): DocContext {
     };
     const maskedLines = (): string[] =>
         full ?? (full = maskProtectedLines(lines, scan));
-    return { lines, scan, maskedLine, maskedLines };
+    let starts: boolean[] | null = null;
+    const definitionStarts = (): boolean[] =>
+        starts ?? (starts = definitionStartLines(lines, scan, maskedLine));
+    return { lines, scan, maskedLine, maskedLines, definitionStarts };
 }
 
 /**

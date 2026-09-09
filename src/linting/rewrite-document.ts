@@ -1,5 +1,6 @@
 import {
     DefinitionBlock,
+    definitionStartLines,
     DocumentScan,
     findDefinitionBlocks,
     maskProtectedLines,
@@ -25,6 +26,8 @@ export interface DocumentView {
     readonly lines: string[];
     readonly scan: DocumentScan;
     readonly maskedLines: string[];
+    /** Which lines start a live definition (definitionStartLines). */
+    readonly definitionStarts: boolean[];
     readonly blocks: DefinitionBlock[];
 }
 
@@ -32,6 +35,7 @@ function documentView(lines: string[]): DocumentView {
     let scan: DocumentScan | null = null;
     let masked: string[] | null = null;
     let blocks: DefinitionBlock[] | null = null;
+    let starts: boolean[] | null = null;
     return {
         lines,
         get scan() {
@@ -42,9 +46,22 @@ function documentView(lines: string[]): DocumentView {
             if (masked === null) masked = maskProtectedLines(lines, this.scan);
             return masked;
         },
+        get definitionStarts() {
+            if (starts === null) {
+                const masked = this.maskedLines;
+                starts = definitionStartLines(lines, this.scan, (i) => masked[i]);
+            }
+            return starts;
+        },
         get blocks() {
             if (blocks === null) {
-                blocks = findDefinitionBlocks(lines, this.scan.isProtected, this.scan, this.maskedLines);
+                blocks = findDefinitionBlocks(
+                    lines,
+                    this.scan.isProtected,
+                    this.scan,
+                    this.maskedLines,
+                    this.definitionStarts,
+                );
             }
             return blocks;
         },

@@ -1,19 +1,21 @@
-# 25: definition labels directly after a prose line (OPEN QUESTION, 2026-09-09)
+# 25: definition labels directly after a prose line (2026-09-09)
 
 Settings: defaults, all lint rules ON, popup OFF. Every fixture is
-already in this note. Do NOT undo between the first four checks; they
-only read. Undo after each lint.
+already in this note. The first three checks only read; undo after each
+lint.
 
-The question: Obsidian follows CommonMark here, a footnote definition
-cannot interrupt a paragraph. A `[^x]:` line directly under a prose
-line (paragraph, list item, quote line, table row) renders as plain
-text; only a blank line, the note start, a heading, a closed fence, or
-another definition above it makes it a definition. The plugin reads a
-label as a definition wherever it sits, and the lint "repairs" the
-note by inserting the blank line. Decision pending: match Obsidian, or
-keep the repair. This sheet shows the gap.
+The rule (Obsidian's, matched by the plugin since 2026-09-09): a
+footnote definition cannot interrupt a paragraph. A `[^x]:` line
+directly under a prose line (paragraph text, a list item, a quote or
+callout body line, a table row) is lazy paragraph text and renders as
+plain "[^x]: ..." with no footnote. A label starts a definition only
+after a blank line (a bare `>` inside a quote counts), the note start,
+a heading, a closed fence, a callout's title line, or another
+definition. Ground truth: ten shapes in Reading view plus the
+callout/quote variants; micromark disagrees (its footnote definitions
+may interrupt a paragraph), so this is Obsidian's behavior on purpose.
 
-## Fixtures (label directly under prose, no blank line)
+## Fixtures (label directly under prose, no blank line: prose to Obsidian)
 
 After a paragraph line, reference before it, alpha[^p1] here:
 para line
@@ -32,43 +34,50 @@ After a quote line, charlie[^q1] here:
 > quote
 [^q1]: after a quote line
 
-Two labels under a paragraph, delta[^d1] and echo[^d2]:
+Inside a callout, under its body line, delta[^cb] here:
+> [!note]
+> callout body
+> [^cb]: under the callout body
+
+Two labels under a paragraph, echo[^d1] and foxtrot[^d2]:
 [^d2]: first label
 [^d1]: second label
 
-## Controls (these ARE definitions to Obsidian)
+## Controls (definitions to Obsidian)
 
-After a blank line, foxtrot[^c1] here:
+After a blank line, golf[^c1] here:
 
 [^c1]: after a blank line
 
-After a heading, golf[^c2] here:
+After a heading, hotel[^c2] here:
 # Heading line
 [^c2]: after a heading
 
-After a closed fence, hotel[^c3] here:
+After a closed fence, india[^c3] here:
 ```
 code
 ```
 [^c3]: after a closed fence
 
-## What Obsidian shows (Reading view)
+Inside a callout, right under its title line, juliet[^c4] here:
+> [!note]
+> [^c4]: under the callout title
 
-- [ ] `[^p1]`, `[^p2]`, `[^l1]`, `[^q1]`, `[^d1]`, `[^d2]`: the reference renders as plain `[^p1]` text (no superscript) and the label line reads as prose "[^p1]: after a paragraph"; NO footnote at the bottom
-- [ ] The three controls render as real footnotes: superscript references, entries at the bottom
-- [ ] Hover a plain-text `[^p1]` and open the Footnotes sidebar: nothing, or "Footnote not found"
+Inside a quote after a blank quote line, kilo[^c5] here:
+> quote body
+>
+> [^c5]: after the quote's blank line
 
-## What the plugin does with the same note (source or Live Preview)
+## Reading view
 
-- [ ] Hotkey inside `[^p1]`: the plugin JUMPS to the `[^p1]:` line (it treats it as a definition); Obsidian just showed it as text
-- [ ] Hotkey on the `[^p1]:` line: jumps back to `alpha[^p1]`
-- [ ] Rename footnote with the caret on the `[^p1]:` line: the modal opens (the plugin lists it as a definition)
-- [ ] **Lint footnotes**: every fixture label is moved to the bottom under a blank line, so ALL SIX become real footnotes in Reading view (the "repair"); no alert names `p1`, `p2`, `l1`, `q1`, `d1`, `d2` as references without definitions, even though Obsidian rendered them that way before the lint
-- [ ] Undo, turn `Delete orphaned references` ON, lint again: the six references SURVIVE (the plugin thinks they have definitions) and the labels move to the bottom as before
+- [ ] `[^p1]`, `[^p2]`, `[^l1]`, `[^q1]`, `[^cb]`, `[^d1]`, `[^d2]`: the reference renders as plain text (no superscript) and the label line reads as prose; NO entry at the bottom
+- [ ] The five controls render as real footnotes: superscript references, entries at the bottom
 
-## If the decision is "match Obsidian", this is what changes
+## The plugin agrees
 
-- [ ] The four navigation and rename checks above do nothing special: the caret is in prose
-- [ ] Lint leaves the six fixtures where they are and the alert names all six as references with no definition ("Write its definition or delete the reference")
-- [ ] With `Delete orphaned references` ON, lint deletes the six references and leaves the label lines as the prose they are
-- [ ] The three controls behave exactly as today
+- [ ] Hotkey inside `[^p1]` (and any of the seven prose fixtures): the caret is on prose, so the press INSERTS a new footnote right there (undo it); it does not jump to the label line
+- [ ] Hotkey on the `[^p1]:` line: a plain insert as well; Rename footnote with the caret there: "Place the cursor on a footnote reference or definition to rename it."
+- [ ] Hotkey inside `[^c1]` through `[^c5]`: navigates to the definition (or opens the popup); on their label lines it jumps back to the reference
+- [ ] **Lint footnotes**: the seven prose fixtures stay exactly where they are; the missing-definition alert names all seven (`p1`, `p2`, `l1`, `q1`, `cb`, `d1`, `d2`); the five controls gather at the bottom as usual
+- [ ] Undo, turn `Delete orphaned references` ON, lint again: the seven references in the prose are deleted (`alpha here:` and so on) and the seven label lines stay untouched as the prose they are; the controls are unaffected
+- [ ] Undo. Put the caret at the end of `> callout body` above and press the numbered hotkey: the new definition lands at the bottom under a blank line (never glued to the line above it), and Reading view shows it as a footnote

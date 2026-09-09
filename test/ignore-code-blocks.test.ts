@@ -136,11 +136,12 @@ describe("shouldJumpFromDefinitionToReference ignores code", () => {
             "x[^1]",
             "```",
             "real[^1]",
+            "",
             "[^1]: definition",
         ]);
         const handled = shouldJumpFromDefinitionToReference(
             "[^1]: definition",
-            { line: 4, ch: 3 },
+            { line: 5, ch: 3 },
             fakePlugin,
             doc,
         );

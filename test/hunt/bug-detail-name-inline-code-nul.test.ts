@@ -17,7 +17,7 @@ import { fakeEditor } from "../helpers/fake-editor";
 
 describe("bug: definition name with an inline-code span leaks NUL characters", () => {
     it("keeps the real backtick characters of the footnote name", () => {
-        const doc = fakeEditor(["see[^a`b`c]", "[^a`b`c]: hi"]);
+        const doc = fakeEditor(["see[^a`b`c]", "", "[^a`b`c]: hi"]);
         expect(listExistingFootnoteDefinitions(doc)).toEqual(["a`b`c"]);
     });
 });

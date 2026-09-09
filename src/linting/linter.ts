@@ -11,7 +11,9 @@ import { docContext } from "../editor/doc-context";
 import { rewriteDocument } from "./rewrite-document";
 import { definitionLabel, definitionLabelWithName } from "../parsing/footnote-grammar";
 import { footnotePrefix, footnotePrefixProblem } from "../parsing/footnote-prefix";
-import { findDefinitionBlocks, maskProtectedLines } from "../parsing/markdown-scan";
+import {
+    findDefinitionBlocks,
+} from "../parsing/markdown-scan";
 import { AppWithCommands, AppWithPlugins, readingViewActive, viewEditor, WindowWithVim } from "../editor/obsidian-internals";
 import { activeTableCellEditor, nestedSubEditorOwnsFocus, runOutsideTableCell } from "../editor/table-cursor";
 import { applyFootnotePrefix } from "./rules/apply-footnote-prefix";
@@ -394,9 +396,6 @@ export function installVimWriteHook(plugin: FootnotePlugin) {
 }
 // Stryker restore all
 
-// masked-line shape of a footnote definition with NOTHING typed yet
-const EmptyDefinitionLine = /^\[\^([^[\]]+)\]:[ \t]*$/;
-
 // The name of the note's single empty definition ("[^x]: " with no content),
 // or null when there are none or several. Linting a note right after a
 // footnote was created can RENAME the new footnote (reindex swaps ids by
@@ -404,17 +403,24 @@ const EmptyDefinitionLine = /^\[\^([^[\]]+)\]:[ \t]*$/;
 // definition is empty, and as long as it is the only empty one, it is
 // unambiguously the footnote just created.
 function uniqueEmptyDefinitionName(doc: Editor): string | null {
-    const lines: string[] = [];
-    for (let i = 0; i < doc.lineCount(); i++) lines.push(doc.getLine(i));
+    const ctx = docContext(doc);
+    const starts = ctx.definitionStarts();
     let found: string | null = null;
-    const masked = maskProtectedLines(lines);
-    for (let i = 0; i < masked.length; i++) {
-        const match = masked[i].match(EmptyDefinitionLine);
-        if (!match) continue;
+    for (let i = 0; i < ctx.lines.length; i++) {
+        if (!starts[i]) continue;
+        // the shared label reader (raw name re-sliced from the masked match:
+        // a code span in the name masks to NULs, and the name feeds
+        // jumpToFootnoteDefinition, which compares RAW names), then "nothing
+        // typed after the label yet"
+        const hit = definitionLabelWithName(ctx.lines[i], ctx.maskedLine(i));
+        if (!hit || ctx.lines[i].slice(hit.label.labelEnd).trim() !== "") continue;
+        // a blockquoted "> [^x]: " is a definition of its own, but never the
+        // one this walk hunts for - the plugin only ever creates column-0
+        // (or indented) definitions, and counting it would make the note
+        // look ambiguous and strand the caret
+        if (hit.label.quoted) continue;
         if (found !== null) return null; // ambiguous
-        // re-slice the original line: the name feeds jumpToFootnoteDefinition,
-        // which compares RAW names (a code span in the name masks to NULs)
-        found = lines[i].slice(2, 2 + match[1].length);
+        found = hit.name;
     }
     return found;
 }

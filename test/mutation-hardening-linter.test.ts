@@ -478,14 +478,16 @@ describe("replaceMinimal writes the smallest possible change", () => {
         // move-to-bottom only adds the blank line before the definition: the
         // inserted "\n" matches the newline right before the edit point, so
         // the suffix walk has to stop AT `start` instead of chewing past it.
-        const doc = creationLint("x[^1]\n[^1]: one", {
+        // (a heading above the label: a label directly under a PROSE line
+        // is lazy paragraph text since 2026-09-09, and nothing would move)
+        const doc = creationLint("x[^1]\n# H\n[^1]: one", {
             lintFixPunctuation: false,
             lintReindex: false,
         });
         expect(doc.appliedChanges).toEqual([
-            { from: { line: 1, ch: 0 }, to: { line: 1, ch: 0 }, text: "\n" },
+            { from: { line: 2, ch: 0 }, to: { line: 2, ch: 0 }, text: "\n" },
         ]);
-        expect(doc.value).toBe("x[^1]\n\n[^1]: one");
+        expect(doc.value).toBe("x[^1]\n# H\n\n[^1]: one");
     });
 
     it("a deletion whose tail repeats the kept text still cuts exactly once", () => {
@@ -553,11 +555,11 @@ describe("relanding the cursor on the new empty definition", () => {
         expect(doc.cursor).toEqual({ line: 0, ch: 0 });
     });
 
-    it("only column-0 labels count as definitions", () => {
-        // the "^" anchor: a blockquoted "> [^x]: " is a definition of its
-        // own, but it is not the empty definition this walk hunts for - an
-        // unanchored match would make the note look ambiguous and strand the
-        // caret.
+    it("a blockquoted empty label is not the fresh definition", () => {
+        // a blockquoted "> [^x]: " is a definition of its own, but it is not
+        // the empty definition this walk hunts for (the plugin never creates
+        // quoted definitions) - counting it would make the note look
+        // ambiguous and strand the caret.
         const doc = creationLint(
             "Alpha[^note], bravo\n\n> [^x]: \n\n[^note]: ",
             {},

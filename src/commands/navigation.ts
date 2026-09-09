@@ -65,7 +65,7 @@ export function shouldJumpFromDefinitionToReference(
             lineText,
             ctx.maskedLine(cursorPosition.line),
         );
-        if (hit?.label.quoted) {
+        if (hit?.label.quoted && ctx.definitionStarts()[cursorPosition.line]) {
             definitionName = hit.name;
         }
     }
@@ -117,8 +117,10 @@ export function jumpToFootnoteDefinition(
     // code don't count (#41); blockquote/callout labels count too (C22)
     const lines = ctx.lines;
     const masked = ctx.maskedLines();
+    const starts = ctx.definitionStarts();
     let labelLine = -1;
     for (let i = 0; i < masked.length; i++) {
+        if (!starts[i]) continue;
         // ids are case-insensitive: the definition label may differ in casing
         // from the reference name that sent us here
         const hit = definitionLabelWithName(lines[i], masked[i]);

@@ -42,7 +42,7 @@ describe("blockquoted orphan definitions vs the new orphan rules", () => {
     });
 
     it("C: sanity - C22 pinned behavior still holds (blockquoted def keeps reference alive)", () => {
-        const doc = "> quoted[^1]\n> [^1]: def\nplain[^1] too";
+        const doc = "> quoted[^1]\n>\n> [^1]: def\n\nplain[^1] too";
         expect(removeOrphanedFootnoteReferences(doc)).toBe(doc);
         expect(orphanedFootnoteReferenceNames(doc)).toEqual([]);
     });

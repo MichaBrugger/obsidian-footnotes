@@ -135,6 +135,11 @@ const specialBlockArb = fc.constantFrom(
     "# Footnotes",
     "## Footnotes",
     "\tcode-shaped[^89]",
+    // a label directly under a prose line is lazy paragraph text, not a
+    // definition (Obsidian ground truth 2026-09-09; micromark disagrees,
+    // so the oracle cannot referee this shape - the other properties do)
+    "prose line[^90]\n[^90]: lazy label",
+    "- item[^91]\n  [^91]: lazy under a list item",
 );
 
 const blockArb = fc.oneof(

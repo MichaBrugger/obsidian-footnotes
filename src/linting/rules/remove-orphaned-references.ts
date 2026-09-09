@@ -4,6 +4,7 @@ import {
     referenceOccurrences,
 } from "../../parsing/footnote-grammar";
 import {
+    definitionStartLines,
     maskProtectedLines,
     normalizeEol,
     scanDocument,
@@ -26,9 +27,10 @@ import { FootnoteRule } from "../rule";
 //    deleting it out from under the user's caret would be data loss.
 
 /** The definition names present in the note, case-folded - column-0 labels and blockquoted/callout ones (C22). definitionLabelWithName owns the masked-scan/raw-re-slice invariant. */
-function definitionNamesFolded(lines: string[], masked: string[]): Set<string> {
+function definitionNamesFolded(lines: string[], masked: string[], starts: boolean[]): Set<string> {
     const names = new Set<string>();
     for (let i = 0; i < masked.length; i++) {
+        if (!starts[i]) continue;
         const hit = definitionLabelWithName(lines[i], masked[i]);
         if (hit) names.add(hit.name.toLowerCase());
     }
@@ -64,8 +66,13 @@ export function orphanedFootnoteReferenceNames(
     // scan runs on every lint (perf F4)
     if (!markdown.includes("[^")) return [];
     const lines = precomputed?.lines ?? normalizeEol(markdown).text.split("\n");
-    const masked = precomputed?.masked ?? maskProtectedLines(lines);
-    const definitions = definitionNamesFolded(lines, masked);
+    const scan = scanDocument(lines);
+    const masked = precomputed?.masked ?? maskProtectedLines(lines, scan);
+    const definitions = definitionNamesFolded(
+        lines,
+        masked,
+        definitionStartLines(lines, scan, (i) => masked[i]),
+    );
     const orphanSafeFolded = orphanSafePrefix.toLowerCase();
 
     const names: string[] = [];
@@ -98,7 +105,11 @@ export function removeOrphanedFootnoteReferences(
     const lines = text.split("\n");
     const scan = scanDocument(lines);
     const masked = maskProtectedLines(lines, scan);
-    const definitions = definitionNamesFolded(lines, masked);
+    const definitions = definitionNamesFolded(
+        lines,
+        masked,
+        definitionStartLines(lines, scan, (i) => masked[i]),
+    );
     const orphanSafeFolded = orphanSafePrefix.toLowerCase();
 
     const out = lines.map((line, i) => {

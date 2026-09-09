@@ -26,6 +26,7 @@ describe("fixed 2026-08-10: a blockquoted fence dies with its blockquote", () =>
             "> ```",
             "> sample[^99]",
             "body[^1]",
+            "",
             "[^1]: one",
             "tail",
         ].join("\n");
@@ -33,6 +34,7 @@ describe("fixed 2026-08-10: a blockquoted fence dies with its blockquote", () =>
             "> ```",
             "> sample[^99]",
             "body[^1]",
+            "",
             "tail",
             "",
             "[^1]: one",

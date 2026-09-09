@@ -13,14 +13,9 @@ Terminology: a **reference** is `[^1]` in the text, a **definition** is the `[^1
 5. WP5 test-suite hardening (D10 first, D9 overnight, then D4, D5, D6)
 6. WP0 open question: labels after a paragraph line (needs a live ground truth before any code)
 
-## WP0: open question, a label directly after a paragraph line
+## WP0: DONE 2026-09-09, a label directly after a prose line is prose
 
-Found while ground-truthing A2 (2026-09-09): Obsidian renders `a[^1]\npara\n  [^1]: mid` with NO footnote; the indented label is lazy paragraph text. The plugin has always read a column-0 label as a definition regardless of the line above it, and A2 extended that to the 1-3 space case. So for the shape `para` followed directly by a label line, the plugin and Obsidian may disagree, and they disagree more since A2 (an indented label after prose used to be a reference plus text, which is what Obsidian shows).
-
-- Ground truth first: render `a[^1]\npara\n[^1]: mid` (column 0) and the indented variant through the smoke note (technique in memory: setValue, activate and reveal the leaf, setState preview, read `.footnotes li`). Also `para\n[^1]: mid\n\nuse[^1]`.
-- If Obsidian treats a label after a paragraph line as prose: the scanner needs "a definition starts only when the previous line is blank, a definition, a continuation, or the note start" in `DefinitionStart` consumers (findDefinitionBlocks, definitionLabelIn callers through the raw gate). Blast radius: every definition reader, move-to-bottom, reindex, navigation. Property oracle will referee (micromark treats footnote definitions like link reference definitions, which cannot interrupt a paragraph).
-- If Obsidian treats it as a definition at column 0 but not indented: narrow the A2 rule to "indented labels need a blank or definition line above".
-- Decision belongs to Jason once the ground truth is in; this is a behavior change either way.
+Ground-truthed (column 0, indented, after list items, quote lines, table rows, callout body lines; definitions after blank lines, headings, closed fences, callout title lines, quote blank lines, other definitions) and shipped the same day on Jason's decision to match Obsidian: `definitionStartLines` in markdown-scan is the one rule, consulted by the block walker and every per-line label reader through `DocContext.definitionStarts()` / `DocumentView.definitionStarts`. Note for WP1: micromark's GFM footnotes DO let a definition interrupt a paragraph, so the differential oracle cannot referee this shape; the deterministic pins (test/hunt/bug-label-after-prose-line-is-prose) and manual sheet 25 do. The rule also exposed and fixed an append bug: a definition appended under prose when the note's only definitions were blockquoted got no blank separator.
 
 ## WP1: one masked-line reader (B4, C2, C10)
 

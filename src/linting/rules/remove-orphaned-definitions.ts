@@ -5,6 +5,7 @@ import {
 import {
     DefinitionBlock,
     DocumentScan,
+    definitionStartLines,
     findDefinitionBlocks,
     maskProtectedLines,
     normalizeEol,
@@ -49,12 +50,14 @@ function scanReferences(
     // and NO definition label of either shape counts as a reference (a
     // label defines; treating it as a reference kept orphans alive)
     const labelStartAt = new Array<number>(lines.length).fill(-1);
+    const starts = definitionStartLines(lines, scan, (i) => maskedLines[i]);
     for (let i = 0; i < lines.length; i++) {
         if (scan.isProtected[i]) continue;
         const hit = definitionLabelWithName(lines[i], maskedLines[i]);
         if (!hit) continue;
+        // a label-shaped prefix never counts as a reference, live or lazy
         labelStartAt[i] = hit.label.nameStart - 2;
-        if (hit.label.quoted) {
+        if (hit.label.quoted && starts[i]) {
             blocks.push({
                 name: hit.name,
                 start: i,

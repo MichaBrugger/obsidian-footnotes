@@ -996,7 +996,90 @@ export function removeLineRanges(
     return out;
 }
 
-/** Every definition with its continuation lines (indented lines, plus blank runs that lead to more indented lines). Pass the full `scan` when available: a continuation can OPEN a multi-line comment/math region ("    $$") or a definition-content fence ("    ```", 2026-08-25), and only the scan's startsIn* facts let the walk absorb that construct's protected interior instead of splitting the block in half (Sol bug #3, 2026-08-10). Labels are read through the MASKED twin, like every other definition reader: a comment CLOSER line ("[^2]: two -->") is unprotected for the sake of its live suffix, but the label inside the comment is not a definition (review A1, 2026-09-08 - move-to-bottom used to drag the "-->" away and unclose the comment). Pass `maskedLines` when the twin is already at hand; otherwise only the label-shaped lines are masked, one at a time. */
+/**
+ * Which lines START a live footnote definition: a label (column 0,
+ * indented up to three spaces, or blockquoted) on a line that can begin a
+ * block. Obsidian, like CommonMark for link reference definitions, does
+ * not let a footnote definition interrupt a paragraph: a label directly
+ * under a prose line (paragraph text, a list item, a quote line, a table
+ * row, or a lazy continuation of any of those) is lazy paragraph text and
+ * renders as plain "[^x]: ..." with no footnote. Ground truth in Reading
+ * view 2026-09-09 (manual sheet 25); Jason's ruling the same day: match
+ * Obsidian. A label may start after a blank line (a bare ">" inside a
+ * quote counts), the note start, a protected line (fence closer, comment,
+ * frontmatter, indented code), a heading, a thematic break, or another
+ * definition - its label or its continuation lines, blank gaps included.
+ * Note that micromark's GFM footnotes DO let a definition interrupt a
+ * paragraph, so the differential oracle is no referee for this rule.
+ * The RAW label gate runs first; only label-shaped lines are masked.
+ */
+export function definitionStartLines(
+    lines: string[],
+    scan: Pick<DocumentScan, "isProtected" | "startsInComment" | "startsInMath" | "startsInFence">,
+    maskedAt: (i: number) => string,
+): boolean[] {
+    const starts = new Array<boolean>(lines.length).fill(false);
+    // what the lines so far leave open for the next line: nothing (a label
+    // may start), a paragraph (a label is lazy text), a definition (a label
+    // starts the next one), or a definition with a blank gap behind it
+    // (indented content still continues it; anything else closes it)
+    type Open = "none" | "paragraph" | "definition" | "definition-gap";
+    let open = "none" as Open;
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (scan.isProtected[i]) {
+            // a protected line INSIDE a definition's content (an indented
+            // fence or math block, a comment run the continuation opened)
+            // keeps the definition open, exactly as the block walker absorbs
+            // it; a column-0 construct ends whatever was open
+            const inDefinition = open === "definition" || open === "definition-gap";
+            open =
+                inDefinition &&
+                (IndentedContent.test(line) ||
+                    scan.startsInComment[i] ||
+                    scan.startsInMath[i] ||
+                    scan.startsInFence[i])
+                    ? "definition"
+                    : "none";
+            continue;
+        }
+        const bare = line.replace(BlockquotePrefix, "");
+        if (bare.trim() === "") {
+            open = open === "definition" || open === "definition-gap" ? "definition-gap" : "none";
+            continue;
+        }
+        if (IndentedContent.test(bare) && !DefinitionStart.test(bare)) {
+            // continuation of whatever is open; after a blank with nothing
+            // open, a 1-3 space indent starts a paragraph (4+ is code, and
+            // the scan protected it above)
+            open = open === "definition" || open === "definition-gap" ? "definition" : "paragraph";
+            continue;
+        }
+        if (open !== "paragraph" && definitionLabelIn(line) !== null) {
+            const hit = definitionLabelWithName(line, maskedAt(i));
+            if (hit) {
+                starts[i] = true;
+                open = "definition";
+                continue;
+            }
+        }
+        if (
+            /^ {0,3}#{1,6}(?:\s|$)/.test(bare) ||
+            /^ {0,3}([-*_])(?: *\1){2,} *$/.test(bare) ||
+            // a callout's title line ("> [!note]- Title") is not paragraph
+            // text: a label right under it is a definition (ground truth
+            // 2026-09-09), while a label under the callout's BODY is not
+            /^\[![^\]]*\][+-]?/.test(bare)
+        ) {
+            open = "none";
+            continue;
+        }
+        open = "paragraph";
+    }
+    return starts;
+}
+
+/** Every definition with its continuation lines (indented lines, plus blank runs that lead to more indented lines). Pass the full `scan` when available: a continuation can OPEN a multi-line comment/math region ("    $$") or a definition-content fence ("    ```", 2026-08-25), and only the scan's startsIn* facts let the walk absorb that construct's protected interior instead of splitting the block in half (Sol bug #3, 2026-08-10). Labels are read through the MASKED twin, like every other definition reader: a comment CLOSER line ("[^2]: two -->") is unprotected for the sake of its live suffix, but the label inside the comment is not a definition (review A1, 2026-09-08 - move-to-bottom used to drag the "-->" away and unclose the comment). Pass `maskedLines` when the twin is already at hand; otherwise only the label-shaped lines are masked, one at a time. `starts` is definitionStartLines' answer when the caller already holds it (a label under a prose line is lazy text, not a block start). */
 export function findDefinitionBlocks(
     lines: string[],
     isProtected: boolean[],
@@ -1005,6 +1088,7 @@ export function findDefinitionBlocks(
         "startsInComment" | "startsInMath" | "startsInFence"
     >,
     maskedLines?: string[],
+    starts?: boolean[],
 ): DefinitionBlock[] {
     const maskedAt = (j: number): string => {
         if (maskedLines) return maskedLines[j];
@@ -1013,6 +1097,18 @@ export function findDefinitionBlocks(
             math: scan?.startsInMath[j] ?? false,
         }).masked;
     };
+    const startsAt =
+        starts ??
+        definitionStartLines(
+            lines,
+            {
+                isProtected,
+                startsInComment: scan?.startsInComment ?? [],
+                startsInMath: scan?.startsInMath ?? [],
+                startsInFence: scan?.startsInFence ?? [],
+            },
+            maskedAt,
+        );
     // a protected line the walk may absorb into an open block: the
     // interior/closer of a comment, math, or fence region whose opener
     // was a continuation already absorbed into this block (a region open
@@ -1032,8 +1128,9 @@ export function findDefinitionBlocks(
             /^ {4}/.test(lines[j]));
     const blocks: DefinitionBlock[] = [];
     for (let i = 0; i < lines.length; i++) {
-        if (isProtected[i]) continue;
-        // raw gate first (most lines are prose), then the masked read
+        if (!startsAt[i]) continue;
+        // column-0 or indented blocks only: a blockquoted label is a live
+        // single-line definition to the orphan rules, never a block here
         if (!DefinitionStart.test(lines[i])) continue;
         const hit = definitionLabelWithName(lines[i], maskedAt(i));
         if (!hit) continue;

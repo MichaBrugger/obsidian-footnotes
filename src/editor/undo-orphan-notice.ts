@@ -2,7 +2,7 @@ import { EditorView, ViewUpdate } from "@codemirror/view";
 import { Notice } from "obsidian";
 
 import { definitionLabelWithName, quotedReference, referenceOccurrences } from "../parsing/footnote-grammar";
-import { maskProtectedLines } from "../parsing/markdown-scan";
+import { definitionStartLines, maskProtectedLines, scanDocument } from "../parsing/markdown-scan";
 
 import { showNotice } from "./notice";
 // Feedback for a PARTIAL undo (Jason's report 2026-08-27, notice always
@@ -60,9 +60,12 @@ export function stillOrphanedNames(text: string, names: string[]): string[] {
 
 /** Every definition name in `lines`, folded → raw casing (last one wins, matching Obsidian's last-definition-renders rule). */
 function definedNames(lines: string[]): Map<string, string> {
-    const masked = maskProtectedLines(lines);
+    const scan = scanDocument(lines);
+    const masked = maskProtectedLines(lines, scan);
+    const starts = definitionStartLines(lines, scan, (i) => masked[i]);
     const names = new Map<string, string>();
     for (let i = 0; i < lines.length; i++) {
+        if (!starts[i]) continue;
         const hit = definitionLabelWithName(lines[i], masked[i]);
         if (hit) names.set(hit.name.toLowerCase(), hit.name);
     }
