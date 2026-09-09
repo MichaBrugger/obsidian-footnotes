@@ -196,7 +196,12 @@ export function buildDefinitionAppend(
  * label's end - slides to the end of the body, before any trailing
  * separator newline. A multi-line body (a multi-paragraph selection,
  * 2026-08-19, already carrying its continuation indent) lands the cursor
- * at the end of its LAST line.
+ * at the end of its LAST line. `labelLineOffset` is the label's line
+ * within the change text, found here against the UNSEEDED text: once the
+ * body is spliced in, a label-shaped string inside the body ("`[^1]: x`"
+ * in a code span) would win a lastIndexOf and point the caller at a
+ * continuation line (review A4, Jason confirmed live 2026-09-08 - the
+ * conversion was refused as protected text).
  */
 export function seedDefinitionBody(
     definition: {
@@ -206,13 +211,19 @@ export function seedDefinitionBody(
     },
     footnoteId: string,
     body: string,
-): { change: EditorChange; cursor: EditorPosition; prepend?: EditorChange } {
+): {
+    change: EditorChange;
+    cursor: EditorPosition;
+    prepend?: EditorChange;
+    labelLineOffset: number;
+} {
     const label = `${definitionLabel(footnoteId)} `;
     const text = definition.change.text;
     const at = text.lastIndexOf(label) + label.length;
     const bodyLines = body.split("\n");
     return {
         ...definition,
+        labelLineOffset: text.slice(0, at).split("\n").length - 1,
         change: {
             ...definition.change,
             text: text.slice(0, at) + body + text.slice(at),

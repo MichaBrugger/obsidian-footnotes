@@ -781,11 +781,9 @@ function convertMainSelection(
     // verifyLiveFootnoteInsertion reuses the same simulated result.
     const simulated = simulateChanges(ctx.lines, changes);
     const definitionAnchor = simulatedAnchor(ctx.lines, changes, 1, simulated);
-    const labelAt = definition.change.text.lastIndexOf(`${definitionLabel(footnoteId)} `);
-    const labelLine =
-        definitionAnchor.line +
-        definition.change.text.slice(0, labelAt).split("\n").length -
-        1;
+    // the label's line comes from the seeding step, which located it before
+    // the body could carry a label-shaped string of its own (review A4)
+    const labelLine = definitionAnchor.line + definition.labelLineOffset;
     // where the caret should land AFTER the transaction: the end of the
     // seeded body, in simulated coordinates
     const definitionCursor = {
