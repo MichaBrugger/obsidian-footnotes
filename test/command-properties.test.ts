@@ -7,6 +7,7 @@ import { noticeCalls } from "./mocks/obsidian";
 import { resetNotices } from "./helpers/notices";
 import { fakePlugin as sharedFakePlugin } from "./helpers/fake-plugin";
 import FootnotePlugin from "../src/main";
+import { simulateChanges } from "../src/editor/insertion-liveness";
 import {
     absorbLeadingSpace,
     indentDefinitionBody,
@@ -56,32 +57,13 @@ interface PressDoc extends Editor {
 
 // every change in one transaction addresses the ORIGINAL document
 // (CodeMirror semantics - the commands rely on this for the
-// reference+definition+prepend bundles), so apply back-to-front
-function applyChanges(lines: string[], changes: EditorChange[]): string[] {
-    const text = lines.join("\n");
-    const offsetOf = (pos: EditorPosition): number => {
-        let offset = 0;
-        for (let i = 0; i < pos.line && i < lines.length; i++) {
-            offset += lines[i].length + 1;
-        }
-        return offset + pos.ch;
-    };
-    const resolved = changes
-        .map((change, index) => ({
-            from: offsetOf(change.from),
-            to: change.to ? offsetOf(change.to) : offsetOf(change.from),
-            text: change.text,
-            index,
-        }))
-        // same-position insertions concatenate in change order (CodeMirror
-        // semantics), so back-to-front ties apply the later change first
-        .sort((a, b) => b.from - a.from || b.index - a.index);
-    let out = text;
-    for (const change of resolved) {
-        out = out.slice(0, change.from) + change.text + out.slice(change.to);
-    }
-    return out.split("\n");
-}
+// reference+definition+prepend bundles). Applied through the production
+// simulator: this harness used to carry its own back-to-front splice, the
+// exact algorithm insertion-liveness dropped on 2026-08-25 because it
+// resolves a tied replace's `to` against the already-mutated string and
+// drops a character of the tied insert (test/hunt/bug-simulate-changes-
+// tie-drops-text) - so every conversion property was judged against a
+// document CodeMirror would never produce (review D1, 2026-09-09)
 
 function pressEditor(
     lines: string[],
@@ -126,7 +108,7 @@ function pressEditor(
             changes?: EditorChange[];
             selection?: { from: EditorPosition };
         }) {
-            if (spec.changes) doc.lines = applyChanges(doc.lines, spec.changes);
+            if (spec.changes) doc.lines = simulateChanges(doc.lines, spec.changes);
             if (spec.selection) doc.cursor = spec.selection.from;
         },
     };
