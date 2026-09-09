@@ -76,8 +76,9 @@ export function orphanSafePrefixFor(
     return prefix && footnotePrefixProblem(prefix) === null ? prefix : "";
 }
 
+// no settings gate, unlike its orphan/duplicate siblings: an empty
+// reference is never something a rule may delete, so it is always reported
 function noticeEmptyReferences(
-    plugin: FootnotePlugin,
     markdown: string,
     prefix: string,
     masked: string[],
@@ -271,7 +272,7 @@ export function noticeLintAlerts(plugin: FootnotePlugin, markdown: string) {
     const lines = normalizeEol(markdown).text.split("\n");
     const scan = scanDocument(lines);
     const masked = maskProtectedLines(lines, scan);
-    noticeEmptyReferences(plugin, markdown, prefix, masked);
+    noticeEmptyReferences(markdown, prefix, masked);
     noticeOrphanedReferences(plugin, markdown, prefix, { lines, masked });
     noticeOrphanedDefinitions(plugin, markdown, { lines, scan });
     noticeDuplicateDefinitions(plugin, markdown, { lines, scan });
