@@ -1,10 +1,14 @@
-# Claude: plan for the deferred review items (2026-09-09)
+# Claude: plan for the deferred review items (2026-09-09) - ALL DONE the same day
 
 Claude: a starting point, not a finished plan. Written after the 2026-09-08 review pass shipped its NOW items in 0.2.0-beta.12. The items below are the ones Jason marked LATER (plus one open question the A2 ground truth surfaced). Each work package is sized to land as a handful of commits with the gates green in between; none changes user-visible behavior unless it says so.
 
 Terminology: a **reference** is `[^1]` in the text, a **definition** is the `[^1]:` line. Gates = `npx tsc -noEmit`, `npm run lint`, `npm run knip`, `npx vitest run`, `npm run build`, and `npm run test:smoke` after `npm run build` for anything that touches a command.
 
-## Suggested order
+## Status
+
+Every work package below landed on 2026-09-09 (see the commits named B2, B4, C2, C3, C6, C7, C9, C10, D4, D5, D6, D9, D10, and the WP0 prose-label rule). Kept as the record of why each change was made.
+
+## Suggested order (as executed)
 
 1. WP4 selection types (an hour, warms up the selection file)
 2. WP1 one masked-line reader (the big one: performance plus the last duplicated label reader)
