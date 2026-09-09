@@ -2356,6 +2356,25 @@ async function main() {
         await expectEditorText("Alpha[^1] here.\n[^1]: def\n\nTail.");
     });
 
+    await test("a definition inside a %% block comment is dead: lint leaves it and reports the reference (2026-09-09)", async () => {
+        resetSettings();
+        await setupNote("x[^1] here.\n\n%%\n[^1]: commented out\n%%");
+        setCursorAndRun(0, 0, CMD_LINT);
+        await pollUntil(
+            "the missing-definition alert",
+            `[...document.querySelectorAll('.notice')].map(n => n.textContent).join('|')`,
+            (v) => typeof v === "string" && v.includes("no definition") && v.includes("[^1]"),
+        );
+        await expectEditorText("x[^1] here.\n\n%%\n[^1]: commented out\n%%");
+    });
+
+    await test("a reference inside a %% block comment is live: its definition is no orphan (2026-09-09)", async () => {
+        resetSettings({ lintDeleteOrphanedDefinitions: true, lintReindex: false });
+        await setupNote("x[^1] here.\n\n%%\nhidden[^2]\n%%\n\n[^1]: one\n[^2]: two");
+        setCursorAndRun(0, 0, CMD_LINT);
+        await expectEditorText("x[^1] here.\n\n%%\nhidden[^2]\n%%\n\n[^1]: one\n[^2]: two");
+    });
+
     await test("lint alerts about kept orphaned definitions (2026-08-10)", async () => {
         resetSettings(); // orphaned-definition deletion defaults to off
         await setupNote("plain text[^1]\n\n[^1]: used\n[^stray]: unused");

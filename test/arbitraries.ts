@@ -23,6 +23,11 @@ const inlinePieceArb = fc.constantFrom(
     "^[^shadow]",
     "`code [^77]`",
     "<!-- [^78] -->",
+    // Obsidian %% comments (ground truth 2026-09-09): the reference inside
+    // an inline pair is live; an unpaired mid-line "%%" is literal
+    "%%hidden[^99]%%",
+    "%% b \\%% c %%",
+    "tail %% literal",
     "$m[^79]$",
     "\\[^80]",
     "$5 or $6",
@@ -140,6 +145,16 @@ const specialBlockArb = fc.constantFrom(
     // so the oracle cannot referee this shape - the other properties do)
     "prose line[^90]\n[^90]: lazy label",
     "- item[^91]\n  [^91]: lazy under a list item",
+    // Obsidian %% block comments (ground truth 2026-09-09): references
+    // inside bind and count, a label inside is dead, a comment-only line
+    // is a paragraph line, a quoted block ends with its quote; micromark
+    // knows none of this, so the oracle recuses every "%%" document
+    "%%\nhidden[^92]\n%%",
+    "%%\n[^93]: commented label\n%%",
+    "%% c %%\n[^94]: lazy under a comment line",
+    "> %%\n> [^95]: quoted commented label",
+    "- %%\n  hidden[^96]\n  %%",
+    "%%text\nmore[^97]\n%% after",
 );
 
 const blockArb = fc.oneof(

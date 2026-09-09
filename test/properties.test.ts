@@ -207,12 +207,16 @@ const hasLazyLabel = (doc: string): boolean => {
     const starts = definitionStartLines(lines, scan, (i) => masked[i]);
     return lazyDefinitionLabelNames(lines, scan, masked, starts).length > 0;
 };
+// ... and from documents with an Obsidian "%%" comment: micromark reads
+// "%%" as text, while Obsidian hides the block and kills the definitions
+// in it (ground truth 2026-09-09, spec-obsidian-comments)
 const oracleDocArb = docArb.filter(
     (doc) =>
         !/\[\^[^\]\n]*\$/.test(doc) &&
         !dollarPrefix(doc) &&
         !headBlockWithReference(doc) &&
-        !hasLazyLabel(doc),
+        !hasLazyLabel(doc) &&
+        !doc.includes("%%"),
 );
 
 describe("differential oracle over random documents", () => {

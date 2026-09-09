@@ -83,3 +83,44 @@ Real refs to lint: swap me[^s1].
 - [ ] The refs BEFORE the comment opener and AFTER its closer (`[^c1]`, `[^c3]`) are LIVE: they renumber/swap like normal text; the blockquoted `[^q1]` renumbers too
 - [ ] The quoted fence above ended when its blockquote did: this checklist text is live, not phantom code
 - [ ] The numbered command in the prose: none of `[^9]`, `[^8]`, `[^7]`, `[^90]`, `[^c2]`, `[^f1]`, `[^f2]`, `[^88]`, the escaped `[^9]`, or the inline `^[...]` content reserve numbers
+
+## Obsidian `%%` comments (2026-09-09)
+
+Obsidian hides a `%%` comment but still parses it: a reference inside a
+comment is a real reference (it binds its definition and takes a number,
+though its own superscript is hidden), while a definition inside a `%%`
+block comment is dead. A `%%` at the start of a line with no second `%%`
+on that line opens a block comment through the next `%%` anywhere; a
+mid-line `%%` pairs only within its own line. The plugin matches this.
+
+Hidden reference, live definition: november[^n1] here.
+%%
+A commented paragraph with a hidden reference[^n2].
+%%
+
+Dead definition: oscar[^o1] here.
+%%
+[^o1]: this definition sits inside a comment and never renders
+%%
+
+Inline comment with a hidden reference: papa %%hidden[^n3]%% here.
+
+Numbering counts hidden references: romeo[^1] %%hidden[^2]%% sierra[^3].
+
+%% a comment-only line is still a paragraph line %%
+[^p9]: a label right under a comment line (lazy), tango[^p9]
+
+<!-- an HTML comment line is a block -->
+[^h1]: a label right under an HTML comment line (a definition), uniform[^h1]
+
+[^n1]: november
+[^n2]: the hidden reference's definition: it renders, with no visible marker
+[^n3]: papa's hidden reference's definition
+[^1]: romeo
+[^2]: the hidden second reference's definition
+[^3]: sierra
+
+- [ ] Reading view: `[^n1]`, `[^h1]`, `[^1]`, `[^3]` render as footnotes; the `n2`, `n3`, and `2` entries appear in the footnote list (each with a back-arrow) though no marker is visible for them; `sierra` shows as `[3]`, not `[2]`; `oscar[^o1]` renders as plain text; the `[^p9]:` line renders as plain text
+- [ ] Hotkey inside the hidden `[^n2]` (Source mode or Live Preview): navigates to its definition (or opens the popup), exactly like a visible reference
+- [ ] **Lint footnotes** (defaults): the missing-definition alert names `o1` (its only definition is commented out); `[^p9]:` gets its blank line (its `tango` reference then renders); nothing is inserted or moved inside either `%%` block, and the commented `[^o1]:` line is untouched; `[^h1]:` was never touched (it was a definition all along); with Reindex on, `[^2]`'s hidden reference keeps its number (nothing renumbers in this section)
+- [ ] Undo, turn `Delete orphaned definitions` ON, lint again: the `n2`, `n3`, and `2` definitions SURVIVE (referenced from inside comments); undo and turn it back OFF

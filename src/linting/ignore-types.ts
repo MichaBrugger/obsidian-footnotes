@@ -13,7 +13,11 @@
  * Region kinds a rule can declare it ignores. Names mirror Linter's mdast
  * ignore keys. `Code`, `InlineCode`, `Yaml`, and `HtmlComment` are the ones
  * markdown-scan can actually mask; `Math` is masked by the inline scanner
- * (maskLineRegions) rather than a parser.
+ * (maskLineRegions) rather than a parser. Obsidian "%%" comments are
+ * deliberately NOT a kind here: Obsidian parses their content (references
+ * inside bind and count), so the transforms read them as live text and
+ * only the definition readers skip their block form
+ * (DocumentScan.inCommentBlock).
  */
 export enum IgnoreType {
     Code = "code",

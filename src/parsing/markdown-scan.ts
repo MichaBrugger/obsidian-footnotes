@@ -483,6 +483,38 @@ export interface DocumentScan {
     endsProtected: boolean;
     /** `endsProtected` as of line `i`: what a note cut right after line `i` would report. The definition append's walk up from EOF used to re-slice and re-scan the prefix once per line, quadratic on a long note with an unclosed opener near the top (review B2, 2026-09-09). Lines inside a closed frontmatter block read false. */
     endsProtectedAt: boolean[];
+    /** Line `i` belongs to an Obsidian "%%" BLOCK comment - its opener line, interior, or closer line. Obsidian hides the text but still parses it (ground truth 2026-09-09): a REFERENCE inside binds and takes a number, so these lines are NOT protected and NOT masked; a DEFINITION inside is dead, so definitionStartLines never starts one here and lazyDefinitionLabelLines never reports one. `endsProtected` counts an unclosed block: a definition appended inside it would be dead. Inline "%%…%%" pairs need no flag - a label cannot start behind one, and the references in them are live. */
+    inCommentBlock: boolean[];
+    /** For a block comment's CLOSER line, the index just past its closing "%%"; -1 elsewhere. Text after the closer is live paragraph text. */
+    commentBlockCloseAt: number[];
+}
+
+/**
+ * Whether this line OPENS an Obsidian "%%" block comment: a "%%" at the start
+ * of the line's content - after blockquote markers (`rest`), an optional list
+ * marker, up to three spaces of indent (or the container-relative indent a
+ * list item or an open definition allows) - that is the ONLY "%%" on the line.
+ * A second "%%" would pair with it as an inline comment ("%% a %%", "%%%%",
+ * even "%% `%%`": backticks do not shield a closer), and a trailing unpaired
+ * "%%" after such a pair is literal text. A mid-line "%%" never opens a block.
+ * Ground truth in the live Reading view, 2026-09-09 (spec-obsidian-comments).
+ */
+function opensCommentBlock(
+    line: string,
+    rest: string,
+    depth: number,
+    listContentColumn: number | null,
+    inDefinition: boolean,
+): boolean {
+    if ((line.match(/%%/g) ?? []).length !== 1) return false;
+    let lead = 0;
+    while (lead < rest.length && rest[lead] === " ") lead++;
+    if (rest.startsWith("%%", lead)) {
+        if (lead <= 3) return true;
+        if (depth === 0 && listContentColumn !== null && lead <= listContentColumn + 3) return true;
+        return depth === 0 && inDefinition && lead <= 4 + 3;
+    }
+    return /^ {0,3}(?:[-+*]|\d{1,9}[.)]) +%%/.test(rest);
 }
 
 /** Width of the line's leading whitespace, tabs expanding to 4-column tab stops (CommonMark). */
@@ -513,6 +545,8 @@ export function scanDocument(lines: string[]): DocumentScan {
     const startsInComment = new Array<boolean>(lines.length).fill(false);
     const startsInMath = new Array<boolean>(lines.length).fill(false);
     const startsInFence = new Array<boolean>(lines.length).fill(false);
+    const inCommentBlock = new Array<boolean>(lines.length).fill(false);
+    const commentBlockCloseAt = new Array<number>(lines.length).fill(-1);
     let i = 0;
 
     if (src[0] === "---") {
@@ -544,11 +578,18 @@ export function scanDocument(lines: string[]): DocumentScan {
     let inComment = false;
     let inMath = false;
     let regionDepth = 0;
+    // an open Obsidian "%%" block comment and the blockquote depth it
+    // opened at (it lives in its container like every other region). Its
+    // lines are unprotected - references inside are live - but a
+    // definition appended inside it would be dead, so endsProtected counts
+    // it (see DocumentScan.inCommentBlock)
+    let commentBlock: { depth: number } | null = null;
     // a quoted unclosed region can't reach an EOF append - the appended
     // line ends its quote, same as a blockquoted fence
     const endsProtectedNow = (): boolean =>
         ((inComment || inMath) && regionDepth === 0) ||
-        (fence !== null && fence.depth === 0);
+        (fence !== null && fence.depth === 0) ||
+        (commentBlock !== null && commentBlock.depth === 0);
     const endsProtectedAt = new Array<boolean>(lines.length).fill(false);
     // indented-code state (C21): `blockBoundary` marks a place indented
     // code may OPEN - doc start, blank lines, and (Sol bug #5: lazy
@@ -587,6 +628,24 @@ export function scanDocument(lines: string[]): DocumentScan {
         // count - fences and comment/math regions live in the container
         // that opened them
         const { depth, rest } = blockquoteDepth(src[i]);
+        // an open "%%" block comment claims whole lines until its closer -
+        // the first "%%" anywhere on a later line (escapes and backticks do
+        // not shield it, like an HTML comment's "-->"); a shallower quote
+        // depth ends the quote and the block with it. Nothing on these
+        // lines opens a fence or another region, and the list/indent state
+        // freezes across them: the text is hidden, not code
+        if (commentBlock && depth < commentBlock.depth) commentBlock = null;
+        if (commentBlock) {
+            inCommentBlock[i] = true;
+            const close = src[i].indexOf("%%");
+            if (close === -1) continue;
+            commentBlockCloseAt[i] = close + 2;
+            commentBlock = null;
+            // a bare closer ends a BLOCK: a label directly under it is a
+            // definition, and an indented chunk may open right below
+            if (src[i].slice(close + 2).trim() === "") blockBoundary = true;
+            continue;
+        }
         if ((inComment || inMath) && depth < regionDepth) {
             // the region's blockquote ended, taking it along (a blank or
             // shallower line ends the quote) - this line is normal text
@@ -872,6 +931,24 @@ export function scanDocument(lines: string[]): DocumentScan {
             isProtected[i] = true;
             continue;
         }
+        // an Obsidian "%%" block comment opens on a line-start "%%" that
+        // has no partner on its line (opensCommentBlock); everything on and
+        // after that line is hidden through the closer - an HTML or math
+        // opener inside it is comment text, so this check comes first
+        if (
+            src[i].includes("%%") &&
+            opensCommentBlock(
+                src[i],
+                rest,
+                depth,
+                listStack.length > 0 ? listStack[listStack.length - 1] : null,
+                inDefinition,
+            )
+        ) {
+            commentBlock = { depth };
+            inCommentBlock[i] = true;
+            continue;
+        }
         // a multi-line HTML comment (an unescaped opener outside code with
         // no closer) hides everything through its closing line - a "[^x]:"
         // inside it is commented-out text, not a live definition. Same for
@@ -892,6 +969,8 @@ export function scanDocument(lines: string[]): DocumentScan {
         startsInFence,
         endsProtected: endsProtectedNow(),
         endsProtectedAt,
+        inCommentBlock,
+        commentBlockCloseAt,
     };
 }
 
@@ -1033,7 +1112,10 @@ export function removeLineRanges(
  */
 export function definitionStartLines(
     lines: string[],
-    scan: Pick<DocumentScan, "isProtected" | "startsInComment" | "startsInMath" | "startsInFence">,
+    scan: Pick<
+        DocumentScan,
+        "isProtected" | "startsInComment" | "startsInMath" | "startsInFence" | "inCommentBlock" | "commentBlockCloseAt"
+    >,
     maskedAt: (i: number) => string,
 ): boolean[] {
     const starts = new Array<boolean>(lines.length).fill(false);
@@ -1069,6 +1151,15 @@ export function definitionStartLines(
                     : "none";
             continue;
         }
+        // a "%%" block comment: no label starts inside it (Obsidian hides
+        // the block; the definition is dead, ground truth 2026-09-09); its
+        // closer ends the block, so a label directly under a bare closer
+        // is a definition, while live text after the closer is a paragraph
+        if (scan.inCommentBlock[i]) {
+            const close = scan.commentBlockCloseAt[i];
+            if (close >= 0) open = line.slice(close).trim() === "" ? "none" : "paragraph";
+            continue;
+        }
         const bare = line.replace(BlockquotePrefix, "");
         if (bare.trim() === "") {
             open = open === "definition" || open === "definition-gap" ? "definition-gap" : "none";
@@ -1079,6 +1170,15 @@ export function definitionStartLines(
             // open, a 1-3 space indent starts a paragraph (4+ is code, and
             // the scan protected it above)
             open = open === "definition" || open === "definition-gap" ? "definition" : "paragraph";
+            continue;
+        }
+        // an HTML comment line is an HTML block (CommonMark type 2), not
+        // paragraph text: a label directly under "<!-- c -->", or under the
+        // "-->" line that closes a multi-line comment, is a definition
+        // (ground truth 2026-09-09; an inline "%% c %%" line is a paragraph
+        // line by contrast, and a label under it stays lazy)
+        if (scan.startsInComment[i] || /^ {0,3}<!--/.test(bare)) {
+            open = "none";
             continue;
         }
         if (open !== "paragraph" && definitionLabelIn(line) !== null) {
@@ -1114,7 +1214,7 @@ export function findDefinitionBlocks(
     lines: string[],
     scan: Pick<
         DocumentScan,
-        "isProtected" | "startsInComment" | "startsInMath" | "startsInFence"
+        "isProtected" | "startsInComment" | "startsInMath" | "startsInFence" | "inCommentBlock" | "commentBlockCloseAt"
     > = scanDocument(lines),
     maskedLines?: string[],
     starts?: boolean[],
@@ -1198,7 +1298,9 @@ export function lazyDefinitionLabelLines(
 ): number[] {
     const out: number[] = [];
     for (let i = 0; i < lines.length; i++) {
-        if (scan.isProtected[i] || starts[i]) continue;
+        // a label inside a "%%" block comment is dead text, not a
+        // definition one blank line short - nothing to report or fix
+        if (scan.isProtected[i] || starts[i] || scan.inCommentBlock[i]) continue;
         if (definitionLabelWithName(lines[i], masked[i])) out.push(i);
     }
     return out;
