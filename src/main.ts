@@ -282,7 +282,7 @@ function parseSavedSettings(saved: unknown): Partial<FootnotePluginSettings> {
     if (expected !== undefined && typeof value !== expected) continue;
     parsed[key] = value;
   }
-  return parsed as Partial<FootnotePluginSettings>;
+  return parsed;
 }
 
 // ---- one-time settings migrations, one function per version bump ----

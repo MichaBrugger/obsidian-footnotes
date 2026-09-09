@@ -34,7 +34,7 @@ function modalWith(processFrontMatter: () => Promise<void>, enableFootnotePrefix
             },
         },
     } as unknown as FootnotePlugin;
-    const modal = new SetFootnotePrefixModal(plugin, {} as TFile, "");
+    const modal = new SetFootnotePrefixModal(plugin, new TFile(), "");
     const problems: (string | null)[] = [];
     // onOpen never runs in units (no DOM), so the error line is captured
     // instead of rendered

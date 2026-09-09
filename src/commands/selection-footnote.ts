@@ -3,7 +3,6 @@ import { Editor, EditorChange, EditorPosition } from "obsidian";
 import type FootnotePlugin from "../main";
 import { ValidatedTextModal } from "./validated-text-modal";
 import {
-    definitionLabel,
     footnoteNameProblem,
     idListIncludes,
     referenceOccurrences,

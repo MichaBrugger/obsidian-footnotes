@@ -3,7 +3,7 @@
 // touches an Editor - everything is lines in, facts out.
 
 /** A footnote definition at the start of a line ("[^x]: …"), indented up to three spaces like any block start - four is indented code. Ground truth in Obsidian's Reading view (2026-09-09): "  [^1]: x" renders as a definition, even directly under another definition, where it starts a NEW footnote rather than continuing the one above (review A2). */
-export const DefinitionStart = /^ {0,3}\[\^([^[\]]+)\]:/;
+const DefinitionStart = /^ {0,3}\[\^([^[\]]+)\]:/;
 
 /**
  * The trailing punctuation the insert commands hop over - the same class

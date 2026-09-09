@@ -12,6 +12,7 @@ export class Modal {
     close() {}
 }
 export class MarkdownView {}
+export class TFile {}
 export class Scope {
     register() {}
 }
