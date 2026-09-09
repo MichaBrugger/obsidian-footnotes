@@ -18,13 +18,14 @@ import {
     referenceOccurrences,
 } from "../parsing/footnote-grammar";
 
-// One press's shared read-only view of the document. Depends only on
-// markdown-scan + Obsidian types - split out of the all-in-one commands
-// file 2026-08-11.
+// One press's shared, read-only view of the document. It depends on nothing
+// but markdown-scan and Obsidian's own types. Split out of the all-in-one
+// commands file 2026-08-11.
 
-// Scans run against the document's masked twin (code and frontmatter
-// blotted out, indices preserved): a "[^x]" inside a code sample is plain
-// text, not a footnote (issue #41).
+// Every scan judges the document's masked twin: a copy of it with protected
+// text (code, frontmatter) blotted out and every column left where it was.
+// That is how a "[^x]" inside a code sample counts as plain text rather
+// than a footnote (issue #41).
 export function docLines(doc: Editor): string[] {
     const lines: string[] = [];
     for (let i = 0; i < doc.lineCount(); i++) {
@@ -34,44 +35,58 @@ export function docLines(doc: Editor): string[] {
 }
 
 /**
- * One press's shared read-only view of the document (perf F1): the cascade
- * steps used to each re-materialize the lines and re-walk the protection
- * scan - 3–5 full-document passes per press. Every step takes an optional
- * DocContext (defaulting to a fresh one, so direct/unit callers are
- * unchanged) and the command entry points build ONE per press. Masking is
- * lazy: per line on demand, whole-twin memoized on first full need. Built
- * strictly BEFORE any edit of the press - creation steps edit last, so the
- * context never goes stale within a press.
+ * One press's shared, read-only view of the document (performance item F1).
+ *
+ * Each step of the cascade used to rebuild the list of lines and re-walk
+ * the protection scan for itself, which came to 3–5 passes over the whole
+ * document per press. Now every step accepts an optional DocContext,
+ * falling back to a fresh one so direct callers and unit tests are
+ * unaffected, and the command entry points build exactly ONE per press.
+ *
+ * Masking is lazy: a single line is masked when something asks for it, and
+ * the whole masked twin is built and remembered the first time something
+ * needs all of it.
+ *
+ * The context is built strictly BEFORE any edit the press makes. Creation
+ * steps edit last, so it can never go stale within one press.
  */
 export interface DocContext {
     lines: string[];
     scan: DocumentScan;
-    /** Line `i` of the masked twin ("" when out of range), cached per line. */
+    /** Line `i` of the masked twin, or "" when `i` is outside the document.
+     * Each line is remembered once it has been masked. */
     maskedLine(i: number): string;
-    /** The whole masked twin, memoized. */
+    /** The whole masked twin, built once and remembered. */
     maskedLines(): string[];
-    /** Which lines start a live definition (definitionStartLines), memoized. */
+    /** Which lines start a live definition (definitionStartLines), worked
+     * out once and remembered. */
     definitionStarts(): boolean[];
-    /** The definition blocks (findDefinitionBlocks), memoized - a press used to walk them two or three times (review C2). */
+    /** The definition blocks (findDefinitionBlocks), worked out once and
+     * remembered: a single press used to walk them two or three times
+     * (review C2). */
     blocks(): DefinitionBlock[];
 }
 
-/** Names of all footnote definitions ("[^x]: …" lines) in document order, one per line at most. Code blocks don't count. */
+/** The names of every footnote definition ("[^x]: …" lines) in the order
+ * they appear, at most one per line. A definition inside a code block does
+ * not count. */
 export function listExistingFootnoteDefinitions(
     doc: Editor,
     ctx: DocContext = docContext(doc),
 ) {
     const definitionNames: string[] = [];
 
-    //search each line for footnote definitions - column-0 labels and
-    //blockquote/callout ones ("> [^x]: …", C22) - and list their names
+    // walk every line looking for definition labels, both the ones at
+    // column 0 and the ones inside a blockquote or callout ("> [^x]: …",
+    // C22), and collect their names
     const lines = ctx.lines;
     const masked = ctx.maskedLines();
     const starts = ctx.definitionStarts();
     for (let i = 0; i < lines.length; i++) {
         if (!starts[i]) continue;
-        // definitionLabelWithName owns the masked-match/raw-re-slice
-        // invariant (a code span inside the name masks to NULs)
+        // definitionLabelWithName is the one place that matches against the
+        // masked twin and then re-slices the name from the raw line. That
+        // matters because a code span inside a name masks to NULs
         const hit = definitionLabelWithName(lines[i], masked[i]);
         if (hit) definitionNames.push(hit.name);
     }
@@ -107,17 +122,21 @@ export function docContext(doc: Editor): DocContext {
 }
 
 /**
- * The shared "is the caret on a LIVE reference?" lookup - cascade steps
- * 2–3 and the inline commands all start with it (three byte-identical
- * copies before 2026-08-25). The RAW line gates first: this runs on
- * every press, masking needs the whole document, and most presses sit
- * on plain text (perf F1). Only past that gate is the DocContext built
- * and the masked twin consulted - a "[^x]" inside a fence or inline
- * code is plain text, so the press falls through to insertion (#41).
- * referenceOccurrences re-slices each name from the raw line, so a code
- * span inside the name can't leak NULs (bug-masked-name-identity).
- * Returns the occurrence together with the context that judged it -
- * pass that ctx onward so the press keeps its one-scan budget.
+ * The shared "is the caret on a LIVE reference?" lookup. Cascade steps 2–3
+ * and the inline commands all begin with it; there were three
+ * byte-identical copies of it before 2026-08-25.
+ *
+ * The RAW line is checked first, as a cheap gate: this runs on every press,
+ * masking needs the whole document, and most presses sit on plain text
+ * anyway (performance item F1). Only past that gate is the DocContext built
+ * and the masked twin consulted, because a "[^x]" inside a code fence or
+ * inline code is plain text and the press should fall through to insertion
+ * (#41). referenceOccurrences re-slices each name from the raw line, so a
+ * code span inside a name cannot leak NULs into it
+ * (bug-masked-name-identity).
+ *
+ * It returns the occurrence together with the context that judged it. Pass
+ * that ctx onward, so the press keeps to its one-scan budget.
  */
 export function referenceOccurrenceAtCursor(
     lineText: string,
@@ -129,7 +148,7 @@ export function referenceOccurrenceAtCursor(
         footnote: match[0],
         startIndex: match.index ?? 0,
     }));
-    // Stryker disable next-line ConditionalExpression, BlockStatement, LogicalOperator: units can't tell the arms apart cheaply, but this gate is NOT just perf - masking can only EXTEND a "[^…]" match (NUL satisfies the name class), so on lines like "[^a`]:`x]" the masked twin fabricates a phantom reference where the raw line correctly reads a definition label; the raw gate is what keeps the phantom out (hunt 2026-08-25, probe-error adjudication, micromark-verified)
+    // Stryker disable next-line ConditionalExpression, BlockStatement, LogicalOperator: unit tests cannot cheaply tell the two branches apart, but this gate is NOT only about speed - masking can only ever make a "[^…]" match LONGER, because a NUL counts as a name character, so on a line like "[^a`]:`x]" the masked twin invents a phantom reference where the raw line correctly reads a definition label; the raw-line gate is what keeps that phantom out (hunt 2026-08-25, probe-error adjudication, micromark-verified)
     if (referenceAtCursor(rawReferences, cursorPosition.ch) === null) {
         return null;
     }

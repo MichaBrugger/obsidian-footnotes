@@ -1,17 +1,19 @@
 import { App, Modal, Platform, Setting } from "obsidian";
 
-// The one-validated-text-field modal every dialog in this plugin is:
-// a single Setting with a text input, an inline error line under it,
-// and a CTA button - Enter, the button, and (where a subclass wires
-// them) the plugin's own hotkeys all land in submit(). Three modals
-// (set-prefix, rename, name-the-selection) each hand-rolled this
-// wiring; the base owns it, the subclasses own ONLY their submit
-// semantics and any extra onOpen/onClose behavior (the name modal's
-// active-modal registry and hotkey scope stay in ITS overrides - the
-// prefix modal deliberately does not participate in that protocol).
+// Every dialog in this plugin is the same shape: one text box that gets
+// validated, an error line underneath it, and one main button. Enter, that
+// button, and, where a subclass wires them up, the plugin's own hotkeys all
+// end in submit().
 //
-// Not in stryker.config.json's mutate list: modal DOM against the live
-// app is smoke-test territory, same policy as set-footnote-prefix.ts.
+// Three modals (set-prefix, rename, name-the-selection) each built this
+// wiring by hand. Now this base class owns it, and the subclasses own ONLY
+// what their submit does, plus any extra behavior on open and close. The
+// name modal's active-modal registry and hotkey scope stay in ITS own
+// overrides; the prefix modal deliberately takes no part in that.
+//
+// This file is not in stryker.config.json's mutate list. Modal DOM tested
+// against the live app is smoke-test territory, the same policy as
+// set-footnote-prefix.ts.
 
 export interface ValidatedTextModalUi {
     title: string;
@@ -19,9 +21,9 @@ export interface ValidatedTextModalUi {
     fieldDesc: string;
     buttonText: string;
     placeholder?: string;
-    /** prefills the input and selects it, so editing is one step */
+    /** fills the box in and selects the text, so replacing it takes one step */
     initialValue?: string;
-    /** selects only the tail of `initialValue` from this offset (the rename modal keeps an armed footnote-prefix visibly in place); omitted = select all */
+    /** select only the part of `initialValue` from this position onwards. The rename modal uses it to leave an armed footnote prefix visibly in place. Leave it out to select everything. */
     selectFrom?: number;
 }
 
@@ -39,13 +41,17 @@ export abstract class ValidatedTextModal extends Modal {
 
     onOpen() {
         this.setTitle(this.ui.title);
-        // On Android the soft keyboard OVERLAYS the webview instead of
-        // resizing it, so a vertically centered modal keeps its lower
-        // half - the error line and the CTA button - hidden behind the
-        // keyboard (Jason's beta report, 2026-08-28). Anchor the modal to
-        // the TOP of the screen on mobile and cap its height to what the
-        // keyboard leaves visible: visualViewport.height shrinks when the
-        // keyboard opens and its resize event fires on open AND close.
+        // On Android the on-screen keyboard is drawn OVER the webview
+        // rather than shrinking it. A modal centered vertically therefore
+        // keeps its lower half, which is the error line and the main
+        // button, hidden behind the keyboard (Jason's beta report,
+        // 2026-08-28).
+        //
+        // So on mobile, pin the modal to the TOP of the screen and limit
+        // its height to what the keyboard leaves visible.
+        // visualViewport.height shrinks when the keyboard opens, and its
+        // resize event fires both when the keyboard opens AND when it
+        // closes.
         if (Platform.isMobile) {
             this.containerEl.addClass("footnote-shortcut-keyboard-aware");
             const viewport = this.containerEl.win.visualViewport;
@@ -98,12 +104,12 @@ export abstract class ValidatedTextModal extends Modal {
         );
     }
 
-    /** the inline error line; null clears it */
+    /** Shows an error line under the input. Pass null to clear it. */
     protected showProblem(problem: string | null) {
         this.errorEl.setText(problem ?? "");
     }
 
-    /** Enter, the CTA button, and any subclass-wired hotkey land here. Stay open by returning after showProblem; close() when done. */
+    /** Enter, the main button, and any hotkey a subclass wires up all land here. To keep the modal open, call showProblem and return. To finish, call close(). */
     protected abstract submit(): void | Promise<void>;
 
     onClose() {

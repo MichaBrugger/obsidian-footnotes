@@ -16,50 +16,67 @@ import {
 import { IgnoreType } from "../ignore-types";
 import { FootnoteRule } from "../rule";
 
-// Orphaned DEFINITION deletion as its own rule (2026-08-10): it used to live
-// inside reindex (the keepOrphanedDefinitions option, which reindexFootnotes
-// still honors for direct callers), but the lint pipeline runs this instead -
-// the "Delete orphaned definitions" toggle works with reindexing off, and the
-// two orphan settings mirror each other. Deletion is transitive over a
-// reference graph, so a chain of definitions each kept alive only by the
-// previous one's body dies in ONE call at any depth (reindex's fixpoint
-// cap never applies here); definitions that reference each other in
-// a cycle count as referenced and survive, exactly like the reindex policy.
+// Deleting orphaned definitions, as a rule of its own (2026-08-10).
+//
+// This used to live inside reindex, as its keepOrphanedDefinitions option,
+// which reindexFootnotes still honours for code that calls it directly. The
+// lint runs this rule instead, for two reasons: the "Delete orphaned
+// definitions" toggle then works even with reindexing switched off, and the
+// two orphan settings behave the same as each other.
+//
+// Deletion follows the chain. A definition kept alive only by a reference in
+// another definition's body dies when that one dies, however long the chain
+// gets, and it all happens in ONE call, so the repeat limit in reindex never
+// comes into it. Definitions that reference each other in a ring count as
+// referenced and survive, exactly as they do under reindex.
 
 interface ReferenceScan {
     blocks: DefinitionBlock[];
-    /** folded name → reference count from lines OUTSIDE every definition block */
+    /**
+     * For each name, lower-cased, how many references to it there are on
+     * lines OUTSIDE every definition block.
+     */
     liveRefs: Map<string, number>;
-    /** per block: the folded names its own lines reference */
+    /**
+     * One entry per definition block: the names, lower-cased, that its own
+     * lines reference.
+     */
     blockRefs: string[][];
 }
 
 function scanReferences(
     lines: string[],
     scan: DocumentScan,
-    // the alert tail hands over the twin and the starts it already holds
+    // The alerts pass in the masked twin and the definition starts they
+    // have already worked out
     precomputedMasked?: string[],
     precomputedStarts?: boolean[],
 ): ReferenceScan {
-    // document-aware masked twin: protected lines are all-NUL (no matches),
-    // and comment portions of boundary lines are invisible
+    // The masked twin is built with the whole note in view: a protected
+    // line is nothing but NUL characters, so it matches nothing, and on a
+    // line where a comment opens or closes, only the part inside the
+    // comment is blanked.
     const maskedLines = precomputedMasked ?? maskProtectedLines(lines, scan);
     const starts = precomputedStarts ?? definitionStartLines(lines, scan, (i) => maskedLines[i]);
     const blocks = findDefinitionBlocks(lines, scan, maskedLines, starts);
 
-    // C22 follow-through (parallel-review probe, 2026-08-10): a
-    // blockquoted/callout label ("> [^x]: …") is a LIVE definition - as a
-    // single-line block, since blockquoted continuations aren't a thing -
-    // and NO definition label of either shape counts as a reference (a
-    // label defines; treating it as a reference kept orphans alive)
+    // Following through on C22 (parallel-review probe, 2026-08-10). A label
+    // inside a blockquote or a callout, "> [^x]: ...", is a REAL
+    // definition. It is treated as a definition block one line long, since
+    // there is no such thing as a continuation line inside a blockquote.
+    //
+    // And no definition label, of either shape, ever counts as a reference.
+    // A label defines a footnote; it does not point at one. Counting labels
+    // as references kept orphaned definitions alive.
     const labelStartAt = new Array<number>(lines.length).fill(-1);
     for (let i = 0; i < lines.length; i++) {
         if (scan.isProtected[i] || !starts[i]) continue;
         const hit = definitionLabelWithName(lines[i], maskedLines[i]);
         if (!hit) continue;
-        // a real label's prefix is not a reference; a LAZY label's "[^x]"
-        // is one (it renders as such), and it keeps the definition it
-        // points at alive - only real starts are recorded here
+        // The "[^x]" at the head of a real label is not a reference. A LAZY
+        // label's "[^x]" is one, because that is how it renders, and it
+        // does keep the definition it points at alive. So only real
+        // definition starts are recorded here.
         labelStartAt[i] = hit.label.nameStart - 2;
         if (hit.label.quoted) {
             blocks.push({
@@ -86,8 +103,9 @@ function scanReferences(
             maskedLines[i],
             starts[i],
         )) {
-            // column-0 labels are excluded by footnoteReferenceMatches;
-            // blockquoted ones read as mid-line references - skip them here
+            // A label at the left margin is already left out by
+            // footnoteReferenceMatches. One inside a blockquote looks like
+            // an ordinary mid-line reference, so it is skipped here.
             if (start === labelStartAt[i]) continue;
             const name = raw.toLowerCase();
             if (blockAtLine[i] === -1) {
@@ -101,11 +119,16 @@ function scanReferences(
 }
 
 /**
- * The blocks the reference graph can't keep alive: repeatedly kill every
- * definition whose (folded) name has zero remaining references, retiring
- * each removed orphan's own body references as it goes. Duplicate
- * definitions of one name share a fate. Terminates because every round
- * removes at least one block.
+ * The definition blocks nothing keeps alive.
+ *
+ * The method: go round removing every definition whose name has no
+ * references left, and each time one goes, take away the references its own
+ * body was making. Repeat until a round removes nothing. Two definitions
+ * sharing a name live or die together, since a reference to that name is a
+ * reference to both.
+ *
+ * This always finishes, because every round but the last removes at least
+ * one block.
  */
 function orphanedBlocks(referenceScan: ReferenceScan): DefinitionBlock[] {
     const { blocks, liveRefs, blockRefs } = referenceScan;
@@ -132,20 +155,25 @@ function orphanedBlocks(referenceScan: ReferenceScan): DefinitionBlock[] {
 }
 
 /**
- * Distinct names of definitions nothing references (each in its own
- * casing, definition order) - the alert's list. Single-level on purpose: a
- * definition referenced only from an orphan's body is still "referenced",
- * matching the message's wording; fixing the listed orphan surfaces it on
- * the next lint.
+ * The list the alert reads out: the names of definitions nothing
+ * references, each once, spelled as they were written, in the order the
+ * definitions appear.
+ *
+ * This deliberately does not follow chains. A definition referenced only
+ * from an orphan's body still counts as referenced, which is what the
+ * alert's wording says. Once the user fixes the orphan that was listed, the
+ * next lint reports that one.
  */
 export function orphanedFootnoteDefinitionNames(
     markdown: string,
-    // the post-lint alerts share ONE normalize/scan pass across all three
-    // alert helpers (2026-08-11 review perf item); direct callers omit it
+    // The alerts all share ONE pass of normalizing the line endings and
+    // scanning the note, done once and handed round (2026-08-11 review, a
+    // speed fix). Anything calling this on its own leaves it out.
     precomputed?: { lines: string[]; scan: DocumentScan; masked?: string[]; starts?: boolean[] },
 ): string[] {
-    // no "[^" anywhere means no definitions (and no orphans) - this alert
-    // scan runs on every lint (perf F4)
+    // No "[^" anywhere in the note means no definitions, and so no
+    // orphaned ones. Worth checking first, because this runs on every
+    // single lint (speed fix F4).
     if (!markdown.includes("[^")) return [];
     const lines = precomputed?.lines ?? normalizeEol(markdown).text.split("\n");
     const referenceScan = scanReferences(
@@ -169,7 +197,14 @@ export function orphanedFootnoteDefinitionNames(
     return names;
 }
 
-/** The definition blocks the reference graph can't keep alive (transitive - see module note). Shared with reindex's keepOrphanedDefinitions:false path, so both deletion routes agree at any chain depth. */
+/**
+ * The definition blocks nothing keeps alive, following chains all the way
+ * down; see the note at the top of this file.
+ *
+ * Reindex's own keepOrphanedDefinitions:false path calls this too, so both
+ * routes to deleting orphaned definitions always agree, however long the
+ * chain.
+ */
 export function orphanedDefinitionBlocks(
     lines: string[],
     scan: DocumentScan,
@@ -177,7 +212,11 @@ export function orphanedDefinitionBlocks(
     return orphanedBlocks(scanReferences(lines, scan));
 }
 
-/** Every unreferenced definition block removed (transitively - see module note). Protected regions and everything referenced stay put. */
+/**
+ * `markdown` with every unreferenced definition block removed, following
+ * chains all the way down; see the note at the top of this file. Protected
+ * text, and everything that is referenced, stays exactly where it is.
+ */
 export function removeOrphanedFootnoteDefinitions(markdown: string): string {
     const { text, eol } = normalizeEol(markdown);
     const lines = text.split("\n");
@@ -186,7 +225,7 @@ export function removeOrphanedFootnoteDefinitions(markdown: string): string {
     return restoreEol(removeLineRanges(lines, dead).join("\n"), eol);
 }
 
-/** Linter-shaped registry entry. */
+/** This rule's catalogue entry. */
 export const removeOrphanedDefinitionsRule: FootnoteRule = {
     id: "remove-orphaned-definitions",
     name: "Remove orphaned definitions",

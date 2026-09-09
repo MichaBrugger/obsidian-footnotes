@@ -10,9 +10,11 @@ import {
 } from "./obsidian-internals";
 import { nestedSubEditorOwnsFocus } from "./table-cursor";
 
-// Caret placement: the one cursor-moving primitive (vim-jumplist-aware,
-// single-transaction with any text changes), and the end-of-word insertion
-// point logic. Split out of the all-in-one commands file 2026-08-11.
+// Caret placement. Two things live here: the single function that moves the
+// cursor (it records a vim jump point, and it sends any text changes out in
+// the same transaction), and the end-of-word adjustment that works out
+// where an insertion really goes. Split out of the all-in-one commands file
+// 2026-08-11.
 
 export function moveCursorAndSetJumpPoint(
     doc: Editor,
@@ -22,62 +24,70 @@ export function moveCursorAndSetJumpPoint(
     changes?: EditorChange[],
     center = false,
 ): void {
-    // when focus sits in a sub-editor (a table cell being edited - its
-    // contentDOM is nested inside the main editor's), return it to the main
-    // editor BEFORE moving the cursor: a jump out of the table would
-    // otherwise leave keystrokes going to the abandoned cell editor, while
-    // a jump into a table re-activates cell editing on its own
+    // when focus sits in a smaller editor nested inside the main one (a
+    // table cell being edited), hand it back to the main editor BEFORE
+    // moving the cursor. Otherwise a jump out of the table leaves your
+    // keystrokes going to the cell editor you just left. A jump INTO a
+    // table needs no such care: cell editing switches itself on
     const cmView = (doc as EditorWithCm).cm;
     if (cmView && nestedSubEditorOwnsFocus(doc)) {
         cmView.focus();
     }
 
     if (changes && changes.length > 0) {
-        // text edits and the cursor move must go out as ONE transaction:
-        // while a table cell is being edited (Obsidian 1.5+ table editor),
-        // separate dispatches in the same tick race the cell editor's
-        // sync-back and corrupt the document (issue #28). `selection` here
-        // is resolved against the post-change document.
+        // the text edits and the cursor move must go out as ONE
+        // transaction. While a table cell is being edited (the table editor
+        // in Obsidian 1.5+), sending them separately in the same tick races
+        // the cell editor's write-back and corrupts the document (issue
+        // #28). `selection` here counts against the document as it is AFTER
+        // the changes.
         doc.transaction({ changes, selection: { from: newCursorPos } });
     } else {
         doc.setCursor(newCursorPos);
     }
 
-    // jumps land CENTERED: Obsidian's minimal scrolling would park the
-    // cursor at the viewport edge - on mobile, nearly off screen. Local
-    // inserts pass center=false so the view doesn't shift underfoot.
+    // a jump lands CENTERED on screen. Obsidian's own scrolling does the
+    // least it can and parks the cursor at the very edge of the view, which
+    // on mobile is nearly off screen. An insert near where you already are
+    // passes center=false, so the page does not shift under you.
     if (center) {
         doc.scrollIntoView({ from: newCursorPos, to: newCursorPos }, true);
     }
 
-    // if user has vim mode enabled, set jump point
-    // getConfig is private API, like the vim internals below
+    // if the user has vim mode on, add this move to vim's jump list.
+    // getConfig is undocumented API, like the vim internals below
     if ((plugin.app.vault as VaultWithConfig).getConfig?.("vimMode")) {
         (activeWindow as WindowWithVim).CodeMirrorAdapter?.Vim.getVimGlobalState_().jumpList.add(
-            (doc as EditorWithCm).cm?.cm, // SIC two levels deep
+            (doc as EditorWithCm).cm?.cm, // yes, ".cm.cm": vim wants the inner editor, two levels down
             oldCursorPos,
             newCursorPos,
         );
     }
 }
 
-/** Whether `c` is trailing punctuation (TrailingPunctuationChars in markdown-scan - ASCII + CJK, shared with the lint rule). Guards the empty string explicitly - `"…".includes("")` is true, and `text[i]` past EOL yields undefined at some call sites. */
+/** Whether `c` is a trailing punctuation mark. The list is
+ * TrailingPunctuationChars in markdown-scan (ASCII and CJK marks), shared
+ * with the lint rule. The empty string is refused explicitly, because
+ * `"…".includes("")` is true, and reading `text[i]` past the end of a line
+ * gives undefined at some call sites. */
 function isTrailingPunctuation(c: string | undefined): boolean {
     return !!c && TrailingPunctuationChars.includes(c);
 }
 
-// Word characters for the offset walks below are unicode
-// letters/numbers/marks - combining accents belong to the word they
-// follow, matching the grapheme-aware `wordAt`. The walks step by CODE
-// POINTS: astral letters (Deseret, CJK Ext-B like 𠮷) are two UTF-16
-// units, and testing lone surrogates against \p{L} split words in table
-// cells (bug-astral-word-walk).
+// What counts as a word character in the walks below: any unicode letter,
+// number, or mark. Marks include combining accents, which belong to the
+// word they follow, matching the grapheme-aware `wordAt`. The walks step by
+// whole CODE POINTS: letters outside the basic range (Deseret, CJK Ext-B
+// like 𠮷) take two UTF-16 units, and testing one half of such a pair on
+// its own against \p{L} split words apart inside table cells
+// (bug-astral-word-walk).
 const isWordCp = (cp: number | undefined) =>
     cp !== undefined && /[\p{L}\p{N}\p{M}_]/u.test(String.fromCodePoint(cp));
 
-// the code point touching `i` from the left - stepping over a low
-// surrogate to the pair's start, and treating a mid-pair `i` as inside
-// its own pair - or undefined at the text's start
+// The code point touching `i` from the left, or undefined when `i` is at
+// the very start of the text. When that code point takes two UTF-16 units,
+// this steps back to the start of the pair, and an `i` sitting in the
+// middle of a pair counts as being inside that pair.
 const cpBefore = (text: string, i: number): number | undefined => {
     if (i <= 0) return undefined;
     const prev = text.charCodeAt(i - 1);
@@ -90,17 +100,21 @@ const cpBefore = (text: string, i: number): number | undefined => {
     return prev;
 };
 
-/** Document order of two positions: negative, zero, or positive like a sort comparator. The one comparator (it used to live in two files). */
+/** Which of two positions comes first in the document. Negative, zero, or
+ * positive, like any sort comparator. The one copy of it; it used to live
+ * in two files. */
 export function comparePositions(a: EditorPosition, b: EditorPosition): number {
     return a.line - b.line || a.ch - b.ch;
 }
 
 /**
- * The end-of-word insertion point within plain text: from `offset`, the end
- * of the word under (or just before) the cursor, plus one trailing
- * punctuation mark. Offsets with no word touching them are returned
- * unchanged. This is `adjustFootnotePosition` for table cells, where the
- * main editor's `wordAt` can't see the cell sub-editor's text.
+ * The end-of-word adjustment worked out on plain text: starting at
+ * `offset`, the end of the word under the cursor (or just before it), plus
+ * one trailing punctuation mark. An offset with no word touching it comes
+ * back unchanged.
+ *
+ * This is `adjustFootnotePosition`'s job done for table cells, where the
+ * main editor's `wordAt` cannot see the cell editor's text.
  */
 export function endOfWordOffset(text: string, offset: number): number {
     if (
@@ -110,9 +124,10 @@ export function endOfWordOffset(text: string, offset: number): number {
         return offset;
     }
     let end = offset;
-    // a mid-pair start (found by fast-check, 2026-08-10) snaps back to its
-    // code point's boundary so the walk - and the returned caret - always
-    // land between code points
+    // a start offset landing in the middle of a two-unit code point (found
+    // by fast-check, 2026-08-10) snaps back to that code point's boundary,
+    // so the walk, and the caret it returns, always land between code
+    // points
     const unitAtEnd = text.charCodeAt(end);
     if (unitAtEnd >= 0xdc00 && unitAtEnd <= 0xdfff) end--;
     for (;;) {
@@ -125,16 +140,20 @@ export function endOfWordOffset(text: string, offset: number): number {
 }
 
 /**
- * endOfWordOffset's start-side twin, for the selection-to-footnote
- * whole-word expansion (Jason's ask 2026-08-29): from `offset`, the start
- * of the word the offset sits strictly INSIDE. An offset already at a
- * word's first character, or not on a word character at all, returns
- * unchanged - there is no start-side punctuation grab, because the
- * insert hop has no start-side analog either.
+ * endOfWordOffset's twin at the other end of a word, used when a selection
+ * is expanded to whole words before it is turned into a footnote (Jason's
+ * ask 2026-08-29): starting at `offset`, the start of the word the offset
+ * sits strictly INSIDE.
+ *
+ * An offset already at a word's first character, or not on a word
+ * character at all, comes back unchanged. There is no punctuation grab at
+ * this end, because the insertion hop has nothing like it at this end
+ * either.
  */
 export function startOfWordOffset(text: string, offset: number): number {
     let start = offset;
-    // mid-pair offsets snap back to the pair's start before the gates run
+    // an offset in the middle of a two-unit code point snaps back to that
+    // code point's start before the checks below run
     const unitAt = text.charCodeAt(start);
     if (unitAt >= 0xdc00 && unitAt <= 0xdfff) start--;
     if (
@@ -151,7 +170,9 @@ export function startOfWordOffset(text: string, offset: number): number {
     return start;
 }
 
-/** adjust cursor position to insert a footnote only at the end of word, and never where an escape or inline-footnote opener would swallow the insertion (safeInsertionCh in insertion-liveness) */
+/** Move the insertion point so a footnote goes in only at the end of a
+ * word, and never where an escape or an inline-footnote opener would
+ * swallow it (safeInsertionCh in insertion-liveness). */
 export function adjustFootnotePosition(
     cursorPosition: EditorPosition,
     doc: Editor,
@@ -161,7 +182,8 @@ export function adjustFootnotePosition(
     if (plugin.settings.insertAtEndOfWord) {
         const endOfWordUnderCursor = doc.wordAt(cursorPosition)?.to;
         if (endOfWordUnderCursor) {
-            // adjust cursor position to insert a footnote only at the end of word
+            // the insertion point is the end of the word; step past one
+            // trailing punctuation mark as well
             const nextChar = lineText.charAt(endOfWordUnderCursor.ch);
             if (isTrailingPunctuation(nextChar)) endOfWordUnderCursor.ch++;
             cursorPosition = endOfWordUnderCursor;

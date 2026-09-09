@@ -1,14 +1,20 @@
-// Settings shape, defaults, and the settings tab. Requires Obsidian 1.13+:
-// the tab renders from getSettingDefinitions() (declarative, auto-saving).
+// The settings: their shape, their defaults, and the settings tab itself.
+// Obsidian 1.13+ is required, because the tab is built from
+// getSettingDefinitions(): you describe the controls and Obsidian renders
+// them and saves them for you.
 import { App, PluginSettingTab, SettingDefinitionItem } from "obsidian";
 import type FootnotePlugin from "./main";
 import { AppWithPlugins } from "./editor/obsidian-internals";
 
 export interface FootnotePluginSettings {
-    /** Marks saved data whose one-time migrations have run (see loadSettings). Not shown in the settings tab. */
+    /** Records which one-time migrations this saved data has already been
+     * through (see loadSettings). Never shown in the settings tab. */
     settingsVersion: number;
     insertAtEndOfWord: boolean;
-    /** Selection-to-footnote conversions include cut-off words whole, the end normalized to word end + one trailing punctuation mark - the end-of-word insert's selection twin (2026-08-29). */
+    /** When a selection is turned into a footnote, a word the selection cut
+     * in half is taken whole, and the end is moved to the end of the word
+     * plus one trailing punctuation mark. The selection twin of the
+     * end-of-word insertion (2026-08-29). */
     expandSelectionToWholeWords: boolean;
     enablePopupEditor: boolean;
     enableFootnotePrefix: boolean;
@@ -19,14 +25,25 @@ export interface FootnotePluginSettings {
     enableRemoveBlankLastLines: boolean;
 
     renumberNamedFootnotes: boolean;
-    /** Linting deletes references that have no definition; while off, it alerts about them instead. Orphans are never silent either way (Jason, 2026-08-10). */
+    /** Linting deletes references that have no definition. While this is
+     * off, it raises a lint alert about them instead: an orphan is never
+     * silent either way (Jason, 2026-08-10). */
     lintDeleteOrphanedReferences: boolean;
-    /** Linting deletes definitions that have no references (independent of reindexing); while off, they are kept and alerted about. Mirrors lintDeleteOrphanedReferences. */
+    /** Linting deletes definitions that no reference points at. This does
+     * not depend on reindexing. While it is off, they are kept and a lint
+     * alert names them. The mirror image of lintDeleteOrphanedReferences. */
     lintDeleteOrphanedDefinitions: boolean;
-    /** Linting merges later duplicate definitions of a footnote into the first one as continuation lines (Obsidian renders only the last definition otherwise); while off, duplicates are kept and alerted about. Same never-silent contract as the orphan toggles (Jason, 2026-08-12). */
+    /** Linting folds any later duplicate definitions of one footnote into
+     * the first, as continuation lines. Without that, Obsidian renders only
+     * the last definition. While this is off, the duplicates are kept and a
+     * lint alert names them, the same never-silent promise the orphan
+     * toggles make (Jason, 2026-08-12). */
     lintMergeDuplicateDefinitions: boolean;
     lintFixPunctuation: boolean;
-    /** Linting inserts the blank line a definition needs when its label sits directly under a prose line (Obsidian reads it as plain text otherwise); while off, the lazy-definition alert speaks instead (Jason, 2026-09-09). */
+    /** Linting inserts the blank line a definition needs when its label
+     * sits directly under a line of prose. Without that blank line Obsidian
+     * reads the label as plain text. While this is off, the
+     * lazy-definition alert speaks instead (Jason, 2026-09-09). */
     lintFixLazyDefinitions: boolean;
     lintMoveToBottom: boolean;
     lintReindex: boolean;
@@ -36,9 +53,10 @@ export interface FootnotePluginSettings {
 }
 
 export const DEFAULT_SETTINGS: FootnotePluginSettings = {
-    // 0 on purpose: saved data WITHOUT the key predates the flag and must
-    // run the one-time migrations (they no-op on a fresh install); the
-    // migration block stamps the current version and saves once
+    // Zero on purpose. Settings saved before this key existed have no
+    // version at all, and those must run the one-time migrations (on a
+    // fresh install the migrations find nothing to do). The migration code
+    // in main.ts then stamps the current version and saves once.
     settingsVersion: 0,
     insertAtEndOfWord: true,
     expandSelectionToWholeWords: true,
@@ -71,7 +89,8 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
         this.plugin = plugin;
     }
 
-    // controls bind to this.plugin.settings[key] and auto-save
+    // Each control below is tied to one key in this.plugin.settings by name.
+    // Obsidian reads and writes that key itself and saves automatically.
     getSettingDefinitions(): SettingDefinitionItem[] {
         return [
             {
@@ -127,11 +146,12 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                 desc: "Cleanup rules, automatic lint triggers, and reindexing behavior.",
                 items: [
                     {
-                        // control-less row: renders as plain information text.
-                        // Shown only while the Linter plugin is enabled -
-                        // Jason verified (2026-08-08) that the two plugins
-                        // coexist fine EXCEPT when Linter's own footnote
-                        // rules also rewrite the same footnotes.
+                        // A row with no control: it shows as plain information
+                        // text. It only appears while the Linter community
+                        // plugin is enabled. Jason verified on 2026-08-08 that
+                        // the two plugins get along, except when Linter's own
+                        // footnote rules rewrite the same footnotes this plugin
+                        // does.
                         name: "Using the Linter plugin?",
                         desc: "Turn off Linter's own footnote rules (footnote after punctuation, move footnotes to the bottom, re-index footnotes) so the two plugins don't fight over the same footnotes.",
                         visible: () =>
@@ -180,11 +200,11 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                         ],
                     },
                     {
-                        // orphans and duplicates get their own section
-                        // (Jason, 2026-08-10 + 2026-08-12): the toggles
-                        // mirror each other, and while one is off linting
-                        // ALERTS about that problem kind instead - they are
-                        // never silent
+                        // Orphans and duplicates get a section of their own
+                        // (Jason, 2026-08-10 and 2026-08-12). The three toggles
+                        // work the same way: while one is off, linting does not
+                        // ignore that kind of problem, it alerts you about it
+                        // instead. Lint is never silent.
                         type: "group",
                         heading: "Orphans and duplicates",
                         items: [

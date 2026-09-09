@@ -2,25 +2,31 @@ import { Editor, EditorPosition } from "obsidian";
 
 import { EditorWithCm } from "./obsidian-internals";
 
-// A table cell being edited runs in its own CodeMirror sub-editor, and the
-// main editor's getCursor() does NOT track its caret: clicking around inside
-// a cell leaves the main selection wherever it last was. Commands that trust
-// getCursor() then insert text at a stale position - displacing the row's
-// pipes and shredding the table. When focus is in a cell sub-editor, recover
-// the true document position from the sub-editor itself.
+// While you edit a table cell, Obsidian runs a separate little editor
+// inside that cell. The main editor's getCursor() does NOT follow your
+// caret in there: clicking around inside a cell leaves the main editor's
+// idea of the caret wherever it last was. A command that trusts getCursor()
+// then writes at that stale spot, which shoves the row's pipes around and
+// shreds the table.
+//
+// So whenever focus is inside a cell's own editor, this file works out the
+// true position in the document by asking that editor instead.
 
 /**
- * The slice of the cell sub-editor's EditorView the plugin uses. Edits that
- * must land inside an actively edited cell are dispatched HERE, not into the
- * main editor: the cell's widget owns the markdown write-back (pipe
- * escaping, padding, position mapping), so going through it can't race the
- * sync-back the way a main-editor transaction into the row does.
+ * The part of a cell's own editor that the plugin uses.
+ *
+ * Text that has to land inside a cell you are editing is written HERE, not
+ * through the main editor. The cell's widget is the thing that writes the
+ * cell back into the note's markdown: escaping pipes, padding the columns,
+ * mapping positions. Writing through it therefore cannot race that
+ * write-back, which is exactly what a main-editor write into the same row
+ * does.
  */
 export interface TableCellEditor {
     state: {
         doc: { toString(): string };
-        // anchor ≠ head is a live selection inside the cell - the
-        // selection-to-footnote conversion (issue #35) replaces that range
+        // when anchor and head differ, text is selected inside the cell;
+        // the selection-to-footnote conversion (issue #35) replaces it
         selection: { main: { head: number; anchor: number } };
     };
     dispatch(spec: {
@@ -30,11 +36,14 @@ export interface TableCellEditor {
 }
 
 /**
- * Whether a sub-editor NESTED inside the main editor's contentDOM owns
- * focus (an actively edited table cell, or any similar widget editor).
- * Document edits in that state race the sub-editor's sync-back - the
- * issue-#28 corruption family - so callers either defer, re-route, or
- * skip. One shared predicate; it used to be pasted in three places (E9).
+ * Whether a smaller editor sitting INSIDE the main editor holds the focus:
+ * a table cell being edited, or any similar widget editor.
+ *
+ * Editing the document while that is true races the little editor's
+ * write-back into the note, which is the corruption family from issue #28.
+ * Callers therefore wait, write somewhere else, or skip.
+ *
+ * One shared check; the same test used to be pasted in three places (E9).
  */
 export function nestedSubEditorOwnsFocus(editor: Editor): boolean {
     const cm = (editor as EditorWithCm).cm;
@@ -47,15 +56,19 @@ export function nestedSubEditorOwnsFocus(editor: Editor): boolean {
     );
 }
 
-// Fallback for the rare state where focus sits in a nested sub-editor whose
-// EditorView isn't reachable (activeTableCellEditor returned null): editing
-// the document while a sub-editor owns focus races its sync-back on blur -
-// the sub-editor rewrites its region from pre-edit state, which at best
-// swallows the inserted footnote and at worst displaces a table row's pipes
-// (regression reported 2026-07-14; same family as issue #28). Hand focus
-// back to the main editor and only edit once the sync-back has settled.
-// The primary table-cell path dispatches through the cell's own editor
-// instead - see createAutonumFootnote / createFootnoteReference.
+// The fallback for a rare case: focus is inside a nested editor, but that
+// editor cannot be reached (activeTableCellEditor returned null).
+//
+// Editing the document while a nested editor holds focus races the
+// write-back it performs when it loses focus. That write-back rebuilds its
+// own region from the text as it stood BEFORE the edit, which at best
+// swallows the footnote just inserted and at worst displaces a table row's
+// pipes (regression reported 2026-07-14, same family as issue #28).
+//
+// So: hand focus back to the main editor, and edit only once the write-back
+// has settled. The normal table-cell path does better and writes through
+// the cell's own editor - see createAutonumFootnote and
+// createFootnoteReference.
 export function runOutsideTableCell(
     doc: Editor,
     run: (cursorPosition: EditorPosition) => void,
@@ -67,11 +80,12 @@ export function runOutsideTableCell(
         return;
     }
     cm.focus();
-    // rAF stalls entirely while the window is hidden (same reason the popup
-    // teardown uses a timeout), which would swallow the command outright -
-    // whichever of the two fires first runs the edit. Timers come from the
-    // editor's OWN window, so a note popped out into a separate window
-    // isn't scheduled on the main one (E37)
+    // requestAnimationFrame never fires while the window is hidden (the
+    // popup teardown uses a timeout for the same reason), and that would
+    // swallow the command outright. So both are armed and whichever fires
+    // first runs the edit. The timers come from the editor's OWN window, so
+    // a note popped out into a separate window is not scheduled on the main
+    // one (E37)
     const win = cm.contentDOM.ownerDocument.defaultView ?? window;
     let ran = false;
     const invoke = () => {
@@ -84,15 +98,16 @@ export function runOutsideTableCell(
 }
 
 /**
- * The EditorView of the actively edited table cell, or null when focus
- * isn't inside a table cell sub-editor.
+ * The editor object of the table cell being edited, or null when focus is
+ * not inside a cell's own editor.
  *
- * Obsidian attaches no plugin-visible handle to the cell sub-editor's DOM
- * (older builds exposed `cmView` on the content element; current ones do
- * not - verified 2026-07-15), so the cell view is recovered through CM6's
- * own registry: `EditorView.findFromDOM` returns the innermost EditorView
- * owning an element, and the main view's constructor IS the app's
- * EditorView class, so no @codemirror import is needed.
+ * Obsidian gives plugins no handle on that editor through the cell's DOM.
+ * Older builds put a `cmView` on the content element; current ones do not
+ * (verified 2026-07-15). So the cell's editor is recovered through
+ * CodeMirror's own registry instead: `EditorView.findFromDOM` gives back
+ * the innermost EditorView that owns an element. The main view's
+ * constructor IS the app's EditorView class, so that function can be
+ * reached without importing @codemirror.
  */
 export function activeTableCellEditor(editor: Editor): TableCellEditor | null {
     const cm = (editor as EditorWithCm).cm;
@@ -110,11 +125,13 @@ export function activeTableCellEditor(editor: Editor): TableCellEditor | null {
     return view;
 }
 
-/** Cell spans of a table row line, aware of `\|` escapes. */
+/** Where each cell begins and ends within one table row line. An escaped
+ * pipe ("\|") is ordinary text, not a cell border. */
 export function tableRowCellSpans(lineText: string): { from: number; to: number }[] {
     const spans: { from: number; to: number }[] = [];
-    // the leading pipe is optional in GFM ("A | B" is a valid row) - without
-    // one the first cell starts at column 0 instead of after a "|"
+    // a row need not start with a pipe: "A | B" is a valid row in
+    // GitHub-flavored Markdown. Without one, the first cell starts at
+    // column 0 instead of just after a "|"
     const leadingPipe = lineText.match(/^\s*\|/);
     let start = leadingPipe ? leadingPipe[0].length : 0;
     let sawPipe = leadingPipe !== null;
@@ -128,7 +145,8 @@ export function tableRowCellSpans(lineText: string): { from: number; to: number 
             start = i + 1;
         }
     }
-    // a line with no unescaped pipe at all isn't a table row - no cells
+    // a line with no unescaped pipe anywhere is not a table row, so it has
+    // no cells
     if (!sawPipe) return [];
     if (start < lineText.length) {
         spans.push({ from: start, to: lineText.length });
@@ -137,15 +155,16 @@ export function tableRowCellSpans(lineText: string): { from: number; to: number 
 }
 
 /**
- * The document position of the caret inside the actively edited table cell,
- * or null when focus isn't in a table cell sub-editor (or any lookup fails,
- * in which case callers should keep trusting the main editor's cursor).
+ * Where the caret inside the table cell being edited sits in the note's own
+ * text. Null when focus is not in a cell's editor, and also null when any
+ * step of the lookup fails - in that case the caller should go on trusting
+ * the main editor's cursor.
  */
 export function resolveTableCellCursor(editor: Editor): EditorPosition | null {
     const cm = (editor as EditorWithCm).cm;
     if (!cm || !cm.posAtDOM) return null;
 
-    // only relevant while a sub-editor nested in the main editor owns focus
+    // this only matters while an editor nested inside the main one has focus
     const doc = cm.contentDOM.ownerDocument;
     const active = doc.activeElement;
     if (!active || active === cm.contentDOM || !cm.contentDOM.contains(active)) {
@@ -160,8 +179,9 @@ export function resolveTableCellCursor(editor: Editor): EditorPosition | null {
     const cellView = activeTableCellEditor(editor);
     if (!cellView) return null;
 
-    // the table widget's start position anchors the row's line number;
-    // rendered rows skip the delimiter line
+    // the table's own start position gives the first row's line number.
+    // The rendered table has no row for the "| --- |" delimiter line, so
+    // every row after the first sits one line further down than its index
     const startLine = editor.offsetToPos(cm.posAtDOM(table)).line;
     const rowIdx = Array.prototype.indexOf.call(table.rows, tr);
     if (rowIdx < 0) return null;
@@ -169,20 +189,23 @@ export function resolveTableCellCursor(editor: Editor): EditorPosition | null {
     if (line > editor.lastLine()) return null;
 
     const lineText = editor.getLine(line);
-    // a rendered column can outrun the source row's cells - bounds-check
-    // instead of trusting the index
+    // a rendered column can run past the end of the source row's cells, so
+    // check the index against the list instead of trusting it
     const spans = tableRowCellSpans(lineText);
     const cellIndex = (td as HTMLTableCellElement).cellIndex;
     if (cellIndex < 0 || cellIndex >= spans.length) return null;
     const span = spans[cellIndex];
 
-    // the sub-editor's doc is the cell's source sans padding; anchor it
-    // inside the raw cell, then walk the sub-editor's caret offset through
-    // the raw text. The walk is escape-aware: the cell editor shows "\|"
-    // as a bare "|", so each escape byte before the caret consumes a
-    // source column but no cell-editor column - plain addition resolved
-    // one column short per escape and read a caret just inside a reference
-    // as OUTSIDE it, nesting a new reference (bug-table-escape-offset).
+    // The cell editor's text is the cell's source without the padding
+    // spaces. Find where that text begins inside the raw line's cell, then
+    // walk the cell editor's caret offset forward through the raw text.
+    //
+    // The walk has to know about escapes: the cell editor shows "\|" as a
+    // plain "|", so every escaping backslash before the caret uses up a
+    // column of the raw line but no column of the cell editor. Plain
+    // addition landed one column short per escape, which read a caret just
+    // inside a reference as being OUTSIDE it and nested a new reference
+    // there (bug-table-escape-offset).
     const rawCell = lineText.slice(span.from, span.to);
     const cellText = cellView.state.doc.toString();
     let start = rawCell.length - rawCell.trimStart().length;
@@ -194,7 +217,7 @@ export function resolveTableCellCursor(editor: Editor): EditorPosition | null {
     let raw = start;
     for (let c = 0; c < head && raw < rawCell.length; c++) {
         if (rawCell[raw] === "\\" && rawCell[raw + 1] === cellText[c]) {
-            raw += 2; // escape byte + the character the cell editor shows
+            raw += 2; // the backslash, plus the character the cell shows
         } else {
             raw += 1;
         }
@@ -203,20 +226,25 @@ export function resolveTableCellCursor(editor: Editor): EditorPosition | null {
     return { line, ch };
 }
 
-// A GFM delimiter row's cell: optional alignment colons around at least one
-// dash. Judged on the row with any blockquote prefix stripped, so quoted
-// tables ("> | --- |") qualify too.
+// One cell of the "| --- |" row that separates a table's header from its
+// body: at least one dash, with optional alignment colons around it. It is
+// judged after any blockquote markers are stripped off the front, so a
+// quoted table ("> | --- |") qualifies too.
 const DelimiterCell = /^\s*:?-+:?\s*$/;
 const QuotePrefix = /^(\s*>)+\s?/;
 
 /**
- * Which lines are rows of a table: every maximal run of consecutive
- * unprotected lines carrying an unescaped pipe whose SECOND line is a
- * delimiter row. A pipe-bearing line with no delimiter row under it is
- * prose ("a | b"), and a table inside a fence or comment is text, not a
- * table. Powers the partial-table selection refusal (Jason's ruling
- * 2026-09-04): converting a cell, a few cells, or a row into a footnote
- * shreds what stays behind.
+ * Which lines belong to a table.
+ *
+ * The test: take every run of neighboring lines that are not protected text
+ * and that carry an unescaped pipe, and count the whole run as a table when
+ * its SECOND line is a "| --- |" delimiter row. A line with pipes and no
+ * delimiter row under it is only prose ("a | b"), and a table written
+ * inside a code fence or a comment is text, not a table.
+ *
+ * This is what lets the plugin refuse a selection covering part of a table
+ * (Jason's ruling 2026-09-04): turning one cell, a few cells, or a row into
+ * a footnote shreds whatever stays behind.
  */
 export function tableRowLines(lines: string[], isProtected: boolean[]): boolean[] {
     const rows = new Array<boolean>(lines.length).fill(false);
@@ -247,11 +275,11 @@ export function tableRowLines(lines: string[], isProtected: boolean[]): boolean[
 }
 
 /**
- * The caret a command should act on: the actively edited cell's caret
- * mapped into the document when `cell` is set (the main editor's own
- * caret is stale then - see resolveTableCellCursor), else the main
- * caret. The one spelling of that fallback (it used to be inlined at
- * five sites).
+ * The caret a command should act on. When `cell` is set, that is the caret
+ * inside the cell being edited, translated into a position in the note (the
+ * main editor's own caret is stale then - see resolveTableCellCursor).
+ * Otherwise it is simply the main editor's caret. One place spells that
+ * fallback out; it used to be written inline at five call sites.
  */
 export function resolvedCaret(doc: Editor, cell: TableCellEditor | null): EditorPosition {
     return (cell ? resolveTableCellCursor(doc) : null) ?? doc.getCursor();

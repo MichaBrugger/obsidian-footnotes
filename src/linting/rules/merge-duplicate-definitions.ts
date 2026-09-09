@@ -10,35 +10,48 @@ import { IgnoreType } from "../ignore-types";
 import { rewriteDocument } from "../rewrite-document";
 import { FootnoteRule } from "../rule";
 
-// Duplicate footnote definitions - two or more "[^x]:" blocks for the same
-// (case-folded) name. Ground-truthed in the live reading view 2026-08-12:
-// Obsidian renders ONLY the LAST definition; every earlier one is dead
-// text that silently loses. Jason's policy (2026-08-12): while the "Merge
-// duplicate definitions" toggle is off, linting ALERTS about them
-// (duplicates are never silent - same contract as orphans); with it on,
-// this rule merges the later bodies INTO the first block, in document
-// order, so no text is ever lost. The merged bodies land as INDENTED
-// continuation lines - Jason's sketch had the second body unindented (a
-// lazy continuation Obsidian would render too), but that shape is not part
-// of the definition block (the A4 family: move-to-bottom would strand it),
-// while the indented form renders identically and stays one block.
+// Duplicate footnote definitions: two or more "[^x]:" definition blocks for
+// the same name, treating upper and lower case as the same.
+//
+// Checked against the live Reading view on 2026-08-12: Obsidian renders
+// ONLY the LAST definition of a name. Every earlier one is dead text that
+// disappears without a word.
+//
+// Jason's policy (2026-08-12). While the "Merge duplicate definitions"
+// toggle is off, the lint reports duplicates but leaves them alone;
+// duplicates are never passed over in silence, the same promise orphans
+// get. With the toggle on, this rule merges the later bodies INTO the first
+// definition block, in the order they appear in the note, so no text is
+// ever thrown away.
+//
+// The merged bodies arrive as INDENTED continuation lines. Jason's original
+// sketch left the second body unindented, which Obsidian would render just
+// as well. The trouble is that an unindented line is not part of the
+// definition block, so move-to-bottom would leave it stranded behind (the
+// A4 family of bugs). The indented form looks identical when rendered and
+// stays one block.
 
 /**
- * Distinct names defined more than once (first-appearance order, first-seen
- * casing) - the alert's list. Only column-0 definition BLOCKS count. A
- * blockquoted label IS a live definition to the orphan rules (C22), but
- * merging into or out of a quoted block would need quote-aware
- * continuation lines, so duplicates involving one are neither merged nor
- * reported here.
+ * The list the alert reads out: each name that is defined more than once,
+ * once each, in the order the names first appear, spelled with the case
+ * they were first seen with.
+ *
+ * Only definition blocks at the left margin count. A label inside a
+ * blockquote IS a real definition as far as the orphan rules are concerned
+ * (C22), but merging into or out of a quoted block would need continuation
+ * lines that know about quote markers. So duplicates involving a quoted
+ * definition are neither merged nor reported here.
  */
 export function duplicateFootnoteDefinitionNames(
     markdown: string,
-    // the post-lint alerts share ONE normalize/scan pass across the alert
-    // helpers (2026-08-11 review perf item); direct callers omit it
+    // The alerts all share ONE pass of normalizing the line endings and
+    // scanning the note, done once and handed round (2026-08-11 review, a
+    // speed fix). Anything calling this on its own leaves it out.
     precomputed?: { lines: string[]; scan: DocumentScan },
 ): string[] {
-    // no "[^" anywhere means no definitions (and no duplicates) - this
-    // alert scan runs on every lint (perf F4)
+    // No "[^" anywhere in the note means no definitions, and so no
+    // duplicates. Worth checking first, because this runs on every single
+    // lint (speed fix F4).
     if (!markdown.includes("[^")) return [];
     const lines = precomputed?.lines ?? normalizeEol(markdown).text.split("\n");
     const scan = precomputed?.scan ?? scanDocument(lines);
@@ -60,12 +73,17 @@ export function duplicateFootnoteDefinitionNames(
 }
 
 /**
- * Every later duplicate merged into its name's FIRST definition block: the
- * duplicate's label-line body becomes an indented continuation line and its
- * own continuation lines (blank runs included) follow verbatim, so the
- * merged block renders every body in document order. The first block keeps
- * its casing. Protected regions never count as definitions, and the cut
- * seams heal through removeLineRanges like every other block deletion.
+ * Merge every later duplicate into the FIRST definition block for that name.
+ *
+ * What was written after the duplicate's label becomes an indented
+ * continuation line, and the duplicate's own continuation lines follow it
+ * exactly as they were, blank lines included. The merged block therefore
+ * renders every body, in the order they appeared in the note. The first
+ * block keeps the case its name was written with.
+ *
+ * Anything inside protected text is never a definition. Where a duplicate is
+ * cut out, the lines close up through removeLineRanges, the same as any
+ * other definition block deletion.
  */
 export function mergeDuplicateFootnoteDefinitions(markdown: string): string {
     if (!markdown.includes("[^")) return markdown;
@@ -79,8 +97,9 @@ export function mergeDuplicateFootnoteDefinitions(markdown: string): string {
             else groups.set(folded, [block]);
         }
 
-        // appended continuation lines per base block's END line, plus the
-        // duplicate ranges to cut
+        // Two things are collected here: the continuation lines to add,
+        // keyed by the LAST line of the block they are joining, and the
+        // ranges of lines the duplicates occupy, to be cut out.
         const appendAfter = new Map<number, string[]>();
         const doomed: { start: number; end: number }[] = [];
         for (const group of groups.values()) {
@@ -102,16 +121,18 @@ export function mergeDuplicateFootnoteDefinitions(markdown: string): string {
         }
         if (doomed.length === 0) return text;
 
-        // splice the appended lines into the base's last line BEFORE the cut -
-        // removeLineRanges treats lines as opaque strings, so a multi-line
-        // "line" rides through it and unfolds at the final join
+        // Glue the new lines onto the first block's last line BEFORE
+        // cutting the duplicates out. removeLineRanges does not look inside
+        // a line, so one entry holding several lines joined together passes
+        // through it untouched and comes apart again at the final join.
         const mutated = lines.slice();
         for (const [end, appended] of appendAfter) {
             mutated[end] = [mutated[end], ...appended].join("\n");
         }
         const out = removeLineRanges(mutated, doomed);
-        // cutting a duplicate at EOF can leave the blank line that used to
-        // separate it - never mint MORE trailing blank lines than the note had
+        // Cutting a duplicate at the very end of the note can leave behind
+        // the blank line that used to separate it. Never hand back more
+        // blank lines at the end than the note started with.
         let trailingBefore = 0;
         for (let i = lines.length - 1; i >= 0 && lines[i] === ""; i--) {
             trailingBefore++;
@@ -128,7 +149,7 @@ export function mergeDuplicateFootnoteDefinitions(markdown: string): string {
     });
 }
 
-/** Linter-shaped wrapper: id matches the settings toggle's rule. */
+/** This rule's catalogue entry. The id matches the settings toggle's rule. */
 export const mergeDuplicateDefinitionsRule: FootnoteRule = {
     id: "merge-duplicate-definitions",
     name: "Merge duplicate definitions",

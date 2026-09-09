@@ -2,22 +2,32 @@ import { definitionLabel, referenceOccurrences, referenceText } from "../parsing
 import { definitionLabelWithName } from "../parsing/markdown-scan";
 
 /**
- * `line` with every live reference, and its definition label when the
- * line is one, renamed through `resolve` (null = keep this name). The
- * one walk the apply-prefix and reindex rules used to carry separately
- * (duplicated-logic audit, 2026-09-05): references are spliced by their
- * masked-aware occurrences, so copies inside code spans stay; a real
- * label is not among them (referenceOccurrences excludes it when
- * `labelIsDefinition`), so it is re-matched and rewritten on its own;
- * a LAZY label's "[^x]" is a reference and renames in the first pass.
- * `masked` is the line's document-aware masked twin.
+ * Return `line` with every live reference renamed, and, when the line is a
+ * definition, its label renamed too. `resolve` picks the new name for each
+ * old one; returning null means leave that name alone.
+ *
+ * This is the single renaming walk that the apply-prefix and reindex rules
+ * each used to carry their own copy of (duplicated-logic audit,
+ * 2026-09-05).
+ *
+ * How it works. References are found against the masked twin (the copy of
+ * the line with protected text blanked out) and cut into the line by their
+ * positions, so a reference-shaped string inside a code span is left alone.
+ * A real label is not one of those occurrences, because referenceOccurrences
+ * leaves it out when `labelIsDefinition` is true, so the label is matched
+ * and rewritten separately below. A LAZY label is different: its "[^x]" is
+ * genuinely a reference, so it is renamed in the first pass with the rest.
+ *
+ * `masked` is this line's masked twin, worked out with the whole note in
+ * view.
  */
 export function rewriteFootnoteNames(
     line: string,
     masked: string,
     resolve: (name: string) => string | null,
-    // false when the line's label-shaped start is lazy text: its "[^x]" is
-    // then renamed as the reference it is, and the label pass stays out
+    // false when the line only looks like it starts with a label but is
+    // really lazy text: its "[^x]" is then renamed as the reference it
+    // actually is, and the label pass below is skipped
     labelIsDefinition = true,
 ): string {
     let result = "";
@@ -29,10 +39,12 @@ export function rewriteFootnoteNames(
         copied = end;
     }
     result += line.slice(copied);
-    // the line's own label (column 0 or blockquoted) is not among the
-    // occurrences above - it renames here. Nothing precedes a label but
-    // its marker/indent, which the reference pass never touches, so the
-    // label's raw offsets still hold in `result`
+    // The line's own label, at the left margin or inside a blockquote, was
+    // not one of the occurrences above, so it is renamed here. The only
+    // thing that can sit in front of a label is its blockquote marker or
+    // its indent, and the reference pass never touches either, so the
+    // label's positions in the original line still point at the right
+    // characters in `result`.
     const hit = labelIsDefinition ? definitionLabelWithName(line, masked) : null;
     if (hit) {
         const newName = resolve(hit.name);

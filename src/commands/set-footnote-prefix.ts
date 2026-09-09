@@ -6,11 +6,12 @@ import { ensureTextPropertyType } from "../editor/obsidian-internals";
 import { ValidatedTextModal } from "./validated-text-modal";
 
 import { showNotice } from "../editor/notice";
-// The "Set footnote prefix" command's modal: one text input that writes the
-// footnote-prefix frontmatter property on Enter (or the Save button). An
-// invalid prefix - spaces, brackets, or a trailing digit - shows the reason
-// inline and keeps the modal open until the value is fixed (or the user
-// cancels with Escape). An empty value removes the property.
+// The modal behind the "Set footnote prefix" command. One text box, which
+// writes the footnote-prefix frontmatter property when the user presses
+// Enter or the Save button. An invalid prefix, meaning one with spaces,
+// brackets, or a trailing digit, shows the reason inside the modal and
+// keeps it open until the value is fixed or the user presses Escape.
+// Leaving the box empty removes the property.
 
 export class SetFootnotePrefixModal extends ValidatedTextModal {
     private plugin: FootnotePlugin;
@@ -34,14 +35,15 @@ export class SetFootnotePrefixModal extends ValidatedTextModal {
         const prefix = this.value.trim();
         const problem = footnotePrefixProblem(prefix);
         if (problem) {
-            // stay open until the prefix is valid
+            // keep the modal open until the prefix is valid
             this.showProblem(problem);
             return;
         }
-        // flush any unsaved editor changes to this file first:
-        // processFrontMatter edits the FILE, and a pending autosave of a
-        // stale buffer would silently overwrite the property right after
-        // (races lost intermittently until pinned by the smoke suite)
+        // write any unsaved editor changes to this file first.
+        // processFrontMatter edits the FILE on disk, so an autosave of a
+        // stale buffer landing just afterwards would silently overwrite the
+        // property we just set. This race was lost now and then until the
+        // smoke suite pinned it.
         try {
             const view = this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
             if (view?.file === this.file) await view.save();
@@ -53,31 +55,32 @@ export class SetFootnotePrefixModal extends ValidatedTextModal {
                 },
             );
         } catch (error: unknown) {
-            // which of the two documented causes fired matters for a bug
-            // report; the toast stays plain
+            // knowing which of the two known causes fired helps with a bug
+            // report, so log it. What the user sees stays plain.
             console.debug("Footnote Shortcut: the footnote-prefix write failed", error);
-            // the write can reject: malformed YAML in the note's frontmatter
-            // (YAMLParseError) or the file gone from disk under the open
-            // modal (ENOENT) - both confirmed live by Jason, 2026-09-08
-            // (review A7). Enter and the button call submit() fire-and-
-            // forget, so an unhandled rejection left the modal open with
-            // nothing but a console error; say so on the modal's own line
+            // the write can fail for two reasons: the note's frontmatter is
+            // malformed YAML (YAMLParseError), or the file has gone from
+            // disk while the modal was open (ENOENT). Jason confirmed both
+            // live, 2026-09-08 (review A7). Enter and the Save button call
+            // submit() without waiting on it, so a failure used to leave the
+            // modal sitting there with nothing but a console error to show
+            // for it. Say what happened on the modal's own error line.
             this.showProblem(
                 "Couldn't write the footnote-prefix property. Check that the note still exists and that its frontmatter is valid YAML.",
             );
             return;
         }
-        // a prefix is TEXT even when it looks numeric ("2.") - without an
-        // explicit type, Obsidian infers one from occurrences and can
-        // register the property as a number (reported 2026-08-12)
+        // a prefix is TEXT even when it looks like a number ("2."). Without
+        // being told the type, Obsidian guesses it from the values it sees
+        // and can register the property as a number (reported 2026-08-12).
         if (prefix) {
             ensureTextPropertyType(this.plugin.app, "footnote-prefix");
         }
         this.close();
         if (prefix && !this.plugin.settings.enableFootnotePrefix) {
-            // the property was written but nothing reads it while the
-            // feature is off - without this warning the insert commands
-            // just silently ignore the prefix the user set
+            // the property was written, but nothing reads it while the
+            // feature is switched off. Without this warning the insert
+            // commands would just quietly ignore the prefix the user set.
             showNotice(
                 `Footnote prefix set to "${prefix}", but the "Per-note footnote prefix" setting is turned off, so it won't be used until you enable it.`,
                 8000,

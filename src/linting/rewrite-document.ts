@@ -9,34 +9,48 @@ import {
     scanDocument,
 } from "../parsing/markdown-scan";
 
-// The bookends every rewriting rule used to carry on its own (duplicated-
-// logic audit, 2026-09-05): LF-normalize the note, split it, scan it, run
-// the rule, and hand back the ORIGINAL bytes when nothing changed -
-// restoring the EOL onto an unchanged result would normalize a mixed-EOL
-// note and report a phantom lint (decided 2026-08-10,
-// spec-mixed-eol-noop-rewrite) - else the original endings restored.
+// The setup and teardown every rewriting rule used to repeat for itself,
+// gathered here (duplicated-logic audit, 2026-09-05). The steps: convert the
+// note's line endings to plain LF, split it into lines, scan it, run the
+// rule, then put the note's own line endings back.
+//
+// The one subtlety is what happens when the rule changed nothing. Then the
+// ORIGINAL text is handed back byte for byte, without the ending-restoring
+// step. A note with mixed line endings would otherwise come out with them
+// all made the same, and the lint would report a change the user never
+// asked for. (Decided 2026-08-10; pinned by spec-mixed-eol-noop-rewrite.)
 
 /**
- * What a rewriting rule sees. The scan, the masked twin, and the
- * definition blocks are computed on first use and then cached: not every
- * rule needs all three, and one rule (move-to-bottom) trims `lines`
- * before anything is scanned.
+ * The view of the note a rewriting rule works from.
+ *
+ * The scan, the masked twin (the copy with protected text blanked out) and
+ * the definition blocks are each worked out the first time they are asked
+ * for, then kept. Two reasons: no rule needs all three, and one rule,
+ * move-to-bottom, trims `lines` before anything has been scanned.
  */
 export interface DocumentView {
     readonly lines: string[];
     readonly scan: DocumentScan;
     readonly maskedLines: string[];
-    /** Which lines start a live definition (definitionStartLines). */
+    /**
+     * One entry per line: true where a real definition starts there. Worked
+     * out by definitionStartLines.
+     */
     readonly definitionStarts: boolean[];
     readonly blocks: DefinitionBlock[];
     /**
-     * Drop the note's trailing blank lines and return how many there were.
-     * The ONE sanctioned mutation of `lines`, and only before anything
-     * derived from them exists: move-to-bottom used to pop the array
-     * directly, which worked purely because the scan is lazy and the pops
-     * came first - a later read of `scan` above the trim would have
-     * described the untrimmed note (review C7, 2026-09-09). Throws if the
-     * scan, the masked twin, the starts, or the blocks were already taken.
+     * Drop the blank lines at the end of the note, and say how many there
+     * were.
+     *
+     * This is the ONE change to `lines` that is allowed, and only before
+     * anything has been worked out from them. move-to-bottom used to
+     * shorten the array itself. That happened to work, but only because
+     * the scan is done lazily and the shortening came first: read `scan`
+     * anywhere above the trim and it would describe the untrimmed note
+     * (review C7, 2026-09-09).
+     *
+     * So this throws if the scan, the masked twin, the definition starts or
+     * the blocks have already been asked for.
      */
     trimTrailingBlankLines(): number;
 }
@@ -84,10 +98,12 @@ function documentView(lines: string[]): DocumentView {
 }
 
 /**
- * Run `rewrite` over the LF-normalized `text` of `markdown` (with its
- * view) and return the rewritten note in the note's own line endings -
- * or `markdown` itself, byte for byte, when the rule returned `text`
- * unchanged.
+ * Run `rewrite` over `markdown` with its line endings converted to plain LF,
+ * handing it that text and a view of it.
+ *
+ * Returns the rewritten note with the note's own line endings put back, or,
+ * when the rule handed `text` back unchanged, `markdown` itself, byte for
+ * byte.
  */
 export function rewriteDocument(
     markdown: string,

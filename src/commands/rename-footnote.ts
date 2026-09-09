@@ -23,26 +23,36 @@ import { runOutsideTableCell } from "../editor/table-cursor";
 import { withEditableEditor } from "./insert-or-navigate-footnotes";
 
 import { nameAlreadyUsed, showNotice } from "../editor/notice";
-// Renaming a footnote (Jason's calls 2026-08-12): with the
-// caret on a "[^name]" reference or a definition label, the Rename
-// footnote command opens a modal prefilled with the current name and
-// rewrites every masked-LIVE occurrence - references and definition
-// labels, case-insensitively (Obsidian folds ids) - in one transaction.
-// Copies inside code/math/comments are plain text and stay untouched. A
-// name already in use refuses (merging two footnotes is the
-// merge-duplicate-definitions lint's job, not a rename side effect), and
-// the whole rename simulate-verifies before any edit: a new name can
-// complete constructs around an occurrence exactly like an insertion can
-// (the "$…$" swallow class), and then NOTHING is renamed.
+// Renaming a footnote (Jason's calls 2026-08-12).
+//
+// With the caret on a "[^name]" reference or on a definition label, the
+// Rename footnote command opens a modal prefilled with the current name. It
+// then rewrites every live occurrence of that name, references and
+// definition labels alike, in one transaction. The match ignores case,
+// because Obsidian treats footnote names case-insensitively. Copies inside
+// code, math, or comments are plain text, not footnotes, and are left
+// alone.
+//
+// A name that is already in use is refused. Merging two footnotes into one
+// is the merge-duplicate-definitions lint rule's job, not something a
+// rename should do as a side effect.
+//
+// The whole rename is also simulated and checked before a single edit is
+// made. A new name can complete markdown constructs around an occurrence,
+// just as an insertion can (the "$…$" swallow class), and if it would,
+// NOTHING is renamed.
 
 export const RenameTargetNotice =
     "Place the cursor on a footnote reference or definition to rename it.";
 
 /**
- * The footnote name under the caret - a live reference's name (definition
- * BODIES count: a reference inside one is renameable), or the name of the
- * definition label the caret sits inside - or null. Same raw-gate-then-
- * masked-confirm shape as the navigation guards.
+ * The footnote name under the caret, or null when there is none.
+ *
+ * It can come from a live reference (definition BODIES count too: a
+ * reference sitting inside one can be renamed), or from the definition
+ * label the caret sits inside. Like the navigation guards, this checks the
+ * raw line first and only then confirms against the masked twin (the copy
+ * of the note with protected text blanked out).
  */
 export function renameTargetAtCursor(
     doc: Editor,
@@ -60,14 +70,15 @@ export function renameTargetAtCursor(
         cursorPosition.ch,
     );
     if (occurrence !== null) return occurrence.name;
-    // a definition label at column 0 - the caret anywhere before the end
-    // of its ":" targets the definition's name
+    // a definition label at the start of the line: the caret anywhere before
+    // the end of its ":" means the user wants that definition's name
     const label = definitionLabelIn(lineText);
     if (!label || cursorPosition.ch >= label.labelEnd) return null;
     const maskedLabel = definitionLabelIn(ctx.maskedLine(cursorPosition.line));
     if (!maskedLabel) return null;
-    // a label directly under a prose line is lazy paragraph text, not a
-    // definition (definitionStartLines)
+    // a label written directly under a line of prose is what the project
+    // calls a lazy label: Obsidian reads it as more paragraph text, not as a
+    // definition (definitionStartLines decides this)
     if (!ctx.definitionStarts()[cursorPosition.line]) return null;
     return lineText.slice(label.nameStart, label.nameEnd);
 }
@@ -77,9 +88,9 @@ export type RenamePlan =
           kind: "renamed";
           changes: EditorChange[];
           count: number;
-          /** the name actually written - the typed one, or the typed one behind the note's prefix (see prefixAdded) */
+          /** the name that actually gets written: what the user typed, or what they typed with the note's prefix in front of it (see prefixAdded) */
           newName: string;
-          /** the ARMED apply-prefix sweep would have re-prefixed the typed name on the next lint, so the rename applied the prefix itself (Jason's ruling 2026-08-29, replacing the 2026-08-25 refusal); the toast says so */
+          /** true when the apply-prefix rule was armed and would have re-prefixed the typed name on the very next lint, so the rename put the prefix on itself and the toast says so (Jason's ruling 2026-08-29, which replaced the 2026-08-25 refusal) */
           prefixAdded: boolean;
       }
     | { kind: "noop" }
@@ -88,8 +99,9 @@ export type RenamePlan =
     | { kind: "dead" };
 
 /**
- * The rename decision for `oldName` → `newName`: the changes to apply, or
- * why not. Pure planning - nothing is dispatched here.
+ * Decide what renaming `oldName` to `newName` would mean: either the list
+ * of changes to apply, or the reason it cannot be done. This is planning
+ * only. Nothing is written to the document here.
  */
 export function planFootnoteRename(
     doc: Editor,
@@ -98,16 +110,20 @@ export function planFootnoteRename(
     ctx: DocContext = docContext(doc),
     options?: {
         /**
-         * The note's footnote-prefix when the Apply-footnote-prefix
-         * sweep is ARMED (prefix feature on + that lint rule on + a
-         * valid prefix) - an out-of-namespace new name is then written
-         * BEHIND the prefix (effectiveRenameName), because the very
-         * next lint would rename it that way anyway; the 2026-08-25
-         * hunt fix refused such names instead (bug-rename-swept-back-
-         * by-apply-prefix), and Jason's ruling 2026-08-29 swapped the
-         * refusal for doing the lint's work up front and saying so.
-         * Callers with the sweep unarmed omit it; bare names stay legal
-         * and durable.
+         * The note's footnote prefix, but only when the
+         * Apply-footnote-prefix rule is ARMED: the prefix feature is on,
+         * that lint rule is on, and the note's prefix is valid.
+         *
+         * When it is armed, a new name that falls outside the prefix's
+         * namespace is written BEHIND the prefix instead (see
+         * effectiveRenameName), because the very next lint would rename
+         * it that way anyway. The 2026-08-25 hunt fix refused such names
+         * outright (bug-rename-swept-back-by-apply-prefix); Jason's
+         * ruling 2026-08-29 swapped that refusal for doing the lint's
+         * work up front and telling the user.
+         *
+         * Callers whose sweep is not armed leave this out, and bare
+         * names stay legal and stay put.
          */
         sweepPrefix?: string;
     },
@@ -123,10 +139,12 @@ export function planFootnoteRename(
     const oldFolded = oldName.toLowerCase();
     const newFolded = newName.toLowerCase();
     const blocks = ctx.blocks();
-    // every LIVE definition label - column-0 blocks AND blockquoted/callout
-    // labels, which are definitions everywhere else in the plugin but never
-    // blocks (second review 2026-09-09: a rename rewrote the reference and
-    // left "> [^note]:" behind, orphaning both halves)
+    // collect every LIVE definition label. That means the ones at the start
+    // of a line, which form definition blocks, and also labels inside a
+    // blockquote or callout, which count as definitions everywhere else in
+    // the plugin but never form blocks. Missing the second kind was a bug:
+    // a rename rewrote the reference and left "> [^note]:" behind,
+    // orphaning both halves (second review 2026-09-09).
     const starts = ctx.definitionStarts();
     const labels: { line: number; name: string; nameStart: number; nameEnd: number }[] = [];
     for (let line = 0; line < ctx.lines.length; line++) {
@@ -137,8 +155,9 @@ export function planFootnoteRename(
         }
     }
 
-    // collision: the new name already names ANOTHER footnote (any casing).
-    // A case-only rename of the SAME footnote is fine - that's cosmetics.
+    // a collision means the new name already belongs to ANOTHER footnote,
+    // whatever its casing. Changing only the casing of the SAME footnote is
+    // fine: that is cosmetic.
     if (newFolded !== oldFolded) {
         const taken =
             labels.some((label) => label.name.toLowerCase() === newFolded) ||
@@ -191,11 +210,13 @@ export function planFootnoteRename(
 }
 
 /**
- * The name a rename actually writes: the typed `newName`, or the typed
- * name behind the note's prefix when the apply-prefix sweep is armed
- * (`sweepPrefix` given) and the name doesn't already carry it in any
- * casing. Shared by the planner and the modal's messages so they never
- * disagree about which name is being talked about.
+ * The name a rename actually writes. Usually that is `newName` exactly as
+ * typed. When the apply-prefix rule is armed (`sweepPrefix` is given) and
+ * the typed name does not already start with that prefix in any casing, the
+ * prefix goes in front.
+ *
+ * The planner and the modal's messages both call this, so they can never
+ * disagree about which name they are talking about.
  */
 function effectiveRenameName(
     newName: string,
@@ -210,12 +231,15 @@ function effectiveRenameName(
     return `${sweepPrefix}${newName}`;
 }
 
-// Simulate the whole rename and require the document's footnote structure
-// to be EXACTLY the old one with the name mapped: on every edited line the
-// occurrence list (positions shift-adjusted for the length change) must
-// match, and the definition blocks must keep their start lines and mapped
-// names. Anything else means the new name reclassified text around an
-// occurrence - refuse the whole rename rather than corrupt one copy.
+// Run the whole rename in simulation and insist that the note's footnote
+// structure afterwards is EXACTLY the old one with the name swapped.
+//
+// Concretely: on every edited line, the list of occurrences must match the
+// old list, with positions shifted to allow for the new name's length, and
+// the definition blocks must keep their start lines and their mapped names.
+// Anything else means the new name has changed how markdown reads the text
+// around an occurrence. In that case refuse the entire rename, rather than
+// corrupt one copy of it.
 function renameSurvives(
     ctx: DocContext,
     changes: EditorChange[],
@@ -226,9 +250,10 @@ function renameSurvives(
     labelLines: number[],
 ): boolean {
     const simulated = simulateChanges(ctx.lines, changes);
-    // one scan and one masked twin for every line checked below - the
-    // per-line maskedLineAt rescanned the whole document each time, so a
-    // footnote used on forty lines cost forty-one scans (review B4)
+    // scan once and build one masked twin for all the lines checked below.
+    // The old per-line maskedLineAt rescanned the whole document every
+    // time, so a footnote used on forty lines cost forty-one scans
+    // (review B4).
     const simulatedScan = scanDocument(simulated);
     const simulatedMasked = maskProtectedLines(simulated, simulatedScan);
     const startsBefore = ctx.definitionStarts();
@@ -256,8 +281,9 @@ function renameSurvives(
             }
         }
     }
-    // every renamed label (quoted ones are not blocks) must still read as a
-    // live definition under the new name
+    // every renamed label must still read as a live definition under the new
+    // name. Labels inside a blockquote are checked here because they never
+    // form definition blocks.
     for (const line of labelLines) {
         if (!startsAfter[line]) return false;
         const hit = definitionLabelWithName(simulated[line], simulatedMasked[line]);
@@ -281,19 +307,21 @@ function renameSurvives(
 }
 
 /**
- * Add "Rename footnote" to the editor's right-click (and mobile
- * long-press) menu when the click landed on a reference or a definition
- * label - the same pattern as Obsidian's own "Rename this heading" on
- * heading lines (Jason's ask, 2026-08-13). Obsidian moves the caret to
- * the click point before firing editor-menu, so the caret resolution is
- * the command's own.
+ * Add "Rename footnote" to the editor's right-click menu (and to the
+ * mobile long-press menu) when the click landed on a reference or a
+ * definition label. It follows the same pattern as Obsidian's own "Rename
+ * this heading" on heading lines (Jason's ask, 2026-08-13).
+ *
+ * Obsidian moves the caret to the click point before it fires editor-menu,
+ * so working out which footnote was clicked is exactly the command's own
+ * caret lookup.
  */
 export function registerRenameFootnoteMenu(plugin: FootnotePlugin) {
     plugin.registerEvent(
         plugin.app.workspace.on("editor-menu", (menu, editor, info) => {
-            // markdown views only: a canvas card's editor would pass the
-            // target check here while the command later resolves the
-            // ACTIVE markdown view's editor instead
+            // markdown views only. A canvas card's editor would pass the
+            // check here, but the command would later go and act on the
+            // ACTIVE markdown view's editor instead.
             if (!(info instanceof MarkdownView)) return;
             if (renameTargetAtCursor(editor, editor.getCursor()) === null) {
                 return;
@@ -311,7 +339,7 @@ export function registerRenameFootnoteMenu(plugin: FootnotePlugin) {
     );
 }
 
-/** The "Rename footnote" command: resolve the name under the caret, then hand off to the modal. */
+/** The "Rename footnote" command. It works out the name under the caret, then hands over to the modal. */
 export async function renameFootnote(plugin: FootnotePlugin) {
     await withEditableEditor(
         plugin,
@@ -325,17 +353,18 @@ export async function renameFootnote(plugin: FootnotePlugin) {
                 new RenameFootnoteModal(plugin, doc, target).open();
             });
         },
-        // focus in the Properties widget: there is no footnote under a
-        // property field, and the editor's caret is stale - same answer
-        // as a caret on plain prose
+        // When focus is in the Properties panel there is no footnote under a
+        // property field, and the editor's own caret position is stale. So
+        // give the same answer as for a caret on plain prose: nothing here
+        // to rename.
         RenameTargetNotice,
     );
 }
 
-// One text input prefilled with the current name; Enter (or the Rename
-// button) applies. Invalid names, collisions, and names the simulation
-// refuses show their reason inline and keep the modal open - same shape
-// as the Set-footnote-prefix modal.
+// One text box, prefilled with the current name. Enter, or the Rename
+// button, applies it. Invalid names, collisions, and names the simulation
+// refuses each show their reason inside the modal and leave it open. It is
+// built the same way as the Set-footnote-prefix modal.
 // Stryker disable all: modal DOM against the live app - smoke-test
 // territory, unreachable from units (the whole prefix modal's FILE is
 // excluded for the same reason; this one shares a file with the pure
@@ -347,10 +376,11 @@ class RenameFootnoteModal extends ValidatedTextModal {
     private oldName: string;
 
     constructor(plugin: FootnotePlugin, doc: Editor, oldName: string) {
-        // with the sweep armed, only the SUFFIX is preselected: the prefix
-        // visibly stays put, so typing the new name naturally keeps it
-        // (Jason's consistency concern 2026-08-29) - deleting it anyway
-        // still works, the plan adds it back and the toast says so
+        // when the apply-prefix rule is armed, only the part AFTER the
+        // prefix is preselected. The prefix visibly stays put, so typing a
+        // new name keeps it without the user having to think about it
+        // (Jason's consistency concern 2026-08-29). Deleting the prefix by
+        // hand still works: the plan puts it back and the toast says so.
         const prefix = armedSweepPrefix(plugin, doc);
         super(plugin.app, {
             title: "Rename footnote",
@@ -370,12 +400,12 @@ class RenameFootnoteModal extends ValidatedTextModal {
 
     protected submit() {
         const typed = this.value.trim();
-        // read at submit time, like the plan itself: the frontmatter may
-        // have changed while the modal was open
+        // read this when the user submits, just as the plan itself is: the
+        // note's frontmatter may have changed while the modal was open
         const sweepPrefix = armedSweepPrefix(this.plugin, this.doc);
         const newName = effectiveRenameName(typed, sweepPrefix);
-        // planned against the CURRENT document - the note may have changed
-        // while the modal was open
+        // plan against the CURRENT document, for the same reason: the note
+        // may have changed while the modal was open
         const plan = planFootnoteRename(this.doc, this.oldName, typed, undefined, {
             sweepPrefix,
         });
@@ -409,7 +439,7 @@ class RenameFootnoteModal extends ValidatedTextModal {
     }
 }
 
-/** The note's prefix when the Apply-footnote-prefix sweep is armed (prefix feature on + that lint rule on + a valid note prefix) and would re-prefix a bare rename on the very next lint. Invalid prefixes don't arm: lint refuses to run under one (lintBlockedByPrefix). */
+/** The note's prefix, but only when the Apply-footnote-prefix rule is armed: the prefix feature is on, that lint rule is on, and the note's prefix is valid. Armed means a bare rename would be re-prefixed on the very next lint. An invalid prefix never arms, because lint refuses to run under one at all (lintBlockedByPrefix). */
 function armedSweepPrefix(plugin: FootnotePlugin, doc: Editor): string | undefined {
     if (!plugin.settings.enableFootnotePrefix || !plugin.settings.lintApplyPrefix) {
         return undefined;

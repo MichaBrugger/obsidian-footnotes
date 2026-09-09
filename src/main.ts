@@ -1,9 +1,13 @@
-// Plugin entry point: registers the hotkey commands (numbered and
-// named footnotes - each one "insert OR navigate", see
-// insert-or-navigate-footnotes.ts for the decision cascade - the two
-// inline-footnote inserts, and the whole-document cleanups from
-// src/linting/), the settings tab, and the popup-dismissal hook.
-// Also owns settings load/save plus one-time migrations of legacy values.
+// The plugin's entry point. It registers everything: the hotkey commands,
+// the settings tab, and the hook that dismisses the popup.
+//
+// The commands are the numbered and the named footnote (each of those is
+// "insert OR navigate" - insert-or-navigate-footnotes.ts holds the cascade
+// that decides which), the two inline-footnote inserts, and the
+// whole-document cleanups from src/linting/.
+//
+// This file also loads and saves the settings, and runs the one-time
+// migrations that bring old saved values up to date.
 import {
   addIcon,
   MarkdownView,
@@ -28,22 +32,24 @@ import {
 } from "./linting/linter";
 
 import { showNotice } from "./editor/notice";
-// bump when adding a new one-time settings migration in loadSettings
+// raise this by one whenever a new one-time settings migration is added
+// to loadSettings
 const CURRENT_SETTINGS_VERSION = 2;
 
 export default class FootnotePlugin extends Plugin {
-  // `declare`: refine the base Plugin.settings type (Obsidian 1.13+)
-  // without emitting a class field that would shadow it
+  // `declare` narrows the type of the base Plugin.settings (Obsidian
+  // 1.13+) without creating a class field of our own that would hide it
   declare settings: FootnotePluginSettings;
 
-  // The active markdown view, but only when its text can actually be
-  // edited on screen: the text-editing commands disappear from the palette
-  // in Reading view, where the editor API would edit the HIDDEN buffer -
-  // invisible insertions and toasts about references the user can't see
-  // (reported 2026-08-08). "Set footnote prefix" deliberately stays
-  // available there; a frontmatter edit is legitimate in Reading view.
+  // The note you are looking at, but only when its text can actually be
+  // edited on screen. In Reading view the editor API still works, but it
+  // writes into a hidden copy of the note: the insertion is invisible and
+  // the toasts talk about references you cannot see (reported 2026-08-08).
+  // So the text-editing commands drop out of the command palette there.
+  // "Set footnote prefix" deliberately stays available in Reading view,
+  // because editing the frontmatter is a legitimate thing to do there.
 
-  /** Full ids ("plugin:command") of every editor command, recorded at registration - the name modal's keyboard scope speaks exactly these commands' hotkeys. */
+  /** The full id ("plugin:command") of every editor command, noted as each one is registered. The name-the-footnote modal reads this list so that it can answer exactly these commands' hotkeys while it is open. */
   editorCommandIds: string[] = [];
 
   editableMarkdownView(): MarkdownView | null {
@@ -52,17 +58,23 @@ export default class FootnotePlugin extends Plugin {
   }
 
   async onload() {
-    // Jason's hand-drawn "action style" icon family (icons/action style/):
-    // the action is the main glyph - hash (numbered), I-beam text cursor
-    // (named / inline write), clipboard (paste), alert triangle (lint),
-    // left arrow into a dashed divider (prefix), pencil (rename) - and the
-    // small mark gives the footnote type: down ARROW (jump to the note
-    // bottom) for regular footnotes, up chevron (the ^ of ^[...]) for
-    // inline ones. The arrows sit one step lower since 2026-08-13 (Jason's
-    // rebalance). Sources in icons/action style/ are raw Inkscape saves;
-    // scripts/strip-inkscape-icons.mjs strips the editor metadata and
-    // swaps Inkscape's stroke="#000" to currentColor for theming - paste
-    // its icons/optimized/ output here.
+    // Jason's hand-drawn "action style" icon family, from icons/action
+    // style/. Each icon has two parts.
+    //
+    // The main glyph says what the command does: a hash for numbered, an
+    // I-beam text cursor for named and for writing an inline footnote, a
+    // clipboard for paste, an alert triangle for lint, a left arrow into a
+    // dashed divider for prefix, a pencil for rename.
+    //
+    // The small mark says which kind of footnote: a down ARROW (the jump to
+    // the bottom of the note) for a regular footnote, an up chevron (the
+    // "^" of "^[...]") for an inline one. The arrows sit one step lower
+    // since 2026-08-13, Jason's rebalance.
+    //
+    // The files in icons/action style/ are raw Inkscape saves.
+    // scripts/strip-inkscape-icons.mjs strips out the editor's own metadata
+    // and swaps Inkscape's stroke="#000" for currentColor so themes can
+    // recolor it. Paste what lands in icons/optimized/ here.
     addIcon("footnote-numbered", `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><g transform="translate(0,1)" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><g transform="translate(-3,-1)"><path d="M 5,9 H 19" /><path d="M 5,15 H 16" /><line x1="10" x2="8" y1="3" y2="21" /><path d="M 16,3 14,21" /></g><path d="m 22,17 -3,3 -3,-3" /><path d="M 19,19 V 12" /></g></svg>`);
     addIcon("footnote-named", `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><g transform="translate(24,-62)" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><g transform="translate(-24,27)"><path d="m12 53v-12c0-2.209 1.791-4 4-4h1" /><path d="m7 57h1a4 4 0 0 0 4-4" /><path d="m7 37h1a4 4 0 0 1 4 4" /></g><path d="m -2,80 -3,3 -3,-3" /><path d="M -5,82 V 75" /></g></svg>`);
     addIcon("footnote-lint", `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><g fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m 22,18 -3,3 -3,-3" stroke="currentColor" /><path d="M 19,20 V 13" stroke="currentColor" /><g transform="translate(.006 -.019)" stroke="currentColor"><path d="M 16.588,9.019 13.73,4 c -0.766,-1.352 -2.714,-1.352 -3.48,0 l -8,14 c -0.774,1.34 0.202,3.014 1.75,3 h 8.994" fill="none" /><path d="m 11.994,9.019 v 4" /><path d="m 12,17 -0.006,0.019" /></g></g></svg>`);
@@ -73,11 +85,11 @@ export default class FootnotePlugin extends Plugin {
 
     await this.loadSettings();
 
-    // No default hotkeys, per Obsidian's plugin guidelines (considered and
-    // reverted 2026-08-07): the README tells users to bind their own and
-    // recommends Alt+0 / Alt+- for these two core commands. All four
-    // insert commands share one registration shape: available exactly
-    // while an editable markdown view is active.
+    // No default hotkeys, which is what Obsidian's plugin guidelines ask
+    // for (considered and reverted 2026-08-07). The README tells users to
+    // bind their own and recommends Alt+0 and Alt+- for these two core
+    // commands. All four insert commands register the same way: available
+    // exactly while an editable markdown view is active.
     const insertCommands: Array<{
       id: string;
       name: string;
@@ -119,9 +131,10 @@ export default class FootnotePlugin extends Plugin {
           void command.run(this);
         },
       });
-      // every editor command's FULL id, recorded as it registers - the
-      // name-the-footnote modal maps these to hotkey combos on its own
-      // keyboard scope, so the list can never drift from what's registered
+      // record every editor command's FULL id as it registers. The
+      // name-the-footnote modal turns these into hotkey combos on its own
+      // keyboard scope, and building the list right here means it can never
+      // drift from what is actually registered
       this.editorCommandIds.push(`${this.manifest.id}:${command.id}`);
     }
     this.addCommand({
@@ -134,8 +147,9 @@ export default class FootnotePlugin extends Plugin {
       },
     });
     this.editorCommandIds.push(`${this.manifest.id}:rename-footnote`);
-    // right-click / long-press on a footnote also offers the rename, like
-    // the native "Rename this heading" on heading lines
+    // right-click, or long-press on mobile, on a footnote also offers the
+    // rename, the way Obsidian's own "Rename this heading" does on a
+    // heading line
     registerRenameFootnoteMenu(this);
     this.addCommand({
       id: "set-footnote-prefix",
@@ -145,9 +159,10 @@ export default class FootnotePlugin extends Plugin {
         const mdView = this.app.workspace.getActiveViewOfType(MarkdownView);
         if (checking) return !!mdView?.file;
         if (!mdView?.file) return;
-        // prefill with the note's current prefix so editing is one step -
-        // read only the frontmatter block, not getValue()'s whole document
-        // (2026-08-11 review perf item)
+        // prefill the box with the note's current prefix, so changing it is
+        // one step. Only the frontmatter block is read, not the whole
+        // document getValue() would hand back (2026-08-11 review,
+        // performance item)
         const editor = viewEditor(mdView);
         new SetFootnotePrefixModal(
           this,
@@ -157,17 +172,17 @@ export default class FootnotePlugin extends Plugin {
       },
     });
   
-    // The ONE whole-document cleanup command, like Linter's (the individual
-    // rules are settings toggles, not separate commands - palette stays
-    // uncluttered).
+    // The ONE whole-document cleanup command, the way the Linter plugin
+    // does it. The individual rules are toggles in the settings rather than
+    // commands of their own, which keeps the palette uncluttered.
     this.addCommand({
       id: "lint-footnotes",
       name: "Lint footnotes",
       icon: "footnote-lint",
       checkCallback: (checking: boolean) => {
         if (checking) return !!this.editableMarkdownView();
-        // with every rule toggled off the pipeline is a no-op - say that,
-        // instead of a misleading "No linting needed."
+        // with every rule turned off the lint does nothing at all, so say
+        // that plainly instead of the misleading "No linting needed."
         if (lintRulesAllDisabled(this)) {
           showNotice(
             "All lint rules are turned off in the plugin settings, so there is nothing to lint.",
@@ -191,30 +206,33 @@ export default class FootnotePlugin extends Plugin {
     this.registerEvent(
       this.app.workspace.on("active-leaf-change", () => {
         dismissFootnotePopup();
-        // vim mode can be switched on at any time, and its ":w" bypasses
-        // the save command until hooked - re-check on every leaf change
+        // vim mode can be switched on at any moment, and until it is
+        // hooked its ":w" goes around the save command, so re-check on
+        // every leaf change
         installVimWriteHook(this);
       })
     );
-    // "Lint on save" wraps the core save command (restored on unload)
+    // "Lint on save" wraps the core save command; the original is put back
+    // on unload
     installLintOnSave(this);
-    // partial-undo feedback: an undo that orphans a reference (the
-    // two-step table-cell undo, the named flow's definition press) says
-    // so instead of leaving a half-reverted note (2026-08-27)
+    // partial-undo feedback: an undo that leaves a reference with no
+    // definition (the two-step table-cell undo, the definition press of the
+    // named flow) says so, instead of leaving a half-reverted note with no
+    // explanation (2026-08-27)
     this.registerEditorExtension(undoOrphanNoticeExtension());
     this.app.workspace.onLayoutReady(() => {
       installVimWriteHook(this);
-      // with the prefix feature on, pin the plugin-owned footnote-prefix
-      // property to TEXT: numeric-looking values ("2.") otherwise teach
-      // Obsidian's type inference to register it as a number, and the
-      // Properties panel then coerces edits numerically (reported
+      // with the prefix feature on, pin the plugin's own footnote-prefix
+      // property to TEXT. Otherwise a value that looks numeric ("2.")
+      // teaches Obsidian's type guessing to file it as a number, and the
+      // Properties panel then mangles edits to it as numbers (reported
       // 2026-08-12; the Set-footnote-prefix modal pins it on write too)
       if (this.settings.enableFootnotePrefix) {
         ensureTextPropertyType(this.app, "footnote-prefix");
       }
     });
-    // enabling vim mode mid-session loads the adapter without any leaf
-    // change - config-changed catches that moment
+    // switching vim mode on mid-session loads the adapter without any leaf
+    // change happening, and config-changed is what catches that moment
     this.registerEvent(
       (this.app.vault as unknown as VaultWithConfigEvents).on(
         "config-changed",
@@ -233,18 +251,22 @@ export default class FootnotePlugin extends Plugin {
     const saved = parseSavedSettings(await this.loadData());
     this.settings = Object.assign({}, DEFAULT_SETTINGS, saved);
 
-    // One-shot legacy migrations, gated by settingsVersion: some of them
-    // rewrite saved values by SHAPE, so re-running them on every load can
-    // mangle a deliberate new-style value - a saved "**Footnotes**" heading
-    // used to gain "# " on each restart (bug confirmed live 2026-08-08,
-    // pinned in test/hunt/). Version 0 is data from before the flag
-    // existed, or a fresh install (where everything below no-ops). All
-    // migrations share ONE save at the end.
+    // One-time migrations of legacy settings, gated on settingsVersion.
+    //
+    // The gate matters because some of them rewrite a saved value based on
+    // its SHAPE, so re-running them on every load can mangle a value the
+    // user chose deliberately in the new style: a saved "**Footnotes**"
+    // heading used to gain a "# " on every restart (bug confirmed against
+    // the live app 2026-08-08, pinned in test/hunt/).
+    //
+    // Version 0 means either data from before the flag existed or a fresh
+    // install, where everything below does nothing. All the migrations
+    // share ONE save at the end.
     if (this.settings.settingsVersion < CURRENT_SETTINGS_VERSION) {
       // each migration is gated on the version it upgrades FROM, so a
-      // later bump can never re-run an earlier shape-based rewrite on
-      // values the user saved deliberately in the meantime (the
-      // heading-mangle bug)
+      // later version bump can never re-run an earlier shape-based rewrite
+      // over values the user saved deliberately in the meantime (that is
+      // the heading-mangle bug)
       if (this.settings.settingsVersion < 1) {
         migrateSettingsToV1(this.settings, saved);
       }
@@ -262,14 +284,19 @@ export default class FootnotePlugin extends Plugin {
 }
 
 /**
- * The saved data.json, trusted only where a value's type matches its
- * default's: a hand edit or a sync merge can leave `"lintReindex": "no"`,
- * which the old cast let straight into plugin.settings, where every
- * `if (settings.lintReindex)` read the string as truthy - the toggle showed
- * ON and the lint renumbered (review A9, Jason confirmed live 2026-09-08).
- * A mistyped value falls back to the default. Keys the defaults do not
- * know pass through untouched: the one-time migrations below read (and
- * delete) legacy keys from them.
+ * The saved data.json, trusted only where a value's type matches the type
+ * of its default.
+ *
+ * Why: a hand edit or a sync merge can leave something like
+ * `"lintReindex": "no"` in the file. The old cast let that straight into
+ * plugin.settings, where every `if (settings.lintReindex)` read the string
+ * as true, so the toggle showed ON and the lint renumbered (review A9,
+ * Jason confirmed against the live app 2026-09-08). A mistyped value now
+ * falls back to the default.
+ *
+ * Keys the defaults know nothing about pass through untouched, because the
+ * one-time migrations below read the legacy keys out of them (and delete
+ * them).
  */
 function parseSavedSettings(saved: unknown): Partial<FootnotePluginSettings> {
   if (typeof saved !== "object" || saved === null) return {};
@@ -286,20 +313,24 @@ function parseSavedSettings(saved: unknown): Partial<FootnotePluginSettings> {
 }
 
 // ---- one-time settings migrations, one function per version bump ----
-// (gated in loadSettings on the version being upgraded FROM)
+// (loadSettings decides which of them run, based on the version being
+// upgraded FROM)
 
-/** v1: the 0.1.x → 0.2.0-beta shape - PascalCase heading key, implied-H1 heading text, the removed autosuggest toggle, and the beta.5/6 tidy* → lint* renames. */
+/** v1: everything that changed between the 0.1.x shape and 0.2.0-beta. The
+ * PascalCase heading key, heading text that implied an H1, the autosuggest
+ * toggle that no longer exists, and the beta.5/6 rename of the tidy* keys
+ * to their lint* names. */
 function migrateSettingsToV1(
   settings: FootnotePluginSettings,
   saved: Partial<FootnotePluginSettings> | null,
 ) {
-  // saved data from 0.1.x used a PascalCase key for the section heading
+  // data saved by 0.1.x used a PascalCase key for the section heading
   const legacySettings = settings as FootnotePluginSettings & {
     FootnoteSectionHeading?: string;
     enableAutoSuggest?: boolean;
   };
-  // when the saved data SOMEHOW carries both keys (a downgrade or a
-  // data.json sync merge - no real upgrade path produces it), the
+  // if the saved data SOMEHOW carries both keys (a downgrade, or a
+  // data.json merged by sync; no real upgrade path produces it), the
   // newer camelCase value wins (decided 2026-08-10)
   if (
     typeof legacySettings.FootnoteSectionHeading === "string" &&
@@ -309,23 +340,25 @@ function migrateSettingsToV1(
   }
   delete legacySettings.FootnoteSectionHeading;
 
-  // migrate pre-0.2.0 section heading values: the old text input
-  // implied an H1, the textarea takes literal markdown
+  // bring pre-0.2.0 section heading values forward: the old text input
+  // implied an H1, while the textarea that replaced it takes literal
+  // markdown
   const heading = settings.footnoteSectionHeading;
   if (heading && !/^(#{1,6} |---|\*\*\*|___)/.test(heading)) {
     settings.footnoteSectionHeading = `# ${heading}`;
   }
 
-  // drop the setting for the removed autosuggest feature (Obsidian now
-  // suggests footnotes natively)
+  // drop the setting for the autosuggest feature that was removed
+  // (Obsidian suggests footnotes itself now)
   delete legacySettings.enableAutoSuggest;
 
-  // the linting settings shipped under tidy* keys in beta.5/6: copy
-  // each saved tidy* value onto its lint* name and drop the old key,
-  // so beta testers keep their toggle choices. Spelled out per key
-  // (rather than a rename map) so each move is statically typed -
-  // withTidyKeys is the same object as `settings`, so writing here
-  // sets the real lint* setting
+  // The linting settings shipped under tidy* key names in beta.5/6. Copy
+  // each saved tidy* value onto its lint* name and drop the old key, so
+  // beta testers keep the toggle choices they made.
+  //
+  // Each key is written out one at a time, rather than looped over a rename
+  // map, so TypeScript can check every move. withTidyKeys is the very same
+  // object as `settings`, so writing through it sets the real lint* setting
   const withTidyKeys = settings as FootnotePluginSettings & {
     tidyFixPunctuation?: boolean;
     tidyMoveToBottom?: boolean;
@@ -334,9 +367,10 @@ function migrateSettingsToV1(
     lintOnFileChange?: unknown;
     tidyOnFileChange?: unknown;
   };
-  // typeof guards, like migrateSettingsToV2's: the tidy* keys are unknown
-  // to parseSavedSettings, so a mistyped one would otherwise land on its
-  // lint* name as a truthy string (second review 2026-09-09)
+  // each copy is guarded by a typeof check, like migrateSettingsToV2's.
+  // parseSavedSettings knows nothing about the tidy* keys, so without the
+  // guard a mistyped one would land on its lint* name as a string that
+  // counts as true (second review 2026-09-09)
   if (typeof withTidyKeys.tidyFixPunctuation === "boolean") {
     withTidyKeys.lintFixPunctuation = withTidyKeys.tidyFixPunctuation;
   }
@@ -354,13 +388,17 @@ function migrateSettingsToV1(
   }
   delete withTidyKeys.tidyOnSave;
   // the lint-on-focused-file-change trigger was replaced by lint on
-  // footnote creation (2026-08-05) - its saved keys are dropped rather
-  // than carried over, since the semantics are different
+  // footnote creation (2026-08-05). Its saved keys are dropped rather than
+  // carried over, because the two mean different things
   delete withTidyKeys.lintOnFileChange;
   delete withTidyKeys.tidyOnFileChange;
 }
 
-/** v2 (2026-08-10): the two orphan settings became symmetric delete toggles. keepOrphanedDefinitions (shipped in the betas) carries over with its polarity flipped; the short-lived lintOrphanedMarkers dropdown only existed in dev builds but maps just as cheaply. */
+/** v2 (2026-08-10): the two orphan settings became a matching pair of
+ * delete toggles. keepOrphanedDefinitions, which shipped in the betas,
+ * carries over with its true and false swapped. The short-lived
+ * lintOrphanedMarkers dropdown only ever existed in dev builds, but mapping
+ * it across costs just as little. */
 function migrateSettingsToV2(settings: FootnotePluginSettings) {
   const legacyOrphans = settings as FootnotePluginSettings & {
     keepOrphanedDefinitions?: boolean;

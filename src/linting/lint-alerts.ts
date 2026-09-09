@@ -26,33 +26,43 @@ import {
 } from "./rules/remove-orphaned-references";
 
 import { addReferenceOrDeleteDefinition, showNotice } from "../editor/notice";
-// The post-lint alert tail: every lint entry point reports what the rules
-// could not (or were not allowed to) fix - empty "[^]" placeholders,
-// orphans while their delete toggles are off, duplicates while merging is
-// off. Alerts are reporting, not lint RULES; the rules-stay-independent
-// mandate (2026-08-07) is about the transform pipeline, which lives in
-// linter.ts. Split out of linter.ts 2026-08-12.
+// The lint alerts, shown after a lint has run. Every way of starting a lint
+// ends here, reporting what the rules could not fix, or were not allowed
+// to: empty "[^]" placeholders, orphans while their delete toggles are off,
+// duplicates while merging is off.
+//
+// An alert only reports; it never changes the note, so it is not a lint
+// rule. The 2026-08-07 mandate that rules stay independent of each other is
+// about the chain of rules that rewrite the text, which lives in linter.ts.
+// This file was split out of linter.ts on 2026-08-12.
 
 /**
- * Occurrences of unnamed footnote references outside code and frontmatter: the
- * abandoned empty "[^]", plus - when `prefix` is given - its prefix-era twin,
- * the untouched bare-prefix placeholder ("[^3.]" under prefix "3."). Both
- * are footnotes the user started and never named; the rules can't fix them
- * ("[^]" is invisible to the reference regexes, and a bare prefix is
- * indistinguishable from a deliberate name), so the lint paths alert
- * instead - the user should name or delete the fragment ASAP.
+ * How many unnamed footnote references the note has, outside code and
+ * frontmatter.
+ *
+ * There are two shapes. The plain empty "[^]", and, when `prefix` is given,
+ * the same thing in a note that uses prefixes: a bare prefix with nothing
+ * after it, such as "[^3.]" in a note whose prefix is "3.".
+ *
+ * Both are footnotes the user started and never finished naming. No rule can
+ * fix them: "[^]" does not match the reference patterns at all, and a bare
+ * prefix is impossible to tell from a name somebody chose. So the lint says
+ * so instead, and the user should name or delete the fragment.
  */
 export function countEmptyFootnoteReferences(
     markdown: string,
     prefix = "",
-    // the post-lint alerts share ONE normalize/mask pass across all the
-    // alert helpers (2026-08-11 review perf item); direct callers omit it
+    // The alerts all share ONE pass of normalizing the line endings and
+    // building the masked twin, done once and handed round (2026-08-11
+    // review, a speed fix). Anything calling this on its own leaves it out.
     masked?: string[],
 ): number {
     const needles = prefix ? ["[^]", referenceText(prefix)] : ["[^]"];
-    // masking only ever REMOVES needle occurrences, so a raw miss is
-    // definitive - this runs on every lint, and most notes have no "[^]"
-    // (perf F4: skip the whole-document masking pass)
+    // Masking can only ever take these strings away, never add one, so if
+    // the raw text does not contain them at all, neither will the masked
+    // twin. This runs on every single lint and most notes have no "[^]" in
+    // them, so bailing out here skips building the masked twin for the
+    // whole note (speed fix F4).
     if (!needles.some((needle) => markdown.includes(needle))) return 0;
     let count = 0;
     const lines =
@@ -71,7 +81,11 @@ export function countEmptyFootnoteReferences(
     return count;
 }
 
-/** The bare-prefix placeholder the alert should also count: the note's own valid prefix, only while the feature is on. */
+/**
+ * The note's own prefix, so the alerts can also count its bare-prefix
+ * placeholder. Empty unless the prefix feature is on and the note's prefix
+ * is valid.
+ */
 export function orphanSafePrefixFor(
     plugin: FootnotePlugin,
     markdown: string,
@@ -81,8 +95,9 @@ export function orphanSafePrefixFor(
     return prefix && footnotePrefixProblem(prefix) === null ? prefix : "";
 }
 
-// no settings gate, unlike its orphan/duplicate siblings: an empty
-// reference is never something a rule may delete, so it is always reported
+// Unlike the orphan and duplicate alerts, this one is not tied to a
+// setting. No rule is ever allowed to delete an empty reference, so there
+// is no toggle that could make this alert unnecessary; it always speaks.
 function noticeEmptyReferences(
     markdown: string,
     prefix: string,
@@ -99,22 +114,35 @@ function noticeEmptyReferences(
     );
 }
 
-/** `"[^a]", "[^b]", "[^c]"` - EVERY name spelled out, each in quotes like every other toast that names a footnote (Jason's consistency ask 2026-09-04). The list used to stop at three with an ellipsis; the user needs the whole list to fix them (his L-series pass, 2026-09-08). */
+/**
+ * Format names for a notice as `"[^a]", "[^b]", "[^c]"`.
+ *
+ * EVERY name is spelled out, each in quotes, matching every other notice
+ * that names a footnote (Jason asked for that consistency, 2026-09-04). The
+ * list used to stop after three names and trail off; the user needs all of
+ * them to go and fix them (his L-series pass, 2026-09-08).
+ */
 function referenceList(names: string[]): string {
     return names.map(quotedReference).join(", ");
 }
 
-/** `"[^a]:", "[^b]:"` - the label form, for the one alert whose fix is on the label LINE. */
+/**
+ * The same list in label form, `"[^a]:", "[^b]:"`. Used by the one alert
+ * whose fix is made on the label LINE itself.
+ */
 function labelList(names: string[]): string {
     return names.map(quotedDefinitionLabel).join(", ");
 }
 
-// a "[^x]:" directly under a prose line is lazy paragraph text to Obsidian
-// (the prose-label rule, 2026-09-09): the definition the user typed is one
-// blank line short of existing. The generic missing-definition alert would
-// say "write its definition", the wrong advice, so these names get their
-// own alert and drop out of that one (the orphan rule exempts them from
-// the alert and from deletion alike). Never silent, like every alert.
+// A "[^x]:" line directly under a line of prose is not a definition to
+// Obsidian; it is more paragraph text (the prose-label rule, 2026-09-09).
+// The definition the user typed is one blank line short of existing.
+//
+// These need their own alert because the general missing-definition alert
+// would tell the user to "write its definition", which is the wrong advice:
+// they already wrote it. So these names get this alert and are left out of
+// that one. The orphan rule exempts them too, from its alert and from
+// deletion alike. Like every alert, this one is never silent.
 function noticeLazyDefinitions(lines: string[], scan: DocumentScan, masked: string[], starts: boolean[]) {
     const names = lazyDefinitionLabelNames(lines, scan, masked, starts);
     if (names.length === 0) return;
@@ -126,8 +154,9 @@ function noticeLazyDefinitions(lines: string[], scan: DocumentScan, masked: stri
     );
 }
 
-// the alert half of "Delete orphaned references": while the toggle is off,
-// linting reports them instead - orphans are never silent
+// The alert half of "Delete orphaned references". While that toggle is off,
+// the lint reports orphaned references instead of deleting them: an orphan
+// is never passed over in silence.
 function noticeOrphanedReferences(
     plugin: FootnotePlugin,
     markdown: string,
@@ -145,8 +174,9 @@ function noticeOrphanedReferences(
     );
 }
 
-// kept orphaned definitions alert too (Jason, 2026-08-10) - every orphan
-// kind is either deleted or surfaced, never silently preserved
+// Orphaned definitions that were kept get an alert as well (ruling: Jason,
+// 2026-08-10). Every kind of orphan is either deleted or reported; none is
+// quietly left in place.
 function noticeOrphanedDefinitions(
     plugin: FootnotePlugin,
     markdown: string,
@@ -163,9 +193,11 @@ function noticeOrphanedDefinitions(
     );
 }
 
-// the alert half of "Merge duplicate definitions": while the toggle is off,
-// linting reports duplicates instead - like orphans, they are never silent
-// (Jason's policy 2026-08-12; Obsidian renders only the LAST definition)
+// The alert half of "Merge duplicate definitions". While that toggle is
+// off, the lint reports duplicates instead of merging them; like orphans,
+// they are never passed over in silence (Jason's policy, 2026-08-12).
+// Duplicates matter because Obsidian renders only the LAST definition of a
+// name, so the earlier ones simply do not appear.
 function noticeDuplicateDefinitions(
     plugin: FootnotePlugin,
     markdown: string,
@@ -183,13 +215,18 @@ function noticeDuplicateDefinitions(
 }
 
 /**
- * Names that no footnote can carry - whitespace, backticks, "#" - among the
- * note's live references and definition labels, one entry per name
- * (case-folded). Creation and rename refuse such names, but hand-typed and
- * pre-existing ones can't be fixed automatically (which name did the user
- * mean?), so the lint ALERTS (Jason's L-series pass 2026-09-08). Masked
- * fakes don't count. Brackets can't form a reference at all, so they never
- * reach here.
+ * The note's footnote names that a footnote is not allowed to have: ones
+ * containing whitespace, backticks or "#". It looks at live references and
+ * definition labels, and lists each name once, treating upper and lower
+ * case as the same.
+ *
+ * Creating or renaming a footnote refuses such a name up front. But a name
+ * the user typed by hand, or one that was already in the note, cannot be
+ * fixed automatically: there is no telling which name they meant. So the
+ * lint reports it instead (Jason's L-series pass, 2026-09-08).
+ *
+ * Fakes inside protected text do not count. Names containing brackets never
+ * get here, because such text cannot form a reference in the first place.
  */
 export function invalidFootnoteNames(
     lines: string[],
@@ -224,13 +261,18 @@ function noticeInvalidNames(lines: string[], scan: DocumentScan, masked: string[
 }
 
 /**
- * Names of definitions that carry a footnote INSIDE their block - a live
- * reference or inline footnote on the label line (after the label) or a
- * continuation line. Nesting is prevented at creation plugin-wide
- * (Jason's ruling 2026-08-24, Discord-confirmed nobody wants it), but
- * hand-typed and pre-existing nesting can't be fixed automatically
- * without losing content, so the lint ALERTS - the never-silent policy
- * orphans and duplicates already follow. Masked fakes don't count.
+ * The names of definitions that have another footnote INSIDE them: a live
+ * reference or an inline footnote, either on the label line after the label
+ * itself, or on one of the continuation lines.
+ *
+ * A nested footnote is one footnote sitting inside another footnote's text.
+ * The plugin refuses to create one anywhere (Jason's ruling, 2026-08-24,
+ * after Discord confirmed nobody wants them). But nesting the user typed by
+ * hand, or that was already in the note, cannot be undone automatically
+ * without throwing text away, so the lint reports it instead. That is the
+ * same never-silent policy orphans and duplicates follow.
+ *
+ * Fakes inside protected text do not count.
  */
 export function nestedFootnoteDefinitionNames(
     lines: string[],
@@ -238,9 +280,10 @@ export function nestedFootnoteDefinitionNames(
     masked: string[],
 ): string[] {
     const names: string[] = [];
-    // one entry per NAME, case-folded like the duplicate/orphan siblings -
-    // a name defined twice with both copies nested used to report twice,
-    // inflating the notice's count (hunt 2026-08-25)
+    // One entry per NAME, ignoring case, the same way the duplicate and
+    // orphan alerts do it. A name defined twice with both copies nested
+    // used to be reported twice, which made the notice's count too high
+    // (bug hunt, 2026-08-25).
     const seen = new Set<string>();
     for (const block of findDefinitionBlocks(lines, scan)) {
         let nested = false;
@@ -262,7 +305,10 @@ export function nestedFootnoteDefinitionNames(
     return names;
 }
 
-/** Whether the masked line carries a live inline footnote span. */
+/**
+ * True when this masked line holds a live inline footnote, the self-
+ * contained "^[...]" form.
+ */
 function lineHasInlineFootnote(masked: string): boolean {
     for (let i = 0; i < masked.length - 1; i++) {
         if (masked[i] !== "^" || masked[i + 1] !== "[") continue;
@@ -288,15 +334,19 @@ function noticeNestedFootnotes(
     );
 }
 
-// every lint entry point calls this with the POST-lint text, so the alerts
-// fire whether or not the rules changed anything. ONE normalize, scan,
-// masked twin, and definition-start pass is shared by all the alerts
-// (2026-08-11 review perf item: the alerts each re-derived it - ~40% of a
-// lint's wall time, felt on every creation with lint-on-footnote-creation
-// enabled; the starts joined the bundle 2026-09-09, when the prose-label
-// rule had quietly added seven re-derivations).
+// Every way of starting a lint calls this with the text as it stands AFTER
+// the lint, so the alerts speak whether or not any rule changed anything.
+//
+// The line-ending normalize, the scan, the masked twin and the
+// definition-start pass are all done once here and shared by every alert.
+// Each alert used to work them out again for itself, which came to about
+// 40% of the time a lint took, noticeable on every footnote created with
+// lint-on-footnote-creation on (2026-08-11 review, a speed fix). The
+// definition starts were added to the shared bundle on 2026-09-09, when the
+// prose-label rule turned out to have quietly added seven more repeats.
 export function noticeLintAlerts(plugin: FootnotePlugin, markdown: string) {
-    // every alert's own raw gate requires a "[^" (all its needles carry one)
+    // Every one of the alerts is looking for text containing "[^", so a
+    // note without those two characters anywhere cannot trigger any of them
     if (!markdown.includes("[^")) return;
     const prefix = orphanSafePrefixFor(plugin, markdown);
     const lines = normalizeEol(markdown).text.split("\n");

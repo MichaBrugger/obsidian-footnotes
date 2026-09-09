@@ -44,30 +44,43 @@ import {
 } from "../editor/notice";
 import { TableCellEditor, tableRowCellSpans, tableRowLines } from "../editor/table-cursor";
 
-// Turning a selection into a footnote (issue #35): a creation press with a
-// live selection REPLACES the selected text instead of inserting at the
-// caret - the numbered key moves it into a new definition's body, the
-// inline key wraps it as "^[…]" in place, and the NAMED key asks for the
-// name in a small modal and then does what autonum does under the chosen
-// name (Jason's ask 2026-08-13; the named flow's usual second press can't
-// carry a body statelessly, so the modal replaces it for selections).
-// Only the paste key redirects: its body is the clipboard, so a selection
-// press is genuinely ambiguous there. Always on, no toggle (Jason's call,
-// 2026-08-12): a press with a selection previously inserted at the stale
-// caret, which served nobody.
+// Conversion: turning selected text into a footnote (issue #35).
 //
-// Multi-line selections convert too (Jason's ask 2026-08-19 - academic
-// footnotes hold whole paragraphs): the autonum/named keys move the
-// selected block into a MULTI-PARAGRAPH definition (continuation lines
-// indented four spaces, the shape the scanner and the jump commands
-// already speak). The INLINE key refuses line-spanning selections and
-// redirects to those two keys instead (Jason's ruling 2026-08-20: the
-// flatten-like-paste behavior basically never looked correct on anything
-// but clean paragraphs, and paste already covers the flatten use case).
-// Protected constructs (fences, math, comments, inline spans) may ride
-// along when the selection contains them WHOLE; only a selection that
-// CUTS one - an edge inside a construct, or a delimiter grabbed without
-// its partner, which would reclassify innocent text below - refuses.
+// Normally a footnote command inserts at the caret. When you have text
+// selected, it replaces that text instead. Each key does it its own way:
+//
+//   numbered - the selected text moves into a new definition's body
+//   inline   - the selected text is wrapped as "^[…]" where it sits
+//   named    - a small modal asks for the name, then the numbered
+//              behavior runs under the name you typed
+//   paste    - refuses and points you at the other three keys
+//
+// The named key needs the modal because the usual named flow takes two
+// presses, and two presses cannot carry a body without keeping state
+// between them (Jason's ask 2026-08-13). The paste key refuses because
+// its body is the clipboard, so a press with a selection is genuinely
+// ambiguous: two candidate bodies, no way to pick.
+//
+// There is no setting for any of this; it is always on (Jason's call,
+// 2026-08-12). Before it existed, a press with a selection inserted at
+// the old caret position, which served nobody.
+//
+// Multi-line selections convert too (Jason's ask 2026-08-19, because
+// academic footnotes hold whole paragraphs). The numbered and named keys
+// turn the selected block into a multi-paragraph definition, its
+// continuation lines indented four spaces. That is the shape the scanner
+// and the jump commands already understand. The inline key refuses a
+// selection that spans lines and points at those two keys instead
+// (Jason's ruling 2026-08-20: flattening it the way paste does almost
+// never looked right except on clean paragraphs, and paste already
+// covers that use case).
+//
+// Protected text (fences, math, comments, inline code spans) can travel
+// into the footnote, but only when the selection contains the whole
+// construct. A selection that CUTS one refuses: an edge sitting inside a
+// construct, or one delimiter grabbed without its partner. Cutting like
+// that would change how Obsidian reads innocent text further down the
+// note.
 
 export const SelectionSpanNotice =
     "Select one continuous stretch of text to turn it into a footnote.";
@@ -75,45 +88,54 @@ export const SelectionCommandNotice =
     "To turn the selected text into a footnote, use the numbered, named, or inline footnote command.";
 export const SelectionChangedNotice =
     "The note changed while naming the footnote. Reselect the text and try again.";
-// inline footnotes are single-line by nature; flattening a multi-line
-// selection (paste parity) was tried and REVERTED (Jason, 2026-08-20) -
-// it basically never looked correct outside clean paragraphs
+// An inline footnote lives on one line, so it cannot hold a selection
+// that spans several. Flattening such a selection into one line, the way
+// the paste key does, was tried and then reversed (Jason, 2026-08-20):
+// outside clean paragraphs the result almost never looked right.
 export const InlineSelectionNotice =
     "Inline footnotes are single-line. Use the numbered or named footnote command to convert a multi-line selection.";
-// nested footnotes are prevented across the plugin (Jason's ruling
-// 2026-08-24, after the Obsidian Academia Discord confirmed nobody uses
-// them and modern style guides engineered the pattern out): converting a
-// selection that touches a live reference or inline footnote would nest
-// it into the new footnote's body - and a PARTIAL overlap would corrupt
-// the artifact it cuts. Dead reference-shaped text inside code spans is
-// not a footnote and still travels.
-// (the nesting refusal itself is NestedFootnoteNotice, shared with the
-// caret guards - one rule, one sentence)
-// distinct from ProtectedCreationNotice on purpose (Jason's manual pass,
-// 2026-08-13): here the caret isn't INSIDE protected text - the selection
-// EDGE cuts through some. Whole constructs inside the selection are fine
-// (2026-08-19); cutting one apart would corrupt what stays behind.
+// A nested footnote is a footnote inside another footnote's body. The
+// plugin prevents them everywhere (Jason's ruling 2026-08-24, after the
+// Obsidian Academia Discord confirmed nobody uses them and modern style
+// guides have engineered the pattern out). So converting a selection that
+// touches a live reference or a live inline footnote refuses: swallowing
+// one whole would nest it in the new footnote's body, and overlapping one
+// only partly would cut it in half. Reference-shaped text inside a code
+// span is not a live footnote, so it travels along like ordinary text.
+// (The refusal message is NestedFootnoteNotice, shared with the caret
+// guards, so the one rule always speaks with one sentence.)
+//
+// This message is deliberately not ProtectedCreationNotice (Jason's
+// manual pass, 2026-08-13). That one means the caret sits inside
+// protected text. This one means a selection EDGE cuts through protected
+// text. Protected text held whole inside the selection is fine
+// (2026-08-19); it is cutting one apart that would corrupt what is left
+// behind.
 export const ProtectedSelectionNotice =
     NoFootnoteCreated + "the selection cuts through code, math, or other protected text. Select all of it or none of it.";
 
-// tables are protected against PARTIAL conversion (Jason's ruling
-// 2026-09-04, from his A13 pass): a cell, a few cells, or a row moved into
-// a footnote shreds the table left behind, and the body renders as nothing
-// sensible. Text inside ONE cell converts (the cell keeps its shape), and
-// a whole table travels with the prose around it like any other block.
+// A selection that takes only PART of a table refuses (Jason's ruling
+// 2026-09-04, from his A13 pass). Moving a cell, a few cells, or a whole
+// row into a footnote shreds the table that stays behind, and the pipes
+// and dashes that travel render as nothing sensible in the definition.
+// Two cases still work: text inside a single cell converts, because the
+// cell keeps its shape, and a whole table selected together with the
+// prose around it travels like any other block.
 export const TableSelectionNotice =
     NoFootnoteCreated + "the selection cuts through a table. Select text inside one cell, or the whole table with the text around it.";
 
 export type FootnoteCommandKind = "autonum" | "named" | "inline" | "paste";
 
-// The open Name-the-footnote modal, if any - so a footnote command pressed
-// while it's open SUBMITS it (like Enter) instead of stacking a second
-// modal over the first (Jason's ask 2026-08-22, always on, no toggle;
-// mirrors the popup editor's press-again-to-close idiom). One slot is
-// enough: modals are app-global overlays and only one can be open.
+// The Name-the-footnote modal that is currently open, or null. It is kept
+// here so that pressing a footnote command while the modal is open
+// submits it, exactly as Enter would, instead of opening a second modal
+// on top of the first (Jason's ask 2026-08-22; always on, no toggle). It
+// mirrors the popup editor, where pressing the key again closes it. A
+// single slot is enough, because a modal covers the whole app and only
+// one can be open at a time.
 let activeNameModal: { submit: () => void } | null = null;
 
-/** NameSelectionModal registers itself here on open (null on close). Exported for units - production callers are the modal below. */
+/** NameSelectionModal calls this when it opens, and again with null when it closes. Exported so tests can call it; in the running plugin only the modal below does. */
 export function registerActiveNameModal(
     modal: { submit: () => void } | null,
 ): void {
@@ -121,10 +143,13 @@ export function registerActiveNameModal(
 }
 
 /**
- * Submit the open Name-the-footnote modal, if any: true = a modal was open
- * and the press is consumed (converted under the typed name, closed on an
- * empty name, or kept open showing why the name can't be used - exactly
- * Enter's semantics). False = no modal; the command proceeds normally.
+ * Submits the open Name-the-footnote modal, if one is open.
+ *
+ * Returns true when a modal was open, which means this press was used up
+ * by the modal. What the modal then does is exactly what Enter does: it
+ * converts under the name you typed, closes on an empty name, or stays
+ * open and shows why the name can't be used. Returns false when no modal
+ * is open, and the command carries on as usual.
  */
 export function submitActiveNameModal(): boolean {
     if (activeNameModal === null) return false;
@@ -133,16 +158,24 @@ export function submitActiveNameModal(): boolean {
 }
 
 /**
- * The selection claim every creation command checks first: when a usable
- * selection exists, convert it (autonum/inline), or explain why this key
- * can't (named/paste, multi-line, multiple selections) - either way the
- * press is consumed (true). False = no usable selection; the normal caret
- * cascade owns the press. A whitespace-only selection counts as none -
- * there is no text to move into a footnote.
+ * The selection claim: the first thing every creation command checks.
  *
- * `cursorPosition` is the RESOLVED document caret the autonum/named
- * commands already hold (table sub-editor fallback); the cell conversion's
- * definition jump falls back to getCursor() without it.
+ * A claim is an early handler that takes the whole press before the
+ * normal cascade of steps begins. If there is text selected that can be
+ * converted, this converts it (numbered and inline) or explains why this
+ * particular key cannot (named, paste, a selection spanning lines,
+ * several separate selections). Either way it returns true, meaning the
+ * press has been dealt with.
+ *
+ * It returns false when there is nothing usable selected, and then the
+ * ordinary caret cascade takes the press. A selection holding only
+ * whitespace counts as nothing: there is no text to move into a footnote.
+ *
+ * `cursorPosition` is the caret position in the document that the
+ * numbered and named commands have already worked out (they need it
+ * because a table cell has its own little editor). Without it, the jump
+ * to the new definition after a cell conversion falls back to
+ * getCursor().
  */
 export function selectionPressHandled(
     plugin: FootnotePlugin,
@@ -152,16 +185,17 @@ export function selectionPressHandled(
     cursorPosition?: EditorPosition,
 ): boolean {
     if (cell) {
-        // the cell sub-editor owns the real selection while a table cell is
-        // being edited - the main editor's is stale (see table-cursor.ts)
+        // While you are editing a table cell, the cell has its own little
+        // editor, and that is where the real selection lives. The main
+        // editor's selection is out of date (see table-cursor.ts).
         const { anchor, head } = cell.state.selection.main;
         if (anchor === head) return false;
-        // the paste key never converts a selection - its body is the
-        // clipboard - so ANY selection redirects to the converting keys,
-        // before trimming, exactly like the main-editor branch below (review
-        // A5, Jason confirmed live 2026-09-08: a whitespace-only cell
-        // selection used to fall through and paste, where the main editor
-        // redirected)
+        // The paste key never converts a selection, because its body is
+        // the clipboard, so any selection at all is sent to the other
+        // keys. This check comes before the whitespace trimming, matching
+        // the main-editor branch further down (review A5, Jason confirmed
+        // live 2026-09-08: a cell selection of nothing but whitespace used
+        // to slip past here and paste, while the main editor redirected).
         if (command === "paste") {
             showNotice(SelectionCommandNotice, 8000);
             return true;
@@ -172,16 +206,19 @@ export function selectionPressHandled(
         while (from < to && /\s/.test(cellText[from])) from++;
         while (to > from && /\s/.test(cellText[to - 1])) to--;
         if (from === to) return false;
-        // whole-word expansion, same as the main-editor branch below
+        // Grow the selection out to whole words, the same way the
+        // main-editor branch below does.
         if (plugin.settings.expandSelectionToWholeWords) {
             from = startOfWordOffset(cellText, from);
             to = endOfWordOffset(cellText, to);
         }
-        // protected-EDGE cut is refused UP FRONT, not just simulated: the
-        // liveness checks prove the RESULT is live, but a selection that
-        // eats one delimiter of a span can make a live result out of
-        // destroying the construct. A span contained WHOLE travels into
-        // the footnote instead (2026-08-19; see the main-editor twin).
+        // Refuse an edge that cuts into protected text here and now,
+        // rather than leaving it to the simulation. The liveness checks
+        // only prove that the RESULT is a live footnote. A selection that
+        // swallows one delimiter of a code span can produce a perfectly
+        // live result precisely by destroying that span. A span the
+        // selection contains whole is fine and travels into the footnote
+        // (2026-08-19; the main editor has the twin of this check).
         const maskedCell = maskInlineRegions(cellText);
         if (
             caretInsideMaskedSpan(maskedCell, from, false, false) ||
@@ -190,20 +227,24 @@ export function selectionPressHandled(
             showNotice(ProtectedSelectionNotice, 8000);
             return true;
         }
-        // no nesting in cells either (2026-08-24)
+        // Nested footnotes are refused inside table cells too, under the
+        // same plugin-wide ruling (2026-08-24).
         if (spanTouchesFootnote(cellText, maskedCell, from, to)) {
             showNotice(NestedFootnoteNotice, 8000);
             return true;
         }
         const text = cellText.slice(from, to);
-        // the reference attaches to the text before the selection (see
-        // absorbLeadingSpace) - cell text carries no pipes, so only prose
-        // and the cell start can precede it
+        // The new reference sits snug against the text in front of the
+        // selection, with no space between (see absorbLeadingSpace). A
+        // cell's own text never contains a pipe, so the only things that
+        // can come before the selection are prose or the start of the
+        // cell.
         const replaceFrom = absorbLeadingSpace(cellText, from);
         const lead = cellText.slice(replaceFrom, from);
         if (command === "inline") {
             const wrapped = `^[${sanitizeInlineFootnoteContent(text)}]`;
-            // liveness refusal (with its own Notice) happens inside
+            // If the result would not be a live footnote, the refusal and
+            // its notice happen inside replaceInTableCell.
             replaceInTableCell(cell, wrapped, replaceFrom, to, wrapped.length);
             return true;
         }
@@ -229,11 +270,13 @@ export function selectionPressHandled(
 
     const resolved = normalizedMainSelection(doc);
     if (resolved === null) return false;
-    // the paste key never converts a selection, however many ranges there
-    // are - its body is the clipboard - so it redirects to the converting
-    // keys BEFORE the one-stretch check (Jason's A9 report 2026-09-08: two
-    // Alt-dragged ranges used to get the "one continuous stretch" toast,
-    // which sends the user somewhere the paste key still won't go)
+    // The paste key never converts a selection, no matter how many
+    // stretches are selected, because its body is the clipboard. So it
+    // points at the other keys BEFORE the one-stretch check runs. Order
+    // matters here: with the checks the other way round, two Alt-dragged
+    // ranges got the "one continuous stretch" message, which tells you to
+    // fix something that would still not let the paste key convert
+    // (Jason's A9 report 2026-09-08).
     if (command === "paste") {
         showNotice(SelectionCommandNotice, 8000);
         return true;
@@ -242,20 +285,25 @@ export function selectionPressHandled(
         showNotice(SelectionSpanNotice, 8000);
         return true;
     }
-    // shrink to the non-whitespace core (line breaks included): a
-    // selection made by double-click or drag routinely carries an edge
-    // space or a trailing newline, and that whitespace belongs to the
-    // prose, not to the footnote
+    // Shrink the selection in to the text itself, dropping whitespace at
+    // both edges, line breaks included. A selection made by double-click
+    // or by dragging routinely picks up a space at the edge or a trailing
+    // newline, and that whitespace belongs to the prose, not to the
+    // footnote.
     const trimmed = trimSelectionEdges(doc, resolved.from, resolved.to);
     if (trimmed === null) return false;
-    // ... then, with the toggle on (default), grow the core to WHOLE
-    // words: the end-of-word insert's selection twin (Jason's ask
-    // 2026-08-29). The start walks to its word's first character when the
-    // selection begins mid-word; the end normalizes to word end plus one
-    // trailing punctuation mark with FULL insert-key parity (his call:
-    // even an exact word-end selection gains the mark). Expansion runs
-    // BEFORE every refusal check below, so the checks judge the range
-    // that would actually convert.
+    // Then, with the setting on (which is the default), grow what is left
+    // out to whole words. This is the selection version of the
+    // end-of-word adjustment the insert keys already do (Jason's ask
+    // 2026-08-29). If the selection starts in the middle of a word, the
+    // start walks back to that word's first character. The end moves to
+    // the end of its word plus one punctuation mark, matching the insert
+    // keys exactly; Jason's call was that even a selection already ending
+    // at a word end picks up the punctuation mark.
+    //
+    // This growing happens BEFORE every refusal check below, so those
+    // checks judge the range that would really be converted, not the one
+    // you happened to drag.
     if (plugin.settings.expandSelectionToWholeWords) {
         trimmed.from = {
             line: trimmed.from.line,
@@ -266,8 +314,9 @@ export function selectionPressHandled(
             ch: endOfWordOffset(doc.getLine(trimmed.to.line), trimmed.to.ch),
         };
     }
-    // the inline key only converts within one line - a line-spanning
-    // selection redirects to the definition-backed keys (2026-08-20)
+    // The inline key works within a single line only. A selection that
+    // spans lines is sent to the numbered and named keys, which put the
+    // text in a definition instead (2026-08-20).
     if (command === "inline" && trimmed.from.line !== trimmed.to.line) {
         showNotice(InlineSelectionNotice, 8000);
         return true;
@@ -278,14 +327,16 @@ export function selectionPressHandled(
         showNotice(TableSelectionNotice, 8000);
         return true;
     }
-    // protected CUTS are refused UP FRONT, not just simulated: the
-    // born-dead checks prove the RESULT is live, but a selection that eats
-    // a delimiter makes a live result out of DESTROYING the construct -
-    // wrapping the first backtick of a fence opener un-fenced everything
-    // below it (found by the conversion property, 2026-08-12). Constructs
-    // contained WHOLE travel into the footnote instead (2026-08-19): an
-    // edge strictly inside protected text, or a replacement that would
-    // reclassify any line it doesn't touch, is what refuses.
+    // Refuse a selection that cuts protected text here and now, rather
+    // than leaving it to the simulation. The born-dead checks only prove
+    // that the RESULT is a live footnote; a selection that swallows one
+    // delimiter can produce a live result precisely by destroying the
+    // construct. A real example: wrapping the first backtick of a fence
+    // opener un-fenced everything below it (found by the conversion
+    // property test, 2026-08-12). Protected text the selection contains
+    // whole is fine and travels into the footnote (2026-08-19). What
+    // refuses is an edge strictly inside protected text, or a replacement
+    // that would change how Obsidian reads a line the edit never touches.
     const replacement =
         command === "inline"
             ? `^[${sanitizeInlineFootnoteContent(text)}]`
@@ -297,11 +348,12 @@ export function selectionPressHandled(
         showNotice(ProtectedSelectionNotice, 8000);
         return true;
     }
-    // a selection inside - or lapping over - another footnote's definition
-    // would nest footnotes into each other, refused like the caret presses
-    // (Jason's ruling 2026-08-13). Any overlap counts: starting inside a
-    // block nests the new footnote into it, and swallowing a block nests
-    // it into the new footnote.
+    // A selection that sits inside another footnote's definition block, or
+    // laps over one, would nest footnotes inside each other. It is refused
+    // just as the caret presses are (Jason's ruling 2026-08-13). Any
+    // overlap at all counts. Starting inside a block would nest the new
+    // footnote into the old one; swallowing a block would nest the old one
+    // into the new footnote.
     if (
         ctx.blocks().some(
             (block) =>
@@ -311,10 +363,11 @@ export function selectionPressHandled(
         showNotice(NestedFootnoteNotice, 8000);
         return true;
     }
-    // a blockquoted/callout definition is a live single-line definition
-    // that is never a block (second review 2026-09-09: selecting the body
-    // of "> [^1]: text" converted it, nesting the new footnote into the
-    // old one's line)
+    // A definition inside a blockquote or a callout is a live definition
+    // that occupies a single line, and it never counts as a definition
+    // block. It needs its own check (second review 2026-09-09: selecting
+    // the body of "> [^1]: text" converted it, which nested the new
+    // footnote into the old one's line).
     const starts = ctx.definitionStarts();
     for (let line = trimmed.from.line; line <= trimmed.to.line; line++) {
         if (starts[line]) {
@@ -322,14 +375,16 @@ export function selectionPressHandled(
             return true;
         }
     }
-    // ... and a selection touching any LIVE footnote artifact refuses too
-    // (nesting prevented plugin-wide, 2026-08-24)
+    // Finally, a selection that touches any live footnote at all refuses:
+    // a reference, a placeholder, or an inline footnote (nesting is
+    // prevented plugin-wide, 2026-08-24).
     if (selectionTouchesFootnote(ctx, trimmed.from, trimmed.to)) {
         showNotice(NestedFootnoteNotice, 8000);
         return true;
     }
-    // the reference attaches to the text before the selection: the
-    // whitespace run in front of the core is replaced too (absorbLeadingSpace)
+    // The new reference sits snug against the text in front of the
+    // selection, so the run of whitespace before it is replaced along with
+    // the selection itself (absorbLeadingSpace decides how much).
     const firstLine = doc.getLine(trimmed.from.line);
     const replaceFrom = { line: trimmed.from.line, ch: absorbLeadingSpace(firstLine, trimmed.from.ch) };
     const selection: ConvertedSelection = {
@@ -348,16 +403,21 @@ export function selectionPressHandled(
     return true;
 }
 
-/** A selection about to become a footnote: `[from, to)` is what the reference REPLACES, `text` is what moves into the footnote, and `lead` is the whitespace absorbed in front of the text (part of the replaced range, never of the body). */
+/**
+ * A selection that is about to become a footnote. `from` up to (but not
+ * including) `to` is the range the new reference replaces. `text` is what
+ * moves into the footnote. `lead` is the whitespace swallowed in front of
+ * the text: it is part of the replaced range, never part of the body.
+ */
 export interface ConvertedSelection {
     from: EditorPosition;
     to: EditorPosition;
     text: string;
-    /** the whitespace absorbed before the selection (absorbLeadingSpace), "" when none - the replacement starts at `from` and the note-changed guards compare `lead + text` */
+    /** The whitespace swallowed in front of the selection by absorbLeadingSpace, or "" when there was none. The replacement still starts at `from`, and the checks for "did the note change under the modal" compare `lead + text`. */
     lead: string;
 }
 
-/** The cell-editor twin of ConvertedSelection: offsets into the cell's own text. */
+/** The same thing as ConvertedSelection, but for a table cell's own editor: the positions are offsets into the cell's text. */
 export interface CellSelection {
     from: number;
     to: number;
@@ -366,14 +426,19 @@ export interface CellSelection {
 }
 
 /**
- * Where the replacement of a selection should START so the new reference
- * attaches to the text before it: a footnote reference never has a space
- * in front of it (Jason's formatting ruling 2026-09-08, from the hero GIF -
- * converting "range. The buoy log confirms this." left "range. [^2]"). The
- * run of spaces/tabs right before `ch` is absorbed when it follows real
- * prose on the same line; it stays when what precedes it is a list, task,
- * heading, or quote marker, a table pipe, or nothing at all - stripping
- * those would break the structure ("-[^1]") or do nothing useful.
+ * Works out where the replacement should start, so the new reference ends
+ * up snug against the text in front of it.
+ *
+ * A footnote reference never has a space before it (Jason's formatting
+ * ruling 2026-09-08, spotted in the hero GIF: converting "range. The buoy
+ * log confirms this." left behind "range. [^2]").
+ *
+ * So the run of spaces or tabs immediately before `ch` is swallowed, but
+ * only when real prose comes before it on the same line. It is left alone
+ * when what comes before is a list marker, a task marker, a heading
+ * marker, a blockquote marker, a table pipe, or nothing at all. Stripping
+ * the space in those cases would either break the structure (you would
+ * get "-[^1]") or achieve nothing.
  */
 export function absorbLeadingSpace(line: string, ch: number): number {
     const before = line.slice(0, ch);
@@ -387,10 +452,13 @@ export function absorbLeadingSpace(line: string, ch: number): number {
 }
 
 /**
- * The selection's non-whitespace core, edges walked ACROSS line breaks
- * (multi-line selections routinely start or end on a blank line), or null
- * when nothing but whitespace is selected. Also normalizes the full-line
- * drag (ending at ch 0 of the next line) back onto the dragged line.
+ * Trims whitespace off both ends of the selection and returns what is
+ * left, or null when the selection held nothing but whitespace.
+ *
+ * The trimming walks across line breaks, because a selection spanning
+ * several lines routinely begins or ends on a blank one. It also tidies
+ * the full-line drag, which ends at character 0 of the NEXT line, back
+ * onto the line you actually dragged.
  */
 function trimSelectionEdges(
     doc: Editor,
@@ -402,7 +470,8 @@ function trimSelectionEdges(
     while (fromLine < toLine || fromCh < toCh) {
         const lineText = doc.getLine(fromLine);
         if (fromCh >= lineText.length) {
-            // the implicit line break is whitespace too
+            // The line break at the end of a line counts as whitespace
+            // too, so step over it to the next line.
             fromLine++;
             fromCh = 0;
             continue;
@@ -427,11 +496,17 @@ function trimSelectionEdges(
 }
 
 /**
- * Whether `[from, to)` on one line touches any LIVE footnote artifact - a
- * reference, an empty "[^]" placeholder, or an inline footnote span. ANY
- * overlap counts: full containment would nest the artifact into the new
- * footnote's body, and a partial overlap would cut it apart. Masked
- * (code/math/comment) fakes are not footnotes and don't count.
+ * Whether the range from `from` up to `to` on one line touches any live
+ * footnote: a reference, an empty "[^]" placeholder, or an inline
+ * footnote.
+ *
+ * Any overlap counts. Containing one whole would nest it in the new
+ * footnote's body; overlapping one only partly would cut it in half.
+ *
+ * Fakes do not count. A fake is reference-shaped text that is not really a
+ * footnote, usually because it sits in code, math, or a comment. Those are
+ * blanked out in the masked twin (the copy of the line with protected text
+ * blotted out), which is what this reads.
  */
 function spanTouchesFootnote(
     lineText: string,
@@ -460,11 +535,14 @@ function spanTouchesFootnote(
 }
 
 /**
- * Whether the selection takes PART of a table: an edge on a table row is
- * refused unless both edges sit inside the same cell of one row (text
- * inside a cell converts). A table contained whole, edges on the prose
- * around it, passes - and a selection that is exactly the table refuses
- * too, since a table can't start on the definition's label line.
+ * Whether the selection takes only PART of a table.
+ *
+ * An edge landing on a table row is refused, unless both edges sit inside
+ * the same cell of the same row, because text within one cell converts
+ * fine. A table held whole, with both edges out in the prose around it,
+ * passes. A selection that is exactly the table and nothing else is
+ * refused as well, since a table cannot begin on a definition's label
+ * line.
  */
 function selectionCutsTable(
     ctx: DocContext,
@@ -479,7 +557,7 @@ function selectionCutsTable(
     );
 }
 
-/** The multi-line sweep of spanTouchesFootnote over a trimmed selection. */
+/** Runs spanTouchesFootnote over every line of a trimmed selection, so a selection spanning lines is checked the same way a single-line one is. */
 function selectionTouchesFootnote(
     ctx: DocContext,
     from: EditorPosition,
@@ -496,7 +574,7 @@ function selectionTouchesFootnote(
     return false;
 }
 
-/** The text `[from, to)` spans, LF-joined - the fake-editor-safe getRange. */
+/** The text between `from` and `to`, lines joined with "\n". This is a stand-in for the editor's own getRange that also works against the fake editor the tests use. */
 function rangeText(
     lines: string[],
     from: EditorPosition,
@@ -512,14 +590,21 @@ function rangeText(
 }
 
 /**
- * Whether either selection EDGE cuts into protected text: strictly inside
- * a masked span on its line, inside a multi-line region (comment/math/
- * fence) that crosses the edge, or anywhere in YAML frontmatter (metadata
- * is never prose - a footnote body carrying half a properties block helps
- * nobody). Constructs the selection contains WHOLE pass: their edges see
- * live text on the outside. Trimming guarantees the character AT `from`
- * and BEFORE `to` exist, so only the outward-facing neighbor needs the
- * open-region stand-in.
+ * Whether either edge of the selection cuts into protected text.
+ *
+ * Three ways it can: the edge is strictly inside a protected span on its
+ * own line, or inside a region that runs over several lines (a comment,
+ * math, or a code fence) and crosses that edge, or anywhere inside the
+ * YAML frontmatter at the top of the note. Frontmatter is never prose, and
+ * a footnote body holding half a properties block helps nobody.
+ *
+ * Protected text the selection contains whole passes this check, because
+ * both edges then look out onto ordinary live text.
+ *
+ * Trimming has already guaranteed that a real character sits at `from` and
+ * another sits just before `to`. So on each edge only the neighbor facing
+ * outward can be unknown, and only that side needs to be told whether a
+ * region is hanging open there.
  */
 function selectionCutsProtectedText(
     ctx: DocContext,
@@ -527,7 +612,8 @@ function selectionCutsProtectedText(
     to: EditorPosition,
 ): boolean {
     const { lines, scan } = ctx;
-    // frontmatter starts at line 0, so any overlap includes `from`
+    // Frontmatter always starts at line 0, so if the selection overlaps it
+    // at all, the `from` edge must be inside it. Checking `from` is enough.
     if (lines[0] === "---" && scan.isProtected[0]) {
         for (let j = 1; j < lines.length; j++) {
             if (/^(---|\.\.\.)\s*$/.test(lines[j])) {
@@ -536,22 +622,26 @@ function selectionCutsProtectedText(
             }
         }
     }
-    // the startsIn* trio says whether a multi-line region (comment, math,
-    // fence - quoted ones included) crosses the edge line's START; the
-    // fence flag exists precisely because a QUOTED fence is invisible to
-    // every endsProtected probe (30k-soak find, 2026-08-20: a full-line
-    // drag on a quoted fence's interior converted the line, demoting its
-    // quote and killing the fence).
+    // The three startsIn* flags each say whether a region that runs over
+    // several lines (a comment, math, or a code fence, quoted ones
+    // included) is still open at the START of a given line. The fence flag
+    // exists because a fence inside a blockquote is invisible to the
+    // endsProtected checks. Found in a 30,000-case soak, 2026-08-20: a
+    // full-line drag inside a quoted fence converted the line, which
+    // dropped its quote marker and killed the fence.
     const openInto = (line: number) =>
         scan.startsInComment[line] ||
         scan.startsInMath[line] ||
         scan.startsInFence[line];
-    // a protected from-line carrying NO region flag is a legitimate edge
-    // only when it's a fence OPENER - its construct extends DOWN into the
-    // selection. Everything else protected-and-unflagged (quote-relative
-    // indented code starts with ">" at ch 0, where the whitespace trim
-    // can't shield the edge - the second 30k-soak find of 2026-08-20 -
-    // plus doc-level indented chunks and dead openers) refuses.
+    // Suppose the line holding the `from` edge is protected but carries
+    // none of those three flags. That is a legitimate edge in one case
+    // only: the line is a fence OPENER, whose construct reaches DOWN into
+    // the selection. Everything else in that state refuses. Examples:
+    // indented code inside a blockquote, which starts with ">" at
+    // character 0, so the whitespace trimming cannot keep the edge out of
+    // it (the second find of the same 30,000-case soak, 2026-08-20); plus
+    // indented code at the top level of the note, and openers that never
+    // close.
     const fenceOpener = (line: number) =>
         line + 1 < lines.length
             ? scan.startsInFence[line + 1]
@@ -568,7 +658,7 @@ function selectionCutsProtectedText(
             ctx.maskedLine(from.line),
             from.ch,
             openInto(from.line),
-            false, // `from` points AT a character - the after-side is on-line
+            false, // the selection start sits ON a character, so its right-hand side is still on this line
         )
     ) {
         return true;
@@ -584,12 +674,16 @@ function selectionCutsProtectedText(
 }
 
 /**
- * Whether replacing the selection with `replacement` changes the
- * protection classification of ANY line the edit doesn't touch - the
- * construct-destruction oracle: a selection that eats a fence delimiter
- * (or completes/un-closes a region by removal) leaves a live-looking
- * result precisely BECAUSE innocent text below got reclassified, which
- * the reference/definition liveness checks can't see.
+ * Whether replacing the selection with `replacement` would change how
+ * Obsidian classifies any line the edit does not itself touch. Protected
+ * or not protected, before against after.
+ *
+ * This is the check that catches a destroyed construct. A selection that
+ * swallows a fence delimiter, or that closes or un-closes a region simply
+ * by being removed, can leave a result that looks perfectly live. It looks
+ * live precisely BECAUSE innocent text elsewhere in the note has just been
+ * reclassified, and the checks that test whether the new reference and
+ * definition are live cannot see that happen.
  */
 function replacementReclassifiesDoc(
     ctx: DocContext,
@@ -607,8 +701,10 @@ function replacementReclassifiesDoc(
         before.isProtected[i] !== after.isProtected[j] ||
         before.startsInComment[i] !== after.startsInComment[j] ||
         before.startsInMath[i] !== after.startsInMath[j] ||
-        // fence-role flips too: a closer whose opener the edit destroyed
-        // becomes an opener itself - same isProtected, different construct
+        // A code fence can change role as well: if the edit destroyed the
+        // opener of a fence, its closer now opens a new fence instead. The
+        // line looks equally protected either way, but it is a different
+        // construct, so this counts as a change too.
         before.startsInFence[i] !== after.startsInFence[j];
     for (let i = 0; i < from.line; i++) {
         if (changed(i, i)) return true;
@@ -620,13 +716,17 @@ function replacementReclassifiesDoc(
 }
 
 /**
- * `text` as a definition body: the first line rides the label, every
- * later line becomes a four-space-indented continuation (the shape the
- * scanner, the jump commands, and Obsidian's renderer all read as ONE
- * multi-paragraph footnote). Whitespace-only lines become exactly "    "
- * - still paragraph separators to the scanner and the renderer (both
- * treat whitespace-only as blank), but visually flush with the
- * continuation indent (Jason's ask, 2026-08-21).
+ * Turns `text` into a definition body.
+ *
+ * The first line goes on the label line itself. Every line after it
+ * becomes a continuation line, indented four spaces. That is the shape the
+ * scanner, the jump commands, and Obsidian's own renderer all read as one
+ * footnote with several paragraphs.
+ *
+ * A line holding only whitespace becomes exactly four spaces. The scanner
+ * and the renderer both treat a whitespace-only line as blank, so it still
+ * separates the paragraphs, but on screen it lines up with the
+ * continuation indent instead of sitting ragged (Jason's ask, 2026-08-21).
  */
 function indentDefinitionBody(text: string): string {
     return text
@@ -638,11 +738,15 @@ function indentDefinitionBody(text: string): string {
 }
 
 /**
- * The modal's validation: why `name` can't name the selection's new
- * footnote, or null when it can. An existing DEFINITION refuses (the
- * selection's text needs somewhere to live - duplicates are the merge
- * rule's business, not a creation side effect); a name that only dangling
- * references carry is WELCOME, since defining it heals them.
+ * The modal's validation: the reason `name` cannot name the selection's
+ * new footnote, or null when it can.
+ *
+ * A name that already has a definition is refused. The selected text needs
+ * somewhere to live, and merging duplicate definitions is the merge rule's
+ * job, not something creation should do behind your back.
+ *
+ * A name carried only by orphaned references is welcome, though. Those
+ * references have no definition, and defining the name heals them.
  */
 function namedSelectionProblem(
     doc: Editor,
@@ -658,12 +762,18 @@ function namedSelectionProblem(
 }
 
 /**
- * The named conversion the modal submits (exported for units - the modal
- * itself is DOM territory): validates against the CURRENT document,
- * confirms the captured selection still reads the same text (the note can
- * change under an open modal), then converts exactly like autonum under
- * `name`. Returns the problem to show inline (modal stays open), or null
- * when the press is settled - converted, or refused with its own Notice.
+ * The named conversion the modal runs when you submit it. Exported so the
+ * unit tests can call it, since the modal itself is DOM work they cannot
+ * reach.
+ *
+ * It checks the name against the document as it stands right now, then
+ * confirms the selection it captured still holds the same text, because
+ * the note can change while the modal sits open. Then it converts under
+ * `name`, exactly as the numbered command would.
+ *
+ * It returns a problem string to show inside the modal, which stays open,
+ * or null when the press is settled: either converted, or refused with a
+ * notice of its own.
  */
 export function convertSelectionToNamed(
     plugin: FootnotePlugin,
@@ -685,7 +795,7 @@ export function convertSelectionToNamed(
     return null;
 }
 
-/** The cell twin of convertSelectionToNamed. */
+/** The same as convertSelectionToNamed, but for a selection inside a table cell's own editor. */
 export function convertCellSelectionToNamed(
     plugin: FootnotePlugin,
     doc: Editor,
@@ -706,11 +816,15 @@ export function convertCellSelectionToNamed(
 }
 
 /**
- * The main editor's one usable selection range, oriented from ≤ to:
- * null = nothing selected, "multi" = unconvertible (multiple selection
- * ranges - one footnote can't stand in for several disjoint stretches).
- * Line-spanning ranges are usable since 2026-08-19: they become
- * multi-paragraph definitions.
+ * The main editor's single usable selection, turned the right way round so
+ * that `from` never comes after `to`.
+ *
+ * Returns null when nothing is selected, and "multi" when the selection
+ * cannot be converted because there are several separate stretches of it:
+ * one footnote cannot stand in for several disconnected pieces of text.
+ *
+ * A selection spanning lines is usable, and has been since 2026-08-19;
+ * such a selection becomes a definition with several paragraphs.
  */
 function normalizedMainSelection(
     doc: Editor,
@@ -720,11 +834,12 @@ function normalizedMainSelection(
         (range) => comparePositions(range.anchor, range.head) !== 0,
     );
     if (ranges.length === 0) return null;
-    // ONE real range plus extra collapsed carets (shift-drag then
-    // Alt-click) is exactly as ambiguous as two real ranges - the press
-    // used to convert the selection and silently DISCARD the extra
-    // caret, the very silent-drop the multi-caret feature exists to
-    // prevent (hunt 2026-08-25, bug-mixed-selection-extra-caret-dropped)
+    // One real selection plus one or more bare extra carets (shift-drag,
+    // then Alt-click somewhere else) is just as ambiguous as two real
+    // selections. The press used to convert the selection and quietly
+    // throw the extra caret away, which is exactly the silent drop the
+    // multi-caret press exists to prevent (hunt 2026-08-25,
+    // bug-mixed-selection-extra-caret-dropped).
     if (ranges.length > 1 || all.length > ranges.length) return "multi";
     let from = ranges[0].anchor;
     let to = ranges[0].head;
@@ -732,13 +847,20 @@ function normalizedMainSelection(
     return { from, to };
 }
 
-// The inline flavor: the selection becomes "^[…]" in place, caret after
-// the closing bracket - single-line selections only (the entry redirects
-// line-spanning ones, 2026-08-20); the sanitizer (shared with paste)
-// collapses whitespace and escapes unbalanced brackets so the wrapper
-// can't end early. Same born-dead refusal as insertInlineText: the span
-// must survive on the masked simulated line (a selection inside protected
-// text, or one whose removal completes a construct around it, dies here).
+// The inline version: the selection is wrapped as "^[…]" where it sits,
+// and the caret lands after the closing bracket. Single-line selections
+// only; a selection spanning lines was already sent elsewhere at the entry
+// point (2026-08-20).
+//
+// The content cleaner, shared with the paste key, collapses runs of
+// whitespace and escapes unbalanced brackets, so that a bracket in your
+// text cannot end the wrapper early.
+//
+// Then comes the same born-dead refusal that insertInlineText uses. A
+// born-dead insertion is one that would not be a real footnote the moment
+// it landed. So the new span has to survive on the masked twin of the
+// simulated line. A selection inside protected text dies here, and so does
+// one whose removal completes some construct around it.
 function convertMainSelectionToInline(
     plugin: FootnotePlugin,
     doc: Editor,
@@ -760,15 +882,21 @@ function convertMainSelectionToInline(
     ]);
 }
 
-// The definition-backed flavor, shared by autonum (next-numbered id) and
-// the named modal (typed id): the selection is replaced by "[^id]" and
-// moved into that footnote's definition body - then popup or jump per
-// settings, exactly like createAutonumFootnote. The simulate-and-verify
-// step matters MORE here than for a plain insert: deleting the selection
-// can un-close a construct (its closer was selected) and the seeded body
-// travels arbitrary text into the definition line. A null id means the
-// note's prefix is invalid (its Notice already explained); the press was
-// still consumed.
+// The version that puts the text in a definition. Both the numbered key
+// (which mints the next free number) and the named modal (which uses the
+// name you typed) come through here. The selection is replaced by
+// "[^name]" and the text moves into that footnote's definition body. The
+// press then lands in the popup or jumps to the definition, whichever the
+// settings say, exactly as createAutonumFootnote does.
+//
+// Simulating the edit and verifying the result matters more here than for
+// a plain insertion, for two reasons. Deleting the selection can leave a
+// construct hanging open, when its closing delimiter was part of what you
+// selected. And the body carries whatever text you selected onto the
+// definition line, which could be anything.
+//
+// A null name means the note's prefix is invalid; the notice explaining
+// that has already been shown. The press still counts as handled.
 function convertMainSelection(
     plugin: FootnotePlugin,
     doc: Editor,
@@ -780,8 +908,9 @@ function convertMainSelection(
     const footnoteReference = referenceText(footnoteId);
     const isFirstFootnote = listExistingFootnoteDefinitions(doc, ctx).length === 0;
 
-    // a multi-line selection becomes a multi-paragraph body: continuation
-    // lines indented four spaces under the label (2026-08-19)
+    // A selection spanning lines becomes a body with several paragraphs:
+    // continuation lines indented four spaces under the label
+    // (2026-08-19).
     const body = indentDefinitionBody(selection.text);
     const bodyExtraLines = body.split("\n").length - 1;
     const definition = seedDefinitionBody(
@@ -798,21 +927,26 @@ function convertMainSelection(
     ];
     if (definition.prepend) changes.push(definition.prepend);
 
-    // same verification as createAutonumFootnote, generalized to a seeded
-    // multi-line body: the definition block must claim every seeded
-    // continuation line. The label line is derived through simulatedAnchor
-    // FIRST - a definition appended ABOVE the selection shifts every later
-    // line (entry-corpus find, 2026-08-12), and a multi-line selection
-    // collapsing to "[^id]" shifts every line BELOW it, the appended
-    // definition included (2026-08-19) - then the shared
-    // verifyLiveFootnoteInsertion reuses the same simulated result.
+    // The same verification createAutonumFootnote does, widened to cover a
+    // body that was filled in ahead of time and may span lines: the new
+    // definition block has to claim every one of those continuation lines.
+    //
+    // Order is load-bearing. The label's line number is worked out through
+    // simulatedAnchor FIRST, because two things can shift line numbers.
+    // A definition appended ABOVE the selection pushes every later line
+    // down (found in the entry corpus, 2026-08-12). And a selection
+    // spanning lines collapsing to "[^name]" pulls every line below it up,
+    // the appended definition included (2026-08-19). Only then does the
+    // shared verifyLiveFootnoteInsertion run, reusing the same simulated
+    // document.
     const simulated = simulateChanges(ctx.lines, changes);
     const definitionAnchor = simulatedAnchor(ctx.lines, changes, 1, simulated);
-    // the label's line comes from the seeding step, which located it before
-    // the body could carry a label-shaped string of its own (review A4)
+    // The label's line comes from the seeding step, which found it before
+    // the body could contribute a label-shaped string of its own and
+    // confuse the search (review A4).
     const labelLine = definitionAnchor.line + definition.labelLineOffset;
-    // where the caret should land AFTER the transaction: the end of the
-    // seeded body, in simulated coordinates
+    // Where the caret should end up once the edit has been applied: the
+    // end of the body, in the simulated document's line numbers.
     const definitionCursor = {
         line: labelLine + bodyExtraLines,
         ch: definition.cursor.ch,
@@ -843,24 +977,26 @@ function convertMainSelection(
             line: referenceAnchor.line,
             ch: referenceAnchor.ch + footnoteReference.length,
         },
-        // a conversion CREATES a footnote, so the landing's creation lint
-        // covers it like every other creation press (Jason's parity ask
-        // 2026-08-25). The seeded body is how the lint re-finds the new
-        // definition after renumbering and MOVING it - the
-        // empty-definition relocation can't (a conversion's definition is
-        // never empty), and without it the caret was left on whatever the
-        // lint's minimal replacement put at its old spot (Jason's A8
-        // report, 2026-08-26)
+        // A conversion creates a footnote, so the landing runs the same
+        // after-creation lint that every other creation press gets (Jason
+        // asked for that parity on 2026-08-25). The seeded body is how the
+        // lint finds the new definition again after it has renumbered it
+        // and moved it to the bottom. The usual trick, looking for the one
+        // empty definition, cannot work here because a converted definition
+        // is never empty. Without the seeded body the caret was left on
+        // whatever text the lint's replacement put at its old spot (Jason's
+        // A8 report, 2026-08-26).
         seededBody: body,
     });
 }
 
-// The definition-backed flavor inside an actively edited table cell,
-// shared by autonum and the named modal: the reference replaces the cell
-// selection through the cell's own editor, the pre-filled definition
-// appends outside the table - mirroring createAutonumFootnote's cell
-// branch, including its refused-cell contract: a born-dead cell
-// replacement must not leave an orphaned definition behind.
+// The definition-backed version for a table cell you are actively
+// editing. Both the numbered key and the named modal use it. The
+// reference replaces the cell selection through the cell's own editor,
+// while the pre-filled definition is appended outside the table. This
+// mirrors createAutonumFootnote's cell branch, including its promise
+// about refusals: when the cell replacement would be born-dead, no
+// orphaned definition may be left behind.
 function convertCellSelection(
     plugin: FootnotePlugin,
     doc: Editor,
@@ -895,7 +1031,7 @@ function convertCellSelection(
     });
 }
 
-/** What the name modal converts on submit: the captured main-editor or cell selection. */
+/** What the name modal will convert when you submit it: the selection it captured, either from the main editor or from a table cell. */
 type NamedSelectionTarget =
     | {
           kind: "main";
@@ -908,13 +1044,15 @@ type NamedSelectionTarget =
           cursorPosition?: EditorPosition;
       };
 
-// One text input for the footnote's name; Enter (or Create) converts the
-// captured selection under it. Invalid names and collisions show their
-// reason inline and keep the modal open - same shape as the rename and
-// set-prefix modals. Validation and conversion live in the exported
-// functions above; this is thin wiring.
-// Stryker disable all: modal DOM against the live app - smoke-test
-// territory, unreachable from units (same policy as RenameFootnoteModal).
+// A single text box for the footnote's name. Enter, or the Create button,
+// converts the captured selection under whatever you typed. A name that is
+// invalid, or one that is already taken, shows its reason inside the modal
+// and leaves it open. This is the same shape as the rename and set-prefix
+// modals. The validation and the conversion itself live in the exported
+// functions above; what follows is just the wiring.
+// Stryker disable all: this is modal DOM running against the live app.
+// The unit tests cannot reach it, so the smoke tests cover it instead
+// (the same policy RenameFootnoteModal follows).
 class NameSelectionModal extends ValidatedTextModal {
     private plugin: FootnotePlugin;
     private doc: Editor;
@@ -934,23 +1072,26 @@ class NameSelectionModal extends ValidatedTextModal {
     }
 
     onOpen() {
-        // a closure, not `this`: submit() is protected and the registry
-        // only needs the one capability. This modal alone participates in
-        // the active-modal protocol - the base class knows nothing of it.
+        // Register a small closure rather than `this`. submit() is
+        // protected, and the one thing the registry needs is the ability
+        // to call it. Only this modal takes part in the active-modal
+        // arrangement; the base class knows nothing about it.
         registerActiveNameModal({
             submit: () => {
                 this.submit();
             },
         });
-        // the registry above only serves the command palette and
-        // executeCommandById - a REAL keypress never reaches global
-        // hotkeys while a modal is open, because the modal's scope owns
-        // the keyboard (Jason's report 2026-08-22: "the dialog still only
-        // closes with Enter"). Speak the commands' own combos on this
-        // scope: the same keys that create footnotes submit the modal.
-        // The ids come from the plugin's registration itself (never a
-        // second hand-kept list), and Scope does the combo matching - the
-        // one mechanism Obsidian provides for exactly this.
+        // The registry above only helps the command palette and
+        // executeCommandById. A real keypress never reaches a global
+        // hotkey while a modal is open, because the modal's scope owns the
+        // keyboard (Jason's report 2026-08-22: "the dialog still only
+        // closes with Enter").
+        //
+        // So register the commands' own key combinations on this scope:
+        // the very keys that create footnotes now submit the modal. The
+        // command ids come from the plugin's own registration, never from
+        // a second list kept by hand, and Obsidian's Scope does the
+        // matching, which is the one mechanism it offers for this.
         for (const commandId of this.plugin.editorCommandIds) {
             for (const hotkey of commandHotkeys(this.plugin.app, commandId)) {
                 this.scope.register([...hotkey.modifiers], hotkey.key, (evt) => {

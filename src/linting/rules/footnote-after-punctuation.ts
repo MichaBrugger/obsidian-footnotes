@@ -4,34 +4,44 @@ import { IgnoreType } from "../ignore-types";
 import { rewriteDocument } from "../rewrite-document";
 import { FootnoteRule } from "../rule";
 
-// Linter's "footnote after punctuation" as a pure transform. Policy pinned
-// in test/footnote-after-punctuation.test.ts.
+// The obsidian-linter plugin's "footnote after punctuation" rule, rewritten
+// here as a pure function: text in, text out. What it should and should not
+// do is pinned by test/footnote-after-punctuation.test.ts.
 
-// the ONE punctuation class shared with the insert commands' end-of-word
-// hop (TrailingPunctuationChars: ASCII + CJK fullwidth), escaped for use
-// inside a regex character class
+// The ONE set of punctuation characters used across the plugin. The insert
+// commands' end-of-word adjustment uses the same list
+// (TrailingPunctuationChars: the ASCII punctuation plus the CJK fullwidth
+// forms). It is escaped here so it can go inside a regular expression's
+// square brackets.
 const PunctuationClass = TrailingPunctuationChars.replace(
     /[.*+?^${}()|[\]\\-]/g,
     "\\$&",
 );
 const SinglePunctuation = new RegExp(`[${PunctuationClass}]`);
 
-// Swap every reference-run/punctuation-run pair in one segment of a line.
-// References come from referenceOccurrences - the grammar's exclusions
-// (escaped "\[^1]" is literal prose, "^[…]" brackets belong to their
-// inline footnote) apply here too: a hand-rolled regex used to swap those,
-// turning text the user typed on purpose into a live reference
-// (2026-08-11 review bug #1). The scan runs on the code-masked text but
-// the output is assembled from the original (a reference name could
-// otherwise pick up mask characters).
+// Swap each run of references with the run of punctuation after it, within
+// one stretch of a line.
+//
+// The references come from referenceOccurrences, so everything the shared
+// grammar refuses to count as a reference is refused here too: an escaped
+// "\[^1]" is literal prose, and the brackets of an "^[...]" inline footnote
+// belong to that footnote. This file used to find them with a regular
+// expression of its own, which swapped those shapes as well and so turned
+// text the user had typed on purpose into a live reference (2026-08-11
+// review, bug #1).
+//
+// The searching is done on the masked twin, but the text handed back is
+// built from the original line. Otherwise a footnote name could come out
+// with the blanking characters in it.
 function swapInSegment(original: string, masked: string): string {
     const occurrences = referenceOccurrences(original, masked);
     let out = "";
     let copied = 0;
     let k = 0;
     while (k < occurrences.length) {
-        // a run of back-to-back references swaps as one unit - an excluded
-        // shape between two references breaks the run
+        // References written back to back move as one unit. Anything the
+        // grammar refuses to count, sitting between two of them, ends the
+        // run.
         let last = k;
         while (
             last + 1 < occurrences.length &&
@@ -42,8 +52,9 @@ function swapInSegment(original: string, masked: string): string {
         const start = occurrences[k].start;
         const end = occurrences[last].end;
         k = last + 1;
-        // the punctuation run directly after; matching both as runs makes a
-        // single pass idempotent ("[^1][^2]?!" swaps as one unit)
+        // The run of punctuation immediately after it. Taking both sides as
+        // whole runs is what lets one pass finish the job, so running the
+        // lint again changes nothing: "[^1][^2]?!" moves in one go.
         let punctuationEnd = end;
         while (
             punctuationEnd < masked.length &&
@@ -52,9 +63,10 @@ function swapInSegment(original: string, masked: string): string {
             punctuationEnd++;
         }
         if (punctuationEnd === end) continue;
-        // a reference run already sitting AFTER punctuation is settled - the
-        // punctuation following it belongs to the next clause, and swapping
-        // again would drift it away from its text (idempotence)
+        // A run of references that already comes AFTER punctuation is where
+        // it should be. Any punctuation after it belongs to the next
+        // clause, and moving the references again would walk them further
+        // and further from the words they belong to.
         if (start > 0 && SinglePunctuation.test(masked[start - 1])) continue;
         out +=
             original.slice(copied, start) +
@@ -66,24 +78,28 @@ function swapInSegment(original: string, masked: string): string {
 }
 
 /**
- * Move every footnote reference that sits before punctuation to sit after it
- * ("word[^1]." → "word.[^1]"). Definition prefixes are never touched;
- * definition content, like all other prose, is corrected. Code blocks,
- * inline code, and frontmatter are left alone.
+ * Move every footnote reference that sits before punctuation so it sits
+ * after it instead: "word[^1]." becomes "word.[^1]".
+ *
+ * A definition's own label is never touched. The body of a definition is
+ * prose like any other, so references in it are moved too. Code blocks,
+ * inline code and frontmatter are left alone.
  */
 export function footnoteAfterPunctuation(markdown: string): string {
-    // document-aware masking: the comment portions of multi-line boundary
-    // lines are masked while their live portions still get the swap
-    // (bug-comment-boundary-lines)
+    // The masked twin is built with the whole note in view. On a line where
+    // a comment opens or closes, the part inside the comment is blanked
+    // while the part outside it still gets the swap
+    // (bug-comment-boundary-lines).
     return rewriteDocument(markdown, (_text, { lines, scan, maskedLines }) => {
 
         const result = lines.map((line, i) => {
             if (scan.isProtected[i]) return line;
             const masked = maskedLines[i];
-            // a definition's own "[^x]:" prefix must not be treated as a
-            // reference-before-colon - skip past it. Blockquoted/callout labels
-            // ("> [^1]: def.") are definitions too (C22): the swap used to
-            // mangle them into "> :[^1] def."
+            // A definition's own "[^x]:" label is not a reference sitting
+            // in front of a colon, so start after it. Labels inside a
+            // blockquote or a callout ("> [^1]: def.") are labels just the
+            // same (C22); the swap used to mangle those into
+            // "> :[^1] def."
             const prefixLength = definitionLabelIn(line)?.labelEnd ?? 0;
             return (
                 line.slice(0, prefixLength) +
@@ -94,7 +110,7 @@ export function footnoteAfterPunctuation(markdown: string): string {
     });
 }
 
-/** Linter-shaped wrapper: id matches Linter's rule filename. */
+/** This rule's catalogue entry. The id matches obsidian-linter's file name. */
 export const footnoteAfterPunctuationRule: FootnoteRule = {
     id: "footnote-after-punctuation",
     name: "Footnote after punctuation",

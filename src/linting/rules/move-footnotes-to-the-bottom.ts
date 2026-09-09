@@ -8,24 +8,34 @@ import { IgnoreType } from "../ignore-types";
 import { rewriteDocument } from "../rewrite-document";
 import { FootnoteRule } from "../rule";
 
-// Linter's "move footnotes to the bottom" as a pure transform, integrated
-// with the plugin's section-heading setting. Policy pinned in
-// test/move-footnotes-to-bottom.test.ts. The output layout deliberately
-// matches buildDefinitionAppend's insert flow, so a note the plugin built is a
-// fixed point of this transform.
+// The obsidian-linter plugin's "move footnotes to the bottom" rule,
+// rewritten here as a pure function and joined up with this plugin's
+// section-heading setting. What it should and should not do is pinned by
+// test/move-footnotes-to-bottom.test.ts.
+//
+// The layout it produces deliberately matches the one buildDefinitionAppend
+// produces when the plugin inserts a definition. That means a note the
+// plugin built is already in its final shape: running this rule over it
+// changes nothing.
 
 /**
- * A document whose FIRST line is a bare unclosed "---" reads as a thematic
- * break - until an edit introduces a column-0 "---"/"..." further down, at
- * which point Obsidian re-reads the whole head as a YAML frontmatter block
- * and every line in it (prose, references) silently leaves the note body
- * (verified against metadataCache section types, 2026-08-10; found by the
- * remark differential oracle - gathering definitions under a "---\n##
- * Footnotes" heading closed the phantom block and reindex then renumbered
- * an orphaned definition onto the swallowed reference's name). When a
- * rebuild would flip that interpretation, one blank line is prepended: it
- * renders identically, and frontmatter can only open on the very first
- * line, so line 0 stays content forever.
+ * Guard against a note's first line turning into frontmatter.
+ *
+ * A note whose FIRST line is "---" with no matching "---" later on reads as
+ * a horizontal rule. But add a "---" or "..." at the left margin further
+ * down, and Obsidian re-reads the whole top of the note as a YAML
+ * frontmatter block. Everything caught in it, prose and references alike,
+ * quietly stops being part of the note's body. (Verified against
+ * metadataCache's section types, 2026-08-10.)
+ *
+ * This was found by the differential test that compares the plugin against
+ * the remark parser: gathering definitions under a "---\n## Footnotes"
+ * heading closed that phantom block, and reindex then handed the name of a
+ * swallowed reference to an orphaned definition.
+ *
+ * So when rebuilding the note would flip that reading, one blank line goes
+ * in front. It renders exactly the same, and frontmatter can only open on
+ * the very first line, so line 0 stays ordinary content for good.
  */
 function preserveLeadingThematicBreak(
     firstLineWasProtected: boolean,
@@ -37,18 +47,25 @@ function preserveLeadingThematicBreak(
 }
 
 /**
- * Gather every footnote definition block at the note's footnote section,
- * keeping the blocks' relative order (reordering is reindexFootnotes' job).
- * When `sectionHeading` is given (the raw setting value) and an exact
- * unprotected copy exists in the note, its FIRST occurrence anchors the
- * section: definitions gather directly under it, WHEREVER it is - linting
- * must obey the user's chosen section location instead of dragging the
- * section to the bottom (issue #55 follow-up, reported 2026-08-05).
- * Without an anchor, definitions move to the end of the note and the
- * heading (when configured) is inserted above them, always separated from
- * content by blank lines. A note whose end sits inside an unclosed fence
- * or comment is returned unchanged: appending there would turn the
- * definitions into inert code.
+ * Gather every footnote definition block into the note's footnote section,
+ * leaving the blocks in the order they were already in. Putting them in a
+ * different order is reindexFootnotes' job, not this one.
+ *
+ * Where they gather depends on the section heading. `sectionHeading` is the
+ * setting's value exactly as the user typed it. When it is set and the note
+ * contains an exact copy of it outside protected text, the FIRST such copy
+ * fixes the spot: the definitions gather directly under it, WHEREVER in the
+ * note it happens to be. The lint has to respect where the user put their
+ * footnote section instead of hauling it down to the bottom (issue #55
+ * follow-up, reported 2026-08-05).
+ *
+ * With no such heading to aim at, the definitions move to the end of the
+ * note, and the heading, if one is configured, is put in above them. Blank
+ * lines always separate them from the text around them.
+ *
+ * A note that ends inside an unclosed code fence or comment comes back
+ * untouched: anything added at the end would land inside that region and
+ * stop being a definition at all.
  */
 export function moveFootnoteDefinitionsToBottom(
     markdown: string,
@@ -57,37 +74,46 @@ export function moveFootnoteDefinitionsToBottom(
     return rewriteDocument(markdown, (text, view) => {
         const lines = view.lines;
 
-        // remember the document's trailing newlines; they go back on at the
-        // end. The view's own trim keeps the scan honest: nothing derived
-        // from the lines may exist before it runs
+        // Remember how many blank lines the note ended with; they go back on
+        // at the end. The trim goes through the view's own method, which
+        // refuses to run once anything has been worked out from the lines,
+        // so the scan can never end up describing the untrimmed note.
         const trailingNewlines = view.trimTrailingBlankLines();
 
         const { scan, blocks } = view;
         const isProtected = scan.isProtected;
         if (blocks.length === 0) return text;
 
-        // a line appended at EOF would itself be protected (an unclosed fence
-        // or comment runs to EOF) - relocating definitions into such a region
-        // would sever them from their references
+        // A line added at the end of the note would be inside protected
+        // text, because an unclosed code fence or comment runs on to the end
+        // of the file. Moving definitions in there would cut them off from
+        // their references.
         if (scan.endsProtected) return text;
 
         const definitions = blocks
             .map((block) => lines.slice(block.start, block.end + 1).join("\n"))
             .join("\n");
 
-        // everything that isn't moving, in place (removeLineRanges collapses
-        // the blank lines a cut leaves meeting each other)
+        // Everything that is staying put, still in order. removeLineRanges
+        // also closes the gap: when cutting a block leaves two blank lines
+        // next to each other, they become one.
         const body = removeLineRanges(lines, blocks);
         while (body.length > 0 && body[body.length - 1] === "") body.pop();
 
-        // the setting is markdown that can span MULTIPLE lines
-        // ("---\n## Footnotes"), so matching compares line runs - single-line
-        // comparison kept re-adding multi-line headings on every lint (bug
-        // reported 2026-07-17). findLineRunEnd is the ONE anchor matcher
-        // shared with buildDefinitionAppend's heading slot (fixed-point
-        // guarantee). The scan runs on the post-cut body: cutting whole
-        // definition blocks can't change fence pairing, so protection is
-        // re-derived safely.
+        // The section-heading setting is markdown that may run over
+        // SEVERAL lines, such as "---\n## Footnotes". So the search
+        // compares runs of lines, not single ones. Comparing line by line
+        // meant a multi-line heading was never recognised and a fresh copy
+        // was added on every lint (bug reported 2026-07-17).
+        //
+        // findLineRunEnd is the ONE piece of code that finds the heading,
+        // shared with the heading slot in buildDefinitionAppend. That is
+        // what guarantees a note the plugin built comes back unchanged.
+        //
+        // The scan here runs on the body with the definitions already cut
+        // out. That is safe: removing whole definition blocks cannot change
+        // which code fences pair with which, so the protected regions come
+        // out the same.
         let anchorEnd = -1;
         if (sectionHeading) {
             anchorEnd = findLineRunEnd(
@@ -101,8 +127,9 @@ export function moveFootnoteDefinitionsToBottom(
             const out: string[] = [];
             const headingStart = anchorEnd - sectionHeading.split("\n").length + 1;
             for (let i = 0; i <= anchorEnd; i++) {
-                // normalize the blank line above the heading run's start -
-                // same markdown block convention as everywhere else
+                // Make sure there is a blank line above where the heading
+                // starts, the same way every other block of markdown here
+                // is separated
                 if (
                     i === headingStart &&
                     out.length > 0 &&
@@ -113,9 +140,10 @@ export function moveFootnoteDefinitionsToBottom(
                 out.push(body[i]);
             }
             out.push("", ...definitions.split("\n"));
-            // the rest of the note follows below the gathered definitions,
-            // separated by a blank line so it can't lazily continue the last
-            // definition (same rule as buildDefinitionAppend)
+            // The rest of the note goes below the gathered definitions,
+            // with a blank line between. Without it, the first line of that
+            // text would be read as more of the last definition
+            // (buildDefinitionAppend follows the same rule).
             const rest = body.slice(anchorEnd + 1);
             while (rest.length > 0 && rest[0] === "") rest.shift();
             if (rest.length > 0) out.push("", ...rest);
@@ -129,10 +157,12 @@ export function moveFootnoteDefinitionsToBottom(
         const base = body.join("\n");
         let headingPart = "";
         if (sectionHeading !== "" && base !== "") {
-            // same layout rule as addFootnoteSectionHeader: a blank line always
-            // separates the heading from the body above it (markdown block
-            // convention; it also keeps a divider heading from turning the last
-            // body line into a setext heading)
+            // The same layout rule addFootnoteSectionHeader uses: a blank
+            // line always separates the heading from the text above it.
+            // That is how markdown blocks are kept apart, and it also stops
+            // a heading that starts with a "---" divider from turning the
+            // last line of the note's text into a heading, the way a line
+            // of dashes underneath text does in markdown.
             headingPart = "\n\n" + sectionHeading;
         }
 
@@ -150,8 +180,9 @@ export function moveFootnoteDefinitionsToBottom(
 }
 
 /**
- * Linter-shaped wrapper: id matches Linter's rule filename. The option is the
- * raw section-heading setting value (empty = no heading).
+ * This rule's catalogue entry. The id matches obsidian-linter's file name.
+ * The option is the section-heading setting exactly as the user typed it;
+ * empty means no heading.
  */
 export const moveFootnotesToTheBottomRule: FootnoteRule<string> = {
     id: "move-footnotes-to-the-bottom",

@@ -2,52 +2,64 @@ import { Notice } from "obsidian";
 
 import { quotedReference } from "../parsing/footnote-grammar";
 
-// Every toast the plugin shows goes through showNotice. Obsidian's notice
-// wraps with `overflow-wrap: anywhere`, which is allowed to break a line
-// between ANY two characters once the line is full - so a quoted footnote
-// name could render as `Add a"` on one line and `[^bob]" reference` on the
-// next (Jason's report 2026-09-04, right after every toast gained the
-// quotes for consistency). A quoted reference is one visual token; it is
-// wrapped in a no-wrap span so the quotes, the brackets, and the name
-// always land on the same line. Messages without one stay plain strings.
+// Every toast the plugin shows goes through showNotice.
+//
+// The problem it solves: Obsidian's notice uses `overflow-wrap: anywhere`,
+// which lets a full line break between ANY two characters. So a quoted
+// footnote name could come out as `Add a"` at the end of one line and
+// `[^bob]" reference` at the start of the next (Jason's report 2026-09-04,
+// right after every toast gained the quotes for consistency).
+//
+// A quoted reference should read as one thing, so it is wrapped in a
+// no-wrap span: the quotes, the brackets and the name always land on the
+// same line. A message with none of them stays a plain string.
 
 // ---- Shared toast text ------------------------------------------------
-// One string per rule, built from shared parts (Jason, 2026-09-05): a
-// refusal that means the same thing says the same thing wherever it
-// fires, so there are fewer unique strings to maintain and, later, to
-// translate.
+// One string per rule, assembled from shared pieces (Jason, 2026-09-05).
+// A refusal that means the same thing says the same thing wherever it
+// fires, which leaves fewer separate strings to keep in step and, later,
+// to translate.
 
-/** The refusal opener every "nothing was created" toast starts with. */
+/** The opening words every "nothing was created" refusal starts with. */
 export const NoFootnoteCreated = "No footnote was created: ";
-/** Its plural, for the multi-caret press. */
+/** The same opener in the plural, for a multi-caret press. */
 const NoFootnotesCreated = "No footnotes were created: ";
-/** The lint's opener when a note can't be linted at all. */
+/** The opener lint uses when a note cannot be linted at all. */
 export const LintingCanceled = "Linting canceled: ";
 
-/** The one nesting rule: a caret in a definition body, a selection holding a footnote, a caret inside a footnote among plain-text carets. */
+/** The one nesting rule, worded once. It covers a caret inside a definition
+ * body, a selection that already holds a footnote, and a caret inside a
+ * footnote among otherwise plain-text carets. */
 const NestingRule = "footnotes can't be nested inside other footnotes.";
 export const NestedFootnoteNotice = NoFootnoteCreated + NestingRule;
 export const MultiCaretNestedNotice = NoFootnotesCreated + NestingRule;
 
-/** The advice for a definition nothing references - the navigation press and the lint alert give the same one. */
+/** The advice for a definition nothing references. The navigation press and
+ * the lint alert give the same advice. */
 export function addReferenceOrDeleteDefinition(name: string): string {
     return `Add a ${quotedReference(name)} reference in the text, or delete the definition.`;
 }
 
-/** A name another footnote already carries - the named-selection and Rename modals say the same thing. */
+/** A name another footnote already carries. The named-selection modal and
+ * the Rename modal say the same thing. */
 export function nameAlreadyUsed(name: string): string {
     return `${quotedReference(name)} is already used by another footnote.`;
 }
 
-/** An invalid footnote-prefix property, as the insert refusal and the lint cancel both report it. */
+/** An invalid footnote-prefix property, worded the same way whether the
+ * insert refuses or the lint cancels. */
 export function invalidPrefixMessage(opener: string, prefix: string, problem: string): string {
     return `${opener}this note's footnote-prefix ("${prefix}") is invalid. ${problem}`;
 }
 
-/** A quoted footnote reference exactly as the toasts spell it: `"[^name]"`, the empty `"[^]"` and bare-prefix `"[^2.]"` placeholders included - and the quoted label `"[^name]:"` the lazy-definition alert uses. */
+/** A quoted footnote reference, exactly as the toasts spell it:
+ * `"[^name]"`, including the empty `"[^]"` and bare-prefix `"[^2.]"`
+ * placeholders, and the quoted label `"[^name]:"` that the lazy-definition
+ * alert uses. */
 const QuotedReference = /"\[\^[^"\]]*\]:?"/g;
 
-/** The message split into runs: `nowrap` runs are quoted references that must not break across lines. */
+/** The message cut into runs. A run marked `nowrap` is a quoted reference,
+ * which must not be broken across two lines. */
 export function noticeSegments(message: string): { text: string; nowrap: boolean }[] {
     const segments: { text: string; nowrap: boolean }[] = [];
     let last = 0;
@@ -65,10 +77,10 @@ export function noticeSegments(message: string): { text: string; nowrap: boolean
 }
 
 /**
- * Show a toast. Quoted footnote references in `message` are kept on one
- * line (a no-wrap span each); a message without any, or a host without
- * Obsidian's DOM helpers (units), goes to Obsidian's Notice as the plain
- * string.
+ * Show a toast. Every quoted footnote reference in `message` is kept on one
+ * line, each in its own no-wrap span. A message with none of them, or a
+ * host that has no Obsidian DOM helpers (unit tests), is handed to
+ * Obsidian's Notice as the plain string.
  */
 export function showNotice(message: string, duration?: number): Notice {
     const segments = noticeSegments(message);

@@ -8,32 +8,50 @@ import { IgnoreType } from "../ignore-types";
 import { rewriteDocument } from "../rewrite-document";
 import { FootnoteRule } from "../rule";
 
-// "Fix definitions hidden by a missing blank line" (Jason, 2026-09-09). A
-// "[^x]:" line directly under a prose line - paragraph text, a list item,
-// a quote or callout body line, a table row - is lazy paragraph text to
-// Obsidian (the prose-label rule, definitionStartLines), one blank line
-// short of the definition the user typed. This rule inserts that blank
-// line; it runs FIRST in the lint pipeline, so every rule after it sees
-// the definition it was meant to be (move-to-bottom gathers it, the orphan
-// and duplicate rules judge it, reindex numbers it). While the toggle is
-// off, the lazy-definition alert speaks instead.
+// The "Fix definitions hidden by a missing blank line" rule.
+//
+// The problem it fixes: when you type a "[^x]:" line directly under a line
+// of prose (a paragraph, a list item, a quote or callout line, a table row)
+// with no blank line between them, Obsidian does not see a definition. It
+// sees more of the paragraph. The project calls such a line a "lazy label";
+// definitionStartLines in the scanner is what decides it. You meant a
+// definition and are one blank line short of it.
+//
+// What this rule does: inserts that blank line.
+//
+// Why it runs first in the lint pipeline: every rule after it should judge
+// the definition you meant, not the prose line Obsidian saw. Once the blank
+// line exists, move-to-bottom gathers the definition, the orphan and
+// duplicate rules judge it, and reindex numbers it.
+//
+// When the setting is off, nothing is inserted and the lazy-definition lint
+// alert reports the line instead. (Ruling: Jason, 2026-09-09.)
 
-// the blockquote markers a label line sits behind: the inserted line
-// carries the same markers, bare, because a bare ">" line is the blank
-// line inside a quote (ground truth 2026-09-09)
+// The blockquote markers in front of a label line. Inside a quote, a line
+// holding nothing but those same ">" markers is what counts as a blank
+// line, so the inserted line copies them (checked against the real app,
+// ground truth 2026-09-09).
 const QuoteMarkers = /^ {0,3}((?:>[ \t]?)*)/;
 
-/** `markdown` with one blank line (or bare quote line) inserted above each hidden definition; a note with none comes back byte-identical. */
+/**
+ * `markdown` with one blank line inserted above each hidden definition, or a
+ * bare quote line where the definition is inside a quote. A note that has no
+ * hidden definitions comes back byte for byte as it went in.
+ */
 export function fixLazyDefinitions(markdown: string): string {
     return rewriteDocument(markdown, (text, view) => {
         let lines = view.lines;
         let lazy = lazyDefinitionLabelLines(lines, view.scan, view.maskedLines, view.definitionStarts);
         if (lazy.length === 0) return text;
-        // one line above the TOPMOST lazy label, then re-read: that blank
-        // often promotes the labels under it as well (a label directly under
-        // a definition is a definition), so inserting above every lazy label
-        // at once would over-insert. Each pass promotes at least the label it
-        // targets; the bound is a guard, never the stop condition
+        // Insert one line above the TOPMOST lazy label, then look at the
+        // note again. That single blank line often turns the labels below it
+        // into definitions too, because a label sitting directly under a
+        // definition is itself a definition. Inserting above every lazy
+        // label in one go would therefore add lines that are not needed.
+        //
+        // Each time round, at least the label being aimed at becomes a
+        // definition, so this always finishes. The loop count is only a
+        // safety net, not what actually stops it.
         for (let guard = lazy.length; guard > 0 && lazy.length > 0; guard--) {
             const at = lazy[0];
             const markers = (QuoteMarkers.exec(lines[at])?.[1] ?? "").trimEnd();
@@ -41,9 +59,11 @@ export function fixLazyDefinitions(markdown: string): string {
             const scan = scanDocument(lines);
             const masked = maskProtectedLines(lines, scan);
             lazy = lazyDefinitionLabelLines(lines, scan, masked, definitionStartLines(lines, scan, (i) => masked[i]));
-            // the targeted label did not become a definition: stop rather than
-            // stack blank lines above it (no known shape does this; the
-            // property in test/fix-lazy-definitions.test.ts watches for one)
+            // The label being aimed at did not become a definition. Stop,
+            // rather than pile blank line on blank line above it. No known
+            // piece of markdown behaves this way; the property test in
+            // test/fix-lazy-definitions.test.ts is watching in case one
+            // turns up.
             if (lazy.length > 0 && lazy[0] === at + 1) break;
         }
         return lines.join("\n");

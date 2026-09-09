@@ -16,35 +16,57 @@ import { rewriteFootnoteNames } from "../rewrite-footnote-names";
 import { FootnoteRule } from "../rule";
 import { orphanedDefinitionBlocks } from "./remove-orphaned-definitions";
 
-// The reindex algorithm: a pure markdown → markdown transform, no Editor.
-// Policy (pinned in test/reindex-footnotes.test.ts): numbered footnotes are
-// renumbered 1..n by first reference appearance and their definitions reordered
-// to match; named footnotes keep their names (unless renumberNamedFootnotes)
-// but slot into the definition ordering; orphaned definitions are kept and
-// numbered after everything referenced (unless keepOrphanedDefinitions is
-// off); code and frontmatter are invisible to all of it.
+// Reindex: renumbering the note's footnotes. This is a pure function,
+// markdown in and markdown out, with no editor involved.
+//
+// What it does, pinned by test/reindex-footnotes.test.ts:
+//
+// - Numbered footnotes are renumbered 1, 2, 3 and so on, in the order their
+//   references first appear, and their definitions are put in the same
+//   order.
+// - Named footnotes keep their names, unless renumberNamedFootnotes is on,
+//   but they still take their place in that ordering of definitions.
+// - Orphaned definitions are kept, and numbered after everything that is
+//   referenced, unless keepOrphanedDefinitions is off.
+// - Code and frontmatter are invisible to all of this.
 
 export interface ReindexOptions {
-    /** Keep definitions nothing references, numbering them after everything referenced (default). Off deletes them. */
+    /**
+     * Keep orphaned definitions, the ones nothing references, and number
+     * them after everything that is referenced. This is what happens by
+     * default; turn it off and they are deleted instead.
+     */
     keepOrphanedDefinitions?: boolean;
-    /** Give named footnotes numbers by appearance order instead of preserving their names (default off). With an active `prefix` they renumber into its namespace. */
+    /**
+     * Give named footnotes numbers, in order of appearance, instead of
+     * leaving their names alone (off by default). When a `prefix` is in
+     * play, they are renumbered into that namespace.
+     */
     renumberNamedFootnotes?: boolean;
     /**
-     * The note's own footnote-prefix: names matching `<prefix><digits>` are
-     * NUMBERED footnotes of that namespace, renumbered `<prefix>1..n` by
-     * appearance with their own counter - the same reordering behavior as
-     * plain numbered footnotes (QOL, 2026-07-18). Other prefixes stay
-     * named. Invalid prefixes (digit-ending) are ignored defensively.
+     * The note's own footnote-prefix.
+     *
+     * A name made of the prefix followed by digits is a NUMBERED footnote of
+     * that namespace. Such footnotes get their own counter and are
+     * renumbered prefix-1, prefix-2 and so on by appearance, behaving
+     * exactly like plain numbered footnotes (added to make life easier,
+     * 2026-07-18). Names carrying any other prefix stay named.
+     *
+     * A prefix ending in a digit is invalid and is ignored here, as a
+     * precaution.
      */
     prefix?: string;
 }
 
 /**
- * Distinct reference names by first appearance in the (unprotected) text,
- * folded to lowercase - footnote ids are case-insensitive in Obsidian, so
- * "[^Note]" and "[^note]" are one footnote for ordering and identity. A
- * definition's own "[^id]:" label is not a reference (footnoteReferenceMatches
- * excludes it positionally), but a reference nested in a definition body is.
+ * The reference names, each listed once, in the order they first appear in
+ * the text outside protected regions. They come back lower-cased, because
+ * Obsidian treats footnote names as the same whatever their case: "[^Note]"
+ * and "[^note]" are one footnote, both for ordering and for identity.
+ *
+ * A definition's own "[^name]:" label does not count as a reference;
+ * footnoteReferenceMatches leaves it out based on where it sits. A reference
+ * inside a definition's body does count.
  */
 function referenceAppearanceOrder(
     lines: string[],
@@ -54,9 +76,11 @@ function referenceAppearanceOrder(
     const order: string[] = [];
     const seen = new Set<string>();
     for (let i = 0; i < lines.length; i++) {
-        // protected lines are all-NUL in the masked twin - no matches;
-        // referenceOccurrences re-slices raw names (bug-masked-name-identity);
-        // a lazy label's own "[^x]" is a reference and takes its slot here
+        // A protected line is nothing but NUL characters in the masked
+        // twin, so it matches nothing. referenceOccurrences cuts each name
+        // out of the raw line rather than the twin
+        // (bug-masked-name-identity). And a lazy label's own "[^x]" really
+        // is a reference, so it takes its place in the order here.
         for (const { name } of referenceOccurrences(lines[i], maskedLines[i], starts[i])) {
             const id = name.toLowerCase();
             if (!seen.has(id)) {
@@ -69,30 +93,43 @@ function referenceAppearanceOrder(
 }
 
 /**
- * Reindex every footnote in `markdown`: numbered footnotes become 1..n by
- * order of first reference appearance (all repeats follow), named footnotes
- * keep their names, and definition blocks are reordered into the same
- * appearance order by permuting them among their existing positions -
- * everything between them stays where it was. `options` selects the two
- * alternative policies: deleting orphaned definitions instead of keeping
- * them, and renumbering named footnotes instead of preserving them.
+ * Reindex every footnote in `markdown`.
+ *
+ * Numbered footnotes become 1, 2, 3 and so on, in the order their references
+ * first appear; later references to the same footnote follow their first.
+ * Named footnotes keep their names. The definition blocks are put into that
+ * same order, but only by swapping them between the places definitions
+ * already sit: everything in between stays exactly where it was.
+ *
+ * `options` chooses the two alternatives: deleting orphaned definitions
+ * rather than keeping them, and renumbering named footnotes rather than
+ * leaving their names alone.
  */
 export function reindexFootnotes(
     markdown: string,
     options: ReindexOptions = {},
 ): string {
-    // A single pass can leave the result not-yet-stable - permuting
-    // definition blocks changes the appearance order of references NESTED in
-    // their bodies, which the next pass renumbers - so re-run to a fixpoint.
-    // Some documents have NO fixpoint: permutation and nested renumbering
-    // can chase each other in a genuine cycle (bug-reindex-cycle, period 3),
-    // and with lint-on-save that rewrote the note on every save forever.
-    // Detecting a repeat and returning one canonical member of the cycle
-    // (the lexicographically smallest - any fixed choice works) restores
-    // idempotence: re-running from the canon walks the same cycle and picks
-    // the same canon. Orphan deletion is transitive within ONE pass (see
-    // orphanedDefinitionBlocks), so it never drives the iteration. The cap
-    // is a pure safety net for a cycle longer than it (never observed).
+    // One pass is not always enough. Moving definition blocks around
+    // changes the order in which references INSIDE those blocks appear, and
+    // the next pass then renumbers those. So this runs again and again
+    // until a pass changes nothing.
+    //
+    // Some notes never settle. The reordering and the renumbering of nested
+    // references can chase each other round a genuine loop
+    // (bug-reindex-cycle, a loop of three states), and with lint-on-save
+    // that rewrote the note on every single save, forever.
+    //
+    // The fix: spot a state that has come round before, and return one
+    // agreed member of the loop. The one chosen is whichever sorts first as
+    // text; any fixed choice would do. That makes running the lint again
+    // safe, because starting from that state walks the same loop and lands
+    // on the same choice.
+    //
+    // Deleting orphaned definitions does not drive this loop: it follows
+    // chains of any length within ONE pass, see orphanedDefinitionBlocks.
+    //
+    // The limit of 30 is a pure safety net, in case of a loop longer than
+    // that. None has ever been seen.
     let current = markdown;
     const seen: string[] = [];
     for (let i = 0; i < 30; i++) {
@@ -119,8 +156,9 @@ function reindexOnce(
 ): string {
     const keepOrphans = options.keepOrphanedDefinitions ?? true;
     const renumberNamed = options.renumberNamedFootnotes ?? false;
-    // the namespace prefix, kept in its original casing for output but
-    // matched case-insensitively (ids are case-folded throughout)
+    // The namespace prefix. It is written out with the case the user gave
+    // it, but matched without regard to case, since footnote names are
+    // compared that way everywhere.
     const prefixOut =
         options.prefix && footnotePrefixProblem(options.prefix) === null
             ? options.prefix
@@ -132,7 +170,8 @@ function reindexOnce(
         /^\d+$/.test(name.slice(prefixFolded.length));
 
     return rewriteDocument(markdown, (text, view) => {
-        // rebound below when orphan deletion rewrites the note mid-pass
+        // These are all replaced further down if orphan deletion rewrites
+        // the note part way through this pass
         let lines = view.lines;
         let scan = view.scan;
         let maskedLines = view.maskedLines;
@@ -141,15 +180,19 @@ function reindexOnce(
         let referenceOrder = referenceAppearanceOrder(lines, maskedLines, starts);
 
         if (!keepOrphans) {
-            // the shared reference-graph deletion: transitive chains of any
-            // depth die in THIS pass (the outer fixpoint used to expose one
-            // link per iteration and its cap returned mid-chain on 21+-deep
-            // chains - bug-reindex-orphan-cap), while definitions referencing
-            // each other in a cycle count as referenced and survive
+            // The shared orphan-finding code. It follows chains of any
+            // length in THIS one pass: a definition kept alive only by an
+            // orphan that is itself being deleted goes too, and so on down.
+            // The loop above used to peel off one link per go, and its
+            // limit meant a chain 21 or more deep was left half deleted
+            // (bug-reindex-orphan-cap). Definitions that reference each
+            // other in a ring count as referenced and survive.
             const orphans = orphanedDefinitionBlocks(lines, scan);
             if (orphans.length > 0) {
-                // cut the orphan blocks out, then re-derive everything - line
-                // numbers shifted, and a cut can even change fence pairing
+                // Cut the orphaned blocks out, then work everything out
+                // again from scratch: the line numbers have all shifted,
+                // and removing lines can even change which code fences pair
+                // with which.
                 lines = removeLineRanges(lines, orphans);
                 scan = scanDocument(lines);
                 maskedLines = maskProtectedLines(lines, scan);
@@ -159,10 +202,13 @@ function reindexOnce(
             }
         }
 
-        // referenced names first (by first reference appearance), then whatever
-        // orphaned definitions remain, in definition order
-        // all names are canonical (lowercased) here so case-variant references and
-        // definitions share one identity throughout ordering and numbering
+        // The full order: names that are referenced first, in the order
+        // their references first appear, then any orphaned definitions that
+        // are left, in the order their definitions appear.
+        //
+        // Every name here is lower-cased, so that a reference and a
+        // definition written with different capitals count as one footnote
+        // all the way through the ordering and the numbering.
         const order = [...referenceOrder];
         const seen = new Set(order);
         for (const block of blocks) {
@@ -172,10 +218,12 @@ function reindexOnce(
                 order.push(name);
             }
         }
-        // blockquoted/callout labels are live single-line definitions
-        // outside the column-0 blocks (C22): an orphan among them still
-        // needs a place in the order, or the number it holds could be
-        // handed to a renumbered live footnote (review A3, 2026-09-08)
+        // A label inside a blockquote or a callout is a real definition,
+        // one line long, and it is not one of the definition blocks at the
+        // left margin (C22). An orphan among these still needs its place in
+        // the order. Otherwise the number it is holding could be handed to
+        // some other footnote being renumbered, and two footnotes would end
+        // up sharing a name (review A3, 2026-09-08).
         for (let i = 0; i < lines.length; i++) {
             if (scan.isProtected[i] || !starts[i]) continue;
             const hit = definitionLabelWithName(lines[i], maskedLines[i]);
@@ -187,12 +235,16 @@ function reindexOnce(
             }
         }
 
-        // numbered names → their new number, in appearance order; the prefix
-        // namespace runs its own independent counter; named footnotes only
-        // consume a number when they're being renumbered too - and with an
-        // active prefix they renumber INTO its namespace (they're this note's
-        // footnotes), which also keeps the lint pipeline idempotent: a plain
-        // number here would be re-prefixed by the next apply-prefix pass
+        // Work out each numbered name's new number, walking the order
+        // above. The prefix namespace has its own counter, quite separate
+        // from the plain one.
+        //
+        // A named footnote only takes a number when named footnotes are
+        // being renumbered as well. When there is a prefix, it is renumbered
+        // INTO that namespace, because it is one of this note's footnotes.
+        // That also keeps the lint from changing the note twice over: give
+        // it a plain number here and the next apply-prefix pass would put
+        // the prefix on it anyway.
         const renames = new Map<string, string>();
         let nextNumber = 1;
         let nextPrefixed = 1;
@@ -211,20 +263,25 @@ function reindexOnce(
             }
         }
 
-        // ids matched case-insensitively; the map is complete, so swaps can't
-        // collide
+        // Names are matched without regard to case. Every name that is
+        // changing is in the map, so no footnote can be renamed onto
+        // another one's name.
         const rewritten = lines.map((line, i) =>
             scan.isProtected[i]
                 ? line
                 : rewriteFootnoteNames(line, maskedLines[i], (name) => renames.get(name.toLowerCase()) ?? null, starts[i]),
         );
 
-        // permute definition blocks among their existing slots so they read in
-        // appearance order; a stable sort keeps duplicate definitions together
-        // every block's name is in `order` (referenced names first, then the
-        // blocks themselves were appended), so the lookup can't miss; should
-        // that invariant ever break, an unknown block sorts LAST rather than
-        // jumping the queue as the old `?? 0` made it (review C9)
+        // Swap the definition blocks between the places definitions already
+        // sit, so that they read in appearance order. The sort is stable,
+        // which keeps two definitions of one name next to each other in the
+        // order they were written.
+        //
+        // Every block's name is in `order`: referenced names went in first,
+        // then the blocks themselves were added. So the lookup below always
+        // finds something. If that ever stopped being true, a block with an
+        // unknown name sorts to the END rather than jumping to the front,
+        // which is what the old `?? 0` made it do (review C9).
         const orderIndex = new Map(order.map((name, i) => [name, i]));
         const rank = (name: string) => orderIndex.get(name.toLowerCase()) ?? order.length;
         const sorted = blocks
@@ -248,7 +305,7 @@ function reindexOnce(
     });
 }
 
-/** Linter-shaped wrapper: id matches Linter's rule filename. */
+/** This rule's catalogue entry. The id matches obsidian-linter's file name. */
 export const reIndexFootnotesRule: FootnoteRule<ReindexOptions> = {
     id: "re-index-footnotes",
     name: "Re-index footnotes",

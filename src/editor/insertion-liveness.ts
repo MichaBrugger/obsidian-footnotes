@@ -11,27 +11,36 @@ import {
     scanDocument,
 } from "../parsing/markdown-scan";
 
-// The born-dead safety kit: will inserted text still MEAN what it says
-// once it lands? An insertion can be swallowed by an escape or an
-// inline-footnote opener directly before it, or RECLASSIFY the document
-// around it (complete a "$…$" pair, demote a quote whose region then
-// swallows the append) - every failure mode here was found by the
-// command-press property suite (2026-08-12). Split out of the all-in-one
-// commands file 2026-08-12: one subject, independently mutation-testable.
+// The born-dead safety kit. One question: once the text lands, will it
+// still MEAN what it says?
+//
+// Two ways it can fail. The insertion is swallowed by whatever sits
+// directly before it: an escaping backslash, or an inline-footnote opener.
+// Or the insertion RECLASSIFIES the text around it, by completing a "$…$"
+// math pair, or by demoting a quote whose region then swallows the appended
+// definition. Every failure mode here was found by the command-press
+// property suite (2026-08-12).
+//
+// Split out of the all-in-one commands file 2026-08-12: one subject, and
+// mutation-testable on its own.
 
 export const ProtectedCreationNotice =
     NoFootnoteCreated + "footnotes can't go inside code, math, or other protected text.";
 
 /**
- * The rightmost column at or left of `ch` where an insertion keeps its
- * meaning: text inserted directly after an ESCAPING backslash would itself
- * be escaped ("\" + "[^N]" is literal prose, its appended definition
- * instantly orphaned - while the character the backslash used to protect
- * goes LIVE), and a reference inserted directly after an unescaped "^"
- * would be swallowed as inline-footnote content ("^" + "[^N]" reads as
- * "^[^N]"). Both found by the command-press property suite (2026-08-12).
- * Each hazard steps one column left; runs of hazards walk left until the
- * insertion is safe.
+ * The furthest right column, at or left of `ch`, where an insertion still
+ * means what it says.
+ *
+ * Two hazards. Text placed directly after an ESCAPING backslash is itself
+ * escaped: "\" plus "[^N]" is literal prose, so the definition appended for
+ * it is an orphaned definition the moment it lands, while the character the
+ * backslash used to protect goes LIVE. And a reference placed directly
+ * after an unescaped "^" is swallowed as inline-footnote text: "^" plus
+ * "[^N]" reads as "^[^N]".
+ *
+ * Both were found by the command-press property suite (2026-08-12). Each
+ * hazard steps the column one to the left, and a run of them is walked
+ * until the insertion is safe.
  */
 export function safeInsertionCh(lineText: string, ch: number): number {
     for (;;) {
@@ -52,14 +61,18 @@ export function safeInsertionCh(lineText: string, ch: number): number {
 }
 
 /**
- * The caret line's masked twin AFTER replacing `[position.ch, toCh)` with
- * `insert` (a plain insertion when `toCh` is omitted) - the liveness
- * oracle for single-change edits: an insertion can COMPLETE a construct
- * around it and be masked into it at birth ("$…$" whose content
- * previously had a space edge is the found case - command-press property
- * suite, 2026-08-12), and a selection REPLACEMENT (issue #35) can
- * additionally un-close a construct whose closer it deletes. Simulated
- * against the whole document so multi-line region state is honored.
+ * The caret line's masked twin (a copy of the line with protected text
+ * blanked out) as it WOULD look after replacing the columns from
+ * `position.ch` up to `toCh` with `insert`. Leave `toCh` out for a plain
+ * insertion.
+ *
+ * This is how a single-change edit is checked for liveness. An insertion
+ * can COMPLETE a construct around itself and so be masked into it at birth:
+ * the case found was a "$…$" math pair whose contents previously had a
+ * space at the edge (command-press property suite, 2026-08-12). A selection
+ * REPLACEMENT (issue #35) can also do the opposite and un-close a construct
+ * by deleting its closer. The simulation runs against the whole document,
+ * so region state spanning several lines is honored.
  */
 export function simulatedMaskedLine(
     doc: Editor,
@@ -74,8 +87,9 @@ export function simulatedMaskedLine(
     return maskedLineAt(lines, position.line);
 }
 
-// shared by simulateChanges and simulatedAnchor: the character offset of a
-// position in `lines` (LF-joined, matching CodeMirror's coordinates)
+// Shared by simulateChanges and simulatedAnchor: how many characters into
+// `lines` a position sits, counting the lines as joined by a single "\n",
+// which is how CodeMirror counts them.
 function offsetIn(lines: string[], pos: EditorPosition): number {
     let offset = 0;
     for (let i = 0; i < pos.line && i < lines.length; i++) {
@@ -84,16 +98,20 @@ function offsetIn(lines: string[], pos: EditorPosition): number {
     return offset + pos.ch;
 }
 
-// The ONE resolved, ordered view of a transaction's changes, shared by
-// simulateChanges and simulatedAnchor so the two can never disagree:
-// offsets against the ORIGINAL text (CodeMirror transaction semantics),
-// sorted by position, with zero-length INSERTS landing BEFORE a range
-// change at the same offset REGARDLESS of array order and same-position
-// inserts keeping array order - both verified empirically against
+// The ONE sorted view of a transaction's changes, shared by simulateChanges
+// and simulatedAnchor so the two can never disagree about them.
+//
+// The rules: every offset is measured against the ORIGINAL text, which is
+// how CodeMirror transactions work; the changes are sorted by position; a
+// zero-length INSERT at the same offset as a range change comes first,
+// REGARDLESS of the order the array had; and inserts at the same position
+// keep their array order. Both tie rules were checked by experiment against
 // @codemirror/state 6.5 (hunt 2026-08-25: the old back-to-front splice
-// resolved a tied replace's `to` against the already-mutated string and
-// silently dropped a character of the tied insert). Range changes never
-// overlap; CodeMirror itself refuses overlapping spans.
+// worked out a tied replace's `to` against a string it had already changed,
+// and silently dropped a character of the tied insert).
+//
+// Range changes never overlap, because CodeMirror itself refuses
+// overlapping spans.
 function resolveChanges(lines: string[], changes: EditorChange[]) {
     return changes
         .map((change, index) => ({
@@ -104,7 +122,7 @@ function resolveChanges(lines: string[], changes: EditorChange[]) {
             text: change.text,
             index,
         }))
-        // Stryker disable ConditionalExpression, ArithmeticOperator: whether the comparator's tiebreak mutants flip anything depends on which argument order the engine's sort probes with, not on behavior - the tie ORDER contract itself (insert-before-replace, array order among stacked inserts) is pinned in bug-simulate-changes-tie-drops-text
+        // Stryker disable ConditionalExpression, ArithmeticOperator: changing this comparator's tiebreak may or may not alter anything, depending only on which argument order the sort happens to probe with, not on real behavior - the tie ORDER contract itself (an insert comes before a replace, stacked inserts keep array order) is pinned in bug-simulate-changes-tie-drops-text
         .sort(
             (a, b) =>
                 a.from - b.from ||
@@ -114,18 +132,18 @@ function resolveChanges(lines: string[], changes: EditorChange[]) {
     // Stryker restore all
 }
 
-// Apply the resolved changes left-to-right against the original text,
-// recording where each change's text BEGINS in the output (indexed by
-// the change's ORIGINAL array position). Landing offsets fall out of the
-// construction itself, so the anchor arithmetic cannot drift from the
-// applied result.
+// Apply the sorted changes left to right against the original text, and
+// note where each change's text BEGINS in the result, stored under the
+// change's ORIGINAL position in the array. Those landing offsets fall out
+// of the building itself, so the anchor arithmetic can never drift away
+// from what was actually applied.
 function applyResolvedChanges(
     text: string,
     resolved: ReturnType<typeof resolveChanges>,
 ): { out: string; landing: number[] } {
     let out = "";
     let pos = 0;
-    // Stryker disable next-line ArrayDeclaration: the length hint is an allocation hint only - every slot is assigned by index below, so new Array() is behavior-identical
+    // Stryker disable next-line ArrayDeclaration: the length is only a hint about how much room to reserve up front - every slot is filled in by index just below, so a plain new Array() behaves identically
     const landing = new Array<number>(resolved.length);
     for (const change of resolved) {
         out += text.slice(pos, Math.max(pos, change.from));
@@ -136,7 +154,8 @@ function applyResolvedChanges(
     return { out: out + text.slice(pos), landing };
 }
 
-/** The document `changes` would produce - every change addresses the ORIGINAL text (CodeMirror transaction semantics). */
+/** The document `changes` would produce. Every change is measured against
+ * the ORIGINAL text, the way CodeMirror transactions work. */
 export function simulateChanges(
     lines: string[],
     changes: EditorChange[],
@@ -150,14 +169,18 @@ export function simulateChanges(
 
 /**
  * Where the text of `changes[anchorIndex]` BEGINS in the simulated
- * document - read off the same construction simulateChanges applies, so
- * it is exact by definition (the pre-2026-08-25 shift arithmetic
- * disagreed with the applied result on same-offset ties). The
- * reference-liveness checks used to read the anchor's ORIGINAL line
- * index off the simulated document instead, falsely refusing legitimate
- * creations whenever the definition appended ABOVE the caret -
- * definitions under a mid-document heading with prose below them (found
- * by the entry corpus, 2026-08-12).
+ * document.
+ *
+ * It is read straight off the same construction simulateChanges applies, so
+ * it is exact by definition. The shift arithmetic used before 2026-08-25
+ * disagreed with the applied result whenever two changes tied at one
+ * offset.
+ *
+ * The reference-liveness checks used to look up the anchor's ORIGINAL line
+ * number in the simulated document instead. That wrongly refused perfectly
+ * good creations whenever the definition was appended ABOVE the caret,
+ * which happens with definitions under a heading partway down the note that
+ * has prose below them (found by the entry corpus, 2026-08-12).
  */
 export function simulatedAnchor(
     lines: string[],
@@ -168,7 +191,9 @@ export function simulatedAnchor(
     return simulatedAnchors(lines, changes, [anchorIndex], simulated)[0];
 }
 
-/** Every requested landing from ONE resolution pass: the per-anchor form re-joined and re-resolved the whole document once per reference (review B4, 2026-09-09). */
+/** Every requested landing spot from ONE pass. The single-anchor form above
+ * re-joined and re-sorted the whole document once per reference (review B4,
+ * 2026-09-09). */
 export function simulatedAnchors(
     lines: string[],
     changes: EditorChange[],
@@ -190,7 +215,12 @@ export function simulatedAnchors(
     });
 }
 
-/** Whether `ch` sits STRICTLY inside a masked (NUL) span - the text on both sides is claimed. Boundaries are fine: just before an opener or just after a closer inserts outside the span. `openAtStart`/`openAtEnd` stand in for the off-line neighbor at ch 0 / end of line. */
+/** Whether `ch` sits STRICTLY inside a masked span (the run of NULs that
+ * stands in for protected text), meaning the characters on both sides of it
+ * are claimed. The edges are fine: just before an opener, or just after a
+ * closer, inserts outside the span. At column 0 there is no character to
+ * the left, and at end of line none to the right, so `openAtStart` and
+ * `openAtEnd` say whether a masked span is already open there. */
 export function caretInsideMaskedSpan(
     masked: string,
     ch: number,
@@ -203,31 +233,37 @@ export function caretInsideMaskedSpan(
 }
 
 /**
- * The shared born-dead verdict for definition-backed insertions - the
- * single-caret insert, the multi-caret insert, and the selection
- * conversion each cloned this block before 2026-08-25. On the SIMULATED
- * result: every reference change must still parse as a live "[^id]"
- * occurrence at its shifted anchor (simulatedAnchor - a definition
- * appended ABOVE the caret shifts later lines, a collapsing selection
- * shifts lines below it), and the definition must parse as a live block
- * starting at `definitionLabelLine` that claims every seeded
- * continuation line. Null = something died - the caller toasts
- * ProtectedCreationNotice and refuses the whole press (atomicity: one
- * dead landing refuses the lot). Every failure mode this guards was
- * found by the command-press property suite (2026-08-12).
+ * The shared born-dead verdict for any insertion that comes with a
+ * definition. The single-caret insert, the multi-caret press, and the
+ * selection conversion each had their own copy of this block before
+ * 2026-08-25.
  *
- * Pass `simulated` when the caller already simulated (to derive the
- * label line); otherwise it is computed here.
+ * It judges the SIMULATED result, and two things must hold. Every reference
+ * the press writes must still read as a live "[^id]" at its shifted landing
+ * spot (simulatedAnchor: a definition appended ABOVE the caret pushes later
+ * lines down, and a selection collapsing pulls the lines below it up). And
+ * the definition must read as a live definition block that starts at
+ * `definitionLabelLine` and claims every continuation line seeded under it.
+ *
+ * Null means something died. The caller then shows ProtectedCreationNotice
+ * and refuses the whole press: one dead landing refuses the lot. Every
+ * failure mode this guards against was found by the command-press property
+ * suite (2026-08-12).
+ *
+ * Pass `simulated` when you have already simulated (to work out the label
+ * line); otherwise it is computed here.
  */
 export function verifyLiveFootnoteInsertion(opts: {
     lines: string[];
     changes: EditorChange[];
-    /** indices into `changes` that write a "[^id]" reference */
+    /** which entries of `changes` write a "[^id]" reference */
     referenceChangeIndices: number[];
     footnoteId: string;
-    /** the definition label's line in POST-transaction coordinates */
+    /** the definition label's line number, counted in the document AFTER
+     * the changes land */
     definitionLabelLine: number;
-    /** seeded continuation lines under the label (multi-line bodies) */
+    /** how many continuation lines are seeded under the label, for a
+     * definition whose body runs over several lines */
     definitionBodyExtraLines?: number;
     simulated?: string[];
 }): { anchors: EditorPosition[] } | null {
@@ -241,8 +277,9 @@ export function verifyLiveFootnoteInsertion(opts: {
     );
     if (!definitionLive) return null;
     const anchors = simulatedAnchors(opts.lines, opts.changes, opts.referenceChangeIndices, simulated);
-    // one masked twin from the scan already taken - maskedLineAt would rescan
-    // the whole simulated document once per reference (review B4)
+    // build the masked twin once from the scan already taken: maskedLineAt
+    // would re-scan the whole simulated document once per reference
+    // (review B4)
     const simulatedMasked = maskProtectedLines(simulated, simulatedScan);
     const simulatedStarts = definitionStartLines(simulated, simulatedScan, (i) => simulatedMasked[i]);
     const everyReferenceLive = anchors.every((anchor) =>

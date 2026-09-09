@@ -15,20 +15,35 @@ import {
 import { IgnoreType } from "../ignore-types";
 import { FootnoteRule } from "../rule";
 
-// Orphaned REFERENCES - the mirror image of reindex's orphaned definitions
-// (requested 2026-08-10): a "[^5]" with no "[^5]:" line anywhere renders as
-// literal text in Obsidian, so linting either alerts about them (the
-// default) or, with the "Orphaned references" setting on Delete, removes them
-// from the text. Shared exclusions, in both modes:
-//  - ids are case-insensitive, so a definition in any casing counts;
-//  - invalid names (spaces/backticks) are not footnotes to Obsidian either -
-//    deleting "[^my note]" would destroy literal prose, so they are left
-//    alone (the creation path already warns about them);
-//  - the note's own bare-prefix placeholder ("[^2.]" under prefix "2.") is
-//    an IN-PROGRESS footnote mid-naming, owned by the unnamed-reference alert -
-//    deleting it out from under the user's caret would be data loss.
+// Orphaned REFERENCES: the other side of reindex's orphaned definitions
+// (requested 2026-08-10).
+//
+// A "[^5]" with no "[^5]:" line anywhere in the note renders as plain text
+// in Obsidian, not as a footnote. So the lint either reports them, which is
+// what it does by default, or, with the "Orphaned references" setting on
+// Delete, takes them out of the text.
+//
+// Three kinds of reference are left alone either way:
+//
+//  - Names are compared without regard to case, so a definition written
+//    with different capitals still counts as that reference's definition.
+//  - A name Obsidian will not accept, one with a space or a backtick in it,
+//    is not a footnote there either. Deleting "[^my note]" would destroy
+//    ordinary prose, so those stay. The creation path already warns about
+//    such names.
+//  - The note's own bare-prefix placeholder, "[^2.]" in a note whose prefix
+//    is "2.", is a footnote the user is in the middle of naming. The
+//    unnamed-reference alert speaks for it. Deleting it from under the
+//    user's caret would be losing their work.
 
-/** The definition names present in the note, case-folded - column-0 labels and blockquoted/callout ones (C22). definitionLabelWithName owns the masked-scan/raw-re-slice invariant. */
+/**
+ * Every name the note defines, lower-cased. That covers labels at the left
+ * margin and labels inside a blockquote or callout (C22).
+ *
+ * definitionLabelWithName is the piece that finds a label against the masked
+ * twin but cuts its name out of the raw line, so names never come back with
+ * blanking characters in them.
+ */
 function definitionNamesFolded(lines: string[], masked: string[], starts: boolean[]): Set<string> {
     const names = new Set<string>();
     for (let i = 0; i < masked.length; i++) {
@@ -40,13 +55,18 @@ function definitionNamesFolded(lines: string[], masked: string[], starts: boolea
 }
 
 /**
- * Names on label-shaped lines that are NOT definitions: a "[^x]:" directly
- * under a prose line is lazy paragraph text to Obsidian
- * (definitionStartLines), one blank line short of the definition the user
- * meant. First-appearance order, first-seen casing, protected lines
- * skipped. Exported for the lint alert that names them; here, a reference
- * pointing at one is not an orphan to delete - the fix is a blank line,
- * and deleting the reference would be data loss (2026-09-09).
+ * The names on lines that look like labels but are NOT definitions. A
+ * "[^x]:" line directly under a line of prose is more paragraph text to
+ * Obsidian, as definitionStartLines decides; it is one blank line short of
+ * the definition the user meant. The project calls it a lazy label.
+ *
+ * The names come back in the order they first appear, spelled as first
+ * seen, with protected lines skipped.
+ *
+ * This is exported for the lint alert that lists them. Here it matters for a
+ * different reason: a reference pointing at a lazy label is not an orphan to
+ * delete. The fix is a blank line, and deleting the reference would throw
+ * the user's work away (2026-09-09).
  */
 export function lazyDefinitionLabelNames(
     lines: string[],
@@ -67,7 +87,10 @@ export function lazyDefinitionLabelNames(
     return names;
 }
 
-/** Whether this reference occurrence is an orphan the setting should act on. */
+/**
+ * True when this reference is an orphaned reference the setting should act
+ * on.
+ */
 function isOrphan(
     name: string,
     definitions: Set<string>,
@@ -83,19 +106,24 @@ function isOrphan(
 }
 
 /**
- * Distinct names of orphaned references in first-appearance order, each in its
- * first-seen casing - the alert's list. `orphanSafePrefix` is the note's own valid
- * footnote-prefix while the prefix feature is on ("" otherwise).
+ * The list the alert reads out: the names of orphaned references, each once,
+ * in the order they first appear, spelled as first seen.
+ *
+ * `orphanSafePrefix` is the note's own footnote-prefix, when the prefix
+ * feature is on and the prefix is valid. It is "" otherwise.
  */
 export function orphanedFootnoteReferenceNames(
     markdown: string,
     orphanSafePrefix = "",
-    // the post-lint alerts share ONE normalize/scan/mask across all three
-    // alert helpers (2026-08-11 review perf item); direct callers omit it
+    // The alerts all share ONE pass of normalizing the line endings,
+    // scanning the note and building the masked twin, done once and handed
+    // round (2026-08-11 review, a speed fix). Anything calling this on its
+    // own leaves it out.
     precomputed?: { lines: string[]; masked: string[]; scan?: DocumentScan; starts?: boolean[] },
 ): string[] {
-    // no "[^" anywhere means no references (and no orphans) - this alert
-    // scan runs on every lint (perf F4)
+    // No "[^" anywhere in the note means no references, and so no orphaned
+    // ones. Worth checking first, because this runs on every single lint
+    // (speed fix F4).
     if (!markdown.includes("[^")) return [];
     const lines = precomputed?.lines ?? normalizeEol(markdown).text.split("\n");
     const scan = precomputed?.scan ?? scanDocument(lines);
@@ -123,11 +151,14 @@ export function orphanedFootnoteReferenceNames(
 }
 
 /**
- * Every orphaned reference occurrence removed from the text (definitions,
- * protected regions, and the exclusions above untouched). Spacing seams
- * heal: "a [^1] b" → "a b", and a reference that was the last thing on its
- * line takes the space before it along - but spaces the line already ended
- * with (a markdown hard break) survive.
+ * `markdown` with every orphaned reference taken out of the text.
+ * Definitions, protected text and the three exceptions listed at the top of
+ * this file are left alone.
+ *
+ * The spacing closes up neatly: "a [^1] b" becomes "a b", and a reference
+ * that was the last thing on its line takes the space in front of it with
+ * it. Spaces the line already ended with stay, because two of them at the
+ * end of a line are a markdown line break the user typed on purpose.
  */
 export function removeOrphanedFootnoteReferences(
     markdown: string,
@@ -157,8 +188,9 @@ export function removeOrphanedFootnoteReferences(
             if (!isOrphan(name, definitions, lazyLabels, orphanSafeFolded)) continue;
             result += line.slice(copied, start);
             copied = end;
-            // seam: a space directly after the cut collapses when the cut
-            // already ends on a space (or on the start of the line)
+            // Closing the gap: a space just after the cut is dropped when
+            // the text before the cut already ends in a space, or when the
+            // cut was at the very start of the line.
             if (
                 line[copied] === " " &&
                 (result === "" || result.endsWith(" "))
@@ -169,27 +201,32 @@ export function removeOrphanedFootnoteReferences(
         }
         if (!changed) return line;
         const tail = line.slice(copied);
-        // a reference that closed the line leaves its leading space dangling;
-        // a non-empty tail means any trailing spaces were already there
+        // A reference that ended the line leaves the space in front of it
+        // hanging, so trim it. If there is any text left after the cut,
+        // then whatever spaces the line ends with were already the user's.
         return tail === "" ? result.replace(/[ \t]+$/, "") : result + tail;
     });
     if (out.every((line, i) => line === lines[i])) return markdown;
 
-    // Deleting reference text can re-classify a DISTANT line: blanking the
-    // paragraph between a definition and an indented chunk turns that chunk
-    // from indented CODE into a definition CONTINUATION (Obsidian continues
-    // a definition across any run of blank lines - verified against
-    // metadataCache, 2026-08-10; found by the idempotence property), so the
-    // next lint pass would edit text this pass promised to protect. A
-    // deletion that changes ANY other line's protection classification is
-    // refused outright; the orphans stay for the user to resolve.
+    // Deleting reference text can change how Obsidian reads a line far
+    // away. Emptying the paragraph between a definition and an indented
+    // block turns that block from indented CODE into a continuation line of
+    // the definition, because Obsidian carries a definition on across any
+    // number of blank lines. (Verified against metadataCache, 2026-08-10;
+    // found by the idempotence property.) The next lint would then edit
+    // text this one promised to leave alone.
+    //
+    // So a deletion that changes whether ANY other line counts as protected
+    // is refused outright. The orphaned references stay, for the user to
+    // sort out.
     const scanAfter = scanDocument(out);
     for (let i = 0; i < lines.length; i++) {
         if (scan.isProtected[i] !== scanAfter.isProtected[i]) return markdown;
     }
-    // the same promise for the prose-label rule: blanking the line above a
-    // lazy label would promote it into a live definition (second review
-    // 2026-09-09), a reclassification this deletion must not make
+    // The same promise again, this time about the prose-label rule.
+    // Emptying the line above a lazy label would turn that label into a
+    // real definition (second review, 2026-09-09). That is another change
+    // of meaning this deletion is not allowed to make.
     const maskedAfter = maskProtectedLines(out, scanAfter);
     const startsAfter = definitionStartLines(out, scanAfter, (i) => maskedAfter[i]);
     for (let i = 0; i < lines.length; i++) {
@@ -198,7 +235,10 @@ export function removeOrphanedFootnoteReferences(
     return restoreEol(out.join("\n"), eol);
 }
 
-/** Linter-shaped registry entry; the option is the note's safe bare prefix. */
+/**
+ * This rule's catalogue entry. The option is the note's own prefix, whose
+ * bare placeholder must not be deleted.
+ */
 export const removeOrphanedReferencesRule: FootnoteRule<{ orphanSafePrefix?: string }> =
     {
         id: "remove-orphaned-references",

@@ -6,75 +6,90 @@ import { DocContext, docContext } from "../editor/doc-context";
 import { definitionLabel } from "../parsing/footnote-grammar";
 import { findLineRunEnd, scanDocument } from "../parsing/markdown-scan";
 
-// Where a new footnote definition lands: the section-heading setting and
-// the append edit both creation paths share. Split out of the all-in-one
-// commands file 2026-08-11.
+// Where a new footnote definition goes. This module holds the
+// section-heading setting and the append edit, both of which every
+// creation press shares. Split out of the one big commands file on
+// 2026-08-11.
 
 function addFootnoteSectionHeader(plugin: FootnotePlugin): string {
-    //check if 'Enable Footnote Section Heading' is true
-    //if so, return the "Footnote Section Heading"
-    // else, return ""
+    //If the "Enable Footnote Section Heading" setting is on, return the
+    //"Footnote Section Heading" setting's text. Otherwise return "".
 
-    // a cleared-out heading value counts as no heading - the lint path
-    // already treats "" that way, and "\n\n" + "" would otherwise strand
-    // stray blank lines above the first footnote
+    // A heading whose text has been cleared out counts as no heading at
+    // all. Lint already reads "" that way, and without this check the
+    // "\n\n" prefix plus an empty heading would leave stray blank lines
+    // sitting above the first footnote.
     if (
         plugin.settings.enableFootnoteSectionHeading &&
         plugin.settings.footnoteSectionHeading
     ) {
-        // the setting holds literal markdown (legacy plain-text values are
-        // migrated on load); a blank line ALWAYS separates the heading from
-        // the content above it - markdown block convention (requested
-        // 2026-07-20), and it keeps a heading starting with a divider from
-        // turning the line above into a setext heading
+        // The setting holds real markdown; older plain-text values are
+        // converted when the plugin loads. A blank line always goes
+        // between the heading and whatever is above it. That is the
+        // markdown convention for blocks (requested 2026-07-20), and it
+        // also stops a heading that begins with a divider from turning the
+        // line above it into a setext heading.
         return `\n\n${plugin.settings.footnoteSectionHeading}`;
     }
     return "";
 }
 
-// Build (don't apply) the edit that appends `[^id]: ` to the note's
-// footnote definitions: right after the last existing definition block
-// when there is one (issue #55 - the definitions may live under a
-// mid-document heading with more content below), otherwise after the last
-// non-blank line - trimming trailing blank lines if enabled, and adding a
-// blank separator plus the optional section heading before the first
-// footnote. Returned as data so the caller can bundle it with the reference
-// insertion into a single transaction (see moveCursorAndSetJumpPoint).
+// Works out the edit that adds a "[^name]: " label to the note's
+// definitions, and hands it back without applying it.
+//
+// Where it goes: right after the last definition block when the note has
+// one. That matters because the definitions may sit under a heading in the
+// middle of the note with more content below them (issue #55). When there
+// is no definition yet, it goes after the last line that has anything on
+// it, trimming trailing blank lines if that setting is on. Before the very
+// first footnote it also adds a blank line and, if enabled, the section
+// heading.
+//
+// It comes back as plain data so that the calling code can put it and the
+// reference insertion into one single edit (see moveCursorAndSetJumpPoint).
 export function buildDefinitionAppend(
     doc: Editor,
     footnoteId: string,
     isFirstFootnote: boolean,
     plugin: FootnotePlugin,
     ctx: DocContext = docContext(doc),
-    // the span a selection conversion is about to REPLACE in the same
-    // transaction: the definition must not land inside it (the two changes
-    // would overlap), and a section heading the selection swallows is no
-    // slot to append under (property find 2026-09-09: a drag across the
+    // The stretch of text a conversion is about to replace in this same
+    // edit. Two things follow from that. The definition must not land
+    // inside it, or the two edits would overlap. And a section heading
+    // that the selection is swallowing is no place to put the definition
+    // under (found by a property test, 2026-09-09: dragging across a
     // "# Footnotes" heading with the setting on wrote the definition into
-    // the middle of the selection and glued the paragraph's tail to it).
-    // Honored where a slot can fall inside the span: the heading slot
-    // (skipped when the heading is swallowed) and the walk up from an
-    // unclosed tail. The other two branches cannot land inside it - the
-    // caller refuses a selection that overlaps a definition block, and the
-    // EOF append sits at or after the span's end.
+    // the middle of the selection and glued the rest of the paragraph onto
+    // it).
+    //
+    // Only two of the four places a definition can go could ever fall
+    // inside this stretch, and both consult it: the slot under the heading,
+    // which is skipped when the heading is being swallowed, and the walk
+    // upward from a note ending inside an unclosed region. The other two
+    // cannot land inside it, because the calling code refuses a selection
+    // that overlaps a definition block, and the append at the end of the
+    // note sits at or after where the selection ends.
     avoid?: { from: EditorPosition; to: EditorPosition },
 ): { change: EditorChange; cursor: EditorPosition; prepend?: EditorChange } {
-    // every read goes through `ctx` (never `doc`): a cell branch dispatches
-    // a cell edit between building the context and calling this, and two
-    // sources for one document is how those drift (second review 2026-09-09)
+    // Read everything through `ctx`, never through `doc`. The table-cell
+    // path writes into the cell between building the context and calling
+    // this, so reading the document from two places is exactly how the two
+    // pictures of it come to disagree (second review 2026-09-09).
     const lines = ctx.lines;
     const isProtected = ctx.scan.isProtected;
     const blocks = ctx.blocks();
-    // an insertion at the END of `line` would sit strictly inside `avoid`
+    // Whether inserting at the END of `line` would land strictly inside
+    // the stretch `avoid` names.
     const endInsideAvoid = (line: number): boolean => {
         if (!avoid) return false;
         const at = { line, ch: lines[line].length };
         return comparePositions(avoid.from, at) < 0 && comparePositions(at, avoid.to) < 0;
     };
-    // a non-blank line directly below the new definition would be pulled INTO
-    // it - Obsidian lazily continues a definition into the next line - so
-    // insertions with content below them add a trailing blank separator
-    // (A4 bug, 2026-07-20). The cursor still lands on the definition line.
+    // A line with text on it directly below the new definition gets pulled
+    // INTO the definition, because Obsidian carries a definition on into
+    // the next line. So when there is content below, add a blank line
+    // after the definition (the A4 bug, 2026-07-20). The caret still lands
+    // on the definition line itself.
     const needsSeparator = (insertLine: number) =>
         insertLine + 1 < lines.length && lines[insertLine + 1].trim() !== "";
     if (blocks.length > 0) {
@@ -91,21 +106,24 @@ export function buildDefinitionAppend(
         };
     }
 
-    // no definitions yet - but an existing section heading in the note
-    // claims the first footnote (QOL follow-up to issue #55): slot the
-    // definition under it instead of appending a second heading at the end.
-    // The setting is markdown that can span multiple lines, so match runs.
+    // No definitions yet. But if the note already has a section heading,
+    // that heading claims the first footnote (a follow-up to issue #55):
+    // put the definition under it, rather than adding a second heading at
+    // the end of the note. The setting can hold markdown spanning several
+    // lines, so what is matched is a run of lines, not one line.
     if (
         plugin.settings.enableFootnoteSectionHeading &&
         plugin.settings.footnoteSectionHeading
     ) {
-        // findLineRunEnd is the ONE anchor matcher shared with the
-        // move-to-bottom rule - the fixed-point guarantee needs both to
-        // agree on what counts as the existing heading
+        // findLineRunEnd is the single piece of code that finds the
+        // heading, shared with the move-to-bottom rule. They have to agree
+        // on what counts as the existing heading, or running lint twice
+        // would keep changing the note instead of settling.
         const headingLines = plugin.settings.footnoteSectionHeading.split("\n");
         const anchorEnd = findLineRunEnd(lines, isProtected, headingLines);
-        // a heading the selection overlaps is being converted away with it
-        // (a drag ending at ch 0 of the heading line leaves it intact)
+        // A heading the selection overlaps is about to be converted away
+        // along with the rest of the selection. A drag that stops at
+        // character 0 of the heading's line leaves the heading intact.
         const headingSwallowed =
             anchorEnd !== -1 &&
             avoid !== undefined &&
@@ -115,8 +133,8 @@ export function buildDefinitionAppend(
         if (anchorEnd !== -1 && !headingSwallowed) {
             let fromLine = anchorEnd;
             let slotText = `\n\n[^${footnoteId}]: `;
-            // reuse a blank line already separating the heading from what
-            // follows, instead of doubling it
+            // If a blank line already sits between the heading and what
+            // follows, use that one instead of adding a second.
             if (fromLine + 1 < lines.length && lines[fromLine + 1] === "") {
                 fromLine += 1;
                 slotText = `\n[^${footnoteId}]: `;
@@ -140,13 +158,16 @@ export function buildDefinitionAppend(
     let fromLine = lines.length - 1;
     let to: EditorPosition | undefined;
     if (ctx.scan.endsProtected) {
-        // the note ends inside an UNCLOSED fence/comment/math (2026-08-11
-        // review bug #10): a definition appended at EOF would be born as
-        // inert code - and the next lint would then delete its live
-        // reference as an orphan. Land it above the unclosed region: walk
-        // up to the last prefix a definition can live after, then past
-        // blank lines. Trailing-blank trimming must not fire here - its
-        // `to` spans to EOF and would delete the region itself.
+        // The note ends inside a fence, comment, or math region that was
+        // never closed (2026-08-11 review, bug #10). A definition added at
+        // the very end would be born inside it as dead text, and the next
+        // lint would then delete its live reference as an orphan.
+        //
+        // So put it above the unclosed region: walk up to the last line a
+        // definition can follow, then keep walking up past blank lines.
+        // The trailing-blank trimming must not run in this case, because
+        // its range reaches to the end of the note and would delete the
+        // unclosed region itself.
         while (
             fromLine >= 0 &&
             (ctx.scan.endsProtectedAt[fromLine] || endInsideAvoid(fromLine))
@@ -155,8 +176,9 @@ export function buildDefinitionAppend(
         }
         while (fromLine >= 0 && (lines[fromLine].trim() === "" || endInsideAvoid(fromLine))) fromLine--;
         if (fromLine < 0) {
-            // the unclosed region starts at line 0 - plant the definition
-            // on top, blank-separated from whatever follows
+            // The unclosed region starts at line 0, so there is nowhere
+            // above it to walk to. Put the definition at the very top,
+            // with a blank line between it and whatever follows.
             const topText =
                 `${definitionLabel(footnoteId)} \n` + (lines[0].trim() === "" ? "" : "\n");
             return {
@@ -175,42 +197,51 @@ export function buildDefinitionAppend(
     let text = `\n[^${footnoteId}]: `;
     if (isFirstFootnote) {
         let heading = addFootnoteSectionHeader(plugin);
-        // the heading carries its own blank line above; a blank insertion
-        // line (trimming off, note ends empty) already supplies it
+        // The heading already brings a blank line of its own above it. If
+        // the line we are inserting after is itself blank, which happens
+        // when trimming is off and the note ends empty, that blank line is
+        // already there, so drop the heading's one.
         if (heading && lines[fromLine].trim() === "") {
             heading = heading.slice(1);
         }
         text = heading + "\n" + text;
     } else if (lines[fromLine].trim() !== "") {
-        // not the first footnote, yet no column-0 block to append under
-        // (the note's only definitions are blockquoted): the label would
-        // land directly under a prose line, which Obsidian reads as lazy
-        // paragraph text, not a definition (definitionStartLines, ground
-        // truth 2026-09-09) - give it the blank separator the first
-        // footnote gets from its heading slot
+        // Not the first footnote, and yet there is no definition block at
+        // the left margin to append under, because the note's only
+        // definitions are inside blockquotes. Without help the label would
+        // land directly beneath a line of prose, and Obsidian reads such a
+        // line as more of that paragraph rather than as a definition. The
+        // project calls that a lazy label; definitionStartLines is what
+        // decides it (ground truth in the live Reading view, 2026-09-09).
+        // So give it the blank line that the first footnote would have
+        // received from its heading.
         text = "\n" + text;
     }
 
-    // cursor lands at the end of the inserted definition line
+    // The caret ends up at the end of the definition line just inserted.
     const linesAdded = text.split("\n").length - 1;
     const cursor = {
         line: fromLine + linesAdded,
         ch: text.length - text.lastIndexOf("\n") - 1,
     };
 
-    // with the insertion sitting mid-document (above an unclosed region),
-    // a non-blank line directly below it would be pulled INTO the new
-    // definition - same A4 hazard as the other insertion points
+    // When the definition sits in the middle of the note, above an
+    // unclosed region, a line with text on it directly below would be
+    // pulled INTO the new definition. Same danger as at the other places a
+    // definition can be inserted (the A4 bug again).
     if (ctx.scan.endsProtected && needsSeparator(fromLine)) text += "\n";
 
-    // The first footnote's section heading can carry a column-0 "---"
-    // divider; if the note's first line is a bare unclosed "---" (a
-    // thematic break), inserting that divider makes Obsidian re-read the
-    // whole head as YAML frontmatter, swallowing the prose in it (same
-    // hazard as preserveLeadingThematicBreak in
-    // move-footnotes-to-the-bottom - verified against metadataCache,
-    // 2026-08-10). A blank line prepended in the same transaction pins
-    // line 0 as content; it renders identically.
+    // The first footnote's section heading may itself start with a "---"
+    // divider at the left margin. If the note's first line is also a bare
+    // "---", meaning a horizontal rule with no partner, adding that second
+    // divider makes Obsidian re-read the whole top of the note as YAML
+    // frontmatter and swallow the prose in it. The same danger that
+    // preserveLeadingThematicBreak handles in
+    // move-footnotes-to-the-bottom, checked against Obsidian's own
+    // metadataCache on 2026-08-10.
+    //
+    // The fix: add a blank line at the very top in the same edit. That
+    // pins line 0 as ordinary content, and it renders exactly the same.
     let prepend: EditorChange | undefined;
     if (isFirstFootnote && lines[0] === "---" && !isProtected[0]) {
         const candidate = lines.slice(0, fromLine + 1).join("\n") + text;
@@ -223,20 +254,25 @@ export function buildDefinitionAppend(
 }
 
 /**
- * `buildDefinitionAppend`'s edit with `body` seeded after the definition
- * label - the selection-to-footnote conversion (issue #35) creates its
- * definition pre-filled with the selected text. The label is the LAST
- * occurrence in the change text (an optional section heading could carry a
- * label-shaped line above it), and the returned cursor - already at the
- * label's end - slides to the end of the body, before any trailing
- * separator newline. A multi-line body (a multi-paragraph selection,
- * 2026-08-19, already carrying its continuation indent) lands the cursor
- * at the end of its LAST line. `labelLineOffset` is the label's line
- * within the change text, found here against the UNSEEDED text: once the
- * body is spliced in, a label-shaped string inside the body ("`[^1]: x`"
- * in a code span) would win a lastIndexOf and point the caller at a
- * continuation line (review A4, Jason confirmed live 2026-09-08 - the
- * conversion was refused as protected text).
+ * Takes buildDefinitionAppend's edit and fills `body` in after the label,
+ * because a conversion (issue #35) creates its definition already holding
+ * the selected text.
+ *
+ * The label is the LAST label-shaped string in the edit's text, since an
+ * optional section heading above it could contain one too. The caret,
+ * which arrives sitting at the end of the label, slides along to the end
+ * of the body, and stops before any blank line added after it.
+ *
+ * When the body spans several lines, which happens when a selection
+ * spanning lines is converted (2026-08-19) and which already carries its
+ * continuation indent, the caret lands at the end of the body's LAST line.
+ *
+ * `labelLineOffset` is which line of the edit's text the label is on. It
+ * is worked out here, BEFORE the body is filled in. Once the body is
+ * spliced in, a label-shaped string inside the body, say "`[^1]: x`"
+ * written in a code span, would be the last one and would point the caller
+ * at a continuation line instead (review A4; Jason confirmed it live on
+ * 2026-09-08, where the conversion was wrongly refused as protected text).
  */
 export function seedDefinitionBody(
     definition: {

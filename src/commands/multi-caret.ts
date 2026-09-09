@@ -38,21 +38,31 @@ import {
 } from "./press-guards";
 
 import { MultiCaretNestedNotice, showNotice } from "../editor/notice";
-// Multiple Alt-clicked carets get the SAME footnote at every one of them
-// (Jason's ask 2026-08-22 - one source referenced many times; always on,
-// no toggle, his call): the autonum key inserts the same "[^N]" at each
-// caret with ONE definition; the named/inline keys drop their skeleton at
-// each caret and leave a CURSOR inside every bracket pair, so typing fills
-// all of them simultaneously (CodeMirror mirrors input at every cursor);
-// the paste key wraps the same clipboard text at each caret. Atomic by
-// ruling: every caret must sit where a footnote can be created, or the
-// whole press refuses with one toast - and the edit is one transaction,
-// one undo. Extra carets used to be silently ignored, which served nobody.
+// The multi-caret press: several Alt-clicked carets all get the SAME
+// footnote (Jason's ask 2026-08-22, for one source cited in many places;
+// always on, no toggle, his call). What each key does:
+//
+//   numbered - the same "[^N]" at every caret, with ONE definition
+//   named    - the empty "[^]" at every caret, with a cursor left inside
+//              each pair of brackets
+//   inline   - the empty "^[]" at every caret, same idea
+//   paste    - the same clipboard text wrapped at every caret
+//
+// Leaving a cursor inside every bracket pair is what lets you type the
+// name or the body once and have it appear in all of them, because
+// CodeMirror repeats your typing at every cursor.
+//
+// The press is atomic by ruling: every caret has to sit somewhere a
+// footnote can be created, or the whole press refuses with a single
+// message. The edit itself is one transaction, so one undo takes all of it
+// back. Before this, extra carets were quietly ignored, which served
+// nobody.
 
-// the mixed-caret refusal is MultiCaretNestedNotice (editor/notice.ts):
-// the same nesting sentence as the single-caret guards, plural opener
+// The message shown when the carets disagree is MultiCaretNestedNotice
+// (editor/notice.ts). It is the same sentence about nesting that the
+// single-caret guards use, with a plural opening.
 
-/** What a caret sits inside, for the continuation check - the same probe trio the guard sweep refuses on. Inline wins over reference shape on purpose: an inline body can contain reference-shaped text (single-caret guard precedence). */
+/** What a caret is sitting inside, used by the continuation check. These are the same three tests the guard sweep refuses on. An inline footnote is reported ahead of a reference on purpose, because an inline footnote's body can contain reference-shaped text; the single-caret guards order them the same way. */
 type CaretArtifact =
     | { kind: "inline"; empty: boolean }
     | { kind: "empty" }
@@ -83,17 +93,30 @@ function caretArtifact(
 }
 
 /**
- * A press with EVERY caret inside the same footnote artifact is not a
- * refusal - it is the single-caret CONTINUATION, aimed at the FIRST
- * artifact in document order (A14 report, 2026-08-27: the named
- * multi-caret flow dead-ended on its second press, and filled inline
- * footnotes could never hop back out). Uniform empties/placeholders warn
- * through the shared guards WITHOUT collapsing, so typing keeps filling
- * every skeleton; a filled-inline press hops one cursor out past the first
- * span; same-named dangling references get their ONE shared definition
- * (popup/jump + creation lint, via createMatchingFootnoteDefinition).
- * Anything mixed - kinds, names, emptiness - or already working (a
- * defined name) keeps the atomic refusal. Always consumes the press.
+ * When EVERY caret sits inside the same kind of footnote thing, the press
+ * is not refused. It is the ordinary second press, the one that carries on
+ * from where the first left off, aimed at whichever of them comes first in
+ * the note (from Jason's A14 report, 2026-08-27: the named multi-caret
+ * flow had nowhere to go on its second press, and a filled inline footnote
+ * could never be hopped back out of).
+ *
+ * What each case does:
+ *
+ *   every caret in an empty "[^]" or an untouched prefix placeholder: the
+ *   shared guards warn, and the carets are NOT collapsed to one, so typing
+ *   keeps filling all of them at once
+ *
+ *   every caret in a filled inline footnote: one cursor hops out past the
+ *   first one
+ *
+ *   every caret on a reference of the same name with no definition: they
+ *   all get their ONE shared definition, then the popup or the jump and
+ *   the creation lint, through createMatchingFootnoteDefinition
+ *
+ * Anything mixed keeps the atomic refusal: different kinds, different
+ * names, some empty and some filled. So does a name that already works,
+ * meaning it already has a definition, since there is nothing to carry on
+ * from. Either way the press is used up.
  */
 function multiCaretContinuation(
     plugin: FootnotePlugin,
@@ -107,66 +130,80 @@ function multiCaretContinuation(
         showNotice(MultiCaretNestedNotice, 8000);
         return "handled";
     };
-    // FIRST in document order (Jason's consistency ruling 2026-08-29): the
-    // numbered flow already parks and returns the caret after its first
-    // reference, so the named continuation and the inline hop-out land
-    // there too - one answer for "where am I when the insertion is done"
+    // The one that comes first in the note (Jason's consistency ruling,
+    // 2026-08-29). The numbered flow already parks the caret after its
+    // first reference and gives it back there, so the named second press
+    // and the inline hop-out land there too. One answer to the question
+    // "where is my caret when this is done".
     const first = carets.reduce((a, b) => (comparePositions(a, b) <= 0 ? a : b));
     if (new Set(artifacts.map((a) => a.kind)).size !== 1) return refuse();
     const kind = artifacts[0].kind;
     if (kind === "inline") {
-        // uniformly empty or uniformly filled, or the meanings are mixed
+        // They must be all empty or all filled. A mixture means the press
+        // would mean two different things at once.
         if (new Set(artifacts.map((a) => a.kind === "inline" && a.empty)).size !== 1) {
             return refuse();
         }
-        // the shared guards do the rest at the first caret: warn while
-        // empty (every caret stays), or hop out past the first span
-        // (collapsing the multi-cursor)
+        // The shared guards take it from here, working at the first caret.
+        // While the inline footnotes are empty they warn, and every caret
+        // stays put. Once filled, the caret hops out past the first one,
+        // which collapses the several cursors down to one.
         caretGuardsHandled(plugin, doc, null, first);
         return "handled";
     }
     if (kind === "empty") {
-        // the shared empty-"[^]" warning; every caret stays for typing
+        // The shared warning about an empty "[^]". Every caret stays put,
+        // so you can keep typing the name into all of them.
         caretGuardsHandled(plugin, doc, null, first);
         return "handled";
     }
     const names = artifacts.map((a) => (a.kind === "ref" ? a.name : ""));
     if (new Set(names.map((n) => n.toLowerCase())).size !== 1) return refuse();
-    // an untouched "[^prefix]" placeholder asks for its suffix (all stay)
+    // A "[^prefix]" placeholder you have not typed into yet asks for the
+    // rest of the name. Every caret stays put.
     if (warnPrefilledReferenceIfInside(plugin, doc, null, first)) {
         return "handled";
     }
-    // the paste key has no definition-continuation semantics at a single
-    // caret either - its meaning is "wrap the clipboard", so same-named
-    // references keep the refusal there
+    // The paste key does not carry on into a definition at a single caret
+    // either. Its meaning is "wrap the clipboard", so carets on references
+    // of the same name are refused for that key.
     if (!allowDefinitionContinuation) return refuse();
     const name = names[0];
     if (idListIncludes(listExistingFootnoteDefinitions(doc, ctx), name)) {
-        // already a working footnote - nothing to continue
+        // The footnote already works, so there is nothing to carry on
+        // from.
         return refuse();
     }
     if (footnoteNameProblem(name) !== null) {
-        // warns with the shared invalid-name notice, edits nothing
+        // This shows the shared warning about a name that cannot work, and
+        // changes nothing in the note.
         createMatchingFootnoteDefinition(doc.getLine(first.line), first, plugin, doc, ctx);
         return "handled";
     }
-    // collapse to the first caret, then the single-caret continuation
-    // creates the ONE shared definition and lands (popup/jump + lint); the
-    // popup arm parks and returns the caret exactly there on close
+    // Collapse the carets down to the first one. The ordinary second press
+    // then creates the ONE shared definition and lands, in the popup or by
+    // jumping, with the lint after it. On the popup route the caret parks
+    // here and comes back here when the popup closes.
     doc.setCursor(first);
     createMatchingFootnoteDefinition(doc.getLine(first.line), first, plugin, doc, ctx);
     return "handled";
 }
 
 /**
- * The press's insertion targets when this is a multi-caret press: every
- * caret guard-checked (a refusal toasts and returns "handled"), adjusted
- * (end-of-word/punctuation hop, like every single-caret insert), deduped,
- * and sorted to document order. Null = not a multi-caret press (fewer
- * than two carets, a real selection, or an active table cell - cells are
- * their own single-caret world); "handled" = consumed without inserting:
- * refused, or settled by the all-carets-inside-one-footnote continuation
- * (see multiCaretContinuation).
+ * Where a multi-caret press would insert. Every caret is checked by the
+ * guards first, and a refusal shows its message and returns "handled".
+ * The surviving positions get the end-of-word adjustment every
+ * single-caret insertion gets, which moves them to the end of the word and
+ * past trailing punctuation. Then duplicates are dropped and the rest are
+ * sorted into the order they appear in the note.
+ *
+ * Returns null when this is not a multi-caret press at all: fewer than two
+ * carets, a real selection, or an active table cell, since a cell is a
+ * single-caret world of its own.
+ *
+ * Returns "handled" when the press was used up without inserting anything:
+ * refused, or dealt with by the case where every caret sits inside the
+ * same footnote (see multiCaretContinuation).
  */
 function multiCaretTargets(
     plugin: FootnotePlugin,
@@ -176,9 +213,11 @@ function multiCaretTargets(
 ): EditorPosition[] | "handled" | null {
     const ranges = doc.listSelections();
     if (ranges.length < 2) return null;
-    // any non-empty range belongs to the selection-conversion claim, which
-    // runs before this and would have consumed the press - reaching here
-    // with one means the claim declined (e.g. whitespace-only): not ours
+    // Any range with text in it belongs to the selection claim, which runs
+    // before this one and would have taken the press. If such a range
+    // reaches here, the selection claim looked at it and declined, for
+    // instance because it held only whitespace. Either way it is not this
+    // claim's press.
     if (ranges.some((range) => comparePositions(range.anchor, range.head) !== 0)) {
         return null;
     }
@@ -195,17 +234,18 @@ function multiCaretTargets(
     }
     for (const [index, range] of ranges.entries()) {
         const pos = range.head;
-        // a caret inside an existing footnote artifact refuses when the
-        // OTHER carets sit in plain text: on a single caret that press
-        // means navigate/hop/continue, and mixed meanings across carets
-        // are exactly what the atomic rule forbids (all-inside-the-same
-        // presses continue instead - see multiCaretContinuation above)
+        // A caret inside an existing footnote, while the OTHER carets sit
+        // in plain text, refuses. At a single caret such a press means
+        // navigate, hop out, or carry on, and carets that mean different
+        // things from each other are exactly what the atomic rule forbids.
+        // When every caret is inside one, the press carries on instead;
+        // see multiCaretContinuation above.
         if (artifacts[index] !== null) {
             showNotice(MultiCaretNestedNotice, 8000);
             return "handled";
         }
-        // protected text and definition interiors refuse with their own
-        // notices, exactly like the single-caret creation guards
+        // A caret in protected text, or inside a definition, refuses with
+        // its own message, exactly as the single-caret creation guards do.
         if (warnProtectedCaretIfInside(doc, null, pos, ctx)) return "handled";
         if (warnDefinitionCaretIfInside(doc, null, pos, ctx)) return "handled";
     }
@@ -218,17 +258,21 @@ function multiCaretTargets(
         ),
     );
     adjusted.sort(comparePositions);
-    // end-of-word can gather carets from the same word onto one spot -
-    // that spot gets ONE insert
+    // The end-of-word adjustment can push two carets in the same word onto
+    // the same spot. That spot gets ONE insertion, not two.
     return adjusted.filter(
         (pos, i) => i === 0 || comparePositions(pos, adjusted[i - 1]) !== 0,
     );
 }
 
 /**
- * The multi-caret claim for the synchronous keys. True = the press was a
- * multi-caret press and is settled: inserted at every caret, or refused
- * with its toast. False = not multi-caret; the normal cascade owns it.
+ * The multi-caret claim for the keys that work straight away, without
+ * waiting on anything.
+ *
+ * Returns true when the press was a multi-caret press and is now settled,
+ * either inserted at every caret or refused with its message. Returns
+ * false when it was not a multi-caret press, and the ordinary cascade
+ * takes it.
  */
 export function multiCaretPressHandled(
     plugin: FootnotePlugin,
@@ -237,10 +281,10 @@ export function multiCaretPressHandled(
     command: "autonum" | "named" | "inline",
 ): boolean {
     if (cellActive) return false;
-    // the single-caret press is the common case: answer it before building
-    // the document context multiCaretTargets would only discard (every
-    // press used to pay a full scan here and a second one in the cascade;
-    // review B3, 2026-09-09)
+    // A press with one caret is the common case, so answer it before
+    // building the document context that multiCaretTargets would only
+    // throw away. Without this, every press paid for a full scan here and
+    // then a second one in the cascade (review B3, 2026-09-09).
     if (doc.listSelections().length < 2) return false;
     const ctx = docContext(doc);
     const targets = multiCaretTargets(plugin, doc, ctx, true);
@@ -255,7 +299,7 @@ export function multiCaretPressHandled(
         const prefix = plugin.settings.enableFootnotePrefix
             ? activeFootnotePrefix(plugin, footnotePrefixFromEditor(doc))
             : "";
-        // an invalid prefix already toasted its reason
+        // An invalid prefix has already shown a message explaining why.
         if (prefix === null) return true;
         const skeleton = referenceText(prefix);
         insertSkeletonAtEveryCaret(doc, ctx, targets, skeleton, 2 + prefix.length);
@@ -266,9 +310,12 @@ export function multiCaretPressHandled(
 }
 
 /**
- * The multi-caret claim for the paste key: same clipboard text wrapped as
- * "^[…]" at every caret. Async only for the clipboard read, which happens
- * AFTER the guard sweep so a refused press never touches the clipboard.
+ * The multi-caret claim for the paste key: the same clipboard text wrapped
+ * as "^[…]" at every caret.
+ *
+ * The only reason this one has to wait is the clipboard read, and that
+ * happens AFTER the guards have run, so a press that is going to be
+ * refused never touches the clipboard at all.
  */
 export async function multiCaretPastePressHandled(
     plugin: FootnotePlugin,
@@ -284,20 +331,23 @@ export async function multiCaretPastePressHandled(
 
     const text = await readInlineFootnoteFromClipboard(plugin);
     if (text === null) return true;
-    // a pasted body is complete - nothing left to type into every wrapper
-    // - so the press ends like every other multi-caret insertion: ONE
-    // caret after the FIRST footnote (Jason's consistency ruling, extended
-    // to paste 2026-09-04; a cursor after every wrapper only forced a
-    // mouse click to get back to one)
+    // A pasted body is already complete, so there is nothing left for you
+    // to type into each wrapper. The press therefore ends the way every
+    // other multi-caret insertion does: with ONE caret, just after the
+    // first footnote (Jason's consistency ruling, extended to the paste
+    // key on 2026-09-04; leaving a cursor after every wrapper only made
+    // you reach for the mouse to get back down to one).
     insertSkeletonAtEveryCaret(doc, ctx, targets, text, text.length, "first");
     return true;
 }
 
-// The autonum flavor: the same next-numbered reference at every caret,
-// ONE definition appended - then popup or jump per settings, exactly like
-// the single-caret insert (the definition is singular, so the landing is
-// too). The whole edit is one transaction; the liveness verify covers
-// EVERY reference (any dead one refuses the lot - atomicity again).
+// The numbered version: the same next-numbered reference at every caret,
+// with ONE definition appended. Then the popup or the jump, whichever the
+// settings say, exactly as for a single-caret insertion. There is only one
+// definition, so there is only one place to land.
+//
+// The whole thing is a single edit. The liveness check covers EVERY
+// reference, and one dead reference refuses the lot; the press is atomic.
 function insertReferenceAtEveryCaret(
     plugin: FootnotePlugin,
     doc: Editor,
@@ -340,20 +390,26 @@ function insertReferenceAtEveryCaret(
             line: verified.anchors[0].line,
             ch: verified.anchors[0].ch + footnoteReference.length,
         },
-        // the landing owns the creation lint (parity, Jason's ask
-        // 2026-08-25): reindexing renames every minted reference
-        // consistently, and the relocation targets the ONE new definition
+        // The landing runs the after-creation lint, the same as every other
+        // creation press (Jason asked for that parity on 2026-08-25). That
+        // works here because reindexing renames every newly minted reference
+        // to the same new name, and the caret relocation only has to find
+        // the one new definition they all share.
     });
 }
 
-// The skeleton flavor shared by named ("[^]"), inline ("^[]"), and paste
-// ("^[clipboard]"): the same text at every caret, then a CURSOR placed
-// `innerOffset` into each - for named/inline that is inside the brackets,
-// so typing the name/body types into all of them at once (CodeMirror
-// multi-cursor input); for paste it is just past the FIRST wrapper only
-// (`land: "first"` - the body is complete, and one caret is the rule).
-// Born-dead verify per caret on the one simulated result; any dead
-// landing refuses the lot.
+// The shared writer for the named key ("[^]"), the inline key ("^[]"), and
+// the paste key ("^[clipboard]"). It puts the same text at every caret and
+// then places a cursor `innerOffset` characters into it.
+//
+// For the named and inline keys that lands the cursor inside the brackets,
+// so that typing the name or the body types into all of them at once,
+// which is CodeMirror's multi-cursor behavior. For the paste key it lands
+// just past the FIRST wrapper and nowhere else (`land: "first"`), because
+// the body is already complete and one caret is the rule.
+//
+// Each caret's landing is checked for being born-dead against one shared
+// simulated result, and any dead one refuses the whole press.
 function insertSkeletonAtEveryCaret(
     doc: Editor,
     ctx: DocContext,
@@ -364,9 +420,10 @@ function insertSkeletonAtEveryCaret(
 ): void {
     const changes: EditorChange[] = targets.map((pos) => ({ from: pos, text }));
     const simulated = simulateChanges(ctx.lines, changes);
-    // one resolution pass and one masked twin for every caret, like
-    // verifyLiveFootnoteInsertion (the per-anchor form re-resolved and
-    // rescanned the whole note once per caret; second review 2026-09-09)
+    // Work out all the positions in one pass and build one masked twin for
+    // all of them, the way verifyLiveFootnoteInsertion does. The old
+    // one-position-at-a-time version re-resolved and rescanned the whole
+    // note once per caret (second review 2026-09-09).
     const anchors = simulatedAnchors(ctx.lines, changes, targets.map((_, index) => index), simulated);
     const simulatedMasked = maskProtectedLines(simulated, scanDocument(simulated));
     const everyLive = anchors.every((anchor) =>
@@ -376,7 +433,8 @@ function insertSkeletonAtEveryCaret(
         showNotice(ProtectedCreationNotice, 8000);
         return;
     }
-    // targets arrive in document order, so anchors[0] is the first footnote
+    // The targets arrive in the order they appear in the note, so
+    // anchors[0] is the first footnote.
     const landed = land === "first" ? anchors.slice(0, 1) : anchors;
     doc.transaction({
         changes,

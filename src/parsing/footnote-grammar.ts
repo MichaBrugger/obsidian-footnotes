@@ -1,67 +1,94 @@
 import { definitionLabelIn, maskProtectedLines } from "./markdown-scan";
 
-// the label reader lives beside the block walker that needs it (markdown-scan
-// cannot import this module: it already sits below it); re-exported so its
-// many callers keep their import site
+// The label reader lives over in markdown-scan, beside the block walker
+// that needs it, because markdown-scan sits below this module and so cannot
+// import from it. It is re-exported here so its many callers can go on
+// importing it from the same place as before.
 export { definitionLabelWithName } from "./markdown-scan";
 
-// The reference GRAMMAR: what counts as a "[^name]" reference, how names
-// are compared, and the autonumbering scan. Pure text functions with no
-// editor or plugin dependencies - a LEAF module (only markdown-scan below
-// it), so the lint rules and the command cascade can both import it
-// without the import cycles the old all-in-one file forced (split
+// The reference GRAMMAR: what counts as a "[^name]" reference, how two
+// names are compared, and the scan that finds the next free number.
+//
+// Everything here is plain text handling, with nothing from the editor or
+// the plugin. That makes this a leaf module (only markdown-scan sits below
+// it), so the lint rules and the command cascade can both import it without
+// the circular imports the old all-in-one file forced on them (split
 // 2026-08-11, see .claude/plans/split-insert-or-navigate.md).
 
-/** Every footnote reference SHAPE (numbered or named); the definition-label exclusion is positional - see footnoteReferenceMatches. /g: read with matchAll, never test/exec (lastIndex is stateful). */
+/**
+ * Matches everything SHAPED like a footnote reference, numbered or named.
+ * It does not rule out a definition's own label; where the match sits on
+ * the line is what decides that, over in footnoteReferenceMatches.
+ *
+ * The /g flag makes this pattern remember where it last matched, so read it
+ * with matchAll only. Calling test or exec on it gives a different answer
+ * each time.
+ */
 export const AllReferences = /\[\^([^[\]]+)\]/g;
-/** Numbered references AND numbered definitions - both reserve their number for autonumbering. */
+/**
+ * Numbered references AND numbered definitions. Either one reserves its
+ * number, so autonumbering will not hand that number out again.
+ */
 const AllNumberedReferences = /\[\^(\d+)\]/g;
-/** Pulls the name out of a single reference string; the name is match[2]. */
+/** Pulls the name out of one reference string. The name is match[2]. */
 export const ExtractNameFromFootnote = /(\[\^)([^[\]]+)(?=\])/;
 
 /**
- * Reference occurrences on a single line - every "[^id]" EXCEPT a definition's
- * own "[^id]:" label at column 0. A "[^id]:" appearing MID-line is a live
- * reference followed by a literal colon (exactly how Obsidian renders it),
- * so it counts as a reference; only a column-0 label is a definition. Excluding
- * definitions positionally (rather than by the old `(?!:)` lookahead, which
- * also dropped genuine mid-line references sitting before a colon) is the
- * whole point. Pass the line already code-masked when code must be ignored.
- * Footnote ids are case-insensitive in Obsidian, but casing is preserved
- * here - callers fold case only when comparing identities.
- * This is the RAW gate (cheap, per keystroke); a label behind a blockquote
- * marker still reads as a reference here and is excluded one level up, in
- * referenceOccurrences, which knows the line's label.
+ * Every reference on one line: each "[^name]" EXCEPT a definition's own
+ * "[^name]:" label sitting at column 0.
+ *
+ * A "[^name]:" in the MIDDLE of a line is not a label. It is a live
+ * reference followed by an ordinary colon, which is exactly how Obsidian
+ * renders it, so it counts. Only a label at column 0 is a definition.
+ * Deciding this by position is the whole point of the function: the old
+ * test was a `(?!:)` lookahead inside the pattern, and that also threw away
+ * genuine mid-line references that happened to sit before a colon.
+ *
+ * Pass the line already masked when protected text must be ignored.
+ *
+ * Footnote names are case-insensitive in Obsidian, but the casing the user
+ * typed is kept here; callers fold case only when comparing two names.
+ *
+ * This is the RAW gate: cheap enough to run on every keystroke. A label
+ * behind a blockquote marker still reads as a reference here, and is
+ * excluded one level up in referenceOccurrences, which knows where the
+ * line's label is.
  */
 export function footnoteReferenceMatches(
     line: string,
-    // false for a line whose label-shaped start is LAZY paragraph text
-    // (definitionStartLines): its "[^x]" then IS a live reference, as
-    // Obsidian renders it (second review 2026-09-09; the unconditional
-    // exclusion let orphan-definition deletion destroy the real
-    // definition such a reference pointed at)
+    // Pass false when the line's label-shaped start is really LAZY
+    // paragraph text, which definitionStartLines decides. Obsidian renders
+    // that "[^x]" as a live reference, so it must count as one here (second
+    // review, 2026-09-09: excluding it no matter what let orphaned
+    // definition deletion destroy the real definition such a reference
+    // pointed at).
     labelIsDefinition = true,
 ): RegExpMatchArray[] {
     const matches: RegExpMatchArray[] = [];
     for (const match of line.matchAll(AllReferences)) {
         const start = match.index;
         if (labelIsDefinition && start === 0 && line[match[0].length] === ":") continue;
-        // a backslash-escaped "[" is literal text per CommonMark - the
-        // "reference" is prose the user typed on purpose (bug-escaped-marker)
+        // A "[" with a backslash in front of it is literal text under the
+        // CommonMark rules, so this reference-shaped string is prose the
+        // user typed on purpose (bug-escaped-marker).
         if (escapedAt(line, start)) continue;
-        // "^[" opens an INLINE footnote, so the bracket belongs to it:
-        // "^[^literal]" is inline-footnote content, not a reference
-        // (bug-inline-footnote-double-parse) - unless the caret itself is
-        // escaped ("\^[^x]" is a literal caret followed by a real reference)
+        // "^[" opens an INLINE footnote, so that bracket belongs to the
+        // inline footnote: "^[^literal]" is inline-footnote text, not a
+        // reference (bug-inline-footnote-double-parse). The exception is an
+        // escaped caret, since "\^[^x]" is a literal "^" followed by a real
+        // reference.
         if (line[start - 1] === "^" && !escapedAt(line, start - 1)) continue;
         matches.push(match);
     }
     return matches;
 }
 
-/** One reference occurrence from referenceOccurrences: the raw name plus the span of the whole "[^name]". */
+/**
+ * One reference found by referenceOccurrences: the name as the user typed
+ * it, plus where the whole "[^name]" sits on the line.
+ */
 export interface ReferenceOccurrence {
-    /** The name exactly as typed - casing preserved; fold to compare identities. */
+    /** The name exactly as typed, casing and all. Fold case to compare two names. */
     name: string;
     /** Index of the opening "[". */
     start: number;
@@ -70,28 +97,35 @@ export interface ReferenceOccurrence {
 }
 
 /**
- * Every reference on the line, matched against its MASKED twin but with
- * each name re-sliced from the RAW line: a code span inside a name masks
- * to NULs, and a NUL-bearing name can never equal the raw definition label
- * it must pair with (bug-masked-name-identity). This is the ONE home of
- * that invariant - every scan and rewrite iterates through here instead of
- * hand-rolling the match-then-re-slice dance it used to clone.
+ * Every reference on the line. The matching runs against the line's masked
+ * twin (a copy with protected text blanked out), but each name is then cut
+ * out of the RAW line the user typed.
+ *
+ * Why both halves: masking blots out a code span inside a name with NUL
+ * characters, and a name carrying NULs could never equal the raw definition
+ * label it is supposed to pair with (bug-masked-name-identity).
+ *
+ * This function is the one home of that rule. Every scan and every rewrite
+ * loops through here, instead of copying the match-then-re-cut dance the
+ * way they each used to.
  */
 export function referenceOccurrences(
     line: string,
     masked: string,
-    // whether the line's label-shaped start is a real definition
-    // (definitionStartLines says so); callers holding the starts pass
-    // theirs, so a LAZY label's "[^x]" counts as the live reference it is
+    // Whether the line's label-shaped start is a real definition, which
+    // definitionStartLines is what decides. A caller already holding those
+    // starts passes its own answer, so a LAZY label's "[^x]" is counted as
+    // the live reference it really is.
     labelIsDefinition = true,
 ): ReferenceOccurrence[] {
     const occurrences: ReferenceOccurrence[] = [];
-    // the line's own definition label defines, it never references - at
-    // column 0 (footnoteReferenceMatches already skips it) or behind a
-    // blockquote/callout marker ("> [^9]: quoted", C22). Reindex used to
-    // count a quoted orphan's label as the first reference and hand it
-    // number 1 (review A3, 2026-09-08); the exclusion lives here, in the
-    // one home of "every reference on this line", so no rule can disagree
+    // A line's own definition label defines a footnote; it never references
+    // one. That holds at column 0, which footnoteReferenceMatches already
+    // skips, and behind a blockquote or callout marker, as in
+    // "> [^9]: quoted" (case C22). Reindex used to count a quoted orphaned
+    // definition's label as the first reference and give it number 1
+    // (review A3, 2026-09-08). The exclusion lives here, in the one home of
+    // "every reference on this line", so that no rule can disagree with it.
     const label = labelIsDefinition ? definitionLabelIn(masked) : null;
     const labelStart = label ? label.nameStart - 2 : -1;
     for (const match of footnoteReferenceMatches(masked, labelIsDefinition)) {
@@ -104,11 +138,12 @@ export function referenceOccurrences(
 }
 
 /**
- * The occurrence whose brackets strictly contain `ch`, or null - the same
- * "inside" rule as referenceAtCursor, for callers already holding
- * referenceOccurrences (the masked-match→raw-name pairing). The cascade's
- * masked re-checks used to clone the match-then-re-slice dance instead
- * (2026-08-11 review cleanliness).
+ * The reference whose brackets strictly contain the column `ch`, or null.
+ * It follows the same "inside" rule as referenceAtCursor, and is for
+ * callers that already hold a list from referenceOccurrences, with its
+ * masked match and raw name paired up. The cascade's re-checks against the
+ * masked twin used to copy the match-then-re-cut dance instead (2026-08-11
+ * review, for cleanliness).
  */
 export function occurrenceAtCursor(
     occurrences: ReferenceOccurrence[],
@@ -120,30 +155,44 @@ export function occurrenceAtCursor(
     return null;
 }
 
-/** Whether the character at `index` is backslash-escaped: an ODD run of backslashes directly before it. Exported for the insertion-position adjuster - text INSERTED at an escaped position would itself be escaped (bug-insert-after-backslash). */
+/**
+ * Whether the character at `index` is escaped by a backslash, meaning an
+ * ODD number of backslashes sits directly in front of it. (Backslashes pair
+ * off and escape each other, so an even run leaves the next character
+ * alone.)
+ *
+ * Exported for the insertion-position adjuster: text INSERTED at an escaped
+ * position would itself come out escaped (bug-insert-after-backslash).
+ */
 export function escapedAt(line: string, index: number): boolean {
     let backslashes = 0;
     for (let j = index - 1; j >= 0 && line[j] === "\\"; j--) backslashes++;
     return backslashes % 2 === 1;
 }
 
-/** Case-insensitive membership: footnote ids differing only in letter case are the same footnote (Obsidian folds them, and the metadata cache lowercases). */
+/**
+ * Whether `id` is in `ids`, ignoring letter case. Two footnote names that
+ * differ only in case are the same footnote: Obsidian folds them together,
+ * and its metadata cache lowercases them.
+ */
 export function idListIncludes(ids: string[], id: string): boolean {
     const lower = id.toLowerCase();
     return ids.some((name) => name.toLowerCase() === lower);
 }
 
-// Obsidian won't render a footnote whose name contains whitespace or
-// backticks (Jason's call, 2026-08-10: such names are disallowed outright
-// rather than supported), and an empty name isn't a footnote at all; the
-// reference regexes stay permissive so such names can be caught and warned
-// about instead of silently misbehaving. Dollar signs are FINE - Jason
-// verified live that "[^a$1]" renders as a footnote (the scanner keeps
-// in-reference dollars out of math pairing for the same reason).
-// The three spellings of a footnote name, each with ONE owner (the
-// duplicated-logic audit found "[^…]" built in twenty places, 2026-09-05;
-// a spelling with one home is also what a future translation or syntax
-// change would need).
+// Obsidian will not render a footnote whose name holds whitespace or a
+// backtick, and an empty name is not a footnote at all. Jason's call,
+// 2026-08-10: names like that are disallowed outright rather than
+// supported. The reference patterns above stay permissive on purpose, so
+// such a name can be caught and warned about instead of quietly
+// misbehaving. Dollar signs are FINE: Jason verified live that "[^a$1]"
+// renders as a footnote (and for the same reason the scanner keeps a dollar
+// inside a reference out of its math pairing).
+//
+// Below are the three spellings of a footnote name, each with ONE owner.
+// The duplicated-logic audit of 2026-09-05 found "[^…]" being built by hand
+// in twenty places. A spelling with a single home is also what a future
+// translation, or a change to the syntax, would need.
 
 /** The reference: "[^name]". */
 export function referenceText(name: string): string {
@@ -169,27 +218,35 @@ export function isValidFootnoteName(name: string): boolean {
     return name.length > 0 && !/[\s`]/.test(name);
 }
 
-// "#" is refused at CREATION and RENAME on top of the render rule: a
-// "[^#x]" renders in Reading view, but Obsidian's footnote hover preview
-// and its Footnotes sidebar resolve footnotes through a "#[^id]" subpath
-// that splits on "#" - both say "Footnote not found" for it (Jason's
-// finding 2026-09-05), and the plugin's popup can't bind it either. An
-// EXISTING "#" reference stays a footnote to the scanner and the linter,
-// because it does render. It shares the ordinary invalid-character
-// message with spaces and backticks (Jason: one rule, one toast).
+// A "#" is refused when a footnote is CREATED or RENAMED, on top of the
+// render rule above. "[^#x]" does render in Reading view, but Obsidian's
+// footnote hover preview and its Footnotes sidebar both find a footnote
+// through a "#[^name]" subpath that splits on "#", so both say "Footnote
+// not found" for it (Jason's finding, 2026-09-05), and the plugin's own
+// popup can't bind to it either. A "#" reference that already exists stays
+// a footnote to the scanner and the lint, because it does render. It shares
+// the ordinary invalid-character message with spaces and backticks
+// (Jason: one rule, one toast).
 export const InvalidNameCharacters = 'Footnote names can\'t contain spaces, backticks, brackets, or "#".';
 
-/** Why `name` can't name a NEW or RENAMED footnote, or null when it can: one message for every character a name can't carry (Jason, 2026-09-05: the separate brackets line was redundant). */
+/**
+ * Why `name` can't name a NEW or RENAMED footnote, or null when it can.
+ * One message covers every character a name can't carry (Jason, 2026-09-05:
+ * the separate line about brackets said nothing the first line didn't).
+ */
 export function footnoteNameProblem(name: string): string | null {
     if (/[[\]#]/.test(name) || !isValidFootnoteName(name)) return InvalidNameCharacters;
     return null;
 }
 
 /**
- * The reference whose brackets contain `ch`, or null. Strictly INSIDE only -
- * same rule as inline footnotes: a caret immediately after the closing
- * bracket (or before the opening one) is outside, so the hotkey there
- * inserts a consecutive footnote instead of navigating (issue #49).
+ * The reference whose brackets contain the column `ch`, or null.
+ *
+ * The caret must be strictly INSIDE the brackets, the same rule inline
+ * footnotes use. A caret sitting right after the closing bracket, or right
+ * before the opening one, counts as outside, so pressing the hotkey there
+ * inserts a second footnote next to the first instead of navigating
+ * (issue #49).
  */
 export function referenceAtCursor(
     references: { footnote: string; startIndex: number }[],
@@ -203,12 +260,15 @@ export function referenceAtCursor(
     return null;
 }
 
-// The start index of a placeholder `reference` occurrence whose brackets
-// strictly contain `ch`, or null. For the empty "[^]": the reference regexes
-// require a non-empty name, so the placeholder a first press just inserted
-// is invisible to every earlier cascade step - this is the only guard
-// between a second press and a nested "[^[^]]". The prefilled "[^7-]"
-// placeholder reuses the same containment scan via warnPrefilledReferenceIfInside.
+// Where a placeholder starts, when the column `ch` sits strictly inside its
+// brackets; null otherwise.
+//
+// This exists for the empty "[^]". The reference patterns above insist on a
+// non-empty name, so the placeholder a first press has just inserted is
+// invisible to every earlier step of the cascade. This check is the only
+// guard standing between a second press and a nested "[^[^]]". The
+// prefilled "[^7-]" placeholder reuses the same containment scan through
+// warnPrefilledReferenceIfInside.
 export function emptyReferenceStart(
     text: string,
     ch: number,
@@ -220,42 +280,46 @@ export function emptyReferenceStart(
     return null;
 }
 
-// One more than the highest numbered reference or definition in the text; gaps in
-// the numbering are not reused, and named footnotes don't count. Numbers
-// inside code blocks or frontmatter don't reserve anything (#41). With a
-// `prefix`, only references carrying it count ("[^2.7]" under prefix "2."),
-// and plain numbered references belong to the "" prefix only.
+// One more than the highest numbered reference or definition in the text.
+// Gaps in the numbering are not filled back in, and named footnotes don't
+// count. A number inside a code block or the frontmatter reserves nothing
+// (#41). When a `prefix` is given, only references carrying it count
+// ("[^2.7]" under the prefix "2."), and plain numbered references belong to
+// the "" prefix alone.
 export function computeNextFootnoteNumber(
     markdownText: string,
     prefix = "",
-    // callers holding the document's masked twin already (a press context
-    // or a lint rule) pass it to skip the re-mask - it must correspond to
-    // `markdownText` (perf F1)
+    // A caller that already holds the document's masked twin (a press
+    // context, or a lint rule) passes it in so the masking is not done
+    // twice. It must be the masked twin of this same `markdownText`
+    // (performance item F1).
     masked: string = maskProtectedLines(markdownText.split("\n")).join("\n"),
 ): number {
     const escaped = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    // /i: footnote ids are case-insensitive in Obsidian, so "[^P.1]" lives
-    // in prefix "p."'s namespace and must reserve its number - a
-    // case-sensitive scan let the next insert mint a colliding id
+    // The "i" flag matters here: footnote names are case-insensitive in
+    // Obsidian, so "[^P.1]" lives in the prefix "p."'s namespace and must
+    // reserve its number. A case-sensitive scan let the next insert mint a
+    // name that collided with it.
     const numberedReferences = prefix
         ? new RegExp(`\\[\\^${escaped}(\\d+)\\]`, "gi")
         : AllNumberedReferences;
     let currentMax = 1;
     for (const match of masked.matchAll(numberedReferences)) {
         const start = match.index;
-        // the same exclusions footnoteReferenceMatches applies: an escaped
-        // "\[^9]" is literal prose (bug-escaped-marker), and "^[^9]" is
-        // inline-footnote content (bug-inline-footnote-double-parse)
+        // The same two exclusions footnoteReferenceMatches makes: an
+        // escaped "\[^9]" is literal prose (bug-escaped-marker), and
+        // "^[^9]" is the text of an inline footnote
+        // (bug-inline-footnote-double-parse).
         if (escapedAt(masked, start)) continue;
         if (masked[start - 1] === "^" && !escapedAt(masked, start - 1)) {
             continue;
         }
         const value = Number(match[1]);
-        // a digit run that can't round-trip through Number - or whose
-        // SUCCESSOR can't (MAX_SAFE_INTEGER: minting value+1 would create
-        // an id this very scan then skips, so the id after it would repeat
-        // - bug-autonumber-unsafe-integer) - is treated as named, not
-        // numbered
+        // A run of digits too big to survive the trip through Number is
+        // treated as a name, not a number. So is one whose SUCCESSOR is too
+        // big: past MAX_SAFE_INTEGER, minting value + 1 would create a name
+        // this very scan then skips, so the name after it would repeat
+        // (bug-autonumber-unsafe-integer).
         if (!Number.isSafeInteger(value) || !Number.isSafeInteger(value + 1)) {
             continue;
         }

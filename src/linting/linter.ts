@@ -27,11 +27,15 @@ import { mergeDuplicateFootnoteDefinitions } from "./rules/merge-duplicate-defin
 import { noticeLintAlerts, orphanSafePrefixFor } from "./lint-alerts";
 
 import { invalidPrefixMessage, LintingCanceled, showNotice } from "../editor/notice";
-// The whole-document footnote linter: each pure rule (see src/linting/rules/)
-// gets a command, plus one "lint" command composing all three. This module
-// owns the editor plumbing they share, the mapping from plugin settings to
-// the rules' options, and the automatic-lint trigger machinery (lint on save
-// and on footnote creation).
+// The lint: the pass that cleans up footnotes across a whole note.
+//
+// The actual cleanups live one folder down, in src/linting/rules/. Each of
+// those is a pure function (text in, text out) and each gets its own
+// command, plus one "lint" command composing all three.
+//
+// This file is the plumbing around them: talking to the editor, turning the
+// user's settings into the options the rules take, and running the lint
+// automatically when a trigger fires (on save, and on footnote creation).
 
 function configuredSectionHeading(plugin: FootnotePlugin): string {
     return plugin.settings.enableFootnoteSectionHeading
@@ -39,7 +43,14 @@ function configuredSectionHeading(plugin: FootnotePlugin): string {
         : "";
 }
 
-/** The reindex policy the user picked in the settings tab. Orphaned-definition deletion is NOT reindex's job on the lint path anymore - the standalone rule handles it (2026-08-10), so reindex always keeps (and numbers) whatever orphans remain. */
+/**
+ * The reindex policy the user picked in the settings tab.
+ *
+ * Reindex no longer deletes orphaned definitions on the lint path; the
+ * separate orphan rule does that job (ruling 2026-08-10). So reindex keeps
+ * every orphaned definition that is still there, and numbers it like any
+ * other.
+ */
 function reindexOptionsFromSettings(
     plugin: FootnotePlugin,
 ): ReindexOptions {
@@ -48,7 +59,14 @@ function reindexOptionsFromSettings(
     };
 }
 
-/** The lint pipeline (steps + reindex policy) the user picked in the settings tab. `markdown` is the text about to be linted - its frontmatter names the bare-prefix placeholder orphan deletion must never touch. */
+/**
+ * The whole lint pipeline the user picked in the settings tab: which rules
+ * run, plus the reindex policy.
+ *
+ * `markdown` is the text about to be linted. Its frontmatter carries the
+ * note's prefix, which names the bare-prefix placeholder (a footnote the
+ * user is still naming) that orphan deletion must never touch.
+ */
 export function lintOptionsFromSettings(
     plugin: FootnotePlugin,
     sectionHeading: string,
@@ -78,7 +96,12 @@ export interface LintOptions {
     sectionHeading?: string;
     /** Run footnoteAfterPunctuation (default on). */
     fixPunctuation?: boolean;
-    /** Run fixLazyDefinitions (default on): a "[^x]:" directly under a prose line gets the blank line that makes it a definition. Off, the lazy-definition alert reports such lines instead. */
+    /**
+     * Run fixLazyDefinitions (default on). A "[^x]:" line sitting directly
+     * under a line of prose gets the blank line that turns it into a real
+     * definition. When this is off, the lazy-definition lint alert reports
+     * such lines instead of fixing them.
+     */
     fixLazyDefinitions?: boolean;
     /** Run moveFootnoteDefinitionsToBottom (default on). */
     moveDefinitionsToBottom?: boolean;
@@ -86,59 +109,105 @@ export interface LintOptions {
     reindex?: boolean;
     /** Passed through to reindexFootnotes. */
     reindexOptions?: ReindexOptions;
-    /** Delete references that have no definition anywhere in the note (default off; the caller gates on the "Delete orphaned references" setting). */
+    /**
+     * Delete orphaned references: references with no definition anywhere in
+     * the note (default off; the caller turns it on from the "Delete
+     * orphaned references" setting).
+     */
     removeOrphanedReferences?: boolean;
-    /** Delete definitions nothing references, transitively (default off; the caller gates on the "Delete orphaned definitions" setting). Independent of `reindex`. */
+    /**
+     * Delete orphaned definitions: definitions nothing references (default
+     * off; the caller turns it on from the "Delete orphaned definitions"
+     * setting). It works transitively, so deleting one definition can orphan
+     * another, which then goes too. Nothing to do with `reindex`.
+     */
     removeOrphanedDefinitions?: boolean;
-    /** Merge later duplicate definitions into the first as continuation lines (default off; the caller gates on the "Merge duplicate definitions" setting). While off, the alerts report duplicates instead - Obsidian renders only the LAST definition (ground truth 2026-08-12). */
+    /**
+     * When one name has several definitions, fold the later ones into the
+     * first as continuation lines (default off; the caller turns it on from
+     * the "Merge duplicate definitions" setting). While it is off, the lint
+     * alerts report duplicates instead. Worth knowing: Obsidian renders only
+     * the LAST definition of a name (ground truth 2026-08-12).
+     */
     mergeDuplicateDefinitions?: boolean;
-    /** The note's own valid footnote-prefix while the prefix feature is on: its untouched "[^2.]" placeholder is an in-progress footnote, never an orphan to delete. */
+    /**
+     * The note's own footnote-prefix, when the prefix feature is on and the
+     * prefix is valid. A bare "[^2.]" placeholder is a footnote the user is
+     * still typing a name for, so orphan deletion must leave it alone.
+     */
     orphanSafePrefix?: string;
-    /** Rename plain numbered AND named footnotes to carry the note's own footnote-prefix property, AND have reindex treat matching-prefixed footnotes as NUMBERED within that namespace (default off; the caller gates on settings). One flag on purpose: both behaviors ride the apply-prefix rule - renumbering within the namespace while nothing else was being prefixed felt inconsistent (Jason, 2026-08-08), so the separate `prefixAware` knob was folded in (2026-08-11). */
+    /**
+     * Two behaviors on one flag (default off; the caller turns it on from
+     * the settings). First, rename footnotes - plain numbered ones AND named
+     * ones - so they carry the note's own footnote-prefix property. Second,
+     * have reindex treat footnotes that already match the prefix as NUMBERED
+     * inside that namespace.
+     *
+     * They share a flag on purpose. Renumbering inside the namespace while
+     * nothing else was being prefixed felt inconsistent (Jason, 2026-08-08),
+     * so the separate `prefixAware` knob was folded into this one
+     * (2026-08-11). Both behaviors ride the apply-prefix rule.
+     */
     applyNotePrefix?: boolean;
 }
 
-/** The enabled cleanups in dependency order: fix punctuation, gather definitions at the bottom, then renumber and reorder. */
+/**
+ * Run the enabled cleanups, in the order they depend on each other: fix
+ * punctuation, gather the definitions at the bottom, then renumber them and
+ * put them in matching order.
+ */
 export function lintFootnotes(
     markdown: string,
     options: LintOptions = {},
 ): string {
-    // normalize once here so the composed steps all see LF and the note's
-    // original endings are restored a single time on the way out
+    // Notes can use any line endings. rewriteDocument converts them to plain
+    // LF once here, so every step below sees the same thing, and puts the
+    // note's original endings back once on the way out.
     return rewriteDocument(markdown, (text) => {
         let result = text;
-        // hidden definitions FIRST of all: a "[^x]:" directly under a prose
-        // line is lazy paragraph text until the blank line above it exists,
-        // and every rule below - the duplicate merge, both orphan rules, the
+        // Hidden definitions come FIRST of all. A "[^x]:" line directly
+        // under a line of prose is not a definition to Obsidian; it is more
+        // paragraph text (a "lazy label") until a blank line separates them.
+        // Every rule below - the duplicate merge, both orphan rules, the
         // move, prefixing, reindex - must judge the definition the user
-        // meant, not the prose line Obsidian sees (Jason, 2026-09-09)
+        // meant, not the prose line Obsidian sees. (Ruling: Jason,
+        // 2026-09-09.)
         if (options.fixLazyDefinitions ?? true) {
             result = fixLazyDefinitions(result);
         }
-        // duplicates merge next: every rule below then sees one
-        // definition block per name - orphan deletion judges one block, move
-        // gathers one, reindex permutes one - and a second pass has no
-        // duplicates left, so the pipeline stays idempotent
+        // Duplicates merge next, so every rule below sees exactly one
+        // definition block per name: orphan deletion judges one block, the
+        // move gathers one, reindex reorders one. It also means a second run
+        // of the lint finds no duplicates left, which is what keeps running
+        // the lint twice from changing anything the second time.
         if (options.mergeDuplicateDefinitions) {
             result = mergeDuplicateFootnoteDefinitions(result);
         }
-        // definitions slated for deletion shouldn't be moved, prefixed,
-        // or handed numbers by the rules below - and deleting orphaned
-        // definitions can't orphan a live reference (a reference's presence is
-        // exactly what keeps a definition alive). Reindex's own
-        // keepOrphanedDefinitions:false deletion is hoisted here too (the two
-        // routes share orphanedDefinitionBlocks, so they agree; reindex's
-        // internal pass then finds nothing left): EVERY definition deletion
-        // must precede the reference deletion below, whose refusal guard
-        // judges definition geometry - a definition deleted after that
-        // judgment flipped the verdict between passes (idempotence property,
-        // 2026-08-10).
-        // the settings tab never sets keepOrphanedDefinitions (the UI's
-        // deletion route is removeOrphanedDefinitions), so this branch is
-        // dead on every user path - it stays for PROGRAMMATIC callers of
-        // lintFootnotes, the property suite among them, so that
-        // reindexOptions keeps meaning what reindexFootnotes says it means
-        // (review C6, 2026-09-09: documented rather than removed)
+        // Orphaned definitions go next, before the rules that move, prefix,
+        // and number things: there is no point doing any of that to a
+        // definition that is about to be deleted. Deleting an orphaned
+        // definition can never orphan a live reference, because a reference
+        // pointing at a definition is exactly what keeps that definition
+        // alive.
+        //
+        // Reindex has its own orphan deletion (keepOrphanedDefinitions:
+        // false); it is hoisted up to here as well. Both routes call the
+        // same orphanedDefinitionBlocks, so they always agree, and reindex's
+        // own pass later finds nothing left to do.
+        //
+        // The order matters: EVERY definition deletion has to happen before
+        // the reference deletion further down. That rule looks at where the
+        // definitions sit before it decides whether to refuse a deletion, so
+        // a definition deleted after it looked would flip its verdict on the
+        // next run. (Caught by the idempotence property, 2026-08-10.)
+        //
+        // One more thing about keepOrphanedDefinitions: the settings tab
+        // never sets it, because the user-facing route is
+        // removeOrphanedDefinitions. So the branch is dead on every path a
+        // user can take. It stays for code that calls lintFootnotes
+        // directly, the property test suite among it, so that reindexOptions
+        // keeps meaning what reindexFootnotes says it means. (Review C6,
+        // 2026-09-09: documented rather than removed.)
         const reindexDeletesOrphans =
             (options.reindex ?? true) &&
             options.reindexOptions?.keepOrphanedDefinitions === false;
@@ -154,28 +223,38 @@ export function lintFootnotes(
                 options.sectionHeading ?? "",
             );
         }
-        // orphaned-REFERENCE deletion runs on the SETTLED layout - after the
-        // deletions and moves above, before prefix/reindex hand out numbers.
-        // Its classification-refusal guard (bug-orphan-delete-reclassifies)
-        // judges the geometry of definitions around the reference, and both
-        // definition deletion and move-to-bottom change that geometry: judged
-        // any earlier, pass one can refuse a deletion pass two then performs
-        // (caught twice by the idempotence property, 2026-08-10). Punctuation
-        // may swap a doomed reference first - harmless, the deletion seam
-        // heals to the same text. Everything downstream only renames or
-        // permutes definitions among existing slots, which never changes
-        // whether a definition sits above a reference, so the guard's verdict
-        // is stable across passes.
+        // Orphaned REFERENCE deletion runs once the layout has settled:
+        // after the deletions and moves above, and before prefixing and
+        // reindex start handing out numbers.
+        //
+        // Why here and nowhere else: this rule has a guard that refuses a
+        // deletion when removing the reference would change how Obsidian
+        // reads the lines around it (the bug-orphan-delete-reclassifies
+        // guard). That guard looks at where the definitions sit relative to
+        // the reference, and both definition deletion and move-to-bottom
+        // shift them. Run any earlier, the first pass could refuse a
+        // deletion that a second pass then goes ahead and makes. (The
+        // idempotence property caught exactly that, twice, 2026-08-10.)
+        //
+        // The punctuation rule running before this is harmless: it may move
+        // a reference that is about to be deleted anyway, and the text left
+        // behind after the deletion comes out the same either way. Nothing
+        // downstream matters either, because prefixing and reindex only
+        // rename definitions or shuffle them between slots that already
+        // exist. Neither can change whether a definition sits above a
+        // reference, so the guard's verdict stays the same on every pass.
         if (options.removeOrphanedReferences) {
             const beforeDeletion = result;
             result = removeOrphanedFootnoteReferences(
                 result,
                 options.orphanSafePrefix ?? "",
             );
-            // a deleted reference can leave its line blank; where that blank
-            // touches the moved definitions' seams, the NEXT pass's move would
-            // collapse it - re-settle now so this pass's output is already the
-            // fixed point (idempotence property, 2026-08-10)
+            // Deleting a reference can leave its line empty. If that empty
+            // line lands where the moved definitions were joined on, the
+            // NEXT run of the move would collapse it, so this run's output
+            // would not match the next one's. Run the move again now, so
+            // this run already produces the final text. (Idempotence
+            // property, 2026-08-10.)
             if (result !== beforeDeletion && (options.moveDefinitionsToBottom ?? true)) {
                 result = moveFootnoteDefinitionsToBottom(
                     result,
@@ -183,28 +262,33 @@ export function lintFootnotes(
                 );
             }
         }
-        // the note's own valid footnote-prefix, when the prefix behavior is on
-        // (an invalid property changes nothing here - the lint guard cancels
-        // those runs outright anyway)
+        // The note's own footnote-prefix, when the prefix behavior is on and
+        // the prefix is valid. An invalid one changes nothing here, since
+        // the lint guard cancels those runs before they get this far.
         const notePrefix = options.applyNotePrefix ? footnotePrefix(result) : "";
         const validPrefix =
             notePrefix && footnotePrefixProblem(notePrefix) === null
                 ? notePrefix
                 : "";
         if (options.applyNotePrefix && validPrefix) {
-            // BEFORE reindex: strays adopt the prefix (plain numbers slot past
-            // the existing maximum, names keep their name behind it), and the
-            // prefix-aware reindex below then renumbers the WHOLE namespace by
-            // reading order - one lint converges instead of needing a second pass
+            // This runs BEFORE reindex on purpose. Footnotes that do not
+            // carry the prefix yet adopt it here: a plain number is given
+            // the next free slot past the current highest, and a named
+            // footnote keeps its name behind the prefix. Reindex then
+            // renumbers the whole namespace in reading order. Doing it this
+            // way round means one lint settles the note; the other order
+            // would need a second pass.
             result = applyFootnotePrefix(result, validPrefix);
         }
         if (options.reindex ?? true) {
             result = reindexFootnotes(result, {
                 ...options.reindexOptions,
-                // matching-prefixed footnotes are numbered footnotes (QOL):
-                // reindex renumbers them within the namespace like plain ones.
-                // validPrefix is "" unless applyNotePrefix is on - both prefix
-                // behaviors ride the one flag
+                // A footnote that carries this note's prefix counts as a numbered
+                // footnote too: reindex renumbers "2-1", "2-2", "2-3" inside their
+                // own prefix namespace, the same way it renumbers plain "1", "2",
+                // "3". This is a quality-of-life choice. validPrefix is the empty
+                // string unless the apply-prefix rule is on, so one flag drives
+                // both prefix behaviours.
                 prefix: validPrefix,
             });
         }
@@ -212,8 +296,10 @@ export function lintFootnotes(
     });
 }
 
-// Replace only the changed middle of the document, so the cursor and the
-// scroll position map through the edit instead of resetting to the top.
+// Rewrite only the part of the note that actually changed, not the whole
+// thing. The text before and after the change is identical, so the editor
+// can keep the caret and the scroll position where they were instead of
+// jumping back to the top.
 function replaceMinimal(doc: Editor, before: string, after: string) {
     let start = 0;
     const maxStart = Math.min(before.length, after.length);
@@ -240,9 +326,11 @@ function replaceMinimal(doc: Editor, before: string, after: string) {
 }
 
 /**
- * True when every lint step is toggled off - the pipeline is a no-op by
- * construction, and the command should say so instead of implying the note
- * was checked and found clean.
+ * True when the user has turned every lint rule off.
+ *
+ * With nothing enabled the lint cannot change anything, so the command says
+ * that plainly. Reporting "nothing to fix" would wrongly suggest the note
+ * had been checked and come back clean.
  */
 export function lintRulesAllDisabled(plugin: FootnotePlugin): boolean {
     const s = plugin.settings;
@@ -252,9 +340,10 @@ export function lintRulesAllDisabled(plugin: FootnotePlugin): boolean {
         !s.lintMoveToBottom &&
         !s.lintReindex &&
         !(s.enableFootnotePrefix && s.lintApplyPrefix) &&
-        // orphan DELETION and duplicate MERGING are transforms; the alerts
-        // that replace them while the toggles are off deliberately stay
-        // silent when every rule is off
+        // Deleting orphans and merging duplicates are rules that change the
+        // note, so they count here. The lint alerts that speak in their place
+        // while those toggles are off do not count: when every rule is off,
+        // lint is off, and the alerts deliberately stay silent too.
         !s.lintDeleteOrphanedReferences &&
         !s.lintDeleteOrphanedDefinitions &&
         !s.lintMergeDuplicateDefinitions
@@ -263,17 +352,23 @@ export function lintRulesAllDisabled(plugin: FootnotePlugin): boolean {
 
 // ---------- automatic linting (Linter-style triggers) ----------
 
-// A sub-editor (an actively edited table cell) owning focus means document
-// edits race its sync-back (issue #28 family). The manual command defers
-// around this state; the automatic triggers just skip - a save must never
-// be delayed or destabilized by its lint. (Shared predicate:
+// When a table cell is being edited it runs its own little sub-editor, and
+// while that has focus any edit to the document races the cell writing its
+// text back (the issue #28 corruption family).
+//
+// The manual lint command waits for that state to pass. The automatic
+// triggers simply skip instead: a save must never be delayed or made
+// unreliable by the lint attached to it. (The shared check is
 // nestedSubEditorOwnsFocus in table-cursor.ts.)
 
 /**
- * The alert blocking a lint of `markdown`, or null when linting may
- * proceed. A digit-ending footnote-prefix makes prefixed references
- * indistinguishable from plain numbers, so reindexing would collapse the
- * chapter namespace - the lint is refused until the property is fixed.
+ * The message explaining why `markdown` cannot be linted, or null when the
+ * lint may go ahead.
+ *
+ * There is one such case: a footnote-prefix ending in a digit. With a prefix
+ * like that, a prefixed reference is impossible to tell apart from a plain
+ * number, so reindex would fold the whole chapter namespace back into the
+ * ordinary numbers. The lint refuses to run until the property is fixed.
  */
 export function lintBlockedByPrefix(markdown: string): string | null {
     const prefix = footnotePrefix(markdown);
@@ -284,16 +379,25 @@ export function lintBlockedByPrefix(markdown: string): string | null {
 }
 
 /**
- * The automatic triggers' shared safety gate (lint-on-save and
- * lint-on-footnote-creation both used to spell it out): the active
- * markdown view and its editor, or null when linting must not touch the
- * document - no editable view (viewEditor: a deferred view has no
- * editor despite the typings), Reading view (never edit the hidden
- * buffer, 2026-08-08), a pending popup save owning the file, or a
- * table-cell / nested sub-editor owning focus (the issue-#28 corruption
- * family). Mutable territory: units reach it through
- * lintAfterFootnoteCreation (bug-reading-view-deferred-lint pins the
- * Reading-view bail).
+ * The safety check both automatic triggers share (lint-on-save and
+ * lint-on-footnote-creation each used to spell it out separately). It
+ * returns the active markdown view and its editor, or null when the lint
+ * must not touch the document.
+ *
+ * The four reasons to say no:
+ *
+ * - There is no editable view. viewEditor is used because a deferred view
+ *   has no editor, despite what the type definitions claim.
+ * - Reading view is showing: never edit the hidden buffer behind it
+ *   (2026-08-08).
+ * - The popup has a save in flight and owns the file.
+ * - A table cell or other nested sub-editor has focus (the issue #28
+ *   corruption family).
+ *
+ * Unlike the live-Obsidian code further down, this function is covered by
+ * mutation testing: the unit tests reach it through
+ * lintAfterFootnoteCreation, and bug-reading-view-deferred-lint pins the
+ * Reading-view refusal.
  */
 function safeLintTarget(
     plugin: FootnotePlugin,
@@ -302,26 +406,29 @@ function safeLintTarget(
     const doc = mdView && viewEditor(mdView);
     if (!mdView || !doc) return null;
     if (readingViewActive(mdView)) return null;
-    // Stryker disable next-line all: popup liveness is footnote-popup module
-    // state only a live embedRegistry can set - smoke territory (2026-08-12)
+    // Stryker disable next-line all: whether the popup is busy lives in the
+    // footnote-popup module, and only a real running embedRegistry can set
+    // it, so only the smoke tests can reach this line (2026-08-12)
     if (footnotePopupBusy()) return null;
     if (activeTableCellEditor(doc) || nestedSubEditorOwnsFocus(doc)) return null;
     return { mdView, doc };
 }
 
-// Stryker disable all: live-Obsidian integration (workspace views, the
-// save-command wrapper, the vim adapter) - smoke-test territory the unit
-// suite never reaches, so mutants here are unkillable noise by design
-// (coverage-verified 2026-08-11).
-// Lint the active note synchronously when it's safe to; the save hook calls
-// this right before delegating, so the save writes the linted text.
+// Stryker disable all: everything below plugs straight into a running
+// Obsidian (workspace views, the save-command wrapper, the vim adapter).
+// Only the smoke tests can reach it, so mutation testing here would report
+// nothing but noise by design (coverage-verified 2026-08-11).
+
+// Lint the note the user is in, right now, if that is safe. The save hook
+// calls this just before handing off to Obsidian's own save, so what gets
+// written to disk is the linted text.
 function lintActiveNoteIfSafe(plugin: FootnotePlugin) {
     const target = safeLintTarget(plugin);
     if (!target) return;
     const doc = target.doc;
-    // same message as the Lint footnotes command: with every rule off the
-    // pipeline is a no-op by construction, and "No linting needed." would
-    // wrongly imply the note was checked and found clean (E34)
+    // Same message the Lint footnotes command shows. With every rule off
+    // the lint cannot change anything, and "No linting needed." would
+    // wrongly imply the note had been checked and found clean (E34).
     if (lintRulesAllDisabled(plugin)) {
         showNotice(
             "All lint rules are turned off in the plugin settings, so there is nothing to lint.",
@@ -338,11 +445,12 @@ function lintActiveNoteIfSafe(plugin: FootnotePlugin) {
         before,
         lintOptionsFromSettings(plugin, configuredSectionHeading(plugin), before),
     );
-    // a manual save (Ctrl+S / vim :w) is an explicit user command, so it
-    // reports its outcome either way - same as the Lint footnotes command
-    // (Jason's call, 2026-08-08, revisiting an earlier quiet-on-clean
-    // change); only the lint-on-footnote-creation trigger stays silent
-    // when there is nothing to do
+    // A manual save (Ctrl+S, or vim's ":w") is something you asked for, so
+    // it tells you the outcome either way, just like the Lint footnotes
+    // command does. (Jason's call, 2026-08-08, reversing an earlier change
+    // that stayed quiet when the note was already clean.) Only the
+    // lint-on-footnote-creation trigger says nothing when there was nothing
+    // to do.
     if (after === before) {
         showNotice("No linting needed.");
     } else {
@@ -353,9 +461,13 @@ function lintActiveNoteIfSafe(plugin: FootnotePlugin) {
 }
 
 /**
- * Wrap the core save command so "Lint on save" runs just before the write.
- * `app.commands` is private API, so a shape change degrades to manual
- * linting; the original callback is restored on plugin unload.
+ * Wrap Obsidian's own save command so "Lint on save" runs just before the
+ * file is written.
+ *
+ * `app.commands` is private API, not part of what Obsidian promises plugins.
+ * If its shape ever changes, this quietly does nothing and the user is back
+ * to linting by hand. The original callback is put back when the plugin
+ * unloads.
  */
 export function installLintOnSave(plugin: FootnotePlugin) {
     const command = (plugin.app as AppWithCommands).commands?.commands?.[
@@ -364,11 +476,13 @@ export function installLintOnSave(plugin: FootnotePlugin) {
     if (!command || typeof command.checkCallback !== "function") return;
     const original = command.checkCallback;
     const wrapped = (checking: boolean) => {
-        // only lint while THIS plugin instance is still the registered one:
-        // when reload timing stacks a stale wrapper inside a newer one's
-        // chain, the identity-checked restore below rightly leaves it in
-        // place - and without this gate the stale closure kept linting
-        // with FROZEN settings forever (observed live 2026-08-10)
+        // Only lint while THIS copy of the plugin is still the one Obsidian
+        // has loaded. Reloading the plugin can leave an old wrapper buried
+        // inside a newer one's chain, and the restore below correctly
+        // refuses to unpick someone else's wrapper, so the old one stays.
+        // Without this check that old wrapper kept linting forever, using
+        // the settings frozen at the moment it was made (observed live,
+        // 2026-08-10).
         const active = (plugin.app as AppWithPlugins).plugins?.plugins?.[
             "obsidian-footnotes"
         ];
@@ -379,30 +493,37 @@ export function installLintOnSave(plugin: FootnotePlugin) {
     };
     command.checkCallback = wrapped;
     plugin.register(() => {
-        // restore only OUR wrapper: another plugin may have wrapped the
-        // command after us, and blindly writing `original` back would
-        // silently strip its wrapper too (E30)
+        // Put the original back only if OUR wrapper is still the outermost
+        // one. Another plugin may have wrapped the same command after us,
+        // and writing `original` back regardless would throw that plugin's
+        // wrapper away without a word (E30).
         if (command.checkCallback === wrapped) {
             command.checkCallback = original;
         }
     });
 }
 
-// vim's ":w" saves through the CM5 vim adapter, NOT the core save command,
-// so the wrapper above never sees it (verified live: handleEx("w") leaves
-// editor:save-file uninvoked). Linter parity means ":w" must lint too.
-// Tracked by adapter IDENTITY, not a boolean: toggling vim off and on can
-// build a fresh adapter that our defineEx never touched (E31).
+// In vim mode, ":w" saves through vim's own adapter and never goes near
+// Obsidian's save command, so the wrapper above never sees it (verified
+// live: calling handleEx("w") leaves editor:save-file uninvoked). ":w" is a
+// save like any other, so it has to lint too.
+//
+// What is remembered here is the adapter object itself, not a yes/no flag.
+// Turning vim mode off and on again can build a brand new adapter that our
+// defineEx never touched, and a flag would wrongly say it was done (E31).
 let hookedVim: unknown = null;
 
 /**
- * Redefine vim's "write"/":w" ex command to route through the core save
- * command - the one path "Lint on save" already wraps. Behavior with the
- * toggle off is unchanged (the command just saves). The adapter only exists
- * while vim mode is on and it can be toggled anytime, so this is safe and
- * cheap to call repeatedly; the first call that finds the adapter wins.
- * The override deliberately survives plugin unload: it delegates to the
- * app's own save command, which is exactly what ":w" does anyway.
+ * Redefine vim's "write" / ":w" command so it goes through Obsidian's own
+ * save command instead, which is the path "Lint on save" already wraps.
+ *
+ * With the toggle off nothing changes for the user: ":w" still just saves.
+ * The vim adapter only exists while vim mode is on, and the user can toggle
+ * that at any moment, so this is cheap and safe to call over and over; the
+ * first call that finds an adapter is the one that takes effect.
+ *
+ * The override deliberately outlives the plugin: all it does is call the
+ * app's own save command, which is what ":w" was going to do anyway.
  */
 export function installVimWriteHook(plugin: FootnotePlugin) {
     const vim = (activeWindow as WindowWithVim).CodeMirrorAdapter?.Vim;
@@ -415,28 +536,34 @@ export function installVimWriteHook(plugin: FootnotePlugin) {
 }
 // Stryker restore all
 
-// The name of the note's single empty definition ("[^x]: " with no content),
-// or null when there are none or several. Linting a note right after a
-// footnote was created can RENAME the new footnote (reindex swaps ids by
-// appearance order), so the id alone can't relocate it - but the fresh
-// definition is empty, and as long as it is the only empty one, it is
-// unambiguously the footnote just created.
+// The name of the note's one and only empty definition ("[^x]: " with
+// nothing after it), or null when there are none or more than one.
+//
+// Why look for it that way: linting a note right after a footnote was
+// created can rename that footnote, because reindex hands out names by
+// order of appearance. So the name it had a moment ago is no help in
+// finding it again. What is reliable is that the brand new definition is
+// empty, and as long as it is the only empty one in the note, it can only
+// be the footnote just created.
 function uniqueEmptyDefinitionName(doc: Editor): string | null {
     const ctx = docContext(doc);
     const starts = ctx.definitionStarts();
     let found: string | null = null;
     for (let i = 0; i < ctx.lines.length; i++) {
         if (!starts[i]) continue;
-        // the shared label reader (raw name re-sliced from the masked match:
-        // a code span in the name masks to NULs, and the name feeds
-        // jumpToFootnoteDefinition, which compares RAW names), then "nothing
-        // typed after the label yet"
+        // The shared label reader. It finds the label against the masked
+        // twin (the copy of the note with protected text blanked out) but
+        // cuts the name from the raw line, because a code span inside a name
+        // is blanked to NUL characters in the twin. The name then goes to
+        // jumpToFootnoteDefinition, which compares raw names. After that,
+        // check that nothing has been typed after the label yet.
         const hit = definitionLabelWithName(ctx.lines[i], ctx.maskedLine(i));
         if (!hit || ctx.lines[i].slice(hit.label.labelEnd).trim() !== "") continue;
-        // a blockquoted "> [^x]: " is a definition of its own, but never the
-        // one this walk hunts for - the plugin only ever creates column-0
-        // (or indented) definitions, and counting it would make the note
-        // look ambiguous and strand the caret
+        // A "> [^x]: " inside a blockquote is a real definition, but it can
+        // never be the one being hunted here: the plugin only ever creates
+        // definitions at the left margin (or indented). Counting it would
+        // make the note look ambiguous, and the caret would be left
+        // stranded.
         if (hit.label.quoted) continue;
         if (found !== null) return null; // ambiguous
         found = hit.name;
@@ -444,14 +571,18 @@ function uniqueEmptyDefinitionName(doc: Editor): string | null {
     return found;
 }
 
-// The seeded twin of uniqueEmptyDefinitionName, for the selection
-// conversions (A8 report, 2026-08-26): their fresh definition is never
-// empty - it carries the converted text - so after a lint that may have
-// renumbered AND moved it, the seeded body is what identifies the footnote
-// just created. A definition matches when its whole block is exactly
-// "[^name]: " plus the body (continuation lines included - the conversion
-// wrote them, and the lint rules move and rename blocks without editing
-// their bodies). Several matches are ambiguous, same as the empty twin.
+// The same idea as uniqueEmptyDefinitionName, but for conversions: turning
+// selected text into a footnote (A8 report, 2026-08-26).
+//
+// A conversion's new definition is never empty, since it holds the text
+// that was selected. So after a lint that may have both renumbered and
+// moved it, that body text is what identifies it.
+//
+// A definition matches when its whole definition block is exactly
+// "[^name]: " plus the body, continuation lines and all. That works because
+// the conversion wrote those lines itself, and the lint rules only move and
+// rename definition blocks; they never edit the text inside one. More than
+// one match is ambiguous, exactly as with the empty version above.
 function uniqueSeededDefinitionName(doc: Editor, body: string): string | null {
     const ctx = docContext(doc);
     const bodyLines = body.split("\n");
@@ -481,28 +612,40 @@ function uniqueSeededDefinitionName(doc: Editor, body: string): string | null {
 }
 
 /**
- * "Lint on footnote creation" (replacing lint-on-focused-file-change,
- * 2026-08-05): lint the active note right after a new footnote definition was
- * created there. Quiet by design - a clean creation (the usual case) shows
- * no notice at all; only an actual cleanup announces itself, and it happens
- * in the note the user is LOOKING AT, unlike the old file-change trigger.
+ * The "Lint on footnote creation" trigger: lint the note the user is in,
+ * right after a new footnote definition was made there. It replaced the old
+ * lint-on-focused-file-change trigger (2026-08-05).
  *
- * Every definition-backed creation runs this synchronously as part of the
- * press: the jump arm right after landing (with `relandCursor` putting the
- * caret back on the new - possibly renumbered - definition: the unique
- * empty one, or with `seededBody` the unique definition carrying exactly
- * that body, which is how a selection conversion's pre-filled footnote is
- * found again after the lint moved or renumbered it - A8 report,
- * 2026-08-26), and the popup arm right BEFORE the popup opens (Jason's
- * ask 2026-08-27: the note must look linted the moment the popup appears,
- * not after it closes - the old settle-deferred lint left the text
- * visibly unlinted the whole time the popup was up). Linting before the
- * popup BINDS also retires the hazard the deferral existed for: the popup
- * opens on the post-lint id, which is why the relocated definition name is
- * RETURNED (null = the lint changed nothing, or the new definition could
- * not be identified unambiguously - the caller keeps its original id).
- * Table-cell creations skip the trigger entirely (editing the document
- * while a cell sub-editor owns focus is the issue #28 corruption family).
+ * It is quiet on purpose. A creation that needed no cleanup, which is the
+ * usual case, shows no notice at all; only real changes announce
+ * themselves. And they happen in the note the user is LOOKING AT, which the
+ * old file-change trigger could not promise.
+ *
+ * Every creation that makes a definition runs this as part of the press
+ * itself, not later. There are two arms:
+ *
+ * The jump arm runs right after the caret lands. With `relandCursor` set,
+ * the caret is put back on the new definition even if the lint renumbered
+ * or moved it. It is found again as the note's only empty definition, or,
+ * when `seededBody` is given, as the only definition holding exactly that
+ * text. That second route is how a conversion's pre-filled footnote is
+ * found again (A8 report, 2026-08-26).
+ *
+ * The popup arm runs right BEFORE the popup opens. Jason asked for that on
+ * 2026-08-27: the note must already look linted the moment the popup
+ * appears. The old version waited for the popup to settle, which left the
+ * text visibly unlinted for as long as the popup was up.
+ *
+ * Linting before the popup binds also removes the danger the waiting was
+ * there to avoid, because the popup now opens on the name the footnote has
+ * AFTER the lint. That is why this function RETURNS that name. Null means
+ * either that the lint changed nothing, or that the new definition could
+ * not be picked out for certain; either way the caller keeps the name it
+ * started with.
+ *
+ * Creations inside a table cell skip this trigger completely: editing the
+ * document while a cell's sub-editor has focus is the issue #28 corruption
+ * family.
  */
 export function lintAfterFootnoteCreation(
     plugin: FootnotePlugin,
@@ -510,14 +653,15 @@ export function lintAfterFootnoteCreation(
     seededBody?: string,
 ): string | null {
     if (!plugin.settings.lintOnFootnoteCreation) return null;
-    // the shared gate covers Reading view too - defense in depth: the
-    // creation commands are already guarded, but this keeps a
-    // programmatic caller from editing the hidden buffer
+    // The shared safety check covers Reading view as well. That is belt and
+    // braces: the creation commands already refuse it, but this also stops
+    // code calling in directly from editing the hidden buffer.
     const target = safeLintTarget(plugin);
     if (!target) return null;
     const doc = target.doc;
     const before = doc.getValue();
-    // silent on a blocked prefix: the insert path already explained it
+    // Say nothing when a bad prefix blocks the lint. The insert that just
+    // happened has already told the user about it.
     if (lintBlockedByPrefix(before)) return null;
     const after = lintFootnotes(
         before,
@@ -540,35 +684,40 @@ export function lintAfterFootnoteCreation(
     return relocated;
 }
 
-// Stryker disable all: live-Obsidian integration (popup settling, active
-// view, table-cell guard) - smoke-test territory, unreachable from units
+// Stryker disable all: this too plugs straight into a running Obsidian
+// (waiting for the popup to settle, the active view, the table-cell guard).
+// The unit tests cannot reach it; only the smoke tests can
 // (coverage-verified 2026-08-11).
 export async function runFootnoteTransformCommand(
     plugin: FootnotePlugin,
     transform: (markdown: string, sectionHeading: string) => string,
     notices: { done: string; noop: string },
 ) {
-    // an open popup (or a closed one's pending save) would clobber a
-    // whole-document edit: wait out any pending save, close the popup, then
-    // wait out the save that closing itself starts
+    // An open popup, or one that has just closed and still has a save in
+    // flight, would write over a whole-document edit. So: wait for any save
+    // already running, close the popup, then wait for the save that closing
+    // it starts.
     await settleFootnotePopupWithFeedback();
     toggleCloseFootnotePopup();
     await settleFootnotePopupWithFeedback();
 
     const mdView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
-    // viewEditor: a deferred view has no editor despite the typings
+    // viewEditor is used because a deferred view has no editor, whatever
+    // the type definitions say
     const doc = mdView && viewEditor(mdView);
     if (!mdView || !doc) return;
-    // Reading view: never edit the hidden buffer (2026-08-08)
+    // In Reading view, never edit the hidden buffer behind it (2026-08-08)
     if (readingViewActive(mdView)) return;
 
-    // same guard as the insert commands: never edit the document while a
-    // table cell sub-editor owns focus - its sync-back rewrites its region
-    // from pre-edit state (issue #28 family)
+    // The same guard the insert commands use: never edit the document while
+    // a table cell's sub-editor has focus. When that cell writes its text
+    // back, it does so from the state it saw before the edit, which
+    // overwrites its part of the note (issue #28 family).
     runOutsideTableCell(doc, () => {
         const before = doc.getValue();
-        // an invalid footnote-prefix cancels the lint outright - reindexing
-        // would otherwise renumber the prefixed references as plain ones
+        // An invalid footnote-prefix cancels the lint outright. Left to
+        // run, reindex would treat the prefixed references as plain
+        // numbers and renumber them.
         const blocked = lintBlockedByPrefix(before);
         if (blocked) {
             showNotice(blocked, 8000);
