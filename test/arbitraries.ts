@@ -128,6 +128,13 @@ const specialBlockArb = fc.constantFrom(
     "> para\n>     lazy live[^86]",
     ">    > nested[^87]\n>    > [^87]: wide-gap definition",
     ">     > gap code[^88]",
+    // the configured section heading appearing mid-document: the
+    // 2026-07-17 heading-duplication family was unreachable while the
+    // generator never emitted one (review D12, 2026-09-09); and a tab
+    // indent, which CommonMark reads as code
+    "# Footnotes",
+    "## Footnotes",
+    "\tcode-shaped[^89]",
 );
 
 const blockArb = fc.oneof(

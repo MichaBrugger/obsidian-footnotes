@@ -300,9 +300,10 @@ describe("scanner invariants over random documents", () => {
 
     soakIt("maskedLineAt agrees with the full masked twin on every line", () => {
         fc.assert(
-            fc.property(docArb, fc.nat(60), (doc, pick) => {
+            fc.property(docArb, fc.nat(1000), (doc, pick) => {
                 const lines = normalizeEol(doc).text.split("\n");
                 if (lines.length === 0) return;
+                // nat(60) never sampled the tail of a 61+-line document
                 const i = pick % lines.length;
                 expect(maskedLineAt(lines, i)).toBe(
                     maskProtectedLines(lines)[i],
