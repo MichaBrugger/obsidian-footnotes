@@ -204,10 +204,14 @@ const BASELINE_SETTINGS = {
     expandSelectionToWholeWords: false,
     enableFootnotePrefix: false,
     enableFootnoteSectionHeading: false,
+    footnoteSectionHeading: "# Footnotes",
     enableRemoveBlankLastLines: true,
     renumberNamedFootnotes: false,
     lintDeleteOrphanedReferences: false,
     lintDeleteOrphanedDefinitions: false,
+    // both missing from the baseline until 2026-09-09 (review D8): a test
+    // that turned merging on would have leaked it into every later test
+    lintMergeDuplicateDefinitions: false,
     lintFixPunctuation: true,
     lintMoveToBottom: true,
     lintReindex: true,
@@ -2349,6 +2353,16 @@ async function main() {
         if (!text.includes("[^stray]: unused")) {
             throw new Error(`the kept orphan was altered: ${jsLiteral(text)}`);
         }
+    });
+
+    await test("lint merges duplicate definitions when the setting says so (2026-08-12)", async () => {
+        // the one shipped rule with no live exercise until 2026-09-09
+        // (review D8): the later body folds into the first as a
+        // continuation line, and the punctuation rule still runs
+        resetSettings({ lintMergeDuplicateDefinitions: true });
+        await setupNote("dup here[^d].\n\n[^d]: body\n[^d]: another body");
+        setCursorAndRun(0, 0, CMD_LINT);
+        await expectEditorText("dup here.[^d]\n\n[^d]: body\n    another body");
     });
 
     await test("comment boundary lines stay live outside the comment (2026-08-10 A4)", async () => {
