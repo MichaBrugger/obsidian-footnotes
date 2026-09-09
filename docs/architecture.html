@@ -552,7 +552,7 @@
 
 <h3>DocContext: scan once per press</h3>
 <p>A hotkey press builds one <code>DocContext</code> in <code>editor/doc-context.ts</code>. It runs the scanner exactly once and then answers every later question from cache: the masked version of a line, the list of definition starts, the list of blocks. The whole cascade of decisions in the next section shares that one object, so a press costs one walk over the note no matter how many questions it asks.</p>
-<p>Lint is different, and this is one of the few real inefficiencies in the code: each rule takes a string and returns a string, so each rule re-scans the note for itself. A comment in the scanner estimates about ten scans per lint run. Fine for a note, noticeable for a book-length one.</p>
+<p>Lint is different by design: each rule takes a string and returns a string, so each rule builds its own view of the note. That is what lets every rule be tested on its own. Since 2026-09-09 the shared rewrite engine remembers the last scan while a lint is running, so rules that receive the identical text share it. Measured on a book-length note of 25,000 lines, a full lint takes about a tenth of a second, and a normal note lints in a few milliseconds.</p>
 
 <h3>The prefix reader</h3>
 <p>The third parsing file reads the <code>footnote-prefix</code> property out of the frontmatter with a hand-written reader rather than a real YAML parser, on purpose, so it can run on every keystroke without asking Obsidian's metadata cache. It also enforces two odd rules that come from Obsidian itself: a prefix may not end in a digit (it would collide with plain numbering on reindex) and may not contain <code>#</code> (it breaks Obsidian's footnote hover preview).</p>
