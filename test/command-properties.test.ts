@@ -479,7 +479,15 @@ describe("creation-command invariants over random documents", () => {
         await fc.assert(
             fc.asyncProperty(
                 pressArb,
-                fc.string({ maxLength: 40 }),
+                // multi-line, tabbed, CJK, padded clipboards too - bare
+                // fc.string never produces a newline (review D7)
+                fc.oneof(
+                    { weight: 3, arbitrary: fc.string({ maxLength: 40, unit: "grapheme" }) },
+                    {
+                        weight: 1,
+                        arbitrary: fc.constantFrom("a\r\nb", "x\ny\n\nz", "tab\there", "  padded  ", "中文\n第二行"),
+                    },
+                ),
                 async ({ lines, cursor, settings }, clip) => {
                     clipboardText = clip;
                     try {

@@ -314,10 +314,27 @@ describe("scanner invariants over random documents", () => {
 
 // ---------- editor-side invariants ----------
 
+// a real clipboard is multi-line, tabbed, CJK, padded - fc.string alone is
+// printable ASCII with no newline at all (review D7, 2026-09-09)
+const clipboardArb = fc.oneof(
+    { weight: 3, arbitrary: fc.string({ maxLength: 60, unit: "grapheme" }) },
+    {
+        weight: 1,
+        arbitrary: fc.constantFrom(
+            "a\r\nb",
+            "x\ny\n\nz",
+            "tab\there",
+            "  padded  ",
+            "中文\n第二行",
+            "\n",
+        ),
+    },
+);
+
 describe("editor helper invariants", () => {
     soakIt("sanitized clipboard text always forms a closed inline footnote", () => {
         fc.assert(
-            fc.property(fc.string({ maxLength: 60 }), (raw) => {
+            fc.property(clipboardArb, (raw) => {
                 const content = sanitizeInlineFootnoteContent(raw);
                 if (content === "") return;
                 const line = `^[${content}]`;
