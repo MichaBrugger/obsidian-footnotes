@@ -93,7 +93,8 @@ rmSync(join(VAULT, ".footnote-capture"), { recursive: true, force: true });
 const times = JSON.parse(readFileSync(join(work, "times.json"), "utf8"));
 const list = [];
 for (let i = 0; i < times.length; i++) {
-    const dur = i + 1 < times.length ? (times[i + 1] - times[i]) / 1000 : 0.8;
+    // the last frame holds for a while before the loop restarts
+    const dur = i + 1 < times.length ? (times[i + 1] - times[i]) / 1000 : 4.0;
     list.push(`file 'f${String(i).padStart(4, "0")}.png'`, `duration ${dur.toFixed(3)}`);
 }
 list.push(`file 'f${String(times.length - 1).padStart(4, "0")}.png'`);

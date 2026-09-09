@@ -100,7 +100,8 @@
         // 5. lint: the references move past their punctuation, the definitions get a heading
         G.setSettings({ enableFootnoteSectionHeading: true });
         await G.press(LINT, ["Ctrl", "P"], "Lint footnotes (command palette)");
-        await G.sleep(2800);
+        // hold the finished note so the reader can take it in (Jason, 2026-09-08)
+        await G.sleep(6000);
 
         const r = await G.stopRecording();
         window.__scene = { stage: "done", ...r };
