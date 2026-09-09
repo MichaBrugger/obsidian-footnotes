@@ -25,7 +25,7 @@ uses it. `test/fake-editor-helper.test.ts` pins the helper's own
 contract. Purpose-built doubles (the offset-splicing linter fake, richer
 view shapes) stay local to their specs.
 
-The suite has three kinds of files:
+The suite has four kinds of files:
 
 - **Feature specs** (`test/*.test.ts`) — one file per unit under test:
   autonumbering, reference regexes, the insert cascade guards, table-cell
@@ -160,7 +160,7 @@ Requirements:
 Flags: `npm run test:smoke -- --no-deploy` tests whatever build is already
 loaded instead of deploying first. `npm run test:smoke -- --filter "popup"`
 runs only the tests whose name contains the substring (case-insensitive) —
-for iterating on one new test without a full 70-test run.
+for iterating on one new test without the full run.
 
 Notes for writing new smoke tests:
 
