@@ -149,8 +149,11 @@ export function fakeEditor(
         wordAt: options.words
             ? (pos: EditorPosition) => {
                   const line = state.lines[pos.line] ?? "";
+                  // unicode-aware like CodeMirror's wordAt: ASCII \w hid
+                  // the whole main-editor end-of-word branch from CJK text
+                  // (review D2, 2026-09-09)
                   const isWord = (c: string | undefined) =>
-                      !!c && /[\w]/.test(c);
+                      !!c && /[\p{L}\p{N}\p{M}_]/u.test(c);
                   let start = pos.ch;
                   if (!isWord(line[start]) && isWord(line[start - 1])) start--;
                   if (!isWord(line[start])) return null;
