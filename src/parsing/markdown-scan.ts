@@ -2,8 +2,8 @@
 // transforms (reindex, move-to-bottom, after-punctuation). Nothing here
 // touches an Editor - everything is lines in, facts out.
 
-/** A footnote definition at the start of a line ("[^x]: …"). */
-export const DefinitionStart = /^\[\^([^[\]]+)\]:/;
+/** A footnote definition at the start of a line ("[^x]: …"), indented up to three spaces like any block start - four is indented code. Ground truth in Obsidian's Reading view (2026-09-09): "  [^1]: x" renders as a definition, even directly under another definition, where it starts a NEW footnote rather than continuing the one above (review A2). */
+export const DefinitionStart = /^ {0,3}\[\^([^[\]]+)\]:/;
 
 /**
  * The trailing punctuation the insert commands hop over - the same class
@@ -15,7 +15,9 @@ export const DefinitionStart = /^\[\^([^[\]]+)\]:/;
  * gone, but no better shared home exists.
  */
 export const TrailingPunctuationChars = ".,;:!?。，、；：！？";
-// a continuation line belongs to the definition above it
+// a continuation line belongs to the definition above it - unless it is
+// itself a label indented 1-3 spaces, which starts the NEXT definition
+// (DefinitionStart; the walker checks both)
 const IndentedContent = /^\s+\S/;
 
 export interface DefinitionBlock {
@@ -104,9 +106,12 @@ export function definitionLabelIn(line: string): DefinitionLabel | null {
     const prefix = line.match(BlockquotePrefix)?.[0].length ?? 0;
     const match = line.slice(prefix).match(DefinitionStart);
     if (!match) return null;
+    // whatever DefinitionStart matched before "[^": the 0-3 space indent
+    const indent = match[0].length - match[1].length - "[^]:".length;
+    const nameStart = prefix + indent + 2;
     return {
-        nameStart: prefix + 2,
-        nameEnd: prefix + 2 + match[1].length,
+        nameStart,
+        nameEnd: nameStart + match[1].length,
         labelEnd: prefix + match[0].length,
         quoted: prefix > 0,
     };
@@ -996,7 +1001,7 @@ export function findDefinitionBlocks(
                 }
                 break;
             }
-            if (IndentedContent.test(lines[j])) {
+            if (IndentedContent.test(lines[j]) && !DefinitionStart.test(lines[j])) {
                 end = j++;
                 continue;
             }
@@ -1007,7 +1012,9 @@ export function findDefinitionBlocks(
             while (k < lines.length && lines[k].trim() === "") k++;
             if (
                 k < lines.length &&
-                ((!isProtected[k] && IndentedContent.test(lines[k])) ||
+                ((!isProtected[k] &&
+                    IndentedContent.test(lines[k]) &&
+                    !DefinitionStart.test(lines[k])) ||
                     absorbable(k))
             ) {
                 end = k;
