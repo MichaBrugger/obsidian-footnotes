@@ -25,6 +25,9 @@
         "src/commands/insert-or-navigate-footnotes.ts",
         "src/commands/selection-footnote.ts",
         "src/commands/rename-footnote.ts",
+        "src/commands/multi-caret.ts",
+        "src/commands/popup-retry.ts",
+        "src/editor/notice.ts",
         "src/linting/**/*.ts"
     ],
     "incremental": true,
