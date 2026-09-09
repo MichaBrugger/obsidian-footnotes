@@ -1283,7 +1283,7 @@ async function main() {
         await pollUntil(
             "selection converted under the typed name",
             `(${EDITOR}).editor.getValue()`,
-            (v) => v === "Alpha [^brv] charlie\n\n[^brv]: bravo",
+            (v) => v === "Alpha[^brv] charlie\n\n[^brv]: bravo",
             8000,
         );
     });
@@ -1336,7 +1336,7 @@ async function main() {
             (v) =>
                 v ===
                 JSON.stringify({
-                    value: "Alpha [^cmd] charlie\n\n[^cmd]: bravo",
+                    value: "Alpha[^cmd] charlie\n\n[^cmd]: bravo",
                     modal: false,
                 }),
             8000,
