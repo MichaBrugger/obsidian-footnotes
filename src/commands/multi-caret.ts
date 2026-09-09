@@ -237,6 +237,11 @@ export function multiCaretPressHandled(
     command: "autonum" | "named" | "inline",
 ): boolean {
     if (cellActive) return false;
+    // the single-caret press is the common case: answer it before building
+    // the document context multiCaretTargets would only discard (every
+    // press used to pay a full scan here and a second one in the cascade;
+    // review B3, 2026-09-09)
+    if (doc.listSelections().length < 2) return false;
     const ctx = docContext(doc);
     const targets = multiCaretTargets(plugin, doc, ctx, true);
     if (targets === null) return false;
@@ -271,6 +276,7 @@ export async function multiCaretPastePressHandled(
     cellActive: boolean,
 ): Promise<boolean> {
     if (cellActive) return false;
+    if (doc.listSelections().length < 2) return false;
     const ctx = docContext(doc);
     const targets = multiCaretTargets(plugin, doc, ctx, false);
     if (targets === null) return false;
