@@ -328,7 +328,12 @@ export async function openFootnotePopup(
     let embed = buildEmbed();
 
     const onDocMouseDown = (evt: MouseEvent) => {
-        const target = evt.target as HTMLElement;
+        // Element, not HTMLElement: an SVG icon is a common outside-click
+        // target and must still dismiss; a non-Element target (none seen
+        // from the UI) must not throw on closest() - the keydown handler
+        // below already checks its target the same way (review A8)
+        const target = evt.target instanceof Element ? evt.target : null;
+        if (!target) return;
         if (containerEl.contains(target)) return;
         // taps that launch a command (mobile navbar/toolbar, command
         // palette, ribbon) must not dismiss the popup: on mobile they're
