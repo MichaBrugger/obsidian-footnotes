@@ -16,14 +16,18 @@ import {
 } from "../parsing/markdown-scan";
 import { AppWithCommands, AppWithPlugins, readingViewActive, viewEditor, WindowWithVim } from "../editor/obsidian-internals";
 import { activeTableCellEditor, nestedSubEditorOwnsFocus, runOutsideTableCell } from "../editor/table-cursor";
-import { applyFootnotePrefix } from "./rules/apply-footnote-prefix";
-import { fixLazyDefinitions } from "./rules/fix-lazy-definitions";
-import { footnoteAfterPunctuation } from "./rules/footnote-after-punctuation";
-import { moveFootnoteDefinitionsToBottom } from "./rules/move-footnotes-to-the-bottom";
-import { reindexFootnotes, ReindexOptions } from "./rules/re-index-footnotes";
-import { removeOrphanedFootnoteDefinitions } from "./rules/remove-orphaned-definitions";
-import { removeOrphanedFootnoteReferences } from "./rules/remove-orphaned-references";
-import { mergeDuplicateFootnoteDefinitions } from "./rules/merge-duplicate-definitions";
+// The pipeline calls each rule through its catalogue entry (rule.apply), not
+// the bare function behind it. That gives the tests one seam per rule to
+// watch, which is how test/lint-pipeline-order.test.ts checks that the order
+// below matches the order the catalogue in ./rules/index.ts lists.
+import { applyFootnotePrefixRule } from "./rules/apply-footnote-prefix";
+import { fixLazyDefinitionsRule } from "./rules/fix-lazy-definitions";
+import { footnoteAfterPunctuationRule } from "./rules/footnote-after-punctuation";
+import { moveFootnotesToTheBottomRule } from "./rules/move-footnotes-to-the-bottom";
+import { reIndexFootnotesRule, ReindexOptions } from "./rules/re-index-footnotes";
+import { removeOrphanedDefinitionsRule } from "./rules/remove-orphaned-definitions";
+import { removeOrphanedReferencesRule } from "./rules/remove-orphaned-references";
+import { mergeDuplicateDefinitionsRule } from "./rules/merge-duplicate-definitions";
 import { noticeLintAlerts, orphanSafePrefixFor } from "./lint-alerts";
 
 import { invalidPrefixMessage, LintingCanceled, showNotice } from "../editor/notice";
@@ -173,7 +177,7 @@ export function lintFootnotes(
         // meant, not the prose line Obsidian sees. (Ruling: Jason,
         // 2026-09-09.)
         if (options.fixLazyDefinitions ?? true) {
-            result = fixLazyDefinitions(result);
+            result = fixLazyDefinitionsRule.apply(result);
         }
         // Duplicates merge next, so every rule below sees exactly one
         // definition block per name: orphan deletion judges one block, the
@@ -181,7 +185,7 @@ export function lintFootnotes(
         // of the lint finds no duplicates left, which is what keeps running
         // the lint twice from changing anything the second time.
         if (options.mergeDuplicateDefinitions) {
-            result = mergeDuplicateFootnoteDefinitions(result);
+            result = mergeDuplicateDefinitionsRule.apply(result);
         }
         // Orphaned definitions go next, before the rules that move, prefix,
         // and number things: there is no point doing any of that to a
@@ -212,13 +216,13 @@ export function lintFootnotes(
             (options.reindex ?? true) &&
             options.reindexOptions?.keepOrphanedDefinitions === false;
         if (options.removeOrphanedDefinitions || reindexDeletesOrphans) {
-            result = removeOrphanedFootnoteDefinitions(result);
+            result = removeOrphanedDefinitionsRule.apply(result);
         }
         if (options.fixPunctuation ?? true) {
-            result = footnoteAfterPunctuation(result);
+            result = footnoteAfterPunctuationRule.apply(result);
         }
         if (options.moveDefinitionsToBottom ?? true) {
-            result = moveFootnoteDefinitionsToBottom(
+            result = moveFootnotesToTheBottomRule.apply(
                 result,
                 options.sectionHeading ?? "",
             );
@@ -245,10 +249,9 @@ export function lintFootnotes(
         // reference, so the guard's verdict stays the same on every pass.
         if (options.removeOrphanedReferences) {
             const beforeDeletion = result;
-            result = removeOrphanedFootnoteReferences(
-                result,
-                options.orphanSafePrefix ?? "",
-            );
+            result = removeOrphanedReferencesRule.apply(result, {
+                orphanSafePrefix: options.orphanSafePrefix,
+            });
             // Deleting a reference can leave its line empty. If that empty
             // line lands where the moved definitions were joined on, the
             // NEXT run of the move would collapse it, so this run's output
@@ -256,7 +259,7 @@ export function lintFootnotes(
             // this run already produces the final text. (Idempotence
             // property, 2026-08-10.)
             if (result !== beforeDeletion && (options.moveDefinitionsToBottom ?? true)) {
-                result = moveFootnoteDefinitionsToBottom(
+                result = moveFootnotesToTheBottomRule.apply(
                     result,
                     options.sectionHeading ?? "",
                 );
@@ -278,10 +281,10 @@ export function lintFootnotes(
             // renumbers the whole namespace in reading order. Doing it this
             // way round means one lint settles the note; the other order
             // would need a second pass.
-            result = applyFootnotePrefix(result, validPrefix);
+            result = applyFootnotePrefixRule.apply(result, { prefix: validPrefix });
         }
         if (options.reindex ?? true) {
-            result = reindexFootnotes(result, {
+            result = reIndexFootnotesRule.apply(result, {
                 ...options.reindexOptions,
                 // A footnote that carries this note's prefix counts as a numbered
                 // footnote too: reindex renumbers "2-1", "2-2", "2-3" inside their

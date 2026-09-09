@@ -4,13 +4,15 @@
 // definitions, merge duplicates, delete orphaned definitions, fix
 // punctuation, gather definitions at the bottom, delete orphaned references
 // now the layout has settled, apply the note prefix, then renumber and
-// reorder. The lint does not read this list to decide that, though;
-// lintFootnotes in ../linter.ts calls the pure functions itself, so keep the
-// two in step by hand.
+// reorder. The lint does not read this list to decide that: lintFootnotes
+// in ../linter.ts calls each rule's apply in its own hand-written order,
+// with a reason at every step. test/lint-pipeline-order.test.ts watches
+// those calls and fails if the two orders ever differ, so this list can be
+// trusted as a description of the pipeline.
 //
 // What this list is for is describing the rule set: each entry carries its
-// id, its name, the region kinds it ignores, and worked examples, which
-// test/rule-examples.test.ts actually runs.
+// id, its name, and worked examples, which test/rule-examples.test.ts
+// actually runs.
 
 import { FootnoteRule } from "../rule";
 import { applyFootnotePrefixRule } from "./apply-footnote-prefix";
