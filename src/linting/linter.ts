@@ -256,8 +256,9 @@ export function lintRulesAllDisabled(plugin: FootnotePlugin): boolean {
  */
 export function lintBlockedByPrefix(markdown: string): string | null {
     const prefix = footnotePrefix(markdown);
-    const problem = prefix ? footnotePrefixProblem(prefix) : null;
-    if (!prefix || problem === null) return null;
+    if (!prefix) return null;
+    const problem = footnotePrefixProblem(prefix);
+    if (problem === null) return null;
     return invalidPrefixMessage(LintingCanceled, prefix, problem);
 }
 
