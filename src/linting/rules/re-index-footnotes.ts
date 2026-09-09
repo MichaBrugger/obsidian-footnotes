@@ -218,14 +218,15 @@ function reindexOnce(
 
         // permute definition blocks among their existing slots so they read in
         // appearance order; a stable sort keeps duplicate definitions together
+        // every block's name is in `order` (referenced names first, then the
+        // blocks themselves were appended), so the lookup can't miss; should
+        // that invariant ever break, an unknown block sorts LAST rather than
+        // jumping the queue as the old `?? 0` made it (review C9)
         const orderIndex = new Map(order.map((name, i) => [name, i]));
+        const rank = (name: string) => orderIndex.get(name.toLowerCase()) ?? order.length;
         const sorted = blocks
             .map((block, i) => ({ block, i }))
-            .sort(
-                (a, b) =>
-                    (orderIndex.get(a.block.name.toLowerCase()) ?? 0) -
-                        (orderIndex.get(b.block.name.toLowerCase()) ?? 0) || a.i - b.i,
-            )
+            .sort((a, b) => rank(a.block.name) - rank(b.block.name) || a.i - b.i)
             .map((entry) => entry.block);
 
         const slotAtLine = new Map(blocks.map((block, i) => [block.start, i]));
