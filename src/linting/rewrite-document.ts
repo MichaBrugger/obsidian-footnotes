@@ -29,6 +29,16 @@ export interface DocumentView {
     /** Which lines start a live definition (definitionStartLines). */
     readonly definitionStarts: boolean[];
     readonly blocks: DefinitionBlock[];
+    /**
+     * Drop the note's trailing blank lines and return how many there were.
+     * The ONE sanctioned mutation of `lines`, and only before anything
+     * derived from them exists: move-to-bottom used to pop the array
+     * directly, which worked purely because the scan is lazy and the pops
+     * came first - a later read of `scan` above the trim would have
+     * described the untrimmed note (review C7, 2026-09-09). Throws if the
+     * scan, the masked twin, the starts, or the blocks were already taken.
+     */
+    trimTrailingBlankLines(): number;
 }
 
 function documentView(lines: string[]): DocumentView {
@@ -38,6 +48,17 @@ function documentView(lines: string[]): DocumentView {
     let starts: boolean[] | null = null;
     return {
         lines,
+        trimTrailingBlankLines() {
+            if (scan !== null || masked !== null || starts !== null || blocks !== null) {
+                throw new Error("trimTrailingBlankLines must run before the view is scanned");
+            }
+            let trimmed = 0;
+            while (lines.length > 1 && lines[lines.length - 1] === "") {
+                lines.pop();
+                trimmed++;
+            }
+            return trimmed;
+        },
         get scan() {
             if (scan === null) scan = scanDocument(lines);
             return scan;

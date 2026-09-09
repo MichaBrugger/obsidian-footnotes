@@ -57,14 +57,11 @@ export function moveFootnoteDefinitionsToBottom(
     return rewriteDocument(markdown, (text, view) => {
         const lines = view.lines;
 
-        // remember the document's trailing newlines; they go back on at the end
-        let trailingNewlines = 0;
-        while (lines.length > 1 && lines[lines.length - 1] === "") {
-            lines.pop();
-            trailingNewlines++;
-        }
+        // remember the document's trailing newlines; they go back on at the
+        // end. The view's own trim keeps the scan honest: nothing derived
+        // from the lines may exist before it runs
+        const trailingNewlines = view.trimTrailingBlankLines();
 
-        // the scan runs AFTER the trailing-newline trim above (lazy view)
         const { scan, blocks } = view;
         const isProtected = scan.isProtected;
         if (blocks.length === 0) return text;
