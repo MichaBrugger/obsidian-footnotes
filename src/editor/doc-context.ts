@@ -3,7 +3,7 @@ import { Editor, EditorPosition } from "obsidian";
 import {
     definitionStartLines,
     DocumentScan,
-    maskLineRegions,
+    maskLineWithScan,
     maskProtectedLines,
     scanDocument,
 } from "../parsing/markdown-scan";
@@ -83,16 +83,10 @@ export function docContext(doc: Editor): DocContext {
     let full: string[] | null = null;
     const maskedLine = (i: number): string => {
         if (i < 0 || i >= lines.length) return "";
-        const line = lines[i];
         if (full) return full[i];
         let masked = perLine[i];
         if (masked === undefined) {
-            masked = scan.isProtected[i]
-                ? "\0".repeat(line.length)
-                : maskLineRegions(line, {
-                      comment: scan.startsInComment[i],
-                      math: scan.startsInMath[i],
-                  }).masked;
+            masked = maskLineWithScan(lines, scan, i);
             perLine[i] = masked;
         }
         return masked;

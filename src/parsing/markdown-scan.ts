@@ -933,8 +933,17 @@ export function maskProtectedLines(
  */
 export function maskedLineAt(lines: string[], i: number): string {
     if (i < 0 || i >= lines.length) return "";
+    return maskLineWithScan(lines, scanDocument(lines), i);
+}
+
+/** Line `i` of the masked twin, given a scan of `lines` already in hand: the ONE body maskedLineAt (scan inline) and DocContext.maskedLine (scan cached) both use (they were byte-identical copies, review B4, 2026-09-09). "" when out of range. */
+export function maskLineWithScan(
+    lines: string[],
+    scan: Pick<DocumentScan, "isProtected" | "startsInComment" | "startsInMath">,
+    i: number,
+): string {
+    if (i < 0 || i >= lines.length) return "";
     const line = lines[i];
-    const scan = scanDocument(lines);
     return scan.isProtected[i]
         ? "\0".repeat(line.length)
         : maskLineRegions(line, {

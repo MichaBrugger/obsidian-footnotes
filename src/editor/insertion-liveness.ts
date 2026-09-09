@@ -3,7 +3,12 @@ import { NoFootnoteCreated } from "./notice";
 
 import { docLines } from "./doc-context";
 import { escapedAt, referenceOccurrences } from "../parsing/footnote-grammar";
-import { findDefinitionBlocks, maskedLineAt, scanDocument } from "../parsing/markdown-scan";
+import {
+    findDefinitionBlocks,
+    maskedLineAt,
+    maskProtectedLines,
+    scanDocument,
+} from "../parsing/markdown-scan";
 
 // The born-dead safety kit: will inserted text still MEAN what it says
 // once it lands? An insertion can be swallowed by an escape or an
@@ -159,17 +164,29 @@ export function simulatedAnchor(
     anchorIndex: number,
     simulated: string[],
 ): EditorPosition {
+    return simulatedAnchors(lines, changes, [anchorIndex], simulated)[0];
+}
+
+/** Every requested landing from ONE resolution pass: the per-anchor form re-joined and re-resolved the whole document once per reference (review B4, 2026-09-09). */
+export function simulatedAnchors(
+    lines: string[],
+    changes: EditorChange[],
+    anchorIndices: number[],
+    simulated: string[],
+): EditorPosition[] {
     const { landing } = applyResolvedChanges(
         lines.join("\n"),
         resolveChanges(lines, changes),
     );
-    let offset = landing[anchorIndex];
-    let line = 0;
-    while (line < simulated.length && offset > simulated[line].length) {
-        offset -= simulated[line].length + 1;
-        line++;
-    }
-    return { line, ch: offset };
+    return anchorIndices.map((anchorIndex) => {
+        let offset = landing[anchorIndex];
+        let line = 0;
+        while (line < simulated.length && offset > simulated[line].length) {
+            offset -= simulated[line].length + 1;
+            line++;
+        }
+        return { line, ch: offset };
+    });
 }
 
 /** Whether `ch` sits STRICTLY inside a masked (NUL) span - the text on both sides is claimed. Boundaries are fine: just before an opener or just after a closer inserts outside the span. `openAtStart`/`openAtEnd` stand in for the off-line neighbor at ch 0 / end of line. */
@@ -226,13 +243,14 @@ export function verifyLiveFootnoteInsertion(opts: {
             block.end >= opts.definitionLabelLine + bodyExtraLines,
     );
     if (!definitionLive) return null;
-    const anchors = opts.referenceChangeIndices.map((index) =>
-        simulatedAnchor(opts.lines, opts.changes, index, simulated),
-    );
+    const anchors = simulatedAnchors(opts.lines, opts.changes, opts.referenceChangeIndices, simulated);
+    // one masked twin from the scan already taken - maskedLineAt would rescan
+    // the whole simulated document once per reference (review B4)
+    const simulatedMasked = maskProtectedLines(simulated, simulatedScan);
     const everyReferenceLive = anchors.every((anchor) =>
         referenceOccurrences(
             simulated[anchor.line],
-            maskedLineAt(simulated, anchor.line),
+            simulatedMasked[anchor.line],
         ).some(
             (occurrence) =>
                 occurrence.start === anchor.ch &&

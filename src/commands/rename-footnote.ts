@@ -14,7 +14,7 @@ import { simulateChanges } from "../editor/insertion-liveness";
 import {
     definitionLabelIn,
     findDefinitionBlocks,
-    maskedLineAt,
+    maskProtectedLines,
     scanDocument,
 } from "../parsing/markdown-scan";
 import { runOutsideTableCell } from "../editor/table-cursor";
@@ -205,6 +205,11 @@ function renameSurvives(
     blocksBefore: { start: number; name: string }[],
 ): boolean {
     const simulated = simulateChanges(ctx.lines, changes);
+    // one scan and one masked twin for every line checked below - the
+    // per-line maskedLineAt rescanned the whole document each time, so a
+    // footnote used on forty lines cost forty-one scans (review B4)
+    const simulatedScan = scanDocument(simulated);
+    const simulatedMasked = maskProtectedLines(simulated, simulatedScan);
     for (const line of referenceLines) {
         const before = referenceOccurrences(ctx.lines[line], ctx.maskedLine(line));
         const expected: { start: number; name: string }[] = [];
@@ -217,10 +222,7 @@ function renameSurvives(
             });
             if (renamed) shift += newName.length - occurrence.name.length;
         }
-        const after = referenceOccurrences(
-            simulated[line],
-            maskedLineAt(simulated, line),
-        );
+        const after = referenceOccurrences(simulated[line], simulatedMasked[line]);
         if (after.length !== expected.length) return false;
         for (let i = 0; i < expected.length; i++) {
             if (
@@ -231,7 +233,6 @@ function renameSurvives(
             }
         }
     }
-    const simulatedScan = scanDocument(simulated);
     const blocksAfter = findDefinitionBlocks(
         simulated,
         simulatedScan.isProtected,

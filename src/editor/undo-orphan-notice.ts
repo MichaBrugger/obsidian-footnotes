@@ -25,11 +25,9 @@ import { showNotice } from "./notice";
  * compare. Pure; exported for units.
  */
 export function orphanedByUndo(before: string, after: string): string[] {
-    const beforeDefined = definedNames(before.split("\n"));
+    const beforeDefined = namesIn(before.split("\n")).defined;
     if (beforeDefined.size === 0) return [];
-    const afterLines = after.split("\n");
-    const afterDefined = definedNames(afterLines);
-    const referenced = referencedNames(afterLines);
+    const { defined: afterDefined, referenced } = namesIn(after.split("\n"));
     const orphaned: string[] = [];
     for (const [folded, raw] of beforeDefined) {
         if (!afterDefined.has(folded) && referenced.has(folded)) {
@@ -48,9 +46,7 @@ export function orphanedByUndo(before: string, after: string): string[] {
  * Pure; exported for units.
  */
 export function stillOrphanedNames(text: string, names: string[]): string[] {
-    const lines = text.split("\n");
-    const defined = definedNames(lines);
-    const referenced = referencedNames(lines);
+    const { defined, referenced } = namesIn(text.split("\n"));
     return names.filter(
         (name) =>
             referenced.has(name.toLowerCase()) &&
@@ -58,30 +54,28 @@ export function stillOrphanedNames(text: string, names: string[]): string[] {
     );
 }
 
-/** Every definition name in `lines`, folded → raw casing (last one wins, matching Obsidian's last-definition-renders rule). */
-function definedNames(lines: string[]): Map<string, string> {
+/**
+ * Every definition name in `lines` (folded → raw casing; the last one wins,
+ * matching Obsidian's last-definition-renders rule) and every reference
+ * name (folded), from ONE scan and one masked twin - the two used to mask
+ * the document separately (review B4, 2026-09-09). Masked-aware on both.
+ */
+function namesIn(lines: string[]): { defined: Map<string, string>; referenced: Set<string> } {
     const scan = scanDocument(lines);
     const masked = maskProtectedLines(lines, scan);
     const starts = definitionStartLines(lines, scan, (i) => masked[i]);
-    const names = new Map<string, string>();
-    for (let i = 0; i < lines.length; i++) {
-        if (!starts[i]) continue;
-        const hit = definitionLabelWithName(lines[i], masked[i]);
-        if (hit) names.set(hit.name.toLowerCase(), hit.name);
-    }
-    return names;
-}
-
-/** Every reference name in `lines`, folded, masked-aware. */
-function referencedNames(lines: string[]): Set<string> {
-    const masked = maskProtectedLines(lines);
+    const defined = new Map<string, string>();
     const referenced = new Set<string>();
     for (let i = 0; i < lines.length; i++) {
+        if (starts[i]) {
+            const hit = definitionLabelWithName(lines[i], masked[i]);
+            if (hit) defined.set(hit.name.toLowerCase(), hit.name);
+        }
         for (const occurrence of referenceOccurrences(lines[i], masked[i])) {
             referenced.add(occurrence.name.toLowerCase());
         }
     }
-    return referenced;
+    return { defined, referenced };
 }
 
 // The one standing notice and the names it spoke for, so the next
