@@ -102,10 +102,10 @@ export function moveFootnoteDefinitionsToBottom(
 
         if (anchorEnd !== -1) {
             const out: string[] = [];
+            const headingStart = anchorEnd - sectionHeading.split("\n").length + 1;
             for (let i = 0; i <= anchorEnd; i++) {
                 // normalize the blank line above the heading run's start -
                 // same markdown block convention as everywhere else
-                const headingStart = anchorEnd - sectionHeading.split("\n").length + 1;
                 if (
                     i === headingStart &&
                     out.length > 0 &&
