@@ -2393,13 +2393,16 @@ async function main() {
 
     await test("footnotes navigate inside a callout (2026-08-10 C22)", async () => {
         resetSettings();
-        const note = "> [!note]\n> body[^1] here\n> [^1]: def";
+        // the ">" blank line matters: a label directly under the callout's
+        // body line is lazy paragraph text to Obsidian (ground truth
+        // 2026-09-09), so this fixture carries the blank
+        const note = "> [!note]\n> body[^1] here\n>\n> [^1]: def";
         await setupNote(note);
         setCursorAndRun(1, 8, CMD_AUTONUM); // inside [^1] - must navigate
         await pollUntil(
             "cursor on the callout definition line",
             `(${EDITOR}).editor.getCursor()`,
-            (c) => c && c.line === 2,
+            (c) => c && c.line === 3,
         );
         const text = readJson(`(${EDITOR}).editor.getValue()`);
         if (text !== note) {
