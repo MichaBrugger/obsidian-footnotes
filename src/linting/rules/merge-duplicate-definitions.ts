@@ -6,7 +6,6 @@ import {
     removeLineRanges,
     scanDocument,
 } from "../../parsing/markdown-scan";
-import { IgnoreType } from "../ignore-types";
 import { rewriteDocument } from "../rewrite-document";
 import { FootnoteRule } from "../rule";
 
@@ -155,12 +154,6 @@ export const mergeDuplicateDefinitionsRule: FootnoteRule = {
     name: "Merge duplicate definitions",
     description:
         "Merge every later definition of an already-defined footnote into the first one, keeping each body as a continuation line (Obsidian renders only the last definition otherwise).",
-    ignoreTypes: [
-        IgnoreType.Code,
-        IgnoreType.InlineCode,
-        IgnoreType.Math,
-        IgnoreType.Yaml,
-    ],
     examples: [
         {
             description:

@@ -13,7 +13,6 @@ import {
     restoreEol,
     scanDocument,
 } from "../../parsing/markdown-scan";
-import { IgnoreType } from "../ignore-types";
 import { FootnoteRule } from "../rule";
 
 // Deleting orphaned definitions, as a rule of its own (2026-08-10).
@@ -231,13 +230,6 @@ export const removeOrphanedDefinitionsRule: FootnoteRule = {
     name: "Remove orphaned definitions",
     description:
         "Delete footnote definitions that nothing references, including chains only kept alive by each other's bodies.",
-    ignoreTypes: [
-        IgnoreType.Code,
-        IgnoreType.InlineCode,
-        IgnoreType.Math,
-        IgnoreType.Yaml,
-        IgnoreType.HtmlComment,
-    ],
     examples: [
         {
             description: "An unreferenced definition is removed",

@@ -1,7 +1,6 @@
 import { footnotePrefixProblem } from "../../parsing/footnote-prefix";
 import { computeNextFootnoteNumber, referenceOccurrences } from "../../parsing/footnote-grammar";
 
-import { IgnoreType } from "../ignore-types";
 import { rewriteDocument } from "../rewrite-document";
 import { rewriteFootnoteNames } from "../rewrite-footnote-names";
 import { FootnoteRule } from "../rule";
@@ -126,13 +125,6 @@ export const applyFootnotePrefixRule: FootnoteRule<{ prefix?: string }> = {
     name: "Apply footnote prefix",
     description:
         "Rename footnotes to carry the note's footnote-prefix property: plain numbered ones are numbered after any existing prefixed footnotes, named ones keep their name behind the prefix.",
-    ignoreTypes: [
-        IgnoreType.Code,
-        IgnoreType.InlineCode,
-        IgnoreType.Math,
-        IgnoreType.Yaml,
-        IgnoreType.HtmlComment,
-    ],
     examples: [
         {
             description: "Prefixes plain footnotes in appearance order",

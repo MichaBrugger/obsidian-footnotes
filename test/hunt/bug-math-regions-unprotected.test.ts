@@ -12,8 +12,8 @@ import { reindexFootnotes } from "../../src/linting/rules/re-index-footnotes";
 // reindex renumbers $x[^9]$ to $x[^1]$, move-to-bottom rips a
 // definition-shaped line out of a $$ block (leaving an empty $$\n$$ plus a
 // phantom bottom definition), and the composed lint does all of it. Root
-// cause: no math region anywhere in markdown-scan (IgnoreType.Math is
-// declaration-only).
+// cause: no math region anywhere in markdown-scan (the rules only ever
+// declared that they ignored math; nothing protected it).
 
 describe("fixed 2026-08-10: math regions are protected (Jason: linting never touches math)", () => {
     it("a reference inside inline math does not reserve a number", () => {

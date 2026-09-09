@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { IgnoreType } from "../src/linting/ignore-types";
 import {
     duplicateFootnoteDefinitionNames,
     mergeDuplicateDefinitionsRule,
@@ -107,12 +106,6 @@ describe("the rule descriptors (the settings-facing surface)", () => {
         expect(mergeDuplicateDefinitionsRule.description).toBe(
             "Merge every later definition of an already-defined footnote into the first one, keeping each body as a continuation line (Obsidian renders only the last definition otherwise).",
         );
-        expect(mergeDuplicateDefinitionsRule.ignoreTypes).toEqual([
-            IgnoreType.Code,
-            IgnoreType.InlineCode,
-            IgnoreType.Math,
-            IgnoreType.Yaml,
-        ]);
         expect(
             mergeDuplicateDefinitionsRule.examples.map(
                 (example) => example.description,
@@ -126,13 +119,6 @@ describe("the rule descriptors (the settings-facing surface)", () => {
         expect(removeOrphanedReferencesRule.description).toBe(
             "Delete footnote references that have no definition anywhere in the note.",
         );
-        expect(removeOrphanedReferencesRule.ignoreTypes).toEqual([
-            IgnoreType.Code,
-            IgnoreType.InlineCode,
-            IgnoreType.Math,
-            IgnoreType.Yaml,
-            IgnoreType.HtmlComment,
-        ]);
         expect(
             removeOrphanedReferencesRule.examples.map(
                 (example) => example.description,

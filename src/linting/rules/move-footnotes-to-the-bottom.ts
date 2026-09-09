@@ -4,7 +4,6 @@ import {
     scanDocument,
     removeLineRanges,
 } from "../../parsing/markdown-scan";
-import { IgnoreType } from "../ignore-types";
 import { rewriteDocument } from "../rewrite-document";
 import { FootnoteRule } from "../rule";
 
@@ -189,12 +188,6 @@ export const moveFootnotesToTheBottomRule: FootnoteRule<string> = {
     name: "Move footnotes to the bottom",
     description:
         "Gather every footnote definition block under the note's existing section heading, or at the end of the note when there is none, keeping the blocks' relative order.",
-    ignoreTypes: [
-        IgnoreType.Code,
-        IgnoreType.InlineCode,
-        IgnoreType.Math,
-        IgnoreType.Yaml,
-    ],
     examples: [
         {
             description: "A mid-document definition moves to the bottom",

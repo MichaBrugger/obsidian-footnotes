@@ -10,7 +10,6 @@ import {
     scanDocument,
     removeLineRanges,
 } from "../../parsing/markdown-scan";
-import { IgnoreType } from "../ignore-types";
 import { rewriteDocument } from "../rewrite-document";
 import { rewriteFootnoteNames } from "../rewrite-footnote-names";
 import { FootnoteRule } from "../rule";
@@ -311,12 +310,6 @@ export const reIndexFootnotesRule: FootnoteRule<ReindexOptions> = {
     name: "Re-index footnotes",
     description:
         "Renumber numbered footnotes 1..n by first reference appearance and reorder their definitions to match.",
-    ignoreTypes: [
-        IgnoreType.Code,
-        IgnoreType.InlineCode,
-        IgnoreType.Math,
-        IgnoreType.Yaml,
-    ],
     examples: [
         {
             description: "Renumbers by first reference appearance",

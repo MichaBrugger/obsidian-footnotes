@@ -1,13 +1,11 @@
 // The shape a lint rule has to have. It is borrowed from the obsidian-linter
 // plugin, which describes each of its cleanups as a Rule: an id, a name and
-// description for people to read, a list of the region kinds it ignores,
-// worked examples, and one pure apply(text, options) function.
+// description for people to read, worked examples, and one pure
+// apply(text, options) function.
 //
 // This plugin's own footnote cleanups are written as pure functions in
 // ./rules/. The interface below wraps each of them, so the whole set reads
 // as a small catalogue of rules. The ids match obsidian-linter's file names.
-
-import { IgnoreType } from "./ignore-types";
 
 /**
  * One worked example: a small piece of markdown before the rule ran, and the
@@ -33,16 +31,16 @@ interface RuleExample<O = void> {
  * out, nothing else touched. `O` is the type of the options it takes, and is
  * void for a rule that takes none.
  *
- * `ignoreTypes` says which regions the rule leaves alone. It is there to
- * match obsidian-linter's shape and to document the rule; nothing reads it
- * at runtime. Each rule protects those regions itself, using the shared
- * markdown-scan code.
+ * Every rule leaves protected text (code, math, comments, frontmatter)
+ * alone by working from the masked twin that the shared markdown-scan
+ * code builds. obsidian-linter declares that per rule in an ignoreTypes
+ * list; this plugin used to carry the same field for documentation only,
+ * and dropped it on 2026-09-09 because nothing read it.
  */
 export interface FootnoteRule<O = void> {
     id: string;
     name: string;
     description: string;
-    ignoreTypes: IgnoreType[];
     examples: RuleExample<O>[];
     apply(text: string, options: O): string;
 }

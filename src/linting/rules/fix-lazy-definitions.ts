@@ -4,7 +4,6 @@ import {
     maskProtectedLines,
     scanDocument,
 } from "../../parsing/markdown-scan";
-import { IgnoreType } from "../ignore-types";
 import { rewriteDocument } from "../rewrite-document";
 import { FootnoteRule } from "../rule";
 
@@ -75,12 +74,6 @@ export const fixLazyDefinitionsRule: FootnoteRule = {
     name: "Fix definitions hidden by a missing blank line",
     description:
         "Insert the blank line a footnote definition needs when its label line sits directly under a paragraph, list item, quote line, or table - Obsidian reads such a line as plain text.",
-    ignoreTypes: [
-        IgnoreType.Code,
-        IgnoreType.InlineCode,
-        IgnoreType.Math,
-        IgnoreType.Yaml,
-    ],
     examples: [
         {
             description: "A definition typed directly under its paragraph gets its blank line",

@@ -782,7 +782,7 @@
   <li><strong>Two features sit on undocumented ground.</strong> Table-cell editing and the popup both work by reaching into Obsidian internals, and each needs a recovery path for when those internals misbehave.</li>
   <li><strong>The tests outnumber the code by design.</strong> Bug pins accumulate, properties are expensive to write well, and the smoke script is a small program of its own.</li>
 </ul>
-<p>What is <em>not</em> a good reason and could be simplified later: lint rescanning the note once per rule instead of sharing one view; the rule registry in <code>rules/index.ts</code> listing the rules in the same order the linter hard-codes, without the linter ever reading it, so the two can drift; and the <code>ignoreTypes</code> field on each rule, which documents what a rule skips without wiring anything.</p>
+<p>What is <em>not</em> a good reason and could be simplified later: lint rescanning the note once per rule instead of sharing one view; and the rule registry in <code>rules/index.ts</code> listing the rules in the same order the linter hard-codes, without the linter ever reading it, so the two could drift. (Both were dealt with on 2026-09-09: the shared rewrite engine now remembers one scan across rules that see the same text, the linter calls each rule through its registry entry and a test pins the two orders together, and the unused <code>ignoreTypes</code> field was removed.)</p>
 </div>
 </section>
 

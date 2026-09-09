@@ -12,7 +12,6 @@ import {
     restoreEol,
     scanDocument,
 } from "../../parsing/markdown-scan";
-import { IgnoreType } from "../ignore-types";
 import { FootnoteRule } from "../rule";
 
 // Orphaned REFERENCES: the other side of reindex's orphaned definitions
@@ -245,13 +244,6 @@ export const removeOrphanedReferencesRule: FootnoteRule<{ orphanSafePrefix?: str
         name: "Remove orphaned references",
         description:
             "Delete footnote references that have no definition anywhere in the note.",
-        ignoreTypes: [
-            IgnoreType.Code,
-            IgnoreType.InlineCode,
-            IgnoreType.Math,
-            IgnoreType.Yaml,
-            IgnoreType.HtmlComment,
-        ],
         examples: [
             {
                 description: "A reference with no definition is removed",

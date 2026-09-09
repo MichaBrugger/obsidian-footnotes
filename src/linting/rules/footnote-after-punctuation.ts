@@ -1,6 +1,5 @@
 import { referenceOccurrences } from "../../parsing/footnote-grammar";
 import { definitionLabelIn, TrailingPunctuationChars } from "../../parsing/markdown-scan";
-import { IgnoreType } from "../ignore-types";
 import { rewriteDocument } from "../rewrite-document";
 import { FootnoteRule } from "../rule";
 
@@ -116,12 +115,6 @@ export const footnoteAfterPunctuationRule: FootnoteRule = {
     name: "Footnote after punctuation",
     description:
         'Move footnote references that sit before punctuation to sit after it ("word[^1]." → "word.[^1]").',
-    ignoreTypes: [
-        IgnoreType.Code,
-        IgnoreType.InlineCode,
-        IgnoreType.Math,
-        IgnoreType.Yaml,
-    ],
     examples: [
         {
             description: "Reference before a period moves after it",
