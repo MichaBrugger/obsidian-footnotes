@@ -32,6 +32,7 @@ between checks. Default settings unless a sheet says otherwise.
 | 22 | Lint triggers (on save, on creation) and the settings page |
 | 23 | Lint alerts: orphans, strays, empties, invalid names, nesting, duplicates |
 | 24 | Phone and mobile emulation (needs a beta on the phone) |
+| 25 | Definition labels directly after a prose line (OPEN QUESTION: match Obsidian or keep the lint repair) |
 
 Inter-plugin compatibility sheets live separately in the repo's
 `compat-tests/` folder (vault mirror: "Footnote Compat Tests"); they
