@@ -158,6 +158,16 @@ export function selectionPressHandled(
         // being edited - the main editor's is stale (see table-cursor.ts)
         const { anchor, head } = cell.state.selection.main;
         if (anchor === head) return false;
+        // the paste key never converts a selection - its body is the
+        // clipboard - so ANY selection redirects to the converting keys,
+        // before trimming, exactly like the main-editor branch below (review
+        // A5, Jason confirmed live 2026-09-08: a whitespace-only cell
+        // selection used to fall through and paste, where the main editor
+        // redirected)
+        if (command === "paste") {
+            showNotice(SelectionCommandNotice, 8000);
+            return true;
+        }
         const cellText = cell.state.doc.toString();
         let from = Math.min(anchor, head);
         let to = Math.max(anchor, head);
@@ -168,10 +178,6 @@ export function selectionPressHandled(
         if (plugin.settings.expandSelectionToWholeWords) {
             from = startOfWordOffset(cellText, from);
             to = endOfWordOffset(cellText, to);
-        }
-        if (command === "paste") {
-            showNotice(SelectionCommandNotice, 8000);
-            return true;
         }
         // protected-EDGE cut is refused UP FRONT, not just simulated: the
         // liveness checks prove the RESULT is live, but a selection that
