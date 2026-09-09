@@ -121,6 +121,12 @@ export function lintFootnotes(
         // judges definition geometry - a definition deleted after that
         // judgment flipped the verdict between passes (idempotence property,
         // 2026-08-10).
+        // the settings tab never sets keepOrphanedDefinitions (the UI's
+        // deletion route is removeOrphanedDefinitions), so this branch is
+        // dead on every user path - it stays for PROGRAMMATIC callers of
+        // lintFootnotes, the property suite among them, so that
+        // reindexOptions keeps meaning what reindexFootnotes says it means
+        // (review C6, 2026-09-09: documented rather than removed)
         const reindexDeletesOrphans =
             (options.reindex ?? true) &&
             options.reindexOptions?.keepOrphanedDefinitions === false;
