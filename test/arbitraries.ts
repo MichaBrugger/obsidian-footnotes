@@ -1,5 +1,7 @@
 import fc from "fast-check";
 
+import { PREFIXES } from "./helpers/prefixes";
+
 // ---------- document generator ----------
 // Structured, not byte-random: the pieces are the plugin's whole attack
 // surface - references (plain/named/cased/$/escaped/inline), definitions
@@ -139,9 +141,11 @@ const blockArb = fc.oneof(
 const frontmatterArb = fc.constantFrom(
     undefined,
     "---\ntitle: t\n---",
-    "---\nfootnote-prefix: 2.\n---",
     "---\nfootnote-prefix: P-\n---",
     '---\nfootnote-prefix: "2."\n---',
+    // every separator the convention names, regex-special ones included
+    // (review D3, 2026-09-09)
+    ...PREFIXES.map((prefix) => `---\nfootnote-prefix: ${prefix}\n---`),
 );
 
 export const docArb = fc

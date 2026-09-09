@@ -6,6 +6,7 @@ import { gfmFootnote } from "micromark-extension-gfm-footnote";
 import { math } from "micromark-extension-math";
 import { describe, expect, it } from "vitest";
 
+import { PREFIXES } from "./helpers/prefixes";
 import { docArb } from "./arbitraries";
 import { inlineFootnoteSpanAt, sanitizeInlineFootnoteContent } from "../src/commands/inline-footnotes";
 import { endOfWordOffset } from "../src/editor/cursor-motion";
@@ -50,7 +51,8 @@ const optionsArb: fc.Arbitrary<LintOptions> = fc.record({
     removeOrphanedReferences: fc.boolean(),
     removeOrphanedDefinitions: fc.boolean(),
     mergeDuplicateDefinitions: fc.boolean(),
-    orphanSafePrefix: fc.constantFrom("", "2."),
+    // the whole separator set, never just "2." (review D3, 2026-09-09)
+    orphanSafePrefix: fc.constantFrom("", ...PREFIXES),
     applyNotePrefix: fc.boolean(),
     sectionHeading: fc.constantFrom("", "# Footnotes", "---\n## Footnotes"),
 });
