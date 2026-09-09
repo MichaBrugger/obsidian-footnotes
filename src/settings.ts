@@ -190,7 +190,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                             },
                             {
                                 name: "Delete orphaned definitions",
-                                desc: "Linting deletes footnote definitions that have no references  (a \"[^6]:\" line with no \"[^6]\", which Obsidian doesn't render). While off, linting alerts you about them instead and reindexing numbers them after everything else.",
+                                desc: "Linting deletes footnote definitions that have no references (a \"[^6]:\" line with no \"[^6]\", which Obsidian doesn't render). While off, linting alerts you about them instead and reindexing numbers them after everything else.",
                                 control: {
                                     type: "toggle",
                                     key: "lintDeleteOrphanedDefinitions",
