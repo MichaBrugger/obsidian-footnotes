@@ -13,6 +13,8 @@ import { footnotePrefixFromEditor, footnotePrefixProblem } from "../parsing/foot
 import { simulateChanges } from "../editor/insertion-liveness";
 import {
     definitionLabelIn,
+    definitionLabelWithName,
+    definitionStartLines,
     findDefinitionBlocks,
     maskProtectedLines,
     scanDocument,
@@ -117,12 +119,25 @@ export function planFootnoteRename(
     const oldFolded = oldName.toLowerCase();
     const newFolded = newName.toLowerCase();
     const blocks = ctx.blocks();
+    // every LIVE definition label - column-0 blocks AND blockquoted/callout
+    // labels, which are definitions everywhere else in the plugin but never
+    // blocks (second review 2026-09-09: a rename rewrote the reference and
+    // left "> [^note]:" behind, orphaning both halves)
+    const starts = ctx.definitionStarts();
+    const labels: { line: number; name: string; nameStart: number; nameEnd: number }[] = [];
+    for (let line = 0; line < ctx.lines.length; line++) {
+        if (!starts[line]) continue;
+        const hit = definitionLabelWithName(ctx.lines[line], ctx.maskedLine(line));
+        if (hit) {
+            labels.push({ line, name: hit.name, nameStart: hit.label.nameStart, nameEnd: hit.label.nameEnd });
+        }
+    }
 
     // collision: the new name already names ANOTHER footnote (any casing).
     // A case-only rename of the SAME footnote is fine - that's cosmetics.
     if (newFolded !== oldFolded) {
         const taken =
-            blocks.some((block) => block.name.toLowerCase() === newFolded) ||
+            labels.some((label) => label.name.toLowerCase() === newFolded) ||
             ctx.lines.some(
                 (lineText, line) =>
                     lineText.includes("[^") &&
@@ -152,19 +167,19 @@ export function planFootnoteRename(
             referenceLines.add(line);
         }
     }
-    for (const block of blocks) {
-        if (block.name.toLowerCase() !== oldFolded) continue;
-        const label = definitionLabelIn(ctx.lines[block.start]);
-        if (!label) continue;
+    const labelLines: number[] = [];
+    for (const label of labels) {
+        if (label.name.toLowerCase() !== oldFolded) continue;
         changes.push({
-            from: { line: block.start, ch: label.nameStart },
-            to: { line: block.start, ch: label.nameEnd },
+            from: { line: label.line, ch: label.nameStart },
+            to: { line: label.line, ch: label.nameEnd },
             text: newName,
         });
+        labelLines.push(label.line);
     }
     if (changes.length === 0) return { kind: "noop" };
 
-    if (!renameSurvives(ctx, changes, oldFolded, newName, referenceLines, blocks)) {
+    if (!renameSurvives(ctx, changes, oldFolded, newName, referenceLines, blocks, labelLines)) {
         return { kind: "dead" };
     }
     return { kind: "renamed", changes, count: changes.length, newName, prefixAdded };
@@ -203,6 +218,7 @@ function renameSurvives(
     newName: string,
     referenceLines: Set<number>,
     blocksBefore: { start: number; name: string }[],
+    labelLines: number[],
 ): boolean {
     const simulated = simulateChanges(ctx.lines, changes);
     // one scan and one masked twin for every line checked below - the
@@ -232,6 +248,14 @@ function renameSurvives(
                 return false;
             }
         }
+    }
+    // every renamed label (quoted ones are not blocks) must still read as a
+    // live definition under the new name
+    const startsAfter = definitionStartLines(simulated, simulatedScan, (i) => simulatedMasked[i]);
+    for (const line of labelLines) {
+        if (!startsAfter[line]) return false;
+        const hit = definitionLabelWithName(simulated[line], simulatedMasked[line]);
+        if (!hit || hit.name !== newName) return false;
     }
     const blocksAfter = findDefinitionBlocks(simulated, simulatedScan);
     if (blocksAfter.length !== blocksBefore.length) return false;

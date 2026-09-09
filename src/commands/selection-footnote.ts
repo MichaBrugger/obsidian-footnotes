@@ -311,6 +311,17 @@ export function selectionPressHandled(
         showNotice(NestedFootnoteNotice, 8000);
         return true;
     }
+    // a blockquoted/callout definition is a live single-line definition
+    // that is never a block (second review 2026-09-09: selecting the body
+    // of "> [^1]: text" converted it, nesting the new footnote into the
+    // old one's line)
+    const starts = ctx.definitionStarts();
+    for (let line = trimmed.from.line; line <= trimmed.to.line; line++) {
+        if (starts[line]) {
+            showNotice(NestedFootnoteNotice, 8000);
+            return true;
+        }
+    }
     // ... and a selection touching any LIVE footnote artifact refuses too
     // (nesting prevented plugin-wide, 2026-08-24)
     if (selectionTouchesFootnote(ctx, trimmed.from, trimmed.to)) {
