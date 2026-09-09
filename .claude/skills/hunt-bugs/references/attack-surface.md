@@ -84,7 +84,6 @@ Pure modules (unit-probeable, the hunt's home turf):
 | `src/linting/rules/apply-footnote-prefix.ts` | `applyFootnotePrefix`, `applyFootnotePrefixRule` | Rewriting plain numbered ids into the note's prefix namespace |
 | `src/linting/rules/move-footnotes-to-the-bottom.ts` | `moveFootnoteDefinitionsToBottom` | Relocating definition blocks |
 | `src/linting/rules/footnote-after-punctuation.ts` | `footnoteAfterPunctuation` | Swapping reference/punctuation order |
-| `src/linting/ignore-types.ts` | `IgnoreType` | Linter-parity ignore-type vocabulary (declaration-only — transforms self-protect via markdown-scan, which DOES enforce math since 2026-08-10; the old applyIgnored helper was dead and deleted) |
 | `src/editor/table-cursor.ts` | `activeTableCellEditor`, `tableRowCellSpans`, `resolveTableCellCursor` | Escape-aware table cell spans |
 | `src/editor/obsidian-internals.ts` | types (`ObsidianEditorView`, `EditorWithCm`, `MarkdownEmbed`, `AppWithEmbedRegistry`, ...) plus `viewEditor`, `readingViewActive`, `ensureTextPropertyType` | Cast targets + view-reality guards for Obsidian private APIs |
 
