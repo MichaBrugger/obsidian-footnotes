@@ -216,60 +216,71 @@ function isFenceOpener(bareLine: string, delim: string): boolean {
  * Being FOUND as a reference says nothing about validity: a name with a
  * backtick is still invalid, and the lint now reports it by name.
  *
- * Answered from two state tables over the masked-so-far characters
- * instead of walking outward from every candidate: the outward walk ran
- * to the start of the line whenever no bracket or NUL lay behind the
- * candidate, and the closing-candidate loops asked it once per dollar or
- * backtick, so a long line of prices masked in quadratic time (8000
- * characters: 344 ms per mask, and a lint masks the note about ten
- * times; review B1, 2026-09-09). The tables are rebuilt lazily after a
- * blot, since a fresh NUL is a wall for both walks.
+ * Answered from tables built ONCE over the raw line instead of walking
+ * outward from every candidate: the outward walk ran to the start of the
+ * line whenever no bracket lay behind the candidate, and the closing-
+ * candidate loops asked it once per dollar or backtick, so a long line of
+ * prices masked in quadratic time (8000 characters: 344 ms per mask, and
+ * a lint masks the note about ten times; review B1, 2026-09-09). Blots
+ * only ever land BEHIND the scan head, and every query is at or ahead of
+ * it, so the one thing masking changes for a query is whether a NUL now
+ * sits between the candidate and its nearest bracket behind - which the
+ * index answers from the highest blotted position so far.
  */
 class ReferenceShapeIndex {
-    private before: boolean[] | null = null;
-    private after: boolean[] | null = null;
+    /** Index of the nearest "[", "]", or raw NUL behind j, or -1. */
+    private readonly bracketBehind: Int32Array;
+    /** 1 when that nearest character is a "[" followed by "^". */
+    private readonly openerBehind: Uint8Array;
+    /** 1 when a "]" comes before any "[", raw NUL, or the end, walking forward from j + 1. */
+    private readonly closesAhead: Uint8Array;
+    private lastBlotted = -1;
 
-    constructor(private readonly chars: readonly string[]) {}
+    constructor(line: string) {
+        const n = line.length;
+        this.bracketBehind = new Int32Array(n);
+        this.openerBehind = new Uint8Array(n);
+        this.closesAhead = new Uint8Array(n);
+        let bracket = -1;
+        let opener = 0;
+        for (let j = 0; j < n; j++) {
+            this.bracketBehind[j] = bracket;
+            this.openerBehind[j] = opener;
+            const c = line[j];
+            if (c === "\0" || c === "]") {
+                bracket = j;
+                opener = 0;
+            } else if (c === "[") {
+                bracket = j;
+                opener = line[j + 1] === "^" ? 1 : 0;
+            }
+        }
+        // the shape must CLOSE ahead: an unclosed "[^" is a bracket, not a
+        // reference ("`[^` $[^1].$" keeps its code span and its math; the
+        // backtick guard would otherwise never let that span close, and
+        // the dollar guard would then hide the math)
+        let closes = 0;
+        for (let j = n - 1; j >= 0; j--) {
+            this.closesAhead[j] = closes;
+            const c = line[j];
+            if (c === "\0" || c === "[") closes = 0;
+            else if (c === "]") closes = 1;
+        }
+    }
 
-    /** Forget the tables: a blot wrote NULs the walks must now stop at. */
-    invalidate(): void {
-        this.before = null;
-        this.after = null;
+    /** A blot of [from, to) landed: NULs now wall off everything up to to - 1. */
+    blotted(to: number): void {
+        if (to - 1 > this.lastBlotted) this.lastBlotted = to - 1;
     }
 
     inside(i: number): boolean {
-        if (this.before === null || this.after === null) this.build();
-        return (this.before as boolean[])[i] && (this.after as boolean[])[i];
-    }
-
-    private build(): void {
-        const chars = this.chars;
-        const n = chars.length;
-        // before[j]: walking back from j, the nearest of "[", "]", NUL is a
-        // "[" followed by "^" (the original backward walk, run forward once)
-        const before = new Array<boolean>(n);
-        let opened = false;
-        for (let j = 0; j < n; j++) {
-            before[j] = opened;
-            const c = chars[j];
-            if (c === "\0" || c === "]") opened = false;
-            else if (c === "[") opened = chars[j + 1] === "^";
-        }
-        // after[j]: walking forward from j + 1, a "]" comes before any "[",
-        // NUL, or the end of the line - the shape must CLOSE ahead: an
-        // unclosed "[^" is a bracket, not a reference ("`[^` $[^1].$" keeps
-        // its code span and its math; the backtick guard would otherwise
-        // never let that span close, and the dollar guard would hide the math)
-        const after = new Array<boolean>(n);
-        let closes = false;
-        for (let j = n - 1; j >= 0; j--) {
-            after[j] = closes;
-            const c = chars[j];
-            if (c === "\0" || c === "[") closes = false;
-            else if (c === "]") closes = true;
-        }
-        this.before = before;
-        this.after = after;
+        const bracket = this.bracketBehind[i];
+        if (bracket === -1 || this.openerBehind[i] === 0) return false;
+        // a NUL between the opener (or on it, or on its "^") and i ends the
+        // backward walk: every blot so far lies behind i, so that is exactly
+        // "the highest blotted position reaches the opener"
+        if (this.lastBlotted >= bracket) return false;
+        return this.closesAhead[i] === 1;
     }
 }
 
@@ -309,11 +320,11 @@ export function maskLineRegions(
     }
 
     const chars = line.split("");
-    const shapes = new ReferenceShapeIndex(chars);
+    const shapes = new ReferenceShapeIndex(line);
     const insideReferenceShape = (_chars: readonly string[], at: number) => shapes.inside(at);
     const blot = (from: number, to: number) => {
         for (let k = from; k < to; k++) chars[k] = "\0";
-        shapes.invalidate();
+        shapes.blotted(to);
     };
     let i = 0;
 
