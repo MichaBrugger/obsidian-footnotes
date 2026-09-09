@@ -168,7 +168,7 @@ export function simulatedAnchor(
 }
 
 /** Every requested landing from ONE resolution pass: the per-anchor form re-joined and re-resolved the whole document once per reference (review B4, 2026-09-09). */
-export function simulatedAnchors(
+function simulatedAnchors(
     lines: string[],
     changes: EditorChange[],
     anchorIndices: number[],
