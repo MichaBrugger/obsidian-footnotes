@@ -209,12 +209,16 @@ describe("blank line between the new definition and following content", () => {
 describe("never appending into an unclosed region at EOF (2026-08-11 bug #10)", () => {
     it("lands the definition above an unclosed fence", () => {
         const doc = fakeEditor(["prose[^9]?", "", "```", "code"]);
+        // isFirstFootnote is passed false here (a unit convenience), so the
+        // blank separator comes from the prose-above rule instead of the
+        // heading slot: a label directly under prose is lazy paragraph text
+        // to Obsidian (2026-09-09)
         const { change, cursor } = buildDefinitionAppend(doc, "1", false, fakePlugin());
         expect(change).toEqual({
             from: { line: 0, ch: "prose[^9]?".length },
-            text: "\n[^1]: ",
+            text: "\n\n[^1]: ",
         });
-        expect(cursor).toEqual({ line: 1, ch: 6 });
+        expect(cursor).toEqual({ line: 2, ch: 6 });
     });
 
     it("lands the definition above an unclosed comment opener line", () => {
@@ -222,7 +226,7 @@ describe("never appending into an unclosed region at EOF (2026-08-11 bug #10)", 
         const { change } = buildDefinitionAppend(doc, "2", false, fakePlugin());
         expect(change).toEqual({
             from: { line: 0, ch: "alpha[^1].".length },
-            text: "\n[^2]: ",
+            text: "\n\n[^2]: ",
         });
     });
 
@@ -231,7 +235,7 @@ describe("never appending into an unclosed region at EOF (2026-08-11 bug #10)", 
         const { change } = buildDefinitionAppend(doc, "2", false, fakePlugin());
         expect(change).toEqual({
             from: { line: 0, ch: "a[^1]!".length },
-            text: "\n[^2]: \n",
+            text: "\n\n[^2]: \n",
         });
     });
 

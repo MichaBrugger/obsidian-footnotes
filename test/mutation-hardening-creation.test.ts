@@ -225,13 +225,16 @@ describe("createAutonumFootnote", () => {
     it("counts a blockquote definition as an existing footnote", () => {
         const doc = fakeEditor(["> [^q]: quoted def", "prose"], { line: 1, ch: 5 });
         createAutonumFootnote("prose", { line: 1, ch: 5 }, fakePlugin(doc), doc);
-        // no blank separator line: this is NOT the note's first footnote
+        // NOT the note's first footnote (no heading slot), but the label
+        // still gets its blank separator: directly under the prose line it
+        // would be lazy paragraph text to Obsidian (2026-09-09)
         expect(doc.lines).toEqual([
             "> [^q]: quoted def",
             "prose[^1]",
+            "",
             "[^1]: ",
         ]);
-        expect(doc.cursor).toEqual({ line: 2, ch: "[^1]: ".length });
+        expect(doc.cursor).toEqual({ line: 3, ch: "[^1]: ".length });
     });
 
     // The isFirstFootnote twin: with no definition anywhere the blank
@@ -423,7 +426,9 @@ describe("createMatchingFootnoteDefinition", () => {
                 doc,
             ),
         ).toBe(true);
-        expect(doc.lines).toEqual(["> [^q]: d", "see [^tag] x", "[^tag]: "]);
+        // the blank separator: under the prose line the label would be lazy
+        // paragraph text to Obsidian (2026-09-09)
+        expect(doc.lines).toEqual(["> [^q]: d", "see [^tag] x", "", "[^tag]: "]);
     });
 
     // L349 BooleanLiteral (`center` -> false) and L357/L359 BooleanLiterals
@@ -1014,7 +1019,7 @@ describe("the numbered selection conversion", () => {
             head: { line: 1, ch: 9 },
         });
         selectionPressHandled(fakePlugin(doc), doc, null, "autonum");
-        expect(doc.lines).toEqual(["> [^q]: d", "tail[^1]", "[^1]: word"]);
+        expect(doc.lines).toEqual(["> [^q]: d", "tail[^1]", "", "[^1]: word"]);
     });
 
     // L267 BooleanLiteral, `center` -> false.
@@ -1079,6 +1084,7 @@ describe("the numbered cell selection conversion", () => {
         expect(doc.lines).toEqual([
             "> [^q]: d",
             "| plain word |",
+            "",
             "[^1]: word",
         ]);
     });

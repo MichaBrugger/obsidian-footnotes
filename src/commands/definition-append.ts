@@ -1,6 +1,7 @@
 import { Editor, EditorChange, EditorPosition } from "obsidian";
 
 import type FootnotePlugin from "../main";
+import { comparePositions } from "../editor/cursor-motion";
 import { DocContext, docContext } from "../editor/doc-context";
 import { definitionLabel } from "../parsing/footnote-grammar";
 import { findDefinitionBlocks, findLineRunEnd, scanDocument } from "../parsing/markdown-scan";
@@ -45,10 +46,23 @@ export function buildDefinitionAppend(
     isFirstFootnote: boolean,
     plugin: FootnotePlugin,
     ctx: DocContext = docContext(doc),
+    // the span a selection conversion is about to REPLACE in the same
+    // transaction: the definition must not land inside it (the two changes
+    // would overlap), and a section heading the selection swallows is no
+    // slot to append under (property find 2026-09-09: a drag across the
+    // "# Footnotes" heading with the setting on wrote the definition into
+    // the middle of the selection and glued the paragraph's tail to it)
+    avoid?: { from: EditorPosition; to: EditorPosition },
 ): { change: EditorChange; cursor: EditorPosition; prepend?: EditorChange } {
     const lines = ctx.lines;
     const isProtected = ctx.scan.isProtected;
     const blocks = findDefinitionBlocks(lines, isProtected, ctx.scan);
+    // an insertion at the END of `line` would sit strictly inside `avoid`
+    const endInsideAvoid = (line: number): boolean => {
+        if (!avoid) return false;
+        const at = { line, ch: lines[line].length };
+        return comparePositions(avoid.from, at) < 0 && comparePositions(at, avoid.to) < 0;
+    };
     // a non-blank line directly below the new definition would be pulled INTO
     // it - Obsidian lazily continues a definition into the next line - so
     // insertions with content below them add a trailing blank separator
@@ -80,12 +94,17 @@ export function buildDefinitionAppend(
         // findLineRunEnd is the ONE anchor matcher shared with the
         // move-to-bottom rule - the fixed-point guarantee needs both to
         // agree on what counts as the existing heading
-        const anchorEnd = findLineRunEnd(
-            lines,
-            isProtected,
-            plugin.settings.footnoteSectionHeading.split("\n"),
-        );
-        if (anchorEnd !== -1) {
+        const headingLines = plugin.settings.footnoteSectionHeading.split("\n");
+        const anchorEnd = findLineRunEnd(lines, isProtected, headingLines);
+        // a heading the selection overlaps is being converted away with it
+        // (a drag ending at ch 0 of the heading line leaves it intact)
+        const headingSwallowed =
+            anchorEnd !== -1 &&
+            avoid !== undefined &&
+            anchorEnd >= avoid.from.line &&
+            (anchorEnd - headingLines.length + 1 < avoid.to.line ||
+                (anchorEnd - headingLines.length + 1 === avoid.to.line && avoid.to.ch > 0));
+        if (anchorEnd !== -1 && !headingSwallowed) {
             let fromLine = anchorEnd;
             let slotText = `\n\n[^${footnoteId}]: `;
             // reuse a blank line already separating the heading from what
@@ -122,11 +141,11 @@ export function buildDefinitionAppend(
         // `to` spans to EOF and would delete the region itself.
         while (
             fromLine >= 0 &&
-            scanDocument(lines.slice(0, fromLine + 1)).endsProtected
+            (scanDocument(lines.slice(0, fromLine + 1)).endsProtected || endInsideAvoid(fromLine))
         ) {
             fromLine--;
         }
-        while (fromLine >= 0 && lines[fromLine].trim() === "") fromLine--;
+        while (fromLine >= 0 && (lines[fromLine].trim() === "" || endInsideAvoid(fromLine))) fromLine--;
         if (fromLine < 0) {
             // the unclosed region starts at line 0 - plant the definition
             // on top, blank-separated from whatever follows
@@ -154,6 +173,14 @@ export function buildDefinitionAppend(
             heading = heading.slice(1);
         }
         text = heading + "\n" + text;
+    } else if (doc.getLine(fromLine).trim() !== "") {
+        // not the first footnote, yet no column-0 block to append under
+        // (the note's only definitions are blockquoted): the label would
+        // land directly under a prose line, which Obsidian reads as lazy
+        // paragraph text, not a definition (definitionStartLines, ground
+        // truth 2026-09-09) - give it the blank separator the first
+        // footnote gets from its heading slot
+        text = "\n" + text;
     }
 
     // cursor lands at the end of the inserted definition line

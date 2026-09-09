@@ -766,7 +766,10 @@ function convertMainSelection(
     const body = indentDefinitionBody(selection.text);
     const bodyExtraLines = body.split("\n").length - 1;
     const definition = seedDefinitionBody(
-        buildDefinitionAppend(doc, footnoteId, isFirstFootnote, plugin, ctx),
+        buildDefinitionAppend(doc, footnoteId, isFirstFootnote, plugin, ctx, {
+            from: selection.from,
+            to: selection.to,
+        }),
         footnoteId,
         body,
     );
