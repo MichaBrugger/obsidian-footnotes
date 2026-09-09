@@ -289,6 +289,61 @@
         }
     };
 
+    // --- helpers for the remaining scenes ---------------------------------
+    G.setClipboard = (text) => require("electron").clipboard.writeText(text);
+
+    /** The text input of the plugin's open dialog (name, rename, prefix). */
+    G.modalInput = () => document.querySelector(".modal input[type='text'], .modal input:not([type])");
+    G.typeModal = async (text, cps) => {
+        const input = G.modalInput();
+        if (!input) throw new Error("no modal input");
+        input.focus();
+        for (const ch of text) {
+            input.value += ch;
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+            await G.sleep(cps || 80);
+        }
+    };
+    G.clearModal = async () => {
+        const input = G.modalInput();
+        if (!input) throw new Error("no modal input");
+        input.focus();
+        input.select();
+        await G.sleep(350);
+        input.value = "";
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+    };
+    G.submitModal = () => {
+        const input = G.modalInput();
+        if (input) {
+            input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", bubbles: true, cancelable: true }));
+        }
+        const cta = document.querySelector(".modal button.mod-cta");
+        if (cta && G.modalInput()) cta.click();
+    };
+    G.modalOpen = () => !!G.modalInput();
+
+    /** One PNG of `rect` into the capture folder; the driver copies it out as a still.
+     *  `contents` picks another window's webContents (the Settings dialog opens in a popout). */
+    G.snapshot = async (name, rect, contents) => {
+        const img = await (contents || wc).capturePage(rect);
+        const png = img.toPNG();
+        if (!(await app.vault.adapter.exists(".footnote-capture"))) await app.vault.adapter.mkdir(".footnote-capture");
+        const path = ".footnote-capture/" + name + ".png";
+        await app.vault.adapter.writeBinary(path, png.buffer.slice(png.byteOffset, png.byteOffset + png.byteLength));
+        return path;
+    };
+    G.rectOf = (el, pad) => {
+        const r = el.getBoundingClientRect();
+        const p = pad || 0;
+        return {
+            x: Math.max(0, Math.round(r.left - p)),
+            y: Math.max(0, Math.round(r.top - p)),
+            width: Math.round(r.width + 2 * p),
+            height: Math.round(r.height + 2 * p),
+        };
+    };
+
     G.waitFor = async (fn, ms) => {
         const t = Date.now();
         while (Date.now() - t < (ms || 8000)) {
@@ -297,7 +352,20 @@
         }
         return false;
     };
-    G.popupOpen = () =>
-        !!document.querySelector(".footnote-shortcut-popup:not(.footnote-shortcut-popup-loading)") && !!G.popupEditor();
+    // the popup clamps itself to the WINDOW, not to the recorded pane; nudge
+    // it left so it stays inside the frame (the reader never sees the crop)
+    G.fitPopup = () => {
+        const p = document.querySelector(".footnote-shortcut-popup");
+        if (!p || !G.rect) return;
+        const r = p.getBoundingClientRect();
+        const right = G.rect.x + G.rect.width - 12;
+        if (r.right > right) p.style.left = Math.max(G.rect.x + 12, right - r.width) + "px";
+    };
+    G.popupOpen = () => {
+        const open =
+            !!document.querySelector(".footnote-shortcut-popup:not(.footnote-shortcut-popup-loading)") && !!G.popupEditor();
+        if (open) G.fitPopup();
+        return open;
+    };
     G.popupGone = () => !document.querySelector(".footnote-shortcut-popup");
 })();

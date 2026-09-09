@@ -49,11 +49,38 @@ if (vaultName !== VAULT_NAME) {
     process.exit(1);
 }
 
+// a scene whose first line is "// @mobile" runs under Obsidian's mobile
+// emulation. emulateMobile() reloads the window, so the toggle has to happen
+// out here, on either side of the scene, and the reload has to settle
+const sceneSource = readFileSync(join(here, `scene-${scene}.js`), "utf8");
+const wantsMobile = /^\/\/ @mobile/.test(sceneSource);
+const isMobile = () => readJson("document.body.classList.contains('is-mobile')");
+const setMobile = async (on) => {
+    if (isMobile() === on) return;
+    try {
+        evalIn(`app.emulateMobile(${on})`);
+    } catch {
+        // the reload cuts the CLI answer short
+    }
+    for (let i = 0; i < 40; i++) {
+        await sleep(500);
+        try {
+            if (readJson("app.workspace.layoutReady === true") && isMobile() === on) break;
+        } catch {
+            // still reloading
+        }
+    }
+    await sleep(1500);
+    if (isMobile() !== on) throw new Error(`mobile emulation did not turn ${on ? "on" : "off"}`);
+};
+if (wantsMobile) await setMobile(true);
+
 // 1. the scratch note and the two scripts as vault dotfiles
 ob("create", "name=Smoke Test - footnotes", "content=placeholder", "overwrite", "silent");
 copyFileSync(join(here, "inapp.js"), join(VAULT, ".gif-inapp.js"));
+copyFileSync(join(here, "scene-shared.js"), join(VAULT, ".gif-shared.js"));
 copyFileSync(join(here, `scene-${scene}.js`), join(VAULT, ".gif-scene.js"));
-evalIn(`(async () => { window.__scene = null; new Function(await app.vault.adapter.read('.gif-inapp.js'))(); })(); 'fired'`);
+evalIn(`(async () => { window.__scene = null; new Function(await app.vault.adapter.read('.gif-inapp.js'))(); new Function(await app.vault.adapter.read('.gif-shared.js'))(); })(); 'fired'`);
 await sleep(600);
 // supersede any stale scene, then bring the window forward and insist on focus
 evalIn(`(() => { window.__gif.beginRun(); window.__gif.bringToFront(); })(); 'fired'`);
@@ -70,14 +97,30 @@ evalIn(`(async () => { new Function(await app.vault.adapter.read('.gif-scene.js'
 let state = null;
 for (let i = 0; i < 90; i++) {
     await sleep(1000);
-    state = readJson("window.__scene || null");
+    try {
+        state = readJson("window.__scene || null");
+    } catch {
+        continue; // a resize or reload can garble one answer; ask again
+    }
     if (state && (state.stage === "done" || state.stage === "error")) break;
 }
 rmSync(join(VAULT, ".gif-inapp.js"), { force: true });
+rmSync(join(VAULT, ".gif-shared.js"), { force: true });
 rmSync(join(VAULT, ".gif-scene.js"), { force: true });
+// back to the desktop layout whatever the scene did
+if (wantsMobile) await setMobile(false);
 if (!state || state.stage !== "done") {
     console.error("scene failed:", JSON.stringify(state));
     process.exit(1);
+}
+// a still scene hands back one PNG instead of frames
+if (state.still) {
+    const stillOut = resolve(opt("--out", join(REPO, "README", `${scene}.png`)));
+    mkdirSync(dirname(stillOut), { recursive: true });
+    copyFileSync(join(VAULT, state.still), stillOut);
+    rmSync(join(VAULT, ".footnote-capture"), { recursive: true, force: true });
+    console.log(`wrote ${stillOut} (${(readFileSync(stillOut).length / 1024).toFixed(0)} KB still)`);
+    process.exit(0);
 }
 console.log(`captured ${state.count} frames, region ${JSON.stringify(state.rect)}`);
 

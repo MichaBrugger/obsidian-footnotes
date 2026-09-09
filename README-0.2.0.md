@@ -1,4 +1,4 @@
-<!-- Temporary README for the 0.2.0 release. Replaces README.md when 0.2.0 ships. All GIF slots are marked with "GIF:" comments; every recording from 0.1.3 needs replacing. -->
+<!-- Temporary README for the 0.2.0 release. Replaces README.md when 0.2.0 ships. Every GIF and still in README/ is recorded by scripts/readme-gifs/record.mjs. -->
 
 # Footnote Shortcut
 
@@ -32,13 +32,13 @@ Of the plugin's seven commands, the ones you'll press constantly deserve hotkeys
 | Insert inline footnote                   | <kbd>Alt</kbd>+<kbd>=</kbd>                  |
 | Insert inline footnote from clipboard    | <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>=</kbd> |
 
-<!-- GIF or screenshot: assigning a hotkey in the Hotkeys settings tab -->
+![The Hotkeys settings tab filtered to "Footnote Shortcut", with the four recommended bindings set](README/hotkeys.png)
 
 The other three (**Lint footnotes**, **Rename footnote**, and **Set footnote prefix**) come up less often, so running them from the command palette works fine. Give them hotkeys too if they become part of your routine.
 
 Everything also works on mobile from the toolbar.
 
-<!-- GIF or screenshot: mobile toolbar with footnote shortcut commands -->
+<img src="README/mobile.png" width="320" alt="Obsidian mobile: the footnote commands sit on the editor toolbar">
 
 ## Creating footnotes
 
@@ -48,7 +48,7 @@ Put your cursor where the footnote belongs and press the hotkey. The plugin find
 
 Footnotes are never created inside code, math, comments, frontmatter, or another footnote's definition: a press there tells you why instead of leaving dead text behind.
 
-<!-- GIF: numbered insert, popup opens, note typed, popup closed -->
+![Numbered footnote: the hotkey inserts the reference, the popup opens at the cursor, the definition is typed, the same hotkey closes it](README/numbered.gif)
 
 ### Named footnotes
 
@@ -59,7 +59,7 @@ Named footnotes (like `[^Smith2019]`) take two quick presses:
 
 Names can hold almost anything (`[^Smith2019]`, `[^arXiv:1234.5678]`, `[^注]`). The exceptions are spaces, backticks, brackets, and `#`, which Obsidian can't render or find; the plugin refuses those up front rather than creating a footnote that won't work.
 
-<!-- GIF: named footnote two-step -->
+![Named footnote: the first press plants the empty reference, the name is typed, the second press writes the footnote](README/named.gif)
 
 ### Inline footnotes
 
@@ -68,7 +68,7 @@ Two commands cover Obsidian's inline `^[...]` style:
 - **Insert inline footnote** places `^[]` with your cursor inside, ready to type. Press the hotkey again when you're done and the cursor hops out past the closing bracket, so you never need the arrow keys.
 - **Insert inline footnote from clipboard** wraps whatever you've copied into `^[...]` in one press. Multi-line clipboard text is flattened to one line, and anything that would break the footnote (e.g. stray brackets) is escaped automatically.
 
-<!-- GIF: inline footnote typed, then a clipboard paste -->
+![Inline footnotes: one typed in place and hopped out of, then the clipboard wrapped in one press](README/inline.gif)
 
 ### Inside tables
 
@@ -86,7 +86,7 @@ Sometimes you write something mid-sentence and realize it should be a footnote. 
 - A selection that contains (or cuts through) an existing footnote refuses to convert: footnotes can't be nested inside other footnotes. Nesting is prevented throughout the plugin (it doesn't survive export to Pandoc/LaTeX and most markdown tools can't read it), and linting alerts you if a note already has hand-typed nesting.
 - Tables: text inside one cell converts; a selection that cuts through a table (a cell with its pipes, a row, part of the table) refuses. To move a whole table into a footnote, select it together with the text around it.
 
-<!-- GIF: select a clause, press hotkey, clause becomes a footnote. Repeat for all 3 types. -->
+![Selection to footnote with the numbered, named, and inline keys](README/selection.gif)
 
 **Multiple cursors** (Alt+click) get the same footnote at every one of them, handy when one source is cited in several places. The numbered hotkey puts the same `[^N]` at every cursor, sharing a single definition. The named and inline hotkeys drop their brackets at every cursor and leave a cursor inside each pair, so you type the name (or the footnote text) once and it lands everywhere; press the hotkey again with the cursors still inside and the named footnote gets its shared definition. Pasting as an inline footnote wraps the same clipboard text at every cursor. If any cursor sits where a footnote can't go, nothing is inserted anywhere, and one undo reverts the whole press. Every multi-cursor insertion ends with a single cursor after the first reference.
 
@@ -100,13 +100,13 @@ The insert hotkeys double as navigation. What they do depends on where your curs
 
 One hotkey takes you back and forth between a reference and its note.
 
-<!-- GIF: cursor on reference, hotkey, popup edit; then cursor on definition, hotkey, jump back -->
+![Navigation: on a reference the hotkey opens its definition in the popup; on the definition it jumps back to the reference](README/navigation.gif)
 
 ### Renaming a footnote
 
 Put your cursor on any reference or definition and run **Rename footnote**. It works like renaming a variable in a code editor: every reference and the definition get the new name in one step. It's also in the right-click menu when you click on a footnote, just like Obsidian's own rename for headings. Names are case-insensitive, so `[^Note]` and `[^note]` count as the same footnote. The command refuses names that are already taken and names a footnote can't have, and under a per-note prefix the new name gets the prefix added for you.
 
-<!-- GIF: caret on reference, rename modal, every occurrence updates -->
+![Rename footnote: every reference and the definition take the new name together](README/rename.gif)
 
 ### The popup editor
 
@@ -123,7 +123,7 @@ Writing and revising can leave footnotes messy. The **Lint footnotes** command c
 - **Reindex**: renumbers footnotes `1, 2, 3…` in the order they appear and reorders their definitions to match. Named footnotes keep their names (or get numbers too, if you prefer; see settings).
 
 
-<!-- GIF: messy note, run Lint footnotes, everything snaps into place -->
+![Lint footnotes: references move past punctuation, numbering follows the text, definitions gather at the bottom](README/lint.gif)
 
 Each rule can be toggled individually in **Settings → Footnote Shortcut → Linting**, along with two automatic triggers (both off by default):
 
@@ -144,7 +144,7 @@ To fix this, turn on **Per-note footnote prefix** and give each chapter its own 
 
 Notes without the property keep normal `[^1]`, `[^2]`, … numbering. A prefix follows the same rules as a footnote name and can't end in a digit, or `[^2-1]` and `[^21]` would be indistinguishable.
 
-<!-- GIF: add footnote prefix, add prefixed numbered and named footnotes -->
+![Per-note prefix: set it once, then numbered and named footnotes carry it](README/prefix.gif)
 ## Other settings
 
 - **Insert footnote reference at end of word** *(on by default)*: pressing the hotkey mid-word places the reference at the end of the word, past any trailing punctuation, so you don't have to aim.
