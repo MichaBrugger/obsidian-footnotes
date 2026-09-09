@@ -27,7 +27,7 @@ import { findDefinitionBlocks, scanDocument } from "../../src/parsing/markdown-s
 const blocksOf = (doc: string) => {
     const lines = doc.split("\n");
     const scan = scanDocument(lines);
-    return findDefinitionBlocks(lines, scan.isProtected, scan).map((b) => `${b.name}@${b.start}`);
+    return findDefinitionBlocks(lines, scan).map((b) => `${b.name}@${b.start}`);
 };
 
 describe("a label directly under a prose line is prose, not a definition", () => {

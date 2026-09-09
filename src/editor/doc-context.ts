@@ -1,8 +1,10 @@
 import { Editor, EditorPosition } from "obsidian";
 
 import {
+    DefinitionBlock,
     definitionStartLines,
     DocumentScan,
+    findDefinitionBlocks,
     maskLineWithScan,
     maskProtectedLines,
     scanDocument,
@@ -50,6 +52,8 @@ export interface DocContext {
     maskedLines(): string[];
     /** Which lines start a live definition (definitionStartLines), memoized. */
     definitionStarts(): boolean[];
+    /** The definition blocks (findDefinitionBlocks), memoized - a press used to walk them two or three times (review C2). */
+    blocks(): DefinitionBlock[];
 }
 
 /** Names of all footnote definitions ("[^x]: …" lines) in document order, one per line at most. Code blocks don't count. */
@@ -96,7 +100,10 @@ export function docContext(doc: Editor): DocContext {
     let starts: boolean[] | null = null;
     const definitionStarts = (): boolean[] =>
         starts ?? (starts = definitionStartLines(lines, scan, maskedLine));
-    return { lines, scan, maskedLine, maskedLines, definitionStarts };
+    let blocks: DefinitionBlock[] | null = null;
+    const blocksOf = (): DefinitionBlock[] =>
+        blocks ?? (blocks = findDefinitionBlocks(lines, scan, undefined, definitionStarts()));
+    return { lines, scan, maskedLine, maskedLines, definitionStarts, blocks: blocksOf };
 }
 
 /**

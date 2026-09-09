@@ -21,7 +21,7 @@ describe("bug: move-to-bottom buries a definition inside an unclosed fence", () 
     it("the relocated [^1] definition is still a recognized definition", () => {
         const out = moveFootnoteDefinitionsToBottom(doc);
         const lines = out.split("\n");
-        const blocks = findDefinitionBlocks(lines, protectedLines(lines));
+        const blocks = findDefinitionBlocks(lines);
         expect(blocks.map((b) => b.name)).toContain("1");
     });
 });

@@ -304,7 +304,7 @@ export function selectionPressHandled(
     // block nests the new footnote into it, and swallowing a block nests
     // it into the new footnote.
     if (
-        findDefinitionBlocks(ctx.lines, ctx.scan.isProtected, ctx.scan).some(
+        ctx.blocks().some(
             (block) =>
                 trimmed.from.line <= block.end && trimmed.to.line >= block.start,
         )

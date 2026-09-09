@@ -437,11 +437,7 @@ function uniqueSeededDefinitionName(doc: Editor, body: string): string | null {
     const ctx = docContext(doc);
     const bodyLines = body.split("\n");
     let found: string | null = null;
-    for (const block of findDefinitionBlocks(
-        ctx.lines,
-        ctx.scan.isProtected,
-        ctx.scan,
-    )) {
+    for (const block of findDefinitionBlocks(ctx.lines, ctx.scan)) {
         if (block.end - block.start !== bodyLines.length - 1) continue;
         const hit = definitionLabelWithName(
             ctx.lines[block.start],

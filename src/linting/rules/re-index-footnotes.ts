@@ -150,7 +150,7 @@ function reindexOnce(
                 lines = removeLineRanges(lines, orphans);
                 scan = scanDocument(lines);
                 maskedLines = maskProtectedLines(lines, scan);
-                blocks = findDefinitionBlocks(lines, scan.isProtected, scan);
+                blocks = findDefinitionBlocks(lines, scan);
                 referenceOrder = referenceAppearanceOrder(lines, maskedLines);
             }
         }

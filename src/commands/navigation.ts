@@ -49,7 +49,7 @@ export function shouldJumpFromDefinitionToReference(
     ctx ??= docContext(doc);
     const lines = ctx.lines;
     // the press's one protection scan feeds the block lookup and masking
-    const block = findDefinitionBlocks(lines, ctx.scan.isProtected, ctx.scan).find(
+    const block = ctx.blocks().find(
         (candidate) =>
             cursorPosition.line >= candidate.start &&
             cursorPosition.line <= candidate.end,
@@ -137,11 +137,7 @@ export function jumpToFootnoteDefinition(
         // mid-definition (2026-08-11 review bug #12). A blockquoted
         // label is never part of a column-0 block; its own line is the
         // landing spot.
-        const block = findDefinitionBlocks(
-            lines,
-            ctx.scan.isProtected,
-            ctx.scan,
-        ).find((candidate) => candidate.start === labelLine);
+        const block = ctx.blocks().find((candidate) => candidate.start === labelLine);
         const endLine = block ? block.end : labelLine;
         const newCursorPos = { line: endLine, ch: doc.getLine(endLine).length };
         moveCursorAndSetJumpPoint(doc, cursorPosition, newCursorPos, plugin, undefined, true);

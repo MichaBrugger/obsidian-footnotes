@@ -55,7 +55,7 @@ describe("a selection that swallows the section heading", () => {
         expect(label).toBeGreaterThan(tail);
         // the definition is a real block, with the swallowed heading text as its body
         const scan = scanDocument(doc.lines);
-        const block = findDefinitionBlocks(doc.lines, scan.isProtected, scan).find((b) => b.name === "1");
+        const block = findDefinitionBlocks(doc.lines, scan).find((b) => b.name === "1");
         expect(block?.start).toBe(label);
         expect(doc.lines[label]).toBe("[^1]: Footnotes");
         // and a fresh heading was slotted above it, since the old one is gone

@@ -56,7 +56,7 @@ export function buildDefinitionAppend(
 ): { change: EditorChange; cursor: EditorPosition; prepend?: EditorChange } {
     const lines = ctx.lines;
     const isProtected = ctx.scan.isProtected;
-    const blocks = findDefinitionBlocks(lines, isProtected, ctx.scan);
+    const blocks = ctx.blocks();
     // an insertion at the END of `line` would sit strictly inside `avoid`
     const endInsideAvoid = (line: number): boolean => {
         if (!avoid) return false;

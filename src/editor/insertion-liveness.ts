@@ -233,11 +233,7 @@ export function verifyLiveFootnoteInsertion(opts: {
     const simulated = opts.simulated ?? simulateChanges(opts.lines, opts.changes);
     const simulatedScan = scanDocument(simulated);
     const bodyExtraLines = opts.definitionBodyExtraLines ?? 0;
-    const definitionLive = findDefinitionBlocks(
-        simulated,
-        simulatedScan.isProtected,
-        simulatedScan,
-    ).some(
+    const definitionLive = findDefinitionBlocks(simulated, simulatedScan).some(
         (block) =>
             block.start === opts.definitionLabelLine &&
             block.end >= opts.definitionLabelLine + bodyExtraLines,

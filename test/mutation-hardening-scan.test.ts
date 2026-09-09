@@ -902,7 +902,7 @@ describe("findDefinitionBlocks", () => {
         const doc = "x[^1]\n\n[^1]: a\n    cont\n```\nfence\n```";
         const lines = doc.split("\n");
         const scan = scanDocument(lines);
-        expect(findDefinitionBlocks(lines, scan.isProtected, scan)).toEqual([
+        expect(findDefinitionBlocks(lines, scan)).toEqual([
             { name: "1", start: 2, end: 3 },
         ]);
     });
@@ -916,7 +916,7 @@ describe("findDefinitionBlocks", () => {
         const doc = "x[^1]\n\n[^1]: a\n    cont\n```\nfence\n```";
         const lines = doc.split("\n");
         const isProtected = scanDocument(lines).isProtected;
-        expect(findDefinitionBlocks(lines, isProtected)).toEqual([
+        expect(findDefinitionBlocks(lines, { ...scanDocument(lines), isProtected })).toEqual([
             { name: "1", start: 2, end: 3 },
         ]);
     });
@@ -929,7 +929,7 @@ describe("findDefinitionBlocks", () => {
         const doc = "[^1]: a\n\n    more";
         const lines = doc.split("\n");
         const isProtected = scanDocument(lines).isProtected;
-        expect(findDefinitionBlocks(lines, isProtected)).toEqual([
+        expect(findDefinitionBlocks(lines, { ...scanDocument(lines), isProtected })).toEqual([
             { name: "1", start: 0, end: 2 },
         ]);
     });
@@ -937,7 +937,7 @@ describe("findDefinitionBlocks", () => {
         const doc = "[^1]: a\n\nnot indented";
         const lines = doc.split("\n");
         const isProtected = scanDocument(lines).isProtected;
-        expect(findDefinitionBlocks(lines, isProtected)).toEqual([
+        expect(findDefinitionBlocks(lines, { ...scanDocument(lines), isProtected })).toEqual([
             { name: "1", start: 0, end: 0 },
         ]);
     });
@@ -950,7 +950,7 @@ describe("findDefinitionBlocks", () => {
         const doc = "[^1]: a\n\n```\n    fenced\n```";
         const lines = doc.split("\n");
         const scan = scanDocument(lines);
-        expect(findDefinitionBlocks(lines, scan.isProtected, scan)).toEqual([
+        expect(findDefinitionBlocks(lines, scan)).toEqual([
             { name: "1", start: 0, end: 0 },
         ]);
     });
@@ -958,7 +958,7 @@ describe("findDefinitionBlocks", () => {
         const doc = "[^1]: a\n\n\n\n    more";
         const lines = doc.split("\n");
         const isProtected = scanDocument(lines).isProtected;
-        expect(findDefinitionBlocks(lines, isProtected)).toEqual([
+        expect(findDefinitionBlocks(lines, { ...scanDocument(lines), isProtected })).toEqual([
             { name: "1", start: 0, end: 4 },
         ]);
     });
@@ -1429,7 +1429,7 @@ describe("round 2", () => {
             const doc = "[^1]: a\n    <!--\nhidden\n-->";
             const lines = doc.split("\n");
             const scan = scanDocument(lines);
-            expect(findDefinitionBlocks(lines, scan.isProtected, scan)).toEqual([
+            expect(findDefinitionBlocks(lines, scan)).toEqual([
                 { name: "1", start: 0, end: 2 },
             ]);
         });
@@ -1444,7 +1444,7 @@ describe("round 2", () => {
         it("a whitespace-only line within a blank run is swept over like an empty line", () => {
             const doc = ["[^1]: a", "   ", "    more"];
             const isProtected = scanDocument(doc).isProtected;
-            expect(findDefinitionBlocks(doc, isProtected)).toEqual([
+            expect(findDefinitionBlocks(doc, { ...scanDocument(doc), isProtected })).toEqual([
                 { name: "1", start: 0, end: 2 },
             ]);
         });
@@ -1457,7 +1457,7 @@ describe("round 2", () => {
         it("a blank run reaching exactly end-of-document does not overrun the array", () => {
             const doc = ["[^1]: a", ""];
             const isProtected = scanDocument(doc).isProtected;
-            expect(findDefinitionBlocks(doc, isProtected)).toEqual([
+            expect(findDefinitionBlocks(doc, { ...scanDocument(doc), isProtected })).toEqual([
                 { name: "1", start: 0, end: 0 },
             ]);
         });
@@ -1474,7 +1474,7 @@ describe("round 2", () => {
         it("a blank run landing on a protected (indented) fence opener does not get absorbed", () => {
             const doc = ["[^1]: a", "", " ```", " code", " ```"];
             const isProtected = scanDocument(doc).isProtected;
-            expect(findDefinitionBlocks(doc, isProtected)).toEqual([
+            expect(findDefinitionBlocks(doc, { ...scanDocument(doc), isProtected })).toEqual([
                 { name: "1", start: 0, end: 0 },
             ]);
         });
@@ -1489,7 +1489,7 @@ describe("round 2", () => {
         it("a whitespace-only line does not end the block via the outer non-blank check", () => {
             const doc = ["[^1]: a", "   ", "    more"];
             const isProtected = scanDocument(doc).isProtected;
-            expect(findDefinitionBlocks(doc, isProtected)).toEqual([
+            expect(findDefinitionBlocks(doc, { ...scanDocument(doc), isProtected })).toEqual([
                 { name: "1", start: 0, end: 2 },
             ]);
         });

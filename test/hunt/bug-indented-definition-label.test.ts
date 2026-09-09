@@ -41,7 +41,7 @@ describe("a definition label indented 1 to 3 spaces is a definition", () => {
     it("an indented label directly under a definition starts a new block", () => {
         const lines = ["[^1]: one", "  [^2]: two", "    more"];
         const scan = scanDocument(lines);
-        expect(findDefinitionBlocks(lines, scan.isProtected, scan)).toEqual([
+        expect(findDefinitionBlocks(lines, scan)).toEqual([
             { name: "1", start: 0, end: 0 },
             { name: "2", start: 1, end: 2 },
         ]);

@@ -1088,36 +1088,22 @@ export function definitionStartLines(
     return starts;
 }
 
-/** Every definition with its continuation lines (indented lines, plus blank runs that lead to more indented lines). Pass the full `scan` when available: a continuation can OPEN a multi-line comment/math region ("    $$") or a definition-content fence ("    ```", 2026-08-25), and only the scan's startsIn* facts let the walk absorb that construct's protected interior instead of splitting the block in half (Sol bug #3, 2026-08-10). Labels are read through the MASKED twin, like every other definition reader: a comment CLOSER line ("[^2]: two -->") is unprotected for the sake of its live suffix, but the label inside the comment is not a definition (review A1, 2026-09-08 - move-to-bottom used to drag the "-->" away and unclose the comment). Pass `maskedLines` when the twin is already at hand; otherwise only the label-shaped lines are masked, one at a time. `starts` is definitionStartLines' answer when the caller already holds it (a label under a prose line is lazy text, not a block start). */
+/** Every definition with its continuation lines (indented lines, plus blank runs that lead to more indented lines). Pass the full `scan` when available: a continuation can OPEN a multi-line comment/math region ("    $$") or a definition-content fence ("    ```", 2026-08-25), and only the scan's startsIn* facts let the walk absorb that construct's protected interior instead of splitting the block in half (Sol bug #3, 2026-08-10). Labels are read through the MASKED twin, like every other definition reader: a comment CLOSER line ("[^2]: two -->") is unprotected for the sake of its live suffix, but the label inside the comment is not a definition (review A1, 2026-09-08 - move-to-bottom used to drag the "-->" away and unclose the comment). `scan` is the document's scan (taken here when omitted; every caller used to pass scan.isProtected beside it, review C2). Pass `maskedLines` when the twin is already at hand; otherwise only the label-shaped lines are masked, one at a time. `starts` is definitionStartLines' answer when the caller already holds it (a label under a prose line is lazy text, not a block start). */
 export function findDefinitionBlocks(
     lines: string[],
-    isProtected: boolean[],
-    scan?: Pick<
+    scan: Pick<
         DocumentScan,
-        "startsInComment" | "startsInMath" | "startsInFence"
-    >,
+        "isProtected" | "startsInComment" | "startsInMath" | "startsInFence"
+    > = scanDocument(lines),
     maskedLines?: string[],
     starts?: boolean[],
 ): DefinitionBlock[] {
+    const isProtected = scan.isProtected;
     const maskedAt = (j: number): string => {
         if (maskedLines) return maskedLines[j];
-        return maskLineRegions(lines[j], {
-            comment: scan?.startsInComment[j] ?? false,
-            math: scan?.startsInMath[j] ?? false,
-        }).masked;
+        return maskLineWithScan(lines, scan, j);
     };
-    const startsAt =
-        starts ??
-        definitionStartLines(
-            lines,
-            {
-                isProtected,
-                startsInComment: scan?.startsInComment ?? [],
-                startsInMath: scan?.startsInMath ?? [],
-                startsInFence: scan?.startsInFence ?? [],
-            },
-            maskedAt,
-        );
+    const startsAt = starts ?? definitionStartLines(lines, scan, maskedAt);
     // a protected line the walk may absorb into an open block: the
     // interior/closer of a comment, math, or fence region whose opener
     // was a continuation already absorbed into this block (a region open
@@ -1131,9 +1117,9 @@ export function findDefinitionBlocks(
     // construct the definition owns.
     const absorbable = (j: number) =>
         isProtected[j] &&
-        (!!scan?.startsInComment[j] ||
-            !!scan?.startsInMath[j] ||
-            !!scan?.startsInFence[j] ||
+        (scan.startsInComment[j] ||
+            scan.startsInMath[j] ||
+            scan.startsInFence[j] ||
             /^ {4}/.test(lines[j]));
     const blocks: DefinitionBlock[] = [];
     for (let i = 0; i < lines.length; i++) {

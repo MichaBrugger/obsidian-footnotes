@@ -63,7 +63,7 @@ describe("boundaries of the definition-content fence branch (2026-08-25 mutation
         ];
         const scan = scanDocument(lines);
         expect(
-            findDefinitionBlocks(lines, scan.isProtected, scan),
+            findDefinitionBlocks(lines, scan),
         ).toEqual([{ name: "1", start: 0, end: 4 }]);
     });
 
@@ -73,7 +73,7 @@ describe("boundaries of the definition-content fence branch (2026-08-25 mutation
         const lines = ["[^1]: a", "", " ```    x", " code", " ```"];
         const scan = scanDocument(lines);
         expect(
-            findDefinitionBlocks(lines, scan.isProtected, scan),
+            findDefinitionBlocks(lines, scan),
         ).toEqual([{ name: "1", start: 0, end: 0 }]);
     });
 });

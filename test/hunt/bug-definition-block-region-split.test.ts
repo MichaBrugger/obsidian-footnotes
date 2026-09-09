@@ -22,7 +22,7 @@ describe("definition blocks span regions their continuations open", () => {
         const lines = MATH_DOC.split("\n");
         const scan = scanDocument(lines);
         expect(
-            findDefinitionBlocks(lines, scan.isProtected, scan),
+            findDefinitionBlocks(lines, scan),
         ).toEqual([{ name: "1", start: 2, end: 5 }]);
     });
 
@@ -37,7 +37,7 @@ describe("definition blocks span regions their continuations open", () => {
         const lines = doc.split("\n");
         const scan = scanDocument(lines);
         expect(
-            findDefinitionBlocks(lines, scan.isProtected, scan),
+            findDefinitionBlocks(lines, scan),
         ).toEqual([{ name: "1", start: 2, end: 5 }]);
     });
 
@@ -46,7 +46,7 @@ describe("definition blocks span regions their continuations open", () => {
         const lines = doc.split("\n");
         const scan = scanDocument(lines);
         expect(
-            findDefinitionBlocks(lines, scan.isProtected, scan),
+            findDefinitionBlocks(lines, scan),
         ).toEqual([{ name: "1", start: 2, end: 7 }]);
         // and the scanner keeps "    tail" a live continuation, not code
         expect(scan.isProtected[7]).toBe(false);

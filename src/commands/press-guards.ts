@@ -129,11 +129,7 @@ export function warnDefinitionCaretIfInside(
     ctx: DocContext,
 ): boolean {
     if (cell) return false;
-    const inside = findDefinitionBlocks(
-        ctx.lines,
-        ctx.scan.isProtected,
-        ctx.scan,
-    ).some(
+    const inside = ctx.blocks().some(
         (block) =>
             cursorPosition.line >= block.start && cursorPosition.line <= block.end,
     );

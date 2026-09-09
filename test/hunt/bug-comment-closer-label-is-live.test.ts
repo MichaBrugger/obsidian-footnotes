@@ -29,7 +29,7 @@ describe("a definition label on a comment closer line is not a definition block"
     it("findDefinitionBlocks sees no block on the closer line", () => {
         const lines = DOC.split("\n");
         const scan = scanDocument(lines);
-        expect(findDefinitionBlocks(lines, scan.isProtected, scan)).toEqual([]);
+        expect(findDefinitionBlocks(lines, scan)).toEqual([]);
     });
 
     it("the lint leaves the commented-out definitions where they are", () => {

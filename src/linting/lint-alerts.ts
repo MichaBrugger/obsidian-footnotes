@@ -208,7 +208,7 @@ export function invalidFootnoteNames(
     for (let i = 0; i < lines.length; i++) {
         for (const { name } of referenceOccurrences(lines[i], masked[i])) consider(name);
     }
-    for (const block of findDefinitionBlocks(lines, scan.isProtected, scan)) consider(block.name);
+    for (const block of findDefinitionBlocks(lines, scan)) consider(block.name);
     return names;
 }
 
@@ -242,7 +242,7 @@ export function nestedFootnoteDefinitionNames(
     // a name defined twice with both copies nested used to report twice,
     // inflating the notice's count (hunt 2026-08-25)
     const seen = new Set<string>();
-    for (const block of findDefinitionBlocks(lines, scan.isProtected, scan)) {
+    for (const block of findDefinitionBlocks(lines, scan)) {
         let nested = false;
         for (let i = block.start; i <= block.end && !nested; i++) {
             const startAt =

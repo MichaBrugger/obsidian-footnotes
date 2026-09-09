@@ -55,13 +55,7 @@ function documentView(lines: string[]): DocumentView {
         },
         get blocks() {
             if (blocks === null) {
-                blocks = findDefinitionBlocks(
-                    lines,
-                    this.scan.isProtected,
-                    this.scan,
-                    this.maskedLines,
-                    this.definitionStarts,
-                );
+                blocks = findDefinitionBlocks(lines, this.scan, this.maskedLines, this.definitionStarts);
             }
             return blocks;
         },

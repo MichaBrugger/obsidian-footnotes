@@ -248,7 +248,7 @@ function plantedPlaceholder(doc: PressDoc, placeholder: string): boolean {
 function definitionNamesFolded(lines: string[]): Set<string> {
     const scan = scanDocument(lines);
     return new Set(
-        findDefinitionBlocks(lines, scan.isProtected, scan).map((block) =>
+        findDefinitionBlocks(lines, scan).map((block) =>
             block.name.toLowerCase(),
         ),
     );

@@ -237,11 +237,7 @@ describe("rename property", () => {
                                 names.add(occurrence.name.toLowerCase());
                             }
                         }
-                        for (const block of findDefinitionBlocks(
-                            lines,
-                            scan.isProtected,
-                            scan,
-                        )) {
+                        for (const block of findDefinitionBlocks(lines, scan)) {
                             names.add(block.name.toLowerCase());
                         }
                         expect(
@@ -321,11 +317,7 @@ describe("rename property", () => {
                                 ).not.toBe(oldFolded);
                             }
                         }
-                        for (const block of findDefinitionBlocks(
-                            after,
-                            scan.isProtected,
-                            scan,
-                        )) {
+                        for (const block of findDefinitionBlocks(after, scan)) {
                             expect(block.name.toLowerCase()).not.toBe(oldFolded);
                         }
                         // and renaming BACK is possible: the old name is free

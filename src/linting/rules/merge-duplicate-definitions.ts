@@ -42,7 +42,7 @@ export function duplicateFootnoteDefinitionNames(
     if (!markdown.includes("[^")) return [];
     const lines = precomputed?.lines ?? normalizeEol(markdown).text.split("\n");
     const scan = precomputed?.scan ?? scanDocument(lines);
-    const blocks = findDefinitionBlocks(lines, scan.isProtected, scan);
+    const blocks = findDefinitionBlocks(lines, scan);
     const counts = new Map<string, number>();
     for (const block of blocks) {
         const folded = block.name.toLowerCase();

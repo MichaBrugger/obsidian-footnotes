@@ -116,7 +116,7 @@ export function planFootnoteRename(
 
     const oldFolded = oldName.toLowerCase();
     const newFolded = newName.toLowerCase();
-    const blocks = findDefinitionBlocks(ctx.lines, ctx.scan.isProtected, ctx.scan);
+    const blocks = ctx.blocks();
 
     // collision: the new name already names ANOTHER footnote (any casing).
     // A case-only rename of the SAME footnote is fine - that's cosmetics.
@@ -233,11 +233,7 @@ function renameSurvives(
             }
         }
     }
-    const blocksAfter = findDefinitionBlocks(
-        simulated,
-        simulatedScan.isProtected,
-        simulatedScan,
-    );
+    const blocksAfter = findDefinitionBlocks(simulated, simulatedScan);
     if (blocksAfter.length !== blocksBefore.length) return false;
     for (let i = 0; i < blocksBefore.length; i++) {
         const wanted =

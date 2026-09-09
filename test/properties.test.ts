@@ -96,7 +96,7 @@ const definitionKeepingOptionsArb: fc.Arbitrary<LintOptions> = optionsArb.map(
 
 function definitionCount(text: string): number {
     const lines = normalizeEol(text).text.split("\n");
-    return findDefinitionBlocks(lines, protectedLines(lines)).length;
+    return findDefinitionBlocks(lines).length;
 }
 
 function referenceCount(text: string): number {
