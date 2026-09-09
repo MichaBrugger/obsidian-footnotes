@@ -9,12 +9,9 @@ import { fakePlugin as sharedFakePlugin } from "./helpers/fake-plugin";
 import FootnotePlugin from "../src/main";
 import { simulateChanges } from "../src/editor/insertion-liveness";
 import {
-    absorbLeadingSpace,
-    indentDefinitionBody,
     InlineSelectionNotice,
     SelectionCommandNotice,
     SelectionSpanNotice,
-    trimSelectionEdges,
 } from "../src/commands/selection-footnote";
 import { footnoteNameProblem } from "../src/parsing/footnote-grammar";
 import {
@@ -574,17 +571,75 @@ describe("creation-command invariants over random documents", () => {
             },
         );
 
-    /** The trimmed core of the span, exactly as the conversion shrinks it (the shared production trim over a lines-array shim). */
+    // ---- an INDEPENDENT reading of the conversion rules ----
+    // Written from the README and sheet 06, not from the production
+    // functions, so the oracle cannot agree with a bug in trimSelectionEdges,
+    // absorbLeadingSpace, or indentDefinitionBody by construction (review
+    // D6, 2026-09-09: the property used to call all three).
+
+    /** Offset of a position within the LF-joined document. */
+    function offsetAt(lines: string[], pos: EditorPosition): number {
+        let offset = 0;
+        for (let i = 0; i < pos.line; i++) offset += lines[i].length + 1;
+        return offset + pos.ch;
+    }
+
+    /** The position of an offset within the LF-joined document. */
+    function positionAt(lines: string[], offset: number): EditorPosition {
+        let line = 0;
+        let rest = offset;
+        while (line < lines.length - 1 && rest > lines[line].length) {
+            rest -= lines[line].length + 1;
+            line++;
+        }
+        return { line, ch: rest };
+    }
+
+    /**
+     * Rule: the selection converts its non-whitespace core; whitespace at
+     * either edge stays behind, line breaks included, so a drag that ends
+     * at the start of the next line converts the dragged line only.
+     * Nothing but whitespace means no selection to convert.
+     */
     function trimmedSpan(
         lines: string[],
         from: EditorPosition,
         to: EditorPosition,
     ): { from: EditorPosition; to: EditorPosition } | null {
-        return trimSelectionEdges(
-            { getLine: (n: number) => lines[n] } as unknown as Editor,
-            from,
-            to,
-        );
+        const text = lines.join("\n");
+        let start = offsetAt(lines, from);
+        let end = offsetAt(lines, to);
+        while (start < end && /\s/.test(text[start])) start++;
+        while (end > start && /\s/.test(text[end - 1])) end--;
+        if (start >= end) return null;
+        return { from: positionAt(lines, start), to: positionAt(lines, end) };
+    }
+
+    /**
+     * Rule: a reference attaches to the text before it, so the spaces
+     * between that text and the selection go with the replacement - unless
+     * what precedes them is a list, task, or heading marker, a quote
+     * marker, a table pipe, or nothing at all.
+     */
+    function attachStart(line: string, ch: number): number {
+        let start = ch;
+        while (start > 0 && (line[start - 1] === " " || line[start - 1] === "\t")) start--;
+        if (start === ch) return ch;
+        const before = line.slice(0, start);
+        if (before === "") return ch;
+        if (before.endsWith("|") || before.endsWith(">")) return ch;
+        const marker = before.trim().replace(/^(?:>\s*)+/, "");
+        if (/^(?:[-*+]|\d+[.)])(?: \[[ xX]\])?$/.test(marker)) return ch;
+        if (/^#{1,6}$/.test(marker)) return ch;
+        return start;
+    }
+
+    /** Rule: the body's first line rides the label; every later line is indented four spaces, blank lines becoming exactly four spaces. */
+    function bodyOf(text: string): string {
+        return text
+            .split("\n")
+            .map((line, i) => (i === 0 ? line : line.trim() === "" ? "    " : `    ${line}`))
+            .join("\n");
     }
 
     /** The LF-joined text of `[from, to)`. */
@@ -698,7 +753,7 @@ describe("creation-command invariants over random documents", () => {
                     // replaced too (absorbLeadingSpace, 2026-09-08)
                     const prefix = lines[trimmed.from.line].slice(
                         0,
-                        absorbLeadingSpace(lines[trimmed.from.line], trimmed.from.ch),
+                        attachStart(lines[trimmed.from.line], trimmed.from.ch),
                     );
                     const suffix = lines[trimmed.to.line].slice(trimmed.to.ch);
                     const selText = spanText(lines, trimmed.from, trimmed.to);
@@ -741,9 +796,7 @@ describe("creation-command invariants over random documents", () => {
                             reference !== null &&
                             doc.lines
                                 .join("\n")
-                                .includes(
-                                    `[^${reference[1]}]: ${indentDefinitionBody(selText)}`,
-                                );
+                                .includes(`[^${reference[1]}]: ${bodyOf(selText)}`);
                     }
                     expect(
                         found,
