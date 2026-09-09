@@ -481,6 +481,8 @@ export interface DocumentScan {
     startsInFence: boolean[];
     /** A line appended at EOF would itself be protected: an unclosed comment, math block, or DOCUMENT-LEVEL fence runs to EOF (a blockquoted fence dies at the append point - the appended line ends its quote). Replaces move-to-bottom's probe re-scan (perf F6). */
     endsProtected: boolean;
+    /** `endsProtected` as of line `i`: what a note cut right after line `i` would report. The definition append's walk up from EOF used to re-slice and re-scan the prefix once per line, quadratic on a long note with an unclosed opener near the top (review B2, 2026-09-09). Lines inside a closed frontmatter block read false. */
+    endsProtectedAt: boolean[];
 }
 
 /** Width of the line's leading whitespace, tabs expanding to 4-column tab stops (CommonMark). */
@@ -542,6 +544,12 @@ export function scanDocument(lines: string[]): DocumentScan {
     let inComment = false;
     let inMath = false;
     let regionDepth = 0;
+    // a quoted unclosed region can't reach an EOF append - the appended
+    // line ends its quote, same as a blockquoted fence
+    const endsProtectedNow = (): boolean =>
+        ((inComment || inMath) && regionDepth === 0) ||
+        (fence !== null && fence.depth === 0);
+    const endsProtectedAt = new Array<boolean>(lines.length).fill(false);
     // indented-code state (C21): `blockBoundary` marks a place indented
     // code may OPEN - doc start, blank lines, and (Sol bug #5: lazy
     // continuation is paragraph-only) right after an ATX heading, a
@@ -572,6 +580,9 @@ export function scanDocument(lines: string[]): DocumentScan {
         inCode: boolean;
     } | null = null;
     for (; i < src.length; i++) {
+        // the state at the top of an iteration is the state after the
+        // previous line - recorded here so every `continue` below is covered
+        if (i > 0) endsProtectedAt[i - 1] = endsProtectedNow();
         // the blockquote nesting where this line's container constructs
         // count - fences and comment/math regions live in the container
         // that opened them
@@ -873,16 +884,14 @@ export function scanDocument(lines: string[]): DocumentScan {
             if (inComment || inMath) regionDepth = depth;
         }
     }
+    if (src.length > 0) endsProtectedAt[src.length - 1] = endsProtectedNow();
     return {
         isProtected,
         startsInComment,
         startsInMath,
         startsInFence,
-        // a quoted unclosed region can't reach an EOF append - the
-        // appended line ends its quote, same as a blockquoted fence
-        endsProtected:
-            ((inComment || inMath) && regionDepth === 0) ||
-            (fence !== null && fence.depth === 0),
+        endsProtected: endsProtectedNow(),
+        endsProtectedAt,
     };
 }
 

@@ -141,7 +141,7 @@ export function buildDefinitionAppend(
         // `to` spans to EOF and would delete the region itself.
         while (
             fromLine >= 0 &&
-            (scanDocument(lines.slice(0, fromLine + 1)).endsProtected || endInsideAvoid(fromLine))
+            (ctx.scan.endsProtectedAt[fromLine] || endInsideAvoid(fromLine))
         ) {
             fromLine--;
         }
