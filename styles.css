@@ -12,12 +12,22 @@
     border-radius: var(--radius-m);
     box-shadow: var(--shadow-s);
     display: flex;
-    /* the label's baseline follows the first line of the body: a body
-       that starts with a heading is taller than the label, and top
-       alignment left the label sitting half a line above it (Jason's
-       report, sheet 06, 2026-09-09) */
-    align-items: baseline;
+    align-items: flex-start;
     gap: 0.4em;
+}
+
+/* A body that starts with a heading: the editor gives a heading line
+   padding above it, and a bigger line height leaves more room above the
+   letters, so the heading's letters sat a few pixels below the label's
+   (Jason's report, sheet 06, 2026-09-09). The padding goes, and the line
+   is drawn a tenth of its own size higher, which puts the top of the
+   heading level with the top of the label - the same picture the core
+   Footnotes view paints. Tuned live with Jason; a plain first line is
+   untouched. */
+.footnote-shortcut-popup .cm-content > .cm-line.HyperMD-header:first-child {
+    padding-top: 0;
+    position: relative;
+    top: -0.1em;
 }
 
 /* stay invisible until the footnote detail is loaded */
