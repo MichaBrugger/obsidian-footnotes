@@ -13,7 +13,9 @@
     box-shadow: var(--shadow-s);
     display: flex;
     align-items: flex-start;
-    gap: 0.4em;
+    /* the same gap the core Footnotes view puts between its id and the
+       footnote text, so a theme that tunes one tunes both */
+    gap: var(--footnote-gap, 0.4em);
 }
 
 /* A body that starts with a heading: the editor gives a heading line
@@ -30,6 +32,18 @@
     top: -0.1em;
 }
 
+/* The core Footnotes view has the same problem while a footnote is being
+   edited there: its rendered state gives a first heading no space above,
+   so the id and the heading start level, but clicking in swaps in this
+   same editor, whose heading padding drops the heading below the id
+   (16px in the default theme). Strip it there too, so the two states of
+   the sidebar match each other and the popup. No nudge here: the sidebar's
+   id is a digit, which stands lower than the popup's bracket, and box tops
+   are what its rendered state aligns. (Jason, 2026-09-09.) */
+.footnotes-view .footnote-content .cm-content > .cm-line.HyperMD-header:first-child {
+    padding-top: 0;
+}
+
 /* stay invisible until the footnote detail is loaded */
 .footnote-shortcut-popup.footnote-shortcut-popup-loading {
     visibility: hidden;
@@ -42,7 +56,9 @@
     flex: none;
     font-size: var(--font-text-size);
     line-height: var(--line-height-normal);
-    color: var(--text-muted);
+    /* the colour the core Footnotes view gives its ids, so a theme that
+       restyles those restyles this label the same way */
+    color: var(--footnote-id-color, var(--text-muted));
     user-select: none;
 }
 
