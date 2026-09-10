@@ -714,9 +714,19 @@ describe("creation-command invariants over random documents", () => {
                             command !== "inline" &&
                             strictlyInside(i)
                         ) {
+                            // a fence opener never shares the label line:
+                            // the conversion starts such a body on the line
+                            // after the label, so even the first selected
+                            // line arrives indented (2026-09-09)
+                            const opensFence = /^ {0,3}(?:`{3,}|~{3,})/.test(
+                                lines[trimmed.from.line].slice(trimmed.from.ch),
+                            );
+                            const firstLine = lines[trimmed.from.line].slice(trimmed.from.ch);
                             const carried =
                                 i === trimmed.from.line
-                                    ? lines[i].slice(trimmed.from.ch)
+                                    ? opensFence
+                                        ? `    ${firstLine}`
+                                        : firstLine
                                     : `    ${lines[i]}`;
                             expect(
                                 doc.lines.join("\n"),
@@ -792,11 +802,13 @@ describe("creation-command invariants over random documents", () => {
                             break;
                         }
                         const reference = /^\[\^([^\]]+)\]$/.exec(middle);
+                        // a fence-first body starts on the line after the
+                        // label, every line indented (2026-09-09)
+                        const fenceFirst = /^ {0,3}(?:`{3,}|~{3,})/.test(selText.split("\n")[0]);
+                        const seeded = fenceFirst ? bodyOf(`\n${selText}`) : bodyOf(selText);
                         found =
                             reference !== null &&
-                            doc.lines
-                                .join("\n")
-                                .includes(`[^${reference[1]}]: ${bodyOf(selText)}`);
+                            doc.lines.join("\n").includes(`[^${reference[1]}]: ${seeded}`);
                     }
                     expect(
                         found,

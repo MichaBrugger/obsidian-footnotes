@@ -539,10 +539,11 @@ function spanTouchesFootnote(
  *
  * An edge landing on a table row is refused, unless both edges sit inside
  * the same cell of the same row, because text within one cell converts
- * fine. A table held whole, with both edges out in the prose around it,
- * passes. A selection that is exactly the table and nothing else is
- * refused as well, since a table cannot begin on a definition's label
- * line.
+ * fine. A table held whole passes: with both edges out in the prose
+ * around it, or with the edges exactly on its first and last rows (Jason's
+ * ruling, sheet 07, 2026-09-09; it used to be refused on the belief that
+ * a table cannot begin on the label line, and Obsidian renders one that
+ * does).
  */
 function selectionCutsTable(
     ctx: DocContext,
@@ -553,10 +554,7 @@ function selectionCutsTable(
     if (!rows[from.line] && !rows[to.line]) return false;
     if (from.line !== to.line) {
         // A table held whole, edge to edge on its first and last rows,
-        // converts: the table then starts on the line after the label,
-        // indented (Jason's ruling, sheet 07, 2026-09-09; it used to be
-        // refused on the grounds that a table cannot begin on the label
-        // line).
+        // converts (Jason's ruling, sheet 07, 2026-09-09).
         const wholeTable =
             rows[from.line] &&
             rows[to.line] &&
@@ -744,15 +742,20 @@ function replacementReclassifiesDoc(
  * continuation indent instead of sitting ragged (Jason's ask, 2026-08-21).
  */
 function indentDefinitionBody(text: string): string {
-    // A first line that is itself a block construct - a code fence opener,
-    // a table row, a heading, a list item, a quote, a rule, a math block -
-    // cannot share the label line: "[^1]: ```" is the literal text "```"
-    // to Obsidian, and the fence's closer on the continuation line below
-    // then opens an unclosed fence that swallows the rest of the note
-    // (Jason's report, sheet 06, 2026-09-09: converting a selected code
-    // block turned every definition below it into code). Such a body
-    // starts on the line after the label, indented like the rest.
-    const body = startsWithBlockConstruct(text) ? `\n${text}` : text;
+    // A first line that opens a code fence cannot share the label line.
+    // Obsidian itself renders "[^1]: ```" with an indented closer as a code
+    // block, but the plugin's scanner does not read a fence opener that
+    // sits after a label, while it does read the indented closer as an
+    // opener - so to the scanner such a note has an unclosed fence from
+    // that line on, and every definition below it turns into code (Jason's
+    // report, sheet 06, 2026-09-09: the orphaned reference, the waiting
+    // notice, the caret on the wrong footnote). A fence therefore starts
+    // on the line after the label, indented like the rest, where Obsidian
+    // and the scanner read it the same way. Every other block construct -
+    // a heading, a table row, a list item, a quote, a rule, a math block -
+    // renders on the label line in Obsidian (checked 2026-09-09/10) and
+    // the scanner agrees, so it stays there.
+    const body = startsWithFence(text) ? `\n${text}` : text;
     return body
         .split("\n")
         .map((line, i) =>
@@ -761,18 +764,9 @@ function indentDefinitionBody(text: string): string {
         .join("\n");
 }
 
-/** Whether the first line of a selection is a construct that has to start at the beginning of its own line. */
-function startsWithBlockConstruct(text: string): boolean {
-    const first = text.split("\n")[0];
-    return (
-        /^ {0,3}(?:`{3,}|~{3,})/.test(first) ||
-        /^ {0,3}\|/.test(first) ||
-        /^ {0,3}#{1,6}(?:\s|$)/.test(first) ||
-        /^ {0,3}(?:[-+*]|\d{1,9}[.)])(?:\s|$)/.test(first) ||
-        /^ {0,3}>/.test(first) ||
-        /^ {0,3}([-*_])(?: *\1){2,} *$/.test(first) ||
-        /^ {0,3}\$\$/.test(first)
-    );
+/** Whether the first line of a selection opens a code fence. */
+function startsWithFence(text: string): boolean {
+    return /^ {0,3}(?:`{3,}|~{3,})/.test(text.split("\n")[0]);
 }
 
 /**

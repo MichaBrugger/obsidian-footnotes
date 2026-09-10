@@ -23,13 +23,17 @@ import { findDefinitionBlocks, scanDocument } from "../../src/parsing/markdown-s
 // caret landed on the wrong footnote.
 //
 // Sheet 07: a table selected exactly (or with the blank lines around it)
-// was refused, on the grounds that a table cannot begin on the label line.
+// was refused, on the belief that a table cannot begin on the label line.
 // Jason's ruling: it should convert, since a bare table inside a footnote
-// definition renders fine.
+// definition renders fine - and Obsidian renders "[^1]: | a | b |" with
+// the rows indented below it as a table.
 //
-// One fix for both: a body whose first line is a block construct - a fence
-// opener, a table row, a heading, a list item, a quote, a rule, a math
-// block - starts on the line AFTER the label, indented with the rest.
+// Only a fence needs the special shape: it starts on the line AFTER the
+// label, indented with the rest, because the scanner does not read a
+// fence opener that sits after a label. Every other block construct -
+// heading, table row, list item, quote, rule, math - renders on the label
+// line in Obsidian (checked 2026-09-09/10) and stays there (Jason,
+// 2026-09-10: the empty label line read as a stray blank line).
 
 function fakeEditor(
     lines: string[],
@@ -85,11 +89,12 @@ describe("a selection whose first line is a block construct", () => {
         expect(linted).toContain("    select me in here");
     });
 
-    it("a heading first, a list first, a quote first", async () => {
+    it("a heading first, a list first, a quote first, a rule first: all on the label line", async () => {
         for (const [middle, expectedBody] of [
-            [["## Title", "text under it"], ["[^1]: ", "    ## Title", "    text under it"]],
-            [["- item one", "- item two"], ["[^1]: ", "    - item one", "    - item two"]],
-            [["> quoted", "> more"], ["[^1]: ", "    > quoted", "    > more"]],
+            [["## Title", "text under it"], ["[^1]: ## Title", "    text under it"]],
+            [["- item one", "- item two"], ["[^1]: - item one", "    - item two"]],
+            [["> quoted", "> more"], ["[^1]: > quoted", "    > more"]],
+            [["---", "after the rule"], ["[^1]: ---", "    after the rule"]],
         ] as const) {
             const lines = ["above", "", ...middle, "", "tail"];
             const last = 1 + middle.length;
@@ -117,8 +122,7 @@ describe("a table selected whole converts", () => {
         "",
         "after the table",
         "",
-        "[^1]: ",
-        "    | a | b |",
+        "[^1]: | a | b |",
         "    | --- | --- |",
         "    | one | two |",
     ];

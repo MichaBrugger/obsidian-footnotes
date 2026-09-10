@@ -1304,13 +1304,10 @@ describe("the block zoo converts (2026-08-19)", () => {
             "zoo",
         );
         expect(problem).toBeNull();
-        // a body whose first line is a block construct (here a quote)
-        // starts on the line after the label (2026-09-09)
         expect(doc.lines).toEqual([
             "pick [^zoo] end",
             "",
-            "[^zoo]: ",
-            "    > quoted",
+            "[^zoo]: > quoted",
             "    - listed",
         ]);
     });
@@ -1550,7 +1547,7 @@ describe("partial-table selections refuse (Jason's ruling 2026-09-04)", () => {
     it("one cell WITH its pipes", () =>
         refused({ line: 4, ch: 0 }, { line: 4, ch: 7 }));
 
-    it("the table exactly, without the prose around it, CONVERTS (Jason's ruling 2026-09-09: the table starts under an empty label line)", async () => {
+    it("the table exactly, without the prose around it, CONVERTS (Jason's ruling 2026-09-09; Obsidian renders a table that starts on the label line)", async () => {
         const doc = fakeEditor(table, { line: 2, ch: 0 }, { anchor: { line: 2, ch: 0 }, head: { line: 4, ch: 13 } });
         await insertAutonumFootnote(fakePlugin(doc));
         expect(noticed(TableSelectionNotice)).toBe(false);
@@ -1561,8 +1558,7 @@ describe("partial-table selections refuse (Jason's ruling 2026-09-04)", () => {
             "",
             "after the table",
             "",
-            "[^1]: ",
-            "    | a | b |",
+            "[^1]: | a | b |",
             "    | --- | --- |",
             "    | one | two |",
         ]);
