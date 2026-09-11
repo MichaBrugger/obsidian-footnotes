@@ -4,7 +4,7 @@ import type FootnotePlugin from "../main";
 
 import { docLines } from "../editor/doc-context";
 import { maskInlineRegions, maskedLineAt } from "../parsing/markdown-scan";
-import { TableCellEditor } from "../editor/table-cursor";
+import { cellCaret, TableCellEditor } from "../editor/table-cursor";
 
 import { showNotice } from "../editor/notice";
 import { readingViewActive } from "../editor/obsidian-internals";
@@ -245,7 +245,7 @@ function maskedInlineFootnoteSpan(
 ): { text: string; open: number; close: number } | null {
     if (cell) {
         const raw = cell.state.doc.toString();
-        const ch = cell.state.selection.main.head;
+        const ch = cellCaret(cell);
         if (inlineFootnoteSpanAt(raw, ch) === null) return null;
         // a cell's text is a single line, so masking that one line is enough
         const masked = maskInlineRegions(raw);

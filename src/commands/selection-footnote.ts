@@ -42,7 +42,7 @@ import {
     NoFootnoteCreated,
     showNotice,
 } from "../editor/notice";
-import { TableCellEditor, tableRowCellSpans, tableRowLines } from "../editor/table-cursor";
+import { cellSelection, TableCellEditor, tableRowCellSpans, tableRowLines } from "../editor/table-cursor";
 
 // Conversion: turning selected text into a footnote (issue #35).
 //
@@ -188,7 +188,9 @@ export function selectionPressHandled(
         // While you are editing a table cell, the cell has its own little
         // editor, and that is where the real selection lives. The main
         // editor's selection is out of date (see table-cursor.ts).
-        const { anchor, head } = cell.state.selection.main;
+        const { from: cellFrom, to: cellTo } = cellSelection(cell);
+        const anchor = cellFrom;
+        const head = cellTo;
         if (anchor === head) return false;
         // The paste key never converts a selection, because its body is
         // the clipboard, so any selection at all is sent to the other

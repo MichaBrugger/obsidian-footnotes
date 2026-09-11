@@ -16,7 +16,7 @@ import {
     maskInlineRegions,
     maskedLineAt,
 } from "../parsing/markdown-scan";
-import { TableCellEditor } from "../editor/table-cursor";
+import { cellCaret, TableCellEditor } from "../editor/table-cursor";
 
 import { NestedFootnoteNotice, showNotice } from "../editor/notice";
 // The press guards. A footnote key has been pressed: does anything OTHER
@@ -90,7 +90,7 @@ export function warnProtectedCaretIfInside(
         // a cell's text is a single line, so masking that one line is enough
         inside = caretInsideMaskedSpan(
             maskInlineRegions(cell.state.doc.toString()),
-            cell.state.selection.main.head,
+            cellCaret(cell),
             false,
             false,
         );
@@ -217,7 +217,7 @@ function caretInsidePlaceholder(
     cursorPosition?: EditorPosition,
 ): boolean {
     if (cell) {
-        const head = cell.state.selection.main.head;
+        const head = cellCaret(cell);
         const cellText = cell.state.doc.toString();
         if (emptyReferenceStart(cellText, head, placeholder) === null) return false;
         // a cell's text is a single line, so masking that one line is enough

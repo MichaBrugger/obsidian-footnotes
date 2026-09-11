@@ -468,7 +468,7 @@ function lintActiveNoteIfSafe(plugin: FootnotePlugin) {
     if (after === before) {
         showNotice("No linting needed.");
     } else {
-        replaceMinimal(doc, before, after);
+        replaceMinimal(doc, before, after, target.mdView);
         showNotice("Footnotes linted.");
     }
     noticeLintAlerts(plugin, after);
@@ -685,7 +685,7 @@ export function lintAfterFootnoteCreation(
         noticeLintAlerts(plugin, after);
         return null;
     }
-    replaceMinimal(doc, before, after);
+    replaceMinimal(doc, before, after, target.mdView);
     showNotice("Footnotes linted.");
     noticeLintAlerts(plugin, after);
     const relocated =

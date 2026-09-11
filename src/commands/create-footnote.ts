@@ -37,7 +37,7 @@ import {
 import { lintAfterFootnoteCreation } from "../linting/linter";
 import { maskInlineRegions, maskedLineAt } from "../parsing/markdown-scan";
 import { warnDefinitionCaretIfInside, warnProtectedCaretIfInside } from "./press-guards";
-import { TableCellEditor } from "../editor/table-cursor";
+import { cellCaret, TableCellEditor } from "../editor/table-cursor";
 
 import { showNotice } from "../editor/notice";
 // The creation steps of the cascade. The cascade is the ordered list of
@@ -68,7 +68,7 @@ export function insertInTableCell(
     caretOffsetInText: number,
 ): boolean {
     const cellText = cell.state.doc.toString();
-    const head = cell.state.selection.main.head;
+    const head = cellCaret(cell);
     // safeInsertionCh nudges the insertion point, the same way
     // adjustFootnotePosition does. Text inserted right after an escaping
     // backslash, or right after a bare "^", gets swallowed by it
@@ -110,6 +110,9 @@ function dispatchCellEditIfLive(
     // actually found was a pair of "$" signs closing into inline math
     // (command-press property suite, 2026-08-12). A cell's text is one
     // line, so masking that line on its own is enough to decide.
+    // a range from a stale selection is clamped the same way the caret is
+    from = Math.max(0, Math.min(from, cellText.length));
+    to = Math.max(from, Math.min(to, cellText.length));
     const simulatedCell = cellText.slice(0, from) + text + cellText.slice(to);
     if (!insertionLandsIntact(maskInlineRegions(simulatedCell), from, text)) {
         showNotice(ProtectedCreationNotice, 8000);
@@ -638,12 +641,12 @@ export function createFootnoteReference(
         // Confirm against the masked twin, as caretInsidePlaceholder does.
         // Something shaped like "[^]" inside inline code is just plain
         // text, not a placeholder (the rule issue #41 settled).
-        const inEmpty = emptyReferenceStart(cellText, cell.state.selection.main.head);
+        const inEmpty = emptyReferenceStart(cellText, cellCaret(cell));
         if (
             inEmpty !== null &&
             emptyReferenceStart(
                 maskInlineRegions(cellText),
-                cell.state.selection.main.head,
+                cellCaret(cell),
             ) !== null
         ) {
             cell.dispatch({ selection: { anchor: inEmpty + "[^]".length } });

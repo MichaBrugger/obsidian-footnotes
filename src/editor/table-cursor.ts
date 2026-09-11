@@ -98,6 +98,32 @@ export function runOutsideTableCell(
 }
 
 /**
+ * The caret inside a table cell's editor, clamped to the cell's text.
+ *
+ * Why the clamp: Obsidian rebuilds a cell's editor after an undo or a row
+ * re-sync, and for a moment the selection it reports can belong to the
+ * LONGER text the cell had before. A caret past the end of the text made
+ * every slice built from it land nowhere, so the born-dead check refused
+ * an inline footnote with the protected-text toast, now and then, in the
+ * last cell of a table (Jason's report, sheet 08, 2026-09-11; never caught
+ * in the act, so this closes the one door the symptoms point at). Every
+ * cell path reads its caret through here.
+ */
+export function cellCaret(cell: TableCellEditor): number {
+    const length = cell.state.doc.toString().length;
+    return Math.max(0, Math.min(cell.state.selection.main.head, length));
+}
+
+/** Both ends of a cell editor's selection, clamped the same way; `from` never exceeds `to`. */
+export function cellSelection(cell: TableCellEditor): { from: number; to: number } {
+    const length = cell.state.doc.toString().length;
+    const clamp = (n: number) => Math.max(0, Math.min(n, length));
+    const anchor = clamp(cell.state.selection.main.anchor);
+    const head = clamp(cell.state.selection.main.head);
+    return { from: Math.min(anchor, head), to: Math.max(anchor, head) };
+}
+
+/**
  * The editor object of the table cell being edited, or null when focus is
  * not inside a cell's own editor.
  *
