@@ -16,6 +16,7 @@ start messy[^20] references[^10] here
 - [ ] Ctrl+S lints (then undo restores the mess in one step)
 - [ ] Saving again right away shows "No linting needed." (manual saves report their outcome, decided 2026-08-08; only lint on footnote creation is silent when clean)
 - [ ] With vim keybindings on, `:w` lints identically
+- [ ] Fold a heading and a bulleted list in this note (any of them, including one the lint will edit inside), put the caret on an unchanged line, and Ctrl+S: the note is linted, every fold is still folded, and the caret is still where it was (2026-09-11: Obsidian drops a fold on any edit inside it, so the plugin puts the folds back after every lint, on save and on creation as well as the command)
 - [ ] Waiting with the note open does nothing (background autosave never lints)
 - [ ] With `Lint on save` OFF again, Ctrl+S leaves the mess alone
 
