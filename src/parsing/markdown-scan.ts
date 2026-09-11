@@ -421,9 +421,20 @@ export function maskLineRegions(
     const chars = line.split("");
     const shapes = new ReferenceShapeIndex(line);
     const insideReferenceShape = (at: number) => shapes.inside(at);
+    // A dollar whose search for a closer reached the end of the line
+    // without finding one. Every later dollar's search would end the same
+    // way (a closer's eligibility does not depend on which dollar opened),
+    // so their searches are skipped - without this, a line of prices where
+    // every dollar is followed by a digit ("$5 or $6 and ", 600 times)
+    // rescanned the rest of the line from each dollar and masked in
+    // quadratic time (the perf pin in test/perf caught it, 2026-09-11).
+    // A blot can change what counts as inside a reference shape, so the
+    // memo is dropped whenever one happens.
+    let deadDollarFrom = -1;
     const blot = (from: number, to: number) => {
         for (let k = from; k < to; k++) chars[k] = "\0";
         shapes.blotted(to);
+        deadDollarFrom = -1;
     };
     let i = 0;
 
@@ -547,17 +558,26 @@ export function maskLineRegions(
             // empty and neither starts nor ends with a space. Anything else
             // and the dollar is ordinary prose. A dollar inside "[^…]"
             // can't close it either, same as the opener check above.
+            if (deadDollarFrom !== -1 && i > deadDollarFrom) {
+                i++;
+                continue;
+            }
             let close = -1;
             for (let j = i + 1; j < line.length; j++) {
                 if (line[j] === "\\") {
                     j++;
                     continue;
                 }
-                if (line[j] === "$" && !insideReferenceShape(j)) {
+                // a "$" directly followed by a digit cannot close math
+                // ("pay $5 or [^1]$6" is prose with a live reference;
+                // ground truth in Reading view 2026-09-11, Jason's sheet 18
+                // report: the press guard was refusing that spot)
+                if (line[j] === "$" && !insideReferenceShape(j) && !/\d/.test(line[j + 1] ?? "")) {
                     close = j;
                     break;
                 }
             }
+            if (close === -1) deadDollarFrom = i;
             if (
                 close === -1 ||
                 close === i + 1 ||

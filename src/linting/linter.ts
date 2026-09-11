@@ -8,6 +8,7 @@ import {
 } from "../commands/footnote-popup";
 import { jumpToFootnoteDefinition } from "../commands/navigation";
 import { docContext } from "../editor/doc-context";
+import { lineDiffChanges } from "../editor/document-diff";
 import { rewriteDocument } from "./rewrite-document";
 import { definitionLabel, definitionLabelWithName } from "../parsing/footnote-grammar";
 import { footnotePrefix, footnotePrefixProblem } from "../parsing/footnote-prefix";
@@ -299,32 +300,23 @@ export function lintFootnotes(
     });
 }
 
-// Rewrite only the part of the note that actually changed, not the whole
-// thing. The text before and after the change is identical, so the editor
-// can keep the caret and the scroll position where they were instead of
-// jumping back to the top.
+// Rewrite only the lines that actually changed, as separate edits in one
+// transaction. Untouched lines are never rewritten, so a fold on them
+// stays folded and a caret in them stays put. (It used to be one edit from
+// the first changed character to the last, which unfolded everything in
+// between and pushed a caret inside the span to its start: Jason's report,
+// sheet 20, 2026-09-11.) The edits are worked out by lineDiffChanges; all
+// of them are positions in the text BEFORE the rewrite, which is what a
+// transaction expects.
 function replaceMinimal(doc: Editor, before: string, after: string) {
-    let start = 0;
-    const maxStart = Math.min(before.length, after.length);
-    while (start < maxStart && before[start] === after[start]) start++;
-    let beforeEnd = before.length;
-    let afterEnd = after.length;
-    while (
-        beforeEnd > start &&
-        afterEnd > start &&
-        before[beforeEnd - 1] === after[afterEnd - 1]
-    ) {
-        beforeEnd--;
-        afterEnd--;
-    }
+    const changes = lineDiffChanges(before, after);
+    if (changes.length === 0) return;
     doc.transaction({
-        changes: [
-            {
-                from: doc.offsetToPos(start),
-                to: doc.offsetToPos(beforeEnd),
-                text: after.slice(start, afterEnd),
-            },
-        ],
+        changes: changes.map((change) => ({
+            from: doc.offsetToPos(change.from),
+            to: doc.offsetToPos(change.to),
+            text: change.text,
+        })),
     });
 }
 

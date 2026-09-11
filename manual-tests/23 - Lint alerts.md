@@ -1,25 +1,11 @@
 ---
 footnote-prefix: 3.
 ---
-
 # 23: what the linter alerts about instead of fixing
 
-Settings: all lint rules ON except `Reindex` OFF (the alerts speak
-about the post-lint text, and reindex would rename the numbered
-fixtures before they are named); the Orphans toggles and `Merge duplicate
-definitions` start OFF (alerts, not deletions; orphans are never
-silent, 2026-08-10). For the `[^3.]` placeholder check: `Per-note
-footnote prefix` ON (the frontmatter above carries `3.`) with the
-`Apply the note's footnote prefix` lint rule OFF, so nothing gets renamed. Undo
-between checks. Every fixture is already in this note, so ONE run of
-**Lint footnotes** raises every alert below at once.
+Settings: all lint rules ON except `Reindex` OFF (the alerts speak about the post-lint text, and reindex would rename the numbered fixtures before they are named); the Orphans toggles and `Merge duplicate definitions` start OFF (alerts, not deletions; orphans are never silent, 2026-08-10). For the `[^3.]` placeholder check: `Per-note footnote prefix` ON (the frontmatter above carries `3.`) with the `Apply the note's footnote prefix` lint rule OFF, so nothing gets renamed. Undo between checks. Every fixture is already in this note, so ONE run of **Lint footnotes** raises every alert below at once.
 
-Fixture: text[^used] here, a stray[^99] with no definition and five
-more strays[^o1] in[^o2] a[^o3] row[^o4] here[^o5], an empty [^]
-reference, an untouched prefix placeholder [^3.] in this sentence,
-hand-typed invalid names [^bad name] and [^c#d], a nesting
-footnote[^nest], a footnote with a fenced code block in its
-body[^fence], and dup here[^dup].
+Fixture: text[^used] here, a stray[^99] with no definition and five more strays[^o1] in[^o2] a[^o3] row[^o4] here[^o5], an empty [^] reference, an untouched prefix placeholder [^3.] in this sentence, hand-typed invalid names [^bad name] and [^c#d], a hashed name that does have a definition[^#jump], a nesting footnote[^nest], a footnote with a fenced code block in its body[^fence], and dup here[^dup].
 
 x [^aa`a] [^bb#b] [^cc`c] y
 
@@ -42,7 +28,8 @@ prose line
 
 ## Invalid names
 
-- [ ] The invalid-name alert lists FIVE names (`[^bad name]`, `[^c#d]`, `[^aa`a]`, `[^bb#b]`, `[^cc`c]`) and ends with "Footnote names can't contain spaces, backticks, brackets, or "#"." (2026-09-08: backticks inside a reference are footnote-id text to Obsidian, not code openers, so the `x ... y` line is THREE names, not one merged span; a backticked name stays invalid)
+- [ ] The invalid-name alert lists SIX names (`[^bad name]`, `[^c#d]`, `[^#jump]`, `[^aa`a]`, `[^bb#b]`, `[^cc`c]`) and ends with "Footnote names can't contain spaces, backticks, brackets, or "#"." (2026-09-08: backticks inside a reference are footnote-id text to Obsidian, not code openers, so the `x ... y` line is THREE names, not one merged span; a backticked name stays invalid)
+- [ ] `[^#jump]` is counted even though it has a definition and renders in Reading view: Obsidian's own footnote hover and sidebar cannot find it (2026-09-08)
 
 ## Nesting
 
@@ -54,16 +41,20 @@ prose line
 
 ## Duplicate definitions (rule 2026-08-12)
 
-Obsidian renders only the LAST definition of a duplicated footnote;
-earlier ones are dead text (verified live).
+Obsidian renders only the LAST definition of a duplicated footnote; earlier ones are dead text (verified live).
 
 - [ ] Merge OFF: an alert says `[^dup]` is defined more than once and only the last renders; both stay
 - [ ] `Merge duplicate definitions` ON, lint: the bodies merge into ONE definition, the second body as an indented continuation; Reading view shows both lines
 - [ ] Lint again: nothing changes (idempotent)
 
+## Every alert that lists footnotes
+
+- [ ] Any alert that lists footnotes lists EVERY one, never an ellipsis (2026-09-08)
+
 [^used]: referenced definition
 [^lost]: named orphan, nothing uses it
 [^31]: numbered orphan, also unused
+[^#jump]: a hashed definition that renders but the popup can never open
 [^nest]: a definition citing another[^used] footnote in its body
 [^fence]: a definition with a code block
     ```js

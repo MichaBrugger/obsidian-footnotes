@@ -1,13 +1,9 @@
 ---
 footnote-prefix: p.
 ---
-
 # 10: rename footnote (2026-08-12)
 
-Settings: defaults (the frontmatter prefix stays inert until the last
-check turns the prefix feature on). Undo between checks. Every fixture
-is already in this note: two footnotes[^alpha] and[^Beta], a prefixed
-one[^p.1], a right-click fixture here[^menu], plus a fenced decoy.
+Settings: defaults (the frontmatter prefix stays inert until the last check turns the prefix feature on). Undo between checks. Every fixture is already in this note: two footnotes[^alpha] and[^Beta], a prefixed one[^p.1], a right-click fixture here[^menu], plus a fenced decoy.
 
 ```
 fake [^alpha] inside code, decoy [^menu] too
@@ -21,10 +17,10 @@ Run **Rename footnote** from the command palette with the caret in each spot:
 - [ ] The fenced `[^alpha]` decoy is untouched
 - [ ] One undo reverts the whole rename at once
 - [ ] Caret on the `[^Beta]:` definition label at the bottom also opens the modal
-- [ ] Renaming `alpha` to `Beta`: the modal stays open and explains the collision
+- [ ] Renaming `alpha` to `Beta` (the second live footnote): the modal stays open with ""[^Beta]" is already used by another footnote."
 - [ ] Renaming `Beta` to `beta` (case only) works; same footnote to Obsidian
-- [ ] A name with a space, `a#b`, or `a[b` keeps the modal open with the reason
-- [ ] Caret on plain prose: a toast asks for a reference or definition, no modal
+- [ ] Renaming to `bad name`, `a#b`, or `a[b` keeps the modal open with "Footnote names can't contain spaces, backticks, brackets, or "#"." inline
+- [ ] Caret on plain prose: "Place the cursor on a footnote reference or definition to rename it." and no modal
 - [ ] In Reading view the command is absent from the palette
 - [ ] With the popup open on a footnote, running the rename first settles/closes the popup (no stranded popup bound to the old name)
 - [ ] With `Per-note footnote prefix` AND the `Apply the note's footnote prefix` lint rule ON (this note's prefix is `p.`), Rename on `[^p.1]` opens with only the `1` selected (the prefix visibly stays); type `5`, Enter: it becomes `[^p.5]`. Undo, rename again, delete the prefix too and type a bare `5`: the rename ADDS the prefix itself (`[^p.5]`) and the toast says the note's prefix was added, so no later lint renames it behind your back (2026-08-29). With the `Apply the note's footnote prefix` rule OFF, the same bare rename stays bare and survives a lint

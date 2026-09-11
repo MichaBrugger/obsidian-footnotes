@@ -1,18 +1,11 @@
 ---
 footnote-prefix: 2=
 ---
-
 # 15: the linter under a footnote prefix
 
-Settings: `Per-note footnote prefix` ON, the `Apply the note's footnote
-prefix` lint rule ON (both default to that except the first), all
-other lint rules ON. Every fixture is already in this note: plain
-footnotes written "before" the prefix existed, one already-prefixed
-footnote, and one named footnote.
+Settings: `Per-note footnote prefix` ON, the `Apply the note's footnote prefix` lint rule ON (both default to that except the first), all other lint rules ON. `Renumber named footnotes` stays OFF. Every fixture is already in this note: plain footnotes written "before" the prefix existed, one already-prefixed footnote, and one named footnote.
 
-Run **Lint footnotes** on the mess, compare with the fence, then undo.
-The fence shows the shape; the definitions land at the very bottom of
-this note, below the checklist.
+Run **Lint footnotes** on the mess, compare with the fence, then undo. The fence shows the shape; the definitions land at the very bottom of this note, below the checklist.
 
 b[^2] a[^1] pre[^2=5] n[^note] end
 
@@ -34,5 +27,5 @@ b[^2=1] a[^2=2] pre[^2=3] n[^2=note] end
 
 - [ ] The fence matches
 - [ ] Running lint again shows "No linting needed." (idempotent)
-- [ ] With `Apply the note's footnote prefix` OFF, plain footnotes reindex to `[^1]`/`[^2]` while the prefixed one and `[^note]` BOTH keep their ids (prefixed footnotes are treated as named while the rule is off, QOL 2026-08-08)
+- [ ] With `Apply the note's footnote prefix` OFF, plain footnotes reindex to `[^1]`/`[^2]` while the prefixed one and `[^note]` BOTH keep their ids (prefixed footnotes are treated as named while the rule is off, QOL 2026-08-08); turn it back ON afterwards
 - [ ] The settings page greys `Apply the note's footnote prefix` out while the prefix feature itself is off (main tab)

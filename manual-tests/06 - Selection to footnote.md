@@ -1,9 +1,6 @@
 # 06: selection to footnote
 
-Settings: defaults (popup on or off both fine; the popup is sheet 04).
-Undo between checks. Every fixture is already in this note. Tables are
-sheet 08 and the block zoo is sheet 07; this sheet owns plain
-conversions and their refusals.
+Settings: defaults (popup on or off both fine; the popup is sheet 04). Undo between checks. Every fixture is already in this note. Tables are sheet 08 and the block zoo is sheet 07; this sheet owns plain conversions and their refusals.
 
 This fixture keeps a numbered footnote alive[^5] for the numbering and lint checks below.
 
@@ -34,14 +31,15 @@ The paragraph wants to move this aside for later readers. A second sentence ride
 
 ## Refusals (the toast, nothing changes)
 
-Fixture lines: `one two three` for the multi-selection checks; `some code words here` with the code span; a live reference here[^n]; an inline footnote^[like this]; a dead fake `fake [^9]` in code; and the fence below.
+Fixture lines: `one two three` for the multi-selection checks; `some code words here` with the code span; and $x+y$ math; a live reference here[^n]; an inline footnote^[like this]; a dead fake `fake [^9]` in code; and the fence below.
 
 - [ ] With Alt+DRAG (Windows; Option on macOS), make TWO separate selections in `one two three` and press the numbered hotkey: "Select one continuous stretch of text to turn it into a footnote." (wording fixed 2026-08-21)
 - [ ] Same two selections, PASTE hotkey: the paste key's own redirect ("To turn the selected text into a footnote, use the numbered, named, or inline footnote command."), not the one-stretch toast (2026-09-08)
 - [ ] With Alt+CLICK, place extra CARETS instead (no dragged ranges): the press inserts the same footnote at every caret; that flow is sheet 09
 - [ ] Select `code words` inside the span: the cuts-through-protected-text toast
 - [ ] Select the entire `code span` INCLUDING both backticks plus a word on each side: it converts; the span rides into the footnote whole (2026-08-19)
-- [ ] Select a stretch CONTAINING the live reference `[^n]`: the can't-be-nested toast (no nesting, ruling 2026-08-24)
+- [ ] Select `x+y` inside the dollars (cutting the math), numbered key: "No footnote was created: the selection cuts through code, math, or other protected text. Select all of it or none of it."
+- [ ] Select a stretch CONTAINING the live reference `[^n]` (`plain[^n] here` style text): "No footnote was created: footnotes can't be nested inside other footnotes." (no nesting, ruling 2026-08-24)
 - [ ] Select HALF of that reference (drag through `[^` only): the same toast; a cut would corrupt it
 - [ ] Select a stretch containing the inline footnote `^[like this]`: the same toast
 - [ ] Select the dead fake `` `fake [^9]` `` whole with a word each side: it CONVERTS (masked fakes aren't footnotes)
@@ -62,7 +60,7 @@ select me in here
 Fixture for the definition checks[^d].
 
 - [ ] With the caret in the `[^d]:` body below, EVERY insert hotkey (numbered, named, inline, paste) jumps back to the reference instead of creating (ruling 2026-08-13)
-- [ ] Selecting text inside that body and pressing a converting hotkey refuses with the can't-be-nested toast (a selection can't jump)
+- [ ] Selecting text inside that body and pressing a converting hotkey refuses with the same nesting toast (a selection can't jump)
 
 [^d]: press the inline hotkey with the caret right here
 [^n]: nesting-refusal fixture definition

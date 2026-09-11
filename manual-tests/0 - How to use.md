@@ -1,10 +1,6 @@
 # Manual footnote tests
 
-One sheet = one theme (2026-09-08 restructure: the 43 scenario sheets
-were too many and split single features across several files). Every
-sheet states the settings it needs, carries EVERY fixture it uses (no
-typing or pasting to set a check up), and expects an undo (Ctrl+Z)
-between checks. Default settings unless a sheet says otherwise.
+One sheet = one theme (2026-09-08 restructure: the 43 scenario sheets were too many and split single features across several files). Every sheet states the settings it needs, carries EVERY fixture it uses (no typing or pasting to set a check up), and expects an undo (Ctrl+Z) between checks. Default settings unless a sheet says otherwise.
 
 | Sheet | Theme |
 | --- | --- |
@@ -26,32 +22,23 @@ between checks. Default settings unless a sheet says otherwise.
 | 16 | A note whose footnote-prefix property is invalid |
 | 17 | Tricky footnote names: backticks, dollars, case, `#`, CJK |
 | 18 | Protected text and read-only views: creation guards, Reading view, lint, Obsidian `%%` comments |
-| 19 | Refusals catalog: every toast and inline reason, quoted exactly |
-| 20 | Lint rules alone and together: one fixture, seven fences |
+| 19 | Retired 2026-09-11: every refusal now lives on the sheet of its theme (02, 05, 06, 09, 10, 14, 17, 18, 22, 23); delete your copy of 19 |
+| 20 | Lint rules alone and together: one fixture, eight fences (the linter's own section heading is G) |
 | 21 | Lint stability: the definition-on-line-one shape |
 | 22 | Lint triggers (on save, on creation) and the settings page |
 | 23 | Lint alerts: orphans, strays, empties, invalid names, nesting, duplicates |
 | 24 | Phone and mobile emulation (needs a beta on the phone) |
 | 25 | Definition labels directly after a prose line are prose (Obsidian's rule, matched 2026-09-09) |
 
-Inter-plugin compatibility sheets live separately in the repo's
-`compat-tests/` folder (vault mirror: "Footnote Compat Tests"); they
-need other plugins installed and follow different pass/fail rules.
+Inter-plugin compatibility sheets live separately in the repo's `compat-tests/` folder (vault mirror: "Footnote Compat Tests"); they need other plugins installed and follow different pass/fail rules.
 
-The repo's `manual-tests/` folder is the source of truth; the vault
-folder "Footnote Tests" is a synced copy. Move finished sheets to
-"Footnote Tests USED" rather than leaving ticked boxes here.
+The repo's `manual-tests/` folder is the source of truth; the vault folder "Footnote Tests" is a synced copy. Move finished sheets to "Footnote Tests USED" rather than leaving ticked boxes here.
 
-Troubleshooting: if EVERY footnote hotkey is dead, check the plugin is
-actually enabled; a killed smoke-test run once left it session-enabled
-only, so an Obsidian restart brought the vault up with the plugin off
-(smoke script fixed 2026-08-21).
+Troubleshooting: if EVERY footnote hotkey is dead, check the plugin is actually enabled; a killed smoke-test run once left it session-enabled only, so an Obsidian restart brought the vault up with the plugin off (smoke script fixed 2026-08-21).
 
 ## Where the old sheets went
 
-Code comments, tests, and commit messages cite the old ids (for
-example "Jason's A19 pass, 2026-09-04"). This map keeps those
-citations readable.
+Code comments, tests, and commit messages cite the old ids (for example "Jason's A19 pass, 2026-09-04"). This map keeps those citations readable.
 
 | Old | New | | Old | New |
 | --- | --- | --- | --- | --- |
@@ -69,4 +56,4 @@ citations readable.
 | A6, A7 | 14 (invalid property to 16) | | | |
 | A18, A19 | 18 | | | |
 | A23 | 17 (prefix items to 14 and 16) | | | |
-| A24 | 19 | | | |
+| A24 | 02, 06, 09, 10, 23 | | | |

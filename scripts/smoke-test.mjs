@@ -1594,6 +1594,47 @@ async function main() {
         );
     });
 
+    await test("the reading-view toggle from the command palette closes the popup and flips the NOTE (2026-09-11)", async () => {
+        // Jason's report, sheet 04: with the popup open, Toggle reading view
+        // picked from the palette put the popup's embed into reading view
+        // and left the note as it was
+        resetSettings({ enablePopupEditor: true, insertAtEndOfWord: false });
+        await setupNote("Alpha bravo");
+        setCursorAndRun(0, 5, CMD_AUTONUM);
+        await pollUntil("popup open", `!!document.querySelector('.footnote-shortcut-popup .cm-content')`, (v) => v === true);
+        // the palette route: the command itself, with no hotkey for the scope to catch
+        action(`app.commands.executeCommandById('markdown:toggle-preview');`);
+        await pollUntil("popup gone", `!!document.querySelector('.footnote-shortcut-popup')`, (v) => v === false);
+        await pollUntil("the NOTE in reading view", `(${EDITOR}).getMode()`, (v) => v === "preview");
+        action(`app.commands.executeCommandById('markdown:toggle-preview');`);
+        await pollUntil("the note back in source view", `(${EDITOR}).getMode()`, (v) => v === "source");
+        await expectEditorText("Alpha[^1] bravo\n\n[^1]: ");
+    });
+
+    await test("lint keeps the caret where it was and leaves folds folded (2026-09-11)", async () => {
+        // Jason's report, sheet 20: linting unfolded every folded heading and
+        // list and jumped the caret to a linted spot. The rewrite is now a
+        // set of line edits, so untouched lines keep their folds and the
+        // caret maps through untouched text unchanged
+        resetSettings();
+        await setupNote("# Folded section\n\nhidden line one\nhidden line two\n\n# Where the caret sits\n\nword[^1]. keep the caret HERE\n\n[^1]: one");
+        // fold the first heading, then park the caret on the untouched "HERE" word
+        action(`(${EDITOR}).editor.setCursor({line:0, ch:0});`);
+        action(`app.commands.executeCommandById('editor:toggle-fold');`);
+        await sleep(200);
+        const foldedBefore = readJson(`((${EDITOR}).currentMode.getFoldInfo?.() || {folds:[]}).folds.length`);
+        if (foldedBefore !== 1) throw new Error(`expected one fold before the lint, got ${foldedBefore}`);
+        action(`(${EDITOR}).editor.setCursor({line:7, ch:${"word[^1]. keep the caret ".length}});`);
+        setCursorAndRun(7, "word[^1]. keep the caret ".length, CMD_LINT);
+        await expectEditorText("# Folded section\n\nhidden line one\nhidden line two\n\n# Where the caret sits\n\nword.[^1] keep the caret HERE\n\n[^1]: one");
+        const cursor = readJson(`(${EDITOR}).editor.getCursor()`);
+        if (cursor.line !== 7 || cursor.ch !== "word.[^1] keep the caret ".length) {
+            throw new Error(`caret moved to ${jsLiteral(cursor)}`);
+        }
+        const foldedAfter = readJson(`((${EDITOR}).currentMode.getFoldInfo?.() || {folds:[]}).folds.length`);
+        if (foldedAfter !== 1) throw new Error(`the lint unfolded the section (folds after: ${foldedAfter})`);
+    });
+
     await test("footnote lands at the caret inside an actively edited table cell", async () => {
         await requireVisibleWindow();
         // regression (reported 2026-07-14): running the command while a

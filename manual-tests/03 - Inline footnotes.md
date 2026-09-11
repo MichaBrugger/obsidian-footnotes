@@ -1,7 +1,6 @@
 # 03: inline footnotes
 
-Settings: defaults. Undo between checks. Every fixture is already in
-this note.
+Settings: defaults. Undo between checks. Every fixture is already in this note.
 
 ## Typing one
 

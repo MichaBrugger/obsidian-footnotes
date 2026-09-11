@@ -1,9 +1,6 @@
 # 08: footnotes and tables
 
-Settings: defaults. Undo between checks. Every fixture is already in
-this note. Rule (2026-09-04): text inside ONE cell can become a
-footnote, and so can a whole table selected with the text around it
-(sheet 07); a cell, a few cells, or a row never can.
+Settings: defaults. Undo between checks. Every fixture is already in this note. Rule (2026-09-04): text inside ONE cell can become a footnote, and so can a whole table selected with the text around it (sheet 07); a cell, a few cells, or a row never can.
 
 ## Inserting inside a cell
 

@@ -160,9 +160,12 @@ describe("footnote creation is blocked inside protected text", () => {
     });
 
     it("a named placeholder that would COMPLETE an inline-math pair and be swallowed", async () => {
-        // "$5 or [^]$6" satisfies the non-space-edge rule the moment the
-        // placeholder lands - the name-entry flow would be stranded in math
-        await expectBlocked(insertNamedFootnote, ["$5 or $6 tail"], {
+        // "$5 or [^]$x" satisfies the non-space-edge rule the moment the
+        // placeholder lands - the name-entry flow would be stranded in math.
+        // (A digit after the second dollar, "$6", would NOT close math -
+        // ground truth 2026-09-11 - so the fixture's closer is followed by
+        // a letter.)
+        await expectBlocked(insertNamedFootnote, ["$5 or $x tail"], {
             line: 0,
             ch: 6,
         });
@@ -170,8 +173,8 @@ describe("footnote creation is blocked inside protected text", () => {
 
     it("an inline placeholder that would COMPLETE an inline-math pair and be swallowed", async () => {
         // the command-press flow property's shrunk counterexample:
-        // "$5 or ^[]$6" masks the just-planted brackets into math
-        await expectBlocked(insertInlineFootnote, ["$5 or $6"], {
+        // "$5 or ^[]$x" masks the just-planted brackets into math
+        await expectBlocked(insertInlineFootnote, ["$5 or $x"], {
             line: 0,
             ch: 6,
         });
@@ -182,7 +185,7 @@ describe("footnote creation is blocked inside protected text", () => {
         // ends with a space, so the dollars are prose - until "[^2]"
         // lands before the second one and "$5 or [^2]$" satisfies the
         // non-space-edge rule, masking the fresh reference into math
-        await expectBlocked(insertAutonumFootnote, ["$5 or $6 [^1]"], {
+        await expectBlocked(insertAutonumFootnote, ["$5 or $x [^1]"], {
             line: 0,
             ch: 6,
         });

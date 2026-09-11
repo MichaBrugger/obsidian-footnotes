@@ -1,12 +1,8 @@
 # 17: tricky footnote names (2026-08-10)
 
-Settings: defaults; the popup check needs `Edit footnotes in a popup`
-ON. Undo between checks. Every fixture is already in this note.
+Settings: defaults; the popup check needs `Edit footnotes in a popup` ON. Undo between checks. Every fixture is already in this note.
 
-Fixture: a backticked name [^ba`ck], dollar names pay[^a$1] and[^b$2]
-now, a case pair case[^Note] with its lowercase definition below, a
-hashed reference[^#y] with no definition, a hashed reference with a
-definition[^#x], and a CJK name[^注].
+Fixture: a backticked name [^ba`ck], dollar names pay[^a$1] and[^b$2] now, a case pair case[^Note] with its lowercase definition below, a hashed reference[^#y] with no definition, a hashed reference with a definition[^#x], and a CJK name[^注].
 
 - [ ] Press inside the backticked reference: the toast ""[^ba`ck]" won't work as a footnote. Footnote names can't contain spaces, backticks, brackets, or "#"." and nothing is inserted (a backtick inside a reference is id text to Obsidian, not a code opener, 2026-09-08; a backticked name is still invalid)
 - [ ] Press inside `[^a$1]`: its definition is CREATED normally (dollar names are valid and render)

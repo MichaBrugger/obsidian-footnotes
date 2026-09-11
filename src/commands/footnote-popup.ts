@@ -213,6 +213,8 @@ export async function openFootnotePopup(
     // catches that command's own hotkeys first, closes the popup, and runs
     // the toggle against the note. One press, exactly as if the popup were
     // not there.
+    // the observers armed by tryShow (one per attempt), released on close
+    const modeWatchers: MutationObserver[] = [];
     const scope = new Scope(plugin.app.scope);
     for (const hotkey of commandHotkeys(plugin.app, TogglePreviewCommand)) {
         scope.register([...hotkey.modifiers], hotkey.key, () => {
@@ -235,6 +237,8 @@ export async function openFootnotePopup(
     releaseViewHooks = () => {
         plugin.app.keymap.popScope(scope);
         plugin.app.workspace.offref(layoutRef);
+        for (const watcher of modeWatchers) watcher.disconnect();
+        modeWatchers.length = 0;
     };
 
     const dataDeadline = Date.now() + 2000;
@@ -540,6 +544,23 @@ export async function openFootnotePopup(
         containerEl.removeClass("footnote-shortcut-popup-loading");
         embed.showEditor();
         positionPopup();
+        // The reading-view toggle picked from the COMMAND PALETTE (or any
+        // route with no hotkey for the scope above to catch) acts on
+        // Obsidian's active editor, which is the popup's own embed - so the
+        // popup flipped into Reading view and the note did not (Jason's
+        // report, sheet 04, 2026-09-11). The embed keeps a rendered view in
+        // its DOM the whole time, so that is no signal; its EDITOR being
+        // taken out of the DOM is (probed live 2026-09-11). When that
+        // happens while the popup is open: close the popup and hand the
+        // toggle to the note, exactly what the hotkey route does.
+        const modeWatch = new MutationObserver(() => {
+            if (popupClosed() || embedEl.querySelector(".cm-editor")) return;
+            modeWatch.disconnect();
+            close(true);
+            (plugin.app as AppWithCommands).commands?.executeCommandById?.(TogglePreviewCommand);
+        });
+        modeWatch.observe(embedEl, { childList: true, subtree: true });
+        modeWatchers.push(modeWatch);
         const inner = embed.editMode?.editor;
         if (inner) {
             inner.focus();

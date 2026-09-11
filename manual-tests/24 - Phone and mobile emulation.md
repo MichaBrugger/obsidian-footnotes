@@ -1,11 +1,6 @@
 # 24: phone and mobile-emulation checks
 
-Run this sheet after a beta release has synced to the phone (BRAT beta in
-the normal vault); these checks can't run against the sandbox vault's
-dev build. The items marked "or emulation" have a desktop stopgap in
-mobile emulation (`app.emulateMobile(true)`, which reloads the window;
-run it again with `false` to leave), but the real phone is the ground
-truth. Every fixture is already in this note.
+Run this sheet after a beta release has synced to the phone (BRAT beta in the normal vault); these checks can't run against the sandbox vault's dev build. The items marked "or emulation" have a desktop stopgap in mobile emulation (`app.emulateMobile(true)`, which reloads the window; run it again with `false` to leave), but the real phone is the ground truth. Every fixture is already in this note.
 
 Fixture reference[^menu] for the long-press check.
 

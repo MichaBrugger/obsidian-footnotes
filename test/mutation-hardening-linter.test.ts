@@ -462,10 +462,13 @@ describe("configuredSectionHeading", () => {
 
 // ---------- replaceMinimal ----------
 
-// Every mutant in the diff walk (L195-217) leaves the FINAL text reachable
-// by a wider edit, so these assert the change span itself: the cursor and
-// scroll position only map through the edit while the span is minimal.
-describe("replaceMinimal writes the smallest possible change", () => {
+// The write-back is a set of edits, one per run of changed lines and
+// trimmed to the characters that differ (lineDiffChanges, 2026-09-11):
+// untouched lines are never rewritten, so folds on them survive, and a
+// caret outside the differing characters keeps its place. These assert
+// the change spans themselves, since every mutant in the write-back
+// leaves the FINAL text reachable by a wider edit.
+describe("replaceMinimal writes the smallest possible changes", () => {
     it("a substitution touches only the swapped middle", () => {
         const doc = creationLint("Alpha[^1], bravo\n\n[^1]: one");
         expect(doc.appliedChanges).toEqual([

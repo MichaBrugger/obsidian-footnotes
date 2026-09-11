@@ -1,3 +1,4 @@
+import { noteSplitCreation } from "../editor/undo-orphan-notice";
 import {
     Editor,
     EditorChange,
@@ -373,6 +374,10 @@ export function landCellDefinitionAppend(opts: {
     footnoteId: string;
     definitionCursor: EditorPosition;
 }): void {
+    // the reference is already in the cell (one history step); the
+    // definition below is the next one - the partial-undo notice may
+    // promise that a second undo removes the reference too
+    noteSplitCreation(opts.footnoteId);
     // Stryker disable next-line ConditionalExpression, BlockStatement: the unit tests all run with the popup off, so which route is taken is only ever checked by the smoke tests, and the full smoke suite drives both
     if (popupEditingAvailable(opts.plugin)) {
         // Stryker disable all: this is the popup route. The unit tests all

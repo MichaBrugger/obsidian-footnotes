@@ -1,27 +1,28 @@
 ---
 decoy: this note's own frontmatter is the frontmatter fixture, mentions [^1], and must never be touched
 ---
-
 # 18: protected text and read-only views
 
-Settings: defaults; the lint half needs all lint rules ON. Undo between
-checks. Every fixture is already in this note.
+Settings: defaults; the lint half needs all lint rules ON. Undo between checks. Every fixture is already in this note.
 
 ## Creation is blocked in protected text (rule 2026-08-12)
 
-Always on, inline spans included. With the caret in each spot, EVERY
-insert hotkey (numbered, named, inline, paste) toasts "No footnote was
-created: footnotes can't go inside code, math, or other protected
-text." and changes nothing:
+Fixture for the two swallow-guard checks at the end (both are spots where the footnote IS inserted): pay $5 or $6 now, and a lone backslash \ right here.
+
+Always on, inline spans included. With the caret in each spot, EVERY insert hotkey (numbered, named, inline, paste) toasts "No footnote was created: footnotes can't go inside code, math, or other protected text." and changes nothing:
 
 - [ ] Inside the fenced code block below
 - [ ] Inside the `inline code span` on this line
-- [ ] Inside the `$$` math block below, and inside $x + y$ inline math
+- [ ] Inside the `$$` math block below
+- [ ] Inside $x + y$ inline math
 - [ ] On this note's own frontmatter line at the top (source mode)
-- [ ] In LIVE PREVIEW, click into the `decoy` property's value field and press each insert hotkey: the same toast, and NO footnote appears at the spot you last clicked in the prose (the Properties widget sits outside the editor, so that stale caret used to get the footnote; fixed 2026-09-04). Rename footnote from there toasts "Place the cursor on a footnote reference or definition to rename it."
-- [ ] Just BEFORE the opening backtick or just AFTER the closing backtick of the span above, inserting works normally
+- [ ] In LIVE PREVIEW, click into the `decoy` property's value field and press each insert hotkey: the same toast, and NO footnote appears at the spot you last clicked in the prose (the Properties widget sits outside the editor, so that stale caret used to get the footnote; fixed 2026-09-04)
+- [ ] From that same field, Rename footnote toasts "Place the cursor on a footnote reference or definition to rename it."
+- [ ] Just BEFORE the opening backtick of the span above, inserting works normally
+- [ ] Just AFTER its closing backtick, the same
 - [ ] Navigation is unaffected: the hotkey on the live reference swap me[^s1] further down still jumps
-- [ ] Swallow guards (press fuzzer, 2026-08-12): caret between `$5 or ` and `$6` in pay $5 or $6 now shows the same toast (the reference would complete a math pair and vanish); caret right after the lone backslash here \ inserts the footnote BEFORE the backslash
+- [ ] Caret between `$5 or ` and `$6` in the fixture line above: the reference is INSERTED, no toast (`$5 or [^n]$6` is not math: a closing dollar followed by a digit does not close math, ground truth 2026-09-11; the guard used to refuse this spot)
+- [ ] Caret right after the lone backslash in that same line: the footnote is inserted BEFORE the backslash
 
 ```
 block me [^here]
@@ -54,11 +55,7 @@ $$
 Comment boundaries: live[^c1] <!-- hidden [^c2]
 --> live again[^c3].
 
-(The short-form comment `<!-->` is deliberately NOT in this sheet: Reading
-view shows it as literal text and the plugin treats it as complete, both
-per CommonMark, but Live Preview's highlighter paints everything after it
-as one unclosed comment, which made this note display wrong, 2026-09-08.
-The short form is pinned by units instead.)
+(The short-form comment `<!-->` is deliberately NOT in this sheet: Reading view shows it as literal text and the plugin treats it as complete, both per CommonMark, but Live Preview's highlighter paints everything after it as one unclosed comment, which made this note display wrong, 2026-09-08. The short form is pinned by units instead.)
 
 > ```
 > quoted fence[^f1]
@@ -67,8 +64,7 @@ The short form is pinned by units instead.)
   listed fence[^f2]
   ```
 
-Inline code fakes `[^88]` and `[^55]: nope`, an escaped literal \[^9],
-an inline footnote ^[^inline-content] here, and a quoted live ref:
+Inline code fakes `[^88]` and `[^55]: nope`, an escaped literal \[^9], an inline footnote ^[^inline-content] here, and a quoted live ref:
 
 > quoted text[^q1] renumbers like any live text
 
@@ -86,12 +82,7 @@ Real refs to lint: swap me[^s1].
 
 ## Obsidian `%%` comments (2026-09-09)
 
-Obsidian hides a `%%` comment but still parses it: a reference inside a
-comment is a real reference (it binds its definition and takes a number,
-though its own superscript is hidden), while a definition inside a `%%`
-block comment is dead. A `%%` at the start of a line with no second `%%`
-on that line opens a block comment through the next `%%` anywhere; a
-mid-line `%%` pairs only within its own line. The plugin matches this.
+Obsidian hides a `%%` comment but still parses it: a reference inside a comment is a real reference (it binds its definition and takes a number, though its own superscript is hidden), while a definition inside a `%%` block comment is dead. A `%%` at the start of a line with no second `%%` on that line opens a block comment through the next `%%` anywhere; a mid-line `%%` pairs only within its own line. The plugin matches this.
 
 Hidden reference, live definition: november[^n1] here.
 %%

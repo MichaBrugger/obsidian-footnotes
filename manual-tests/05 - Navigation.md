@@ -1,17 +1,13 @@
 # 05: navigation
 
-Settings: run once with `Edit footnotes in a popup` OFF (the classic
-jump) and once ON (the popup opens instead). Every fixture is already
-in this note.
+Settings: run once with `Edit footnotes in a popup` OFF (the classic jump) and once ON (the popup opens instead). Every fixture is already in this note.
 
-Jump from this numbered reference[^1] and from this repeated one[^1];
-jumping back from the definition lands on the FIRST use. Multi-digit[^12]
-works; so do a plain name[^plain], an uppercase name[^Chapter], a colon
-name[^arXiv:2026.0717], and a dotted name[^named-footnote.1].
+Jump from this numbered reference[^1] and from this repeated one[^1]; jumping back from the definition lands on the FIRST use. Multi-digit[^12] works; so do a plain name[^plain], an uppercase name[^Chapter], a colon name[^arXiv:2026.0717], and a dotted name[^named-footnote.1].
 
 - [ ] Popup OFF: inserting a footnote into this sentence jumps the caret to the new definition at the bottom
 - [ ] Reference to definition jump lands CENTERED, at the END of the definition text
 - [ ] Definition to reference jump returns to the FIRST use, centered
+- [ ] Caret in the body of the `[^1]:` definition at the bottom: the key JUMPS back to the reference (a jump, not a toast; the selection twin is sheet 06's nesting refusal)
 - [ ] The multi-line definition below lands the caret at the end of its LAST continuation line
 - [ ] Colon and uppercase names navigate to the right definition (popup ON: the popup is bound to it)
 - [ ] Callout: a press inside `[^cq]` below navigates to the definition INSIDE the callout, no duplicate minted at the bottom (2026-08-10); pressing on the callout's `[^cq]:` line jumps back

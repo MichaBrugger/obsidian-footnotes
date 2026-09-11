@@ -1,10 +1,8 @@
 # 22: lint triggers and the Linting settings page
 
-Settings: defaults, then the trigger named in each section. Undo
-between checks. Every fixture is already in this note.
+Settings: defaults, then the trigger named in each section. Undo between checks. Every fixture is already in this note.
 
-The messy fixture: the references are out of order and reindex to
-`[^1]`/`[^2]` whenever a lint runs.
+The messy fixture: the references are out of order and reindex to `[^1]`/`[^2]` whenever a lint runs.
 
 start messy[^20] references[^10] here
 
@@ -23,11 +21,7 @@ start messy[^20] references[^10] here
 
 ## Lint on footnote creation
 
-`Lint on footnote creation` ON, everything else default. This replaced
-the old `Lint on focused file change` trigger (2026-08-05): the lint
-happens in the note you are LOOKING AT, at the moment a new footnote
-definition is created. Insert a NEW numbered footnote into the word
-"start" of the fixture.
+`Lint on footnote creation` ON, everything else default. This replaced the old `Lint on focused file change` trigger (2026-08-05): the lint happens in the note you are LOOKING AT, at the moment a new footnote definition is created. Insert a NEW numbered footnote into the word "start" of the fixture.
 
 - [ ] Inserting the footnote renumbers the whole note (`[^20]`/`[^10]` become sequential) and a "Footnotes linted." notice appears
 - [ ] The caret still lands on the NEW footnote's empty definition, even though the lint renumbered it
@@ -44,4 +38,5 @@ definition is created. Insert a NEW numbered footnote into the word
 - [ ] `Renumber named footnotes` is greyed out while `Reindex` is off
 - [ ] `Apply the note's footnote prefix` is greyed out while the prefix feature is off (main tab); the Orphans toggles are never greyed
 - [ ] Turn OFF all four rules AND Reindex AND the three Orphans-and-duplicates toggles, run **Lint footnotes**: "All lint rules are turned off in the plugin settings, so there is nothing to lint." (not the misleading "No linting needed."); Ctrl+S with lint-on-save says the same (2026-08-10)
+- [ ] Turn every rule and toggle back to its default afterwards.
 - [ ] With the community Linter plugin ENABLED, the page shows a "Using the Linter plugin?" note about turning off Linter's own footnote rules; with Linter disabled, the note is hidden (2026-08-08)

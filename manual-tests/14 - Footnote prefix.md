@@ -1,15 +1,9 @@
 ---
 footnote-prefix: P-
 ---
-
 # 14: the per-note footnote prefix
 
-Settings: `Per-note footnote prefix` ON. Undo between checks. Every
-fixture is already in this note: the frontmatter carries `P-`, one
-prefixed footnote[^P-1] exists, a hand-written plain reference[^tag]
-waits for the keeps-its-name check, and a hand-typed lowercase
-prefixed reference[^p-1] sits here for the collision check. The lint
-side of prefixes is sheet 15; an invalid property is sheet 16.
+Settings: `Per-note footnote prefix` ON. Undo between checks. Every fixture is already in this note: the frontmatter carries `P-`, one prefixed footnote[^P-1] exists, a hand-written plain reference[^tag] waits for the keeps-its-name check, and a hand-typed lowercase prefixed reference[^p-1] sits here for the collision check. The lint side of prefixes is sheet 15; an invalid property is sheet 16.
 
 ## Inserting under a prefix
 
@@ -23,7 +17,7 @@ side of prefixes is sheet 15; an invalid property is sheet 16.
 
 ## The Set footnote prefix command
 
-Run **Set footnote prefix** from the command palette:
+Turn `Per-note footnote prefix` back ON. Then run **Set footnote prefix** from the command palette:
 
 - [ ] The modal opens prefilled with `P-`
 - [ ] `10` + Enter: inline "The footnote prefix can't end in a number. Its footnotes would be indistinguishable from plain numbered ones." and the modal stays open
