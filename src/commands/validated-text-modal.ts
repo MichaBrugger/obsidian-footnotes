@@ -30,6 +30,7 @@ export interface ValidatedTextModalUi {
 export abstract class ValidatedTextModal extends Modal {
     protected value: string;
     private errorEl!: HTMLElement;
+    private inputEl: HTMLInputElement | null = null;
     private ui: ValidatedTextModalUi;
     private keyboardFit: (() => void) | null = null;
 
@@ -87,6 +88,7 @@ export abstract class ValidatedTextModal extends Modal {
                         void this.submit();
                     }
                 });
+                this.inputEl = text.inputEl;
                 text.inputEl.focus();
                 if (this.ui.initialValue !== undefined) {
                     text.inputEl.setSelectionRange(
@@ -111,6 +113,15 @@ export abstract class ValidatedTextModal extends Modal {
     /** Shows an error line under the input. Pass null to clear it. */
     protected showProblem(problem: string | null) {
         this.errorEl.setText(problem ?? "");
+        // A refused value keeps the field focused, so on a phone the
+        // keyboard stays up (or comes straight back after a tap on the
+        // button took the focus) and the fix can be typed at once. The
+        // text is selected whole, since a refused name is usually retyped
+        // (Jason's phone pass, 2026-09-11).
+        if (problem !== null && this.inputEl) {
+            this.inputEl.focus();
+            this.inputEl.select();
+        }
     }
 
     /** Enter, the main button, and any hotkey a subclass wires up all land here. To keep the modal open, call showProblem and return. To finish, call close(). */

@@ -543,6 +543,19 @@ export async function openFootnotePopup(
         if (embed.subpathNotFound) return false;
         containerEl.removeClass("footnote-shortcut-popup-loading");
         embed.showEditor();
+        // The label takes the embedded editor's own text metrics, read
+        // from its first line, so the two line up on every device and
+        // theme: the stylesheet's guesses (the app's text size and normal
+        // line height) matched on the desktop but sat the phone's body
+        // text a little above the label (Jason's phone pass, 2026-09-11).
+        const firstLine = embedEl.querySelector(".cm-line");
+        const labelEl = containerEl.querySelector<HTMLElement>(".footnote-shortcut-popup-label");
+        if (firstLine && labelEl) {
+            const metrics = win.getComputedStyle(firstLine);
+            labelEl.style.fontSize = metrics.fontSize;
+            labelEl.style.lineHeight = metrics.lineHeight;
+            labelEl.style.fontFamily = metrics.fontFamily;
+        }
         positionPopup();
         // The reading-view toggle picked from the COMMAND PALETTE (or any
         // route with no hotkey for the scope above to catch) acts on
