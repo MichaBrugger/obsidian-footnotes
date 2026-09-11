@@ -4,15 +4,16 @@ import { fakeEditor } from "../helpers/fake-editor";
 
 import { renameTargetInSelection } from "../../src/commands/rename-footnote";
 
-// Jason's phone pass, sheet 24 (2026-09-11): a long press on "[^menu]" opened
-// Obsidian's menu with only its own "Delete footnote and reference"; the
-// plugin's "Rename footnote" was missing, and a long press on a definition
-// label opened no menu at all. On a phone a long press SELECTS the word it
-// lands on, so the caret sits at the selection's end - on the "]" of the
-// reference or after the label's name - and the menu gate, which asked for
-// a caret strictly inside a reference, said no. The gate (and the command
-// the menu item runs) now look at the whole selection: a reference or a
-// definition label the selection overlaps is the target.
+// Jason's phone pass, sheet 24 (2026-09-11): on a phone a long press
+// SELECTS the word it lands on, so the caret sits at the selection's end -
+// on the "]" of the reference or after the label's name - and the rename
+// command, which asked for a caret strictly inside a reference, said no
+// when run from the toolbar right after the press. The command (and the
+// desktop menu gate) now look at the whole selection: a reference or a
+// definition label the selection overlaps is the target. The phone's
+// long-press menu itself is out of reach: Obsidian builds it alone for a
+// reference and fires no editor-menu event for it there, and a definition
+// label gets no menu at all (read in Obsidian's code the same day).
 
 const LINES = ["Fixture reference[^menu] for the long-press check.", "", "[^menu]: the definition"];
 

@@ -36,7 +36,7 @@ Of the plugin's 7 commands, the ones you'll press constantly deserve hotkeys. I 
 
 The other 3 (**Lint footnotes**, **Rename footnote**, and **Set footnote prefix**) come up less often, so running them from the command palette works fine. Give them hotkeys too if they become part of your routine.
 
-Everything also works on mobile from the toolbar, each with their own unique toolbar icons.
+Everything also works on mobile from the toolbar, each with their own unique toolbar icons. To rename a footnote on the phone, tap or long-press it and then tap the **Rename footnote** toolbar icon: Obsidian's own long-press menu on a footnote is Obsidian's alone, so the plugin's item can't appear there.
 
 <img src="README/mobile.png" width="320" alt="Obsidian mobile: the footnote commands sit on the editor toolbar">
 

@@ -90,10 +90,19 @@ export function renameTargetAtCursor(
  *
  * Why: on a phone a long press selects the word it lands on, so the caret
  * ends up at the selection's end - on the "]" of a reference, or after a
- * label's name - and the caret rule alone found nothing there. The
- * long-press menu therefore never offered "Rename footnote", and a long
- * press on a definition label opened no menu at all (Jason's phone pass,
- * sheet 24, 2026-09-11). The ends may come in either order.
+ * label's name - and the caret rule alone found nothing there, so the
+ * Rename footnote toolbar icon tapped after a long press said "not on a
+ * footnote" (Jason's phone pass, sheet 24, 2026-09-11). The ends may come
+ * in either order.
+ *
+ * What this does NOT change: the phone's long-press menu itself. Obsidian
+ * builds that menu on its own for a footnote reference (its "Delete
+ * footnote and reference" item) and, on a phone, never fires the
+ * editor-menu event plugins listen on for it; a long press on a definition
+ * label opens no menu at all there (read in Obsidian's own code,
+ * 2026-09-11). The route to rename on a phone is the toolbar icon or the
+ * command palette, and this function is what makes that route work with
+ * the long press's word selection.
  */
 export function renameTargetInSelection(
     doc: Editor,
@@ -348,14 +357,16 @@ function renameSurvives(
 }
 
 /**
- * Add "Rename footnote" to the editor's right-click menu (and to the
- * mobile long-press menu) when the click landed on a reference or a
- * definition label. It follows the same pattern as Obsidian's own "Rename
- * this heading" on heading lines (Jason's ask, 2026-08-13).
+ * Add "Rename footnote" to the editor's right-click menu when the click
+ * landed on a reference or a definition label. It follows the same pattern
+ * as Obsidian's own "Rename this heading" on heading lines (Jason's ask,
+ * 2026-08-13).
  *
  * Obsidian moves the caret to the click point before it fires editor-menu,
  * so working out which footnote was clicked is exactly the command's own
- * caret lookup.
+ * caret lookup. Desktop only in practice: on a phone Obsidian owns the
+ * long-press menu on a reference and never fires this event for it (see
+ * renameTargetInSelection), so the phone's route is the toolbar icon.
  */
 export function registerRenameFootnoteMenu(plugin: FootnotePlugin) {
     plugin.registerEvent(
@@ -364,8 +375,8 @@ export function registerRenameFootnoteMenu(plugin: FootnotePlugin) {
             // check here, but the command would later go and act on the
             // ACTIVE markdown view's editor instead.
             if (!(info instanceof MarkdownView)) return;
-            // the whole selection, not just the caret: a phone's long press
-            // selects the word under the finger before this menu opens
+            // the whole selection, not just the caret, so a selected word
+            // that overlaps a footnote counts (the same rule as the command)
             const selection = editor.listSelections()[0];
             const target = renameTargetInSelection(editor, selection.anchor, selection.head);
             if (target === null) return;
@@ -388,8 +399,9 @@ export async function renameFootnote(plugin: FootnotePlugin) {
         plugin,
         (doc) => {
             runOutsideTableCell(doc, (cursorPosition) => {
-                // the command run from the long-press menu arrives with the
-                // pressed word selected; the selection decides then
+                // on a phone the command usually runs from the toolbar right
+                // after a long press, which left the pressed word selected;
+                // the selection decides then
                 const selection = doc.listSelections()[0];
                 const target =
                     comparePositions(selection.anchor, selection.head) !== 0

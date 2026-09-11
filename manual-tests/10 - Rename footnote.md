@@ -33,7 +33,7 @@ Run **Rename footnote** from the command palette with the caret in each spot:
 - [ ] Right-click on plain prose in this line: no **Rename footnote** in the menu
 - [ ] Right-click on the fenced decoy above: no item (code is not a footnote)
 
-(The long-press twin on the phone is sheet 24's.)
+(There is no long-press twin on the phone: Obsidian owns that menu there and plugins cannot add to it. Sheet 24 covers the phone's route, the toolbar icon after a long press.)
 
 [^alpha]: first definition
 [^Beta]: second definition
