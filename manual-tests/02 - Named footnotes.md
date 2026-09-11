@@ -8,6 +8,7 @@ Insert into this sentence.
 
 - [ ] Named hotkey inserts `[^]` with the caret inside the brackets
 - [ ] Type a name, press the hotkey again with the caret still inside: the `[^name]:` definition is created
+- [ ] Undo ONCE right after that: the definition goes and the typed reference stays, and the notice says the reference is still in the note WITHOUT promising that another undo removes it (2026-09-11; that sentence is reserved for table-cell creations, sheet 08, where the plugin itself split the creation into two undo steps)
 - [ ] Type a name, then press the NUMBERED hotkey by accident: it creates the definition exactly like the named key; nothing is nested into the brackets (parity fixed 2026-08-09)
 - [ ] Type a name with a space in it and press again: a toast warns that the name won't work as a footnote, no broken definition is created
 

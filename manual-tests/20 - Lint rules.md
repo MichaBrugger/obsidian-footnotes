@@ -24,6 +24,7 @@ Tail prose keeps the definitions from being at the bottom already.
 ## A. All rules on (the defaults: punctuation, move to bottom, reindex; orphans kept; renumber named OFF)
 
 - [ ] Matches; the orphan alert names `3` and `lost` (the alerts describe the post-lint text, where the kept orphan was renumbered); the second lint says "No linting needed."
+- [ ] Before this run, fold the `## B.` section below (click its collapse arrow) and put the caret in the middle of the `Tail prose keeps` line: after the lint the section is still folded and the caret is still on that line at the same column (2026-09-11: the lint used to unfold everything and drop the caret at a changed spot)
 
 ```
 Beta[^1] alpha,[^2] named[^note] end. 中文句子。[^j1] and mixed wait？![^j2] Para[^m] cite. Closing marks: "quoted".[^q] **bold**[^b] [linked](https://theindex.moe).[^k]
