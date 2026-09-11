@@ -87,41 +87,27 @@
 }
 
 /* The plugin's one-field dialogs (Set footnote prefix, Rename footnote,
-   Name the footnote) are built from two setting rows: the field and the
-   button. On the phone, under Minimal, each row came with a thin box
-   around it, the look of a settings list, not of a dialog (Jason's phone
-   pass, 2026-09-11; the default theme draws none). No theme's row box
-   belongs on them. */
-.modal.footnote-shortcut-text-modal .setting-item,
-.modal.footnote-shortcut-text-modal .setting-item-info,
-.modal.footnote-shortcut-text-modal .setting-item-control {
-    border: 0 !important;
-    outline: 0 !important;
-    box-shadow: none !important;
+   Name the footnote) are built like Obsidian's own Rename heading dialog:
+   a short explanation, one text box, an error line, and Obsidian's button
+   row. Obsidian's stylesheet places them (a bottom sheet lifted above the
+   keyboard on a phone, a centred dialog elsewhere); these two rules only
+   shape the explanation and the box. */
+.modal.footnote-shortcut-text-modal .footnote-shortcut-text-modal-desc {
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+    margin-bottom: var(--size-4-3);
 }
 
-/* inline validation message in the Set-footnote-prefix modal */
+.modal.footnote-shortcut-text-modal .footnote-shortcut-text-modal-input {
+    width: 100%;
+}
+
+/* inline validation message under the dialogs' text box */
 .footnote-shortcut-prefix-error {
     color: var(--text-error);
     font-size: var(--font-ui-small);
     min-height: 1.4em;
-    margin-bottom: var(--size-4-2);
-}
-
-/* Mobile: the soft keyboard overlays the webview (Android especially), so
-   a vertically centered dialog hides its lower half - the error line and
-   the CTA - behind the keyboard. The plugin's text modals anchor to the
-   top instead; ValidatedTextModal caps their height to the visual
-   viewport (what the keyboard leaves visible), and the content scrolls
-   within that cap. */
-.is-mobile .modal-container.footnote-shortcut-keyboard-aware {
-    align-items: flex-start;
-    padding-top: var(--size-4-4);
-}
-
-.is-mobile .modal-container.footnote-shortcut-keyboard-aware .modal {
-    max-height: var(--footnote-shortcut-viewport-max, 100%);
-    overflow-y: auto;
+    margin-top: var(--size-4-2);
 }
 
 /* A quoted footnote reference inside a toast ("[^name]") is one visual

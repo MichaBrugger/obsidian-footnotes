@@ -1,9 +1,22 @@
-import { App, Modal, Platform, Setting } from "obsidian";
+import { App, ButtonComponent, Modal } from "obsidian";
 
 // Every dialog in this plugin is the same shape: one text box that gets
-// validated, an error line underneath it, and one main button. Enter, that
-// button, and, where a subclass wires them up, the plugin's own hotkeys all
-// end in submit().
+// validated, an error line underneath it, and one main button (plus a
+// Cancel). Enter, that button, and, where a subclass wires them up, the
+// plugin's own hotkeys all end in submit().
+//
+// The dialog is built the way Obsidian builds its own "Rename heading" and
+// "Rename file" dialogs: a "form" modal inside a "confirmation" container.
+// Obsidian's stylesheet then does the rest on every platform. On a phone
+// the dialog is a sheet at the bottom of the screen with rounded top
+// corners, no close cross, and stacked full-width buttons, and its button
+// row is lifted by the height of the on-screen keyboard (Obsidian keeps
+// that height in a style variable), so the field, the error line, and the
+// buttons all stay above the keyboard. Jason's phone recheck (2026-09-11)
+// asked for exactly this: the earlier version pinned the dialog to the top
+// of the screen, which kept it clear of the keyboard but looked nothing
+// like the native sheet; and it was built from settings rows, which one
+// theme boxed like a settings list.
 //
 // Three modals (set-prefix, rename, name-the-selection) each built this
 // wiring by hand. Now this base class owns it, and the subclasses own ONLY
@@ -17,6 +30,7 @@ import { App, Modal, Platform, Setting } from "obsidian";
 
 export interface ValidatedTextModalUi {
     title: string;
+    /** read out by screen readers for the text box; the box has no visible label, as in Obsidian's own rename dialogs */
     fieldName: string;
     fieldDesc: string;
     buttonText: string;
@@ -32,7 +46,6 @@ export abstract class ValidatedTextModal extends Modal {
     private errorEl!: HTMLElement;
     private inputEl: HTMLInputElement | null = null;
     private ui: ValidatedTextModalUi;
-    private keyboardFit: (() => void) | null = null;
 
     constructor(app: App, ui: ValidatedTextModalUi) {
         super(app);
@@ -42,72 +55,58 @@ export abstract class ValidatedTextModal extends Modal {
 
     onOpen() {
         this.setTitle(this.ui.title);
-        // a hook for the stylesheet: some themes draw a box around a
-        // setting row on the phone, and a one-field dialog is not a
-        // settings list (Jason's phone pass under Minimal, 2026-09-11)
-        this.modalEl.addClass("footnote-shortcut-text-modal");
-        // On Android the on-screen keyboard is drawn OVER the webview
-        // rather than shrinking it. A modal centered vertically therefore
-        // keeps its lower half, which is the error line and the main
-        // button, hidden behind the keyboard (Jason's beta report,
-        // 2026-08-28).
-        //
-        // So on mobile, pin the modal to the TOP of the screen and limit
-        // its height to what the keyboard leaves visible.
-        // visualViewport.height shrinks when the keyboard opens, and its
-        // resize event fires both when the keyboard opens AND when it
-        // closes.
-        if (Platform.isMobile) {
-            this.containerEl.addClass("footnote-shortcut-keyboard-aware");
-            const viewport = this.containerEl.win.visualViewport;
-            if (viewport) {
-                this.keyboardFit = () => {
-                    this.modalEl.style.setProperty(
-                        "--footnote-shortcut-viewport-max",
-                        `${viewport.height - 16}px`,
-                    );
-                };
-                this.keyboardFit();
-                viewport.addEventListener("resize", this.keyboardFit);
-            }
-        }
+        // Obsidian's own classes for a small form dialog (see the note at
+        // the top of this file), plus one of ours for the stylesheet
+        this.containerEl.addClass("mod-confirmation");
+        this.modalEl.addClass("mod-form", "footnote-shortcut-text-modal");
         const { contentEl } = this;
 
-        new Setting(contentEl)
-            .setName(this.ui.fieldName)
-            .setDesc(this.ui.fieldDesc)
-            .addText((text) => {
-                if (this.ui.placeholder) text.setPlaceholder(this.ui.placeholder);
-                text.setValue(this.value).onChange((value) => {
-                    this.value = value;
-                    this.showProblem(null);
-                });
-                text.inputEl.addEventListener("keydown", (evt) => {
-                    if (evt.key === "Enter") {
-                        evt.preventDefault();
-                        void this.submit();
-                    }
-                });
-                this.inputEl = text.inputEl;
-                text.inputEl.focus();
-                if (this.ui.initialValue !== undefined) {
-                    text.inputEl.setSelectionRange(
-                        this.ui.selectFrom ?? 0,
-                        text.inputEl.value.length,
-                    );
-                }
-            });
+        contentEl.createDiv({
+            cls: "footnote-shortcut-text-modal-desc",
+            text: this.ui.fieldDesc,
+        });
+
+        const input = contentEl.createEl("input", {
+            type: "text",
+            cls: "footnote-shortcut-text-modal-input",
+            attr: { "aria-label": this.ui.fieldName },
+        });
+        if (this.ui.placeholder) input.placeholder = this.ui.placeholder;
+        input.value = this.value;
+        input.addEventListener("input", () => {
+            this.value = input.value;
+            this.showProblem(null);
+        });
+        input.addEventListener("keydown", (evt) => {
+            if (evt.key === "Enter") {
+                evt.preventDefault();
+                void this.submit();
+            }
+        });
+        this.inputEl = input;
 
         this.errorEl = contentEl.createDiv({
             cls: "footnote-shortcut-prefix-error",
         });
 
-        new Setting(contentEl).addButton((button) =>
-            button
-                .setButtonText(this.ui.buttonText)
-                .setCta()
-                .onClick(() => void this.submit()),
-        );
+        // the button row Obsidian's own dialogs use: the main button first,
+        // then Cancel, which a phone stacks under it full width
+        const buttons = this.modalEl.createDiv({ cls: "modal-button-container" });
+        new ButtonComponent(buttons)
+            .setButtonText(this.ui.buttonText)
+            .setCta()
+            .onClick(() => void this.submit());
+        const cancel = new ButtonComponent(buttons)
+            .setButtonText("Cancel")
+            .onClick(() => {
+                this.close();
+            });
+        cancel.buttonEl.addClass("mod-cancel");
+
+        input.focus();
+        if (this.ui.initialValue !== undefined) {
+            input.setSelectionRange(this.ui.selectFrom ?? 0, input.value.length);
+        }
     }
 
     /** Shows an error line under the input. Pass null to clear it. */
@@ -128,13 +127,6 @@ export abstract class ValidatedTextModal extends Modal {
     protected abstract submit(): void | Promise<void>;
 
     onClose() {
-        if (this.keyboardFit) {
-            this.containerEl.win.visualViewport?.removeEventListener(
-                "resize",
-                this.keyboardFit,
-            );
-            this.keyboardFit = null;
-        }
         this.contentEl.empty();
     }
 }

@@ -543,15 +543,18 @@ export async function openFootnotePopup(
         if (embed.subpathNotFound) return false;
         containerEl.removeClass("footnote-shortcut-popup-loading");
         embed.showEditor();
-        // The label takes the embedded editor's own text metrics, read
-        // from its first line, so the two line up on every device and
-        // theme: the stylesheet's guesses (the app's text size and normal
-        // line height) matched on the desktop but sat the phone's body
-        // text a little above the label (Jason's phone pass, 2026-09-11).
-        const firstLine = embedEl.querySelector(".cm-line");
+        // The label takes the embedded editor's own base text metrics, so
+        // the two line up on every device and theme: the stylesheet's
+        // guesses (the app's text size and normal line height) matched on
+        // the desktop but sat the phone's body text a little above the
+        // label (Jason's phone pass, 2026-09-11). Read from the editor's
+        // content box, not its first line: a heading first line carries
+        // the heading's size, and a label that copied it grew to heading
+        // size too (Jason's phone recheck, 2026-09-11).
+        const contentBox = embedEl.querySelector(".cm-content");
         const labelEl = containerEl.querySelector<HTMLElement>(".footnote-shortcut-popup-label");
-        if (firstLine && labelEl) {
-            const metrics = win.getComputedStyle(firstLine);
+        if (contentBox && labelEl) {
+            const metrics = win.getComputedStyle(contentBox);
             labelEl.style.fontSize = metrics.fontSize;
             labelEl.style.lineHeight = metrics.lineHeight;
             labelEl.style.fontFamily = metrics.fontFamily;
