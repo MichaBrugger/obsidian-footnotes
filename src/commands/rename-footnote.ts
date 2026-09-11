@@ -83,6 +83,47 @@ export function renameTargetAtCursor(
     return lineText.slice(label.nameStart, label.nameEnd);
 }
 
+/**
+ * The footnote a SELECTION points at: a reference the selection overlaps,
+ * or a definition label it overlaps, on the selection's line. A collapsed
+ * selection is the plain caret rule above.
+ *
+ * Why: on a phone a long press selects the word it lands on, so the caret
+ * ends up at the selection's end - on the "]" of a reference, or after a
+ * label's name - and the caret rule alone found nothing there. The
+ * long-press menu therefore never offered "Rename footnote", and a long
+ * press on a definition label opened no menu at all (Jason's phone pass,
+ * sheet 24, 2026-09-11). The ends may come in either order.
+ */
+export function renameTargetInSelection(
+    doc: Editor,
+    anchor: EditorPosition,
+    head: EditorPosition,
+    ctx: DocContext = docContext(doc),
+): string | null {
+    const [from, to] = comparePositions(anchor, head) <= 0 ? [anchor, head] : [head, anchor];
+    if (from.line !== to.line) return renameTargetAtCursor(doc, head, ctx);
+    if (from.ch === to.ch) return renameTargetAtCursor(doc, from, ctx);
+    const lineText = doc.getLine(from.line);
+    if (!lineText.includes("[^")) return null;
+    for (const occurrence of referenceOccurrences(
+        lineText,
+        ctx.maskedLine(from.line),
+        ctx.definitionStarts()[from.line],
+    )) {
+        if (occurrence.start < to.ch && occurrence.end > from.ch) return occurrence.name;
+    }
+    const label = definitionLabelIn(lineText);
+    if (!label || from.ch >= label.labelEnd) return null;
+    if (!definitionLabelIn(ctx.maskedLine(from.line))) return null;
+    if (!ctx.definitionStarts()[from.line]) return null;
+    return lineText.slice(label.nameStart, label.nameEnd);
+}
+
+function comparePositions(a: EditorPosition, b: EditorPosition): number {
+    return a.line - b.line || a.ch - b.ch;
+}
+
 export type RenamePlan =
     | {
           kind: "renamed";
@@ -323,9 +364,11 @@ export function registerRenameFootnoteMenu(plugin: FootnotePlugin) {
             // check here, but the command would later go and act on the
             // ACTIVE markdown view's editor instead.
             if (!(info instanceof MarkdownView)) return;
-            if (renameTargetAtCursor(editor, editor.getCursor()) === null) {
-                return;
-            }
+            // the whole selection, not just the caret: a phone's long press
+            // selects the word under the finger before this menu opens
+            const selection = editor.listSelections()[0];
+            const target = renameTargetInSelection(editor, selection.anchor, selection.head);
+            if (target === null) return;
             menu.addItem((item) =>
                 item
                     .setTitle("Rename footnote")
@@ -345,7 +388,13 @@ export async function renameFootnote(plugin: FootnotePlugin) {
         plugin,
         (doc) => {
             runOutsideTableCell(doc, (cursorPosition) => {
-                const target = renameTargetAtCursor(doc, cursorPosition);
+                // the command run from the long-press menu arrives with the
+                // pressed word selected; the selection decides then
+                const selection = doc.listSelections()[0];
+                const target =
+                    comparePositions(selection.anchor, selection.head) !== 0
+                        ? renameTargetInSelection(doc, selection.anchor, selection.head)
+                        : renameTargetAtCursor(doc, cursorPosition);
                 if (target === null) {
                     showNotice(RenameTargetNotice, 8000);
                     return;

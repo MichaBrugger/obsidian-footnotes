@@ -41,6 +41,10 @@ export abstract class ValidatedTextModal extends Modal {
 
     onOpen() {
         this.setTitle(this.ui.title);
+        // a hook for the stylesheet: some themes draw a box around a
+        // setting row on the phone, and a one-field dialog is not a
+        // settings list (Jason's phone pass under Minimal, 2026-09-11)
+        this.modalEl.addClass("footnote-shortcut-text-modal");
         // On Android the on-screen keyboard is drawn OVER the webview
         // rather than shrinking it. A modal centered vertically therefore
         // keeps its lower half, which is the error line and the main

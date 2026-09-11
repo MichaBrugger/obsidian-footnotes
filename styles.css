@@ -86,6 +86,20 @@
     display: none;
 }
 
+/* The plugin's one-field dialogs (Set footnote prefix, Rename footnote,
+   Name the footnote) are built from two setting rows: the field and the
+   button. On the phone, under Minimal, each row came with a thin box
+   around it, the look of a settings list, not of a dialog (Jason's phone
+   pass, 2026-09-11; the default theme draws none). No theme's row box
+   belongs on them. */
+.modal.footnote-shortcut-text-modal .setting-item,
+.modal.footnote-shortcut-text-modal .setting-item-info,
+.modal.footnote-shortcut-text-modal .setting-item-control {
+    border: 0 !important;
+    outline: 0 !important;
+    box-shadow: none !important;
+}
+
 /* inline validation message in the Set-footnote-prefix modal */
 .footnote-shortcut-prefix-error {
     color: var(--text-error);
