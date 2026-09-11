@@ -150,3 +150,83 @@ function unmatchedRuns(
     closeRun();
     return runs;
 }
+
+/** A fold as Obsidian's view reports it: the heading (or list item) line and the last folded line, both 0-based. */
+export interface FoldRange {
+    from: number;
+    to: number;
+}
+
+/**
+ * `folds` with their line numbers carried through `changes` (lineDiffChanges
+ * of `before` to the new text).
+ *
+ * Obsidian drops a heading's fold on any edit inside it, even a single
+ * character (probed live, 2026-09-11), so after a lint the plugin puts the
+ * folds back itself, and this works out where each one now lives. Every
+ * fold line is mapped by its start offset, the way an editor maps a
+ * position through edits: text before an edit stays, text after it shifts,
+ * whole lines inserted at a line's start push that line down. A fold whose
+ * heading line the edits removed is dropped; a fold whose last line was
+ * removed ends on the line before the removal.
+ */
+export function mapFoldLines(folds: FoldRange[], changes: OffsetChange[], before: string): FoldRange[] {
+    if (changes.length === 0) return folds;
+    const after = applyOffsetChanges(before, changes);
+    const starts = [0];
+    for (let i = 0; i < before.length; i++) if (before.charCodeAt(i) === 10) starts.push(i + 1);
+    const removed = (line: number) =>
+        changes.some(
+            (c) =>
+                c.from <= starts[line] &&
+                (line + 1 < starts.length ? c.to >= starts[line + 1] : c.to >= before.length) &&
+                c.to > c.from,
+        );
+    const mapOffset = (offset: number): number => {
+        let mapped = offset;
+        for (const c of changes) {
+            if (offset < c.from) break;
+            const shift = c.text.length - (c.to - c.from);
+            if (c.from === c.to) {
+                // whole lines inserted at this very offset push it down
+                mapped += shift;
+                continue;
+            }
+            if (offset >= c.to) {
+                mapped += shift;
+                continue;
+            }
+            // the edit starts at this offset or covers it: the position
+            // collapses to where the edit starts
+            mapped = mapped - offset + c.from;
+            break;
+        }
+        return mapped;
+    };
+    const lineAt = (offset: number) => {
+        let line = 0;
+        for (let i = 0; i < offset && i < after.length; i++) if (after.charCodeAt(i) === 10) line++;
+        return line;
+    };
+    const out: FoldRange[] = [];
+    for (const fold of folds) {
+        if (fold.from >= starts.length || fold.to >= starts.length || removed(fold.from)) continue;
+        const from = lineAt(mapOffset(starts[fold.from]));
+        // a removed last line: the fold now ends where the removal begins,
+        // on the line before it
+        const to = removed(fold.to) ? lineAt(Math.max(0, mapOffset(starts[fold.to]) - 1)) : lineAt(mapOffset(starts[fold.to]));
+        if (to > from) out.push({ from, to });
+    }
+    return out;
+}
+
+/** `before` with `changes` (offsets into `before`, in order, non-overlapping) applied. */
+function applyOffsetChanges(before: string, changes: OffsetChange[]): string {
+    let out = "";
+    let copied = 0;
+    for (const change of changes) {
+        out += before.slice(copied, change.from) + change.text;
+        copied = change.to;
+    }
+    return out + before.slice(copied);
+}

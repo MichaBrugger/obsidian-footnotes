@@ -115,11 +115,13 @@ export function noteSplitCreation(name: string): void {
 
 /** The notice for `orphaned` (already quoted and joined as `refs`): the second-undo guidance only when every name came from a split creation. Exported for the unit tests. */
 export function undoOrphanMessage(orphaned: string[], refs: string): string {
-    const are = orphaned.length === 1 ? "is" : "are";
+    const one = orphaned.length === 1;
     const promise = orphaned.every((name) => splitCreations.has(name.toLowerCase()))
-        ? " Undo again to remove the reference too."
+        ? ` Undo again to remove the ${one ? "reference" : "references"} too.`
         : "";
-    return `The undo removed the footnote definition, but ${refs} ${are} still in the note.${promise}`;
+    // "the footnote reference" spelled out, so the toast says what is left
+    // behind rather than leaving it to the quoted name (Jason, 2026-09-11)
+    return `The undo removed the footnote definition, but the footnote ${one ? "reference" : "references"} ${refs} ${one ? "is" : "are"} still in the note.${promise}`;
 }
 
 // Stryker disable all: CodeMirror update-listener plumbing driven by the

@@ -13,21 +13,21 @@ import { noteSplitCreation, undoOrphanMessage } from "../../src/editor/undo-orph
 describe("the partial-undo notice", () => {
     it("states the fact without the promise for an undo the plugin did not stage", () => {
         expect(undoOrphanMessage(["typed"], '"[^typed]"')).toBe(
-            'The undo removed the footnote definition, but "[^typed]" is still in the note.',
+            'The undo removed the footnote definition, but the footnote reference "[^typed]" is still in the note.',
         );
         expect(undoOrphanMessage(["a", "b"], '"[^a]", "[^b]"')).toBe(
-            'The undo removed the footnote definition, but "[^a]", "[^b]" are still in the note.',
+            'The undo removed the footnote definition, but the footnote references "[^a]", "[^b]" are still in the note.',
         );
     });
 
     it("promises the second undo only for a creation the plugin split itself, any casing", () => {
         noteSplitCreation("Cell");
         expect(undoOrphanMessage(["cell"], '"[^cell]"')).toBe(
-            'The undo removed the footnote definition, but "[^cell]" is still in the note. Undo again to remove the reference too.',
+            'The undo removed the footnote definition, but the footnote reference "[^cell]" is still in the note. Undo again to remove the reference too.',
         );
         // one stranded name that was not staged keeps the promise out
         expect(undoOrphanMessage(["cell", "typed"], '"[^cell]", "[^typed]"')).toBe(
-            'The undo removed the footnote definition, but "[^cell]", "[^typed]" are still in the note.',
+            'The undo removed the footnote definition, but the footnote references "[^cell]", "[^typed]" are still in the note.',
         );
     });
 });

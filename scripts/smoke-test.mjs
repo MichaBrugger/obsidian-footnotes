@@ -1617,22 +1617,26 @@ async function main() {
         // set of line edits, so untouched lines keep their folds and the
         // caret maps through untouched text unchanged
         resetSettings();
-        await setupNote("# Folded section\n\nhidden line one\nhidden line two\n\n# Where the caret sits\n\nword[^1]. keep the caret HERE\n\n[^1]: one");
-        // fold the first heading, then park the caret on the untouched "HERE" word
+        // the folded section CONTAINS the line the lint edits (Obsidian
+        // drops such a fold on any edit inside it, so the plugin puts it
+        // back); the caret sits on an untouched line further down
+        await setupNote("# Folded section\n\nword[^1]. inside the fold\nline b\n\n# Where the caret sits\n\nkeep the caret HERE\n\n[^1]: one");
         action(`(${EDITOR}).editor.setCursor({line:0, ch:0});`);
         action(`app.commands.executeCommandById('editor:toggle-fold');`);
         await sleep(200);
-        const foldedBefore = readJson(`((${EDITOR}).currentMode.getFoldInfo?.() || {folds:[]}).folds.length`);
-        if (foldedBefore !== 1) throw new Error(`expected one fold before the lint, got ${foldedBefore}`);
-        action(`(${EDITOR}).editor.setCursor({line:7, ch:${"word[^1]. keep the caret ".length}});`);
-        setCursorAndRun(7, "word[^1]. keep the caret ".length, CMD_LINT);
-        await expectEditorText("# Folded section\n\nhidden line one\nhidden line two\n\n# Where the caret sits\n\nword.[^1] keep the caret HERE\n\n[^1]: one");
+        const foldsBefore = readJson(`JSON.stringify(((${EDITOR}).currentMode.getFoldInfo?.() || {folds:[]}).folds)`);
+        if (foldsBefore !== '[{"from":0,"to":4}]') throw new Error(`expected the section folded before the lint, got ${foldsBefore}`);
+        setCursorAndRun(7, "keep the ".length, CMD_LINT);
+        await expectEditorText("# Folded section\n\nword.[^1] inside the fold\nline b\n\n# Where the caret sits\n\nkeep the caret HERE\n\n[^1]: one");
         const cursor = readJson(`(${EDITOR}).editor.getCursor()`);
-        if (cursor.line !== 7 || cursor.ch !== "word.[^1] keep the caret ".length) {
+        if (cursor.line !== 7 || cursor.ch !== "keep the ".length) {
             throw new Error(`caret moved to ${jsLiteral(cursor)}`);
         }
-        const foldedAfter = readJson(`((${EDITOR}).currentMode.getFoldInfo?.() || {folds:[]}).folds.length`);
-        if (foldedAfter !== 1) throw new Error(`the lint unfolded the section (folds after: ${foldedAfter})`);
+        await pollUntil(
+            "the section still folded after the lint",
+            `JSON.stringify(((${EDITOR}).currentMode.getFoldInfo?.() || {folds:[]}).folds)`,
+            (v) => v === '[{"from":0,"to":4}]',
+        );
     });
 
     await test("footnote lands at the caret inside an actively edited table cell", async () => {

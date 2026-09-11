@@ -8,7 +8,7 @@ import {
 } from "../commands/footnote-popup";
 import { jumpToFootnoteDefinition } from "../commands/navigation";
 import { docContext } from "../editor/doc-context";
-import { lineDiffChanges } from "../editor/document-diff";
+import { lineDiffChanges, mapFoldLines } from "../editor/document-diff";
 import { rewriteDocument } from "./rewrite-document";
 import { definitionLabel, definitionLabelWithName } from "../parsing/footnote-grammar";
 import { footnotePrefix, footnotePrefixProblem } from "../parsing/footnote-prefix";
@@ -308,9 +308,16 @@ export function lintFootnotes(
 // sheet 20, 2026-09-11.) The edits are worked out by lineDiffChanges; all
 // of them are positions in the text BEFORE the rewrite, which is what a
 // transaction expects.
-function replaceMinimal(doc: Editor, before: string, after: string) {
+function replaceMinimal(doc: Editor, before: string, after: string, mdView?: MarkdownView) {
     const changes = lineDiffChanges(before, after);
     if (changes.length === 0) return;
+    // Obsidian drops a heading's fold on any edit inside it (probed live,
+    // 2026-09-11), so the folds are read before the rewrite and put back
+    // after it, with their line numbers carried through the edits
+    // (Jason's report: a folded section with footnotes under it still
+    // unfolded). The fold API is undocumented, so every step is guarded.
+    const mode = (mdView as { currentMode?: FoldingMode } | undefined)?.currentMode;
+    const foldInfo = mode?.getFoldInfo?.() ?? null;
     doc.transaction({
         changes: changes.map((change) => ({
             from: doc.offsetToPos(change.from),
@@ -318,6 +325,18 @@ function replaceMinimal(doc: Editor, before: string, after: string) {
             text: change.text,
         })),
     });
+    if (foldInfo && foldInfo.folds.length > 0 && mode?.applyFoldInfo) {
+        mode.applyFoldInfo({
+            folds: mapFoldLines(foldInfo.folds, changes, before),
+            lines: after.split("\n").length,
+        });
+    }
+}
+
+/** The fold half of a MarkdownView's edit mode, as Obsidian ships it without typings: the folds as line ranges, and a way to put a list of them back. */
+interface FoldingMode {
+    getFoldInfo?: () => { folds: { from: number; to: number }[]; lines: number } | null;
+    applyFoldInfo?: (info: { folds: { from: number; to: number }[]; lines: number }) => void;
 }
 
 /**
@@ -722,7 +741,7 @@ export async function runFootnoteTransformCommand(
         if (after === before) {
             showNotice(notices.noop);
         } else {
-            replaceMinimal(doc, before, after);
+            replaceMinimal(doc, before, after, mdView);
             showNotice(notices.done);
         }
         noticeLintAlerts(plugin, after);
