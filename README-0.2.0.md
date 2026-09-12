@@ -23,7 +23,8 @@ The plugin adds its commands **without hotkeys**, so assign your own right after
 
 `Settings → Hotkeys → search for "Footnote Shortcut" → click the ⨁ next to a command → press your preferred keys`
 
-Of the plugin's 7 commands, the ones you'll press constantly deserve hotkeys. I personally use:
+Of the plugin's 7 commands, the ones you'll press constantly should have hotkeys. I personally use:
+
 
 | Command                               | Recommended hotkey                           |
 | ------------------------------------- | -------------------------------------------- |
@@ -36,7 +37,7 @@ Of the plugin's 7 commands, the ones you'll press constantly deserve hotkeys. I 
 
 The other 3 (**Lint footnotes**, **Rename footnote**, and **Set footnote prefix**) come up less often, so running them from the command palette works fine. Give them hotkeys too if they become part of your routine.
 
-Everything also works on mobile from the toolbar, each with their own unique toolbar icons. To rename a footnote on the phone, tap or long-press it and then tap the **Rename footnote** toolbar icon: Obsidian's own long-press menu on a footnote is Obsidian's alone, so the plugin's item can't appear there.
+Everything also works on mobile from the toolbar, each with their own unique toolbar icons.
 
 <img src="README/mobile.png" width="320" alt="Obsidian mobile: the footnote commands sit on the editor toolbar">
 
@@ -83,7 +84,7 @@ Sometimes you write something mid-sentence and realize it should be a footnote. 
 - The **inline** hotkey wraps the selection as `^[...]` right where it is. It accepts single-line selections only, as only those format correctly. For a multi-line selection, it points you to the previous 2.
 - A selection that starts or ends mid-word grows to whole words first, plus one trailing punctuation mark, so a sloppy drag still produces a clean footnote. Turn **Expand selections to whole words** off in the settings if you want the exact selection.
 - A selection that contains/cuts-through an existing footnote refuses to convert, as footnotes can't be nested inside other footnotes. Nesting is prevented throughout the plugin, and linting alerts you if a note already has hand-typed nesting.
-- Tables: text inside one cell converts, and so does a whole table selected edge to edge (with or without the text around it). A selection that cuts through a table's pipes refuses, to avoid breaking the table.
+- Tables: text inside one cell converts, as well as a whole table selected edge to edge (with or without the text around it). A selection that cuts through a table's pipes refuses, to avoid breaking the table.
 
 ![Selection to footnote with the numbered, named, and inline keys](README/selection.gif)
 
@@ -114,13 +115,13 @@ One hotkey takes you back and forth between a reference and its note.
 
 ### Renaming a footnote
 
-Put your cursor on any reference or definition and run **Rename footnote**. It works like renaming a variable in a code editor: every reference and the definition get the new name in one step. It's also in the right-click menu when you click on a footnote, just like Obsidian's own rename for headings (on the phone, tap or long-press the footnote and then tap the toolbar icon). Names are case-insensitive, so `[^Note]` and `[^note]` count as the same footnote. The command refuses names that are already taken and names a footnote can't have, and under a per-note prefix the new name gets the prefix added for you.
+Put your cursor on any reference or definition and run **Rename footnote**. It works like renaming a variable in a code editor: every reference and the definition get the new name in one step. It's also in the right-click menu when you click on a footnote, just like Obsidian's own rename for headings. Names are case-insensitive, so `[^Note]` and `[^note]` count as the same footnote. The command refuses names that are already taken and names a footnote can't have, and under a per-note prefix the new name gets the prefix added for you.
 
 ![Rename footnote: every reference and the definition take the new name together](README/rename.gif)
 
 ### The popup editor
 
-Creating or visiting a footnote opens its definition text in a small editor right at your cursor, so you never lose your place in the note. Close it with the same hotkey, <kbd>Escape</kbd>, or by clicking anywhere outside. Switching to Reading view closes it too. If a footnote is defined more than once, the hotkey jumps to the last definition instead, the one Obsidian renders, so you can sort it out (or let the linter merge them). If you prefer the classic jump-to-the-bottom behavior, turn off **Edit footnotes in a popup** in the settings.
+Creating or visiting a footnote opens its definition text in a small editor right at your cursor, so you never lose your place in the note. Close it with the same hotkey, <kbd>Escape</kbd>, or by clicking anywhere outside. Switching to Reading view closes it too. If a footnote has more than one definition, the hotkey jumps to the last definition instead (the one Reading View renders) so you can sort it out (or let the linter merge them). If you prefer the classic jump-to-the-bottom behavior, turn off **Edit footnotes in a popup** in the settings.
 
 ## Keeping footnotes tidy: the linter
 
@@ -135,14 +136,18 @@ Writing and revising can leave footnotes messy. The **Lint footnotes** command c
 
 ![Lint footnotes: references move past punctuation, numbering follows the text, definitions gather at the bottom](README/lint.gif)
 
-Linting keeps your place: only the characters that actually change are written back, so your cursor and your folded sections stay where they were. The linter also reads `%%` comments the way Obsidian does: a reference inside a comment is a real footnote (numbered, just hidden), a definition inside a `%%` block comment is not, and nothing inside a block comment is moved, renamed, or "fixed".
-
 Each rule can be toggled individually in **Settings → Footnote Shortcut → Linting**, along with 2 automatic triggers (both off by default):
 
 - **Lint on save**: lints the note whenever you press <kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<kbd>S</kbd> (vim users: `:w` works too).
 - **Lint on footnote creation**: lints the note right after you create a new footnote.
 
-The linter also watches for problems it can't fix by itself and tells you about them, naming every footnote involved: an empty `[^]` reference you never named, references with no definition or definitions nothing uses (while the delete toggles are off), a definition typed directly under a paragraph with no blank line above it (Obsidian shows it as plain text; add the blank line), duplicate definitions (while merging is off), names a footnote can't have (spaces, backticks, brackets, `#`), and footnotes nested inside another footnote's definition.
+The linter also watches for problems it can't fix by itself and tells you about them, naming every footnote involved: 
+
+- an empty `[^]` reference you never named, references with no definition or definitions nothing uses (while **delete orphaned references/definitions** are off)
+- a definition typed directly under a paragraph with no blank line above it as Obsidian shows it as plain text (while **Fix definitions hidden by a missing blank line** is off)
+- duplicate definitions (while **Merge duplicate definitions** is off)
+- names a footnote can't have (spaces, backticks, brackets, `#`)
+- footnotes nested inside another footnote's definition.
 
 ## For chapter notes: per-note footnote prefix
 
