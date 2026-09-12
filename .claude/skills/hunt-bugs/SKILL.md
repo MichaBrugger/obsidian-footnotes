@@ -22,7 +22,7 @@ wrong more than half the time — the surrounding code compensates, or the
 - Run tests with `npx vitest run <file>` — **never bare `npm test`**, which is
   watch mode and blocks forever.
 - Unit tests import from `../src/...`; the `obsidian` package is aliased to the
-  stub in `test/mocks/obsidian.ts` (see `vitest.config.ts`). If a probe's
+  stub in `test/mocks/obsidian.ts` (see `vitest.config.mts`). If a probe's
   import chain breaks on a missing obsidian export, extend the stub with a
   no-op rather than abandoning the probe.
 - Probes live in `test/hunt/probe-<lens>-<n>.test.ts`. That directory is part

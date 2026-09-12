@@ -48,7 +48,7 @@
       "scripts/readme-gifs/*.js"
     ],
     "ignore": [
-      "vitest.stryker.config.ts"
+      "vitest.stryker.config.mts"
     ],
     "ignoreBinaries": [
       "Obsidian.com",

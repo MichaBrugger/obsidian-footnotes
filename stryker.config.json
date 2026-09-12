@@ -3,7 +3,7 @@
     "_comment": "Mutation testing \u2014 LOCAL pre-release audit, not CI (GitHub Actions are too slow for this; run `npm run mutation`). perTest coverage analysis means each mutant only runs the tests that cover it; incremental mode caches results so re-runs after small changes take seconds-to-minutes. The mutate list is the pure logic the unit suite exercises \u2014 plugin bootstrap, settings UI, and the DOM-bound popup are smoke-test territory where mutants would just be no-coverage noise.",
     "testRunner": "vitest",
     "vitest": {
-        "configFile": "vitest.stryker.config.ts"
+        "configFile": "vitest.stryker.config.mts"
     },
     "coverageAnalysis": "perTest",
     "_timeout_comment": "hard 15s cap per mutant run: the default derives from the (slow, isolation-forced) dry run, and the suite's loop-killing tests make infinite-loop mutants hang until timeout \u2014 uncapped, ~100 such mutants stretched a scoped run from 16 minutes to hours (2026-08-11)",

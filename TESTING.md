@@ -13,7 +13,7 @@ Five layers, four commands and one by hand:
 ## Unit tests — `npm test`
 
 Vitest, watching `test/**/*.test.ts`. The `obsidian` npm package is type
-definitions only, so `vitest.config.ts` aliases it to the runtime stub in
+definitions only, so `vitest.config.mts` aliases it to the runtime stub in
 `test/mocks/obsidian.ts` — extend the stub (empty classes / no-ops) if a
 new import breaks test startup.
 

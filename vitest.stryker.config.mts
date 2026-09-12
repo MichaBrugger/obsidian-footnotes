@@ -1,6 +1,6 @@
 import { defineConfig, mergeConfig } from "vitest/config";
 
-import base from "./vitest.config";
+import base from "./vitest.config.mjs";
 
 // Stryker's perTest coverage analysis attributes coverage per test via
 // worker-level bookkeeping that shared workers corrupt: under the main
