@@ -1,116 +1,183 @@
-# Obsidian Footnotes Plugin
+# Footnote Shortcut
 
 ![Obsidian Downloads](https://img.shields.io/badge/dynamic/json?logo=obsidian&color=%23483699&label=downloads&query=%24%5B%27obsidian-footnotes%27%5D.downloads&url=https%3A%2F%2Fraw.githubusercontent.com%2Fobsidianmd%2Fobsidian-releases%2Fmaster%2Fcommunity-plugin-stats.json) [![Active Development](https://img.shields.io/badge/Maintenance%20Level-Actively%20Developed-brightgreen.svg)](https://gist.github.com/cheerfulstoic/d107229326a01ff0f333a1d3476e068d) ![Release Version](https://img.shields.io/github/v/release/MichaBrugger/obsidian-footnotes)
 
-This hotkey lets you:
+Create, navigate, and edit Obsidian footnotes all from the keyboard:
 
-- Insert a new numbered footnote marker (e.g. `[^1]`) with auto-incremented index in your text
-- Insert a new named footnote marker (e.g. `[^Citation]`) in your text
-- Adds the corresponding footnote detail (e.g. `[^1]: ` or `[^Citation]: `) at the bottom of your text
-- Places your cursor so you can fill in the details quickly
-- Jump from your footnote TO the footnote detail
-- Jump from your footnote detail BACK to the footnote
+- **One hotkey for footnote creation/editing**: insert a new footnote, and jump between the footnote reference and its definition
+- **Popup editor**: edit the footnote right at your cursor, no scrolling to the bottom
+- **Numbered, named, and inline** footnote styles
+- **Selection to footnote**: turn text you already wrote into a footnote with one press
+- **Rename a footnote** everywhere at once, like renaming a variable in a code editor
+- **Footnote linter** to keep footnote formatting tidy
+- **Per-note footnote prefixes** keep footnotes unique even when multiple chapters are merged into a larger document, such as with the [Longform](https://github.com/kevboh/longform) or [Easy Bake](https://github.com/community-archive/obsidian-easy-bake) plugins
+- Works on Obsidian Mobile
 
-![Overview](https://user-images.githubusercontent.com/68677082/228686351-fe71a0ec-be56-4d70-93c1-01925dd6380f.gif)
+![Press the hotkey, the popup opens at the cursor, type the note, the same hotkey closes it](README/hero.gif)
 
-## IMPORTANT: You must to set up your footnote hotkeys
+## FIRST: set up your hotkeys
 
-After installing and activating this plugin, you still have to SET UP your hotkeys. This is easy and quick:
+The plugin adds its commands **without hotkeys**, so assign your own right after installing by going to:
 
-`Settings -> Hotkeys -> Search for "Footnote" -> Customize Command -> Your preferred hotkeys`
+`Settings → Hotkeys → search for "Footnote Shortcut" → click the ⨁ next to a command → press your preferred keys`
 
-I personally use:
+Of the plugin's 7 commands, the ones you'll press constantly should have hotkeys. I personally use:
 
-- <kbd>Alt</kbd>+<kbd>0</kbd> as my numbered footnote hotkey
-- <kbd>Alt</kbd>+<kbd>-</kbd> as my named footnote hotkey
 
-![Hotkey](https://user-images.githubusercontent.com/68677082/228659877-8ea81271-37c4-4fdf-99de-1d4b6ca1c85f.png)
+| Command                               | Recommended hotkey                           |
+| ------------------------------------- | -------------------------------------------- |
+| Insert / navigate numbered footnote   | <kbd>Alt</kbd>+<kbd>0</kbd>                  |
+| Insert / navigate named footnote      | <kbd>Alt</kbd>+<kbd>-</kbd>                  |
+| Insert inline footnote                | <kbd>Alt</kbd>+<kbd>=</kbd>                  |
+| Insert inline footnote from clipboard | <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>=</kbd> |
 
-If you would like, you can further customize the plugin's behavior in Footnote Shortcut Settings.
+![The Hotkeys settings tab filtered to "Footnote Shortcut", with the four recommended bindings set](README/hotkeys.png)
 
-## Feature Details
+The other 3 (**Lint footnotes**, **Rename footnote**, and **Set footnote prefix**) come up less often, so running them from the command palette works fine. Give them hotkeys too if they become part of your routine.
 
-### Numbered Footnotes
+Everything also works on mobile from the toolbar, each with their own unique toolbar icons.
 
-#### Scenario: No previous numbered (e.g. "[^1]") footnotes exist
+<img src="README/mobile.png" width="320" alt="Obsidian mobile: the footnote commands sit on the editor toolbar">
 
-1. Given my cursor is where I want a numbered footnote to exist (e.g. `Foo bar baz▊`)
-2. When I hit `numbered footnote hotkey`
-3. Then a new footnote marker (e.g. `[^1]`) is inserted where my cursor was (e.g. `Foo bar baz[^1]`)
-4. And a new footnote details marker (e.g. `[^1]: `) is inserted on the last line of the document
-5. And my cursor is now placed at the end of the detail marker (e.g. `[^1]: ▊`)
+## Creating footnotes
 
-#### Scenario: Previous numbered (e.g. "[^1]") footnotes exist
+### Numbered footnotes
 
-1. Given there is one or more numbered footnotes in my text
-2. And my cursor is where I want a numbered footnote to exist (e.g. `Foo bar[^1] baz▊`)
-3. When I hit `numbered footnote hotkey`
-4. Then a new footnote marker with the next numbered index (e.g. `[^2]`) is inserted where my cursor was (e.g. `Foo bar[^1] baz[^2]`)
-5. And a new footnote details marker (e.g. `[^2]: `) is inserted on the last line of the document
-6. And my cursor is now placed at the end of the detail marker (e.g. `[^2]: ▊`)
+Put your cursor where the footnote belongs and press the hotkey. The plugin finds the next free number, inserts the reference (say `[^1]`), creates the matching `[^1]: ` definition at the bottom of the note, and lets you type the definition text immediately.
 
-#### Scenario: Chapter notes that merge into one document (footnote prefix)
+Footnotes are never created inside code, math, comments, frontmatter, or another footnote's definition, where they would be invalid. The plugin refuses in those locations and alerts you.
 
-1. Given my note is one chapter of a combined document, so plain numbers would collide across chapters
-2. And I have enabled `Per-note footnote prefix` in the plugin settings (off by default)
-3. And my note's properties (frontmatter) set a prefix, e.g. `footnote-prefix: 2.`
-4. When I hit `numbered footnote hotkey`
-5. Then the new footnotes are numbered within that prefix (e.g. `[^2.1]`, then `[^2.2]`, …)
-6. And notes without the property keep plain numbering (`[^1]`, `[^2]`, …)
+![Numbered footnote: the hotkey inserts the reference, the popup opens at the cursor, the definition is typed, the same hotkey closes it](README/numbered.gif)
 
-### Named Footnotes
+### Named footnotes
 
-#### Scenario: Add a named footnote
+Named footnotes (like `[^smith2024]`) take 2 quick presses:
 
-1. Given my cursor is where I want a named footnote to exist (e.g. `Foo bar baz▊`)
-2. When I hit `named footnote hotkey`
-3. Then an empty footnote marker (e.g. `[^]`) is inserted around my cursor (e.g. `Foo bar baz[^▊]`)
-4. Then, I fill in the name I want (e.g. `Foo bar baz[^customName]`)
-5. When I hit `named footnote hotkey` again
-6. A matching footnote details marker (e.g. `[^customName]: `) is inserted on the last line of the document
-7. And my cursor is now placed at the end of the detail marker (e.g. `[^customName]: ▊`)
+1. **First press** inserts an empty reference `[^]` with your cursor between the brackets. Type the name.
+2. **Second press** (with your cursor still on the reference) creates the matching `[^smith2024]: ` line and lets you write the definition text.
 
-### Universal
+Names can hold almost anything (`[^smith2024]`, `[^arXiv:1234.5678]`, `[^注]`). The exceptions are spaces, backticks, brackets, and `#`, which Obsidian can't render or find. The plugin refuses those invalid characters and alerts you.
 
-#### Footnote Popup Editing
+![Named footnote: the first press plants the empty reference, the name is typed, the second press writes the footnote](README/named.gif)
 
-- creating or jumping to a footnote opens its detail in a small editor right at your cursor, instead of moving your cursor to the bottom of the note
-- close the popup by pressing the footnote hotkey again, hitting `Escape`, or clicking outside it
-- can be disabled in settings to restore the classic jump-to-bottom behavior
+### Inline footnotes
 
-#### Footnote Section Heading
+2 commands cover Obsidian's inline `^[...]` style:
 
-- automatically adds a customizable heading separating your footnotes from the rest of your note
-- disabled by default
+- **Insert inline footnote** places `^[]` with your cursor inside, ready to type. Press the hotkey again when you're done and the cursor hops out past the closing bracket, so you never need the arrow keys.
+- **Insert inline footnote from clipboard** wraps whatever you've copied into `^[...]` in one press. Multi-line clipboard text is flattened to one line, and anything that would break the footnote (e.g. stray brackets) is escaped automatically.
 
-![ezgif com-video-to-gif](https://github.com/MichaBrugger/obsidian-footnotes/assets/68677082/6e53a654-eac0-4077-a2cf-fc76d5ef3961)
+![Inline footnotes: one typed in place and hopped out of, then the clipboard wrapped in one press](README/inline.gif)
 
-#### Scenario: Jumping TO a footnote detail
+### Inside tables
 
-1. Given I'm on a footnote detail line (e.g. `[^1]: ▊`)
-2. When I hit `numbered footnote hotkey` OR `named footnote hotkey`
-3. Then my cursor is placed right after the *first* occurence of this footnote in my text (e.g. `[^1]▊`)
+Footnotes work in table cells too: the reference goes into the cell and the definition lands below the table. Undoing a footnote made from a cell can take 2 undos, because the cell and the note are separate editors. A notice tells you when the first undo has only removed the definition, and whether a second undo removes the reference too.
 
-#### Scenario: Jumping BACK to a footnote
+### Turn selected text into a footnote
 
-1. Given I'm on (or next to) a footnote (e.g. `[^1]▊`) in my text
-2. When I hit `numbered footnote hotkey` OR `named footnote hotkey`
-3. Then my cursor is placed to the right of the footnote (e.g. `[^1]: ▊`)
+Sometimes you write something mid-sentence and realize it should be a footnote. Select it and press a footnote hotkey:
 
-## More Info
+- The **numbered** hotkey replaces the selection with the next numbered footnote reference and moves the selected text into that footnote's definition. Multi-paragraph selections work too: the whole block becomes one multi-paragraph footnote, including whole code blocks, callouts, etc.
+- The **named** hotkey asks you for a name first, then does the same under `[^yourname]`. Confirm with Enter, the Create button, or just press any footnote hotkey again.
+- The **inline** hotkey wraps the selection as `^[...]` right where it is. It accepts single-line selections only, as only those format correctly. For a multi-line selection, it points you to the previous 2.
+- A selection that starts or ends mid-word grows to whole words first, plus one trailing punctuation mark, so a sloppy drag still produces a clean footnote. Turn **Expand selections to whole words** off in the settings if you want the exact selection.
+- A selection that contains/cuts-through an existing footnote refuses to convert, as footnotes can't be nested inside other footnotes. Nesting is prevented throughout the plugin, and linting alerts you if a note already has hand-typed nesting.
+- Tables: text inside one cell converts, as well as a whole table selected edge to edge (with or without the text around it). A selection that cuts through a table's pipes refuses, to avoid breaking the table.
 
-- New to footnotes? [+1creator's video tutorial](https://www.youtube.com/watch?v=HapgV7Y52dY) covers footnotes in Obsidian and includes a full walkthrough of setting up and using this plugin.
-- For more information, please check the [plugin wiki](https://github.com/MichaBrugger/obsidian-footnotes/wiki).
-  - [Overview of how footnotes work in Obsidian](https://github.com/MichaBrugger/obsidian-footnotes/wiki/Footnote-Functionality)
-  - [Debug Guide](https://github.com/MichaBrugger/obsidian-footnotes/wiki/Debug-Guide)
+![Selection to footnote with the numbered, named, and inline keys](README/selection.gif)
 
-## Other Recommended Plugins
+### Creating footnotes at multiple cursors
 
-- If you're looking for the capability to "Automatically Re-Index Footnotes", check out the [Linter plugin](https://github.com/platers/obsidian-linter), which has the ability to re-index all your footnotes based on order of occurrence every time a note is changed or saved.
+**Multiple cursors** (<kbd>Alt</kbd>+<kbd>click</kbd>) get the same footnote at every one of them, handy when one source is cited in several places:
+
+- The numbered hotkey puts the same `[^N]` at every cursor, sharing a single definition.
+- The named hotkey drops footnote brackets around every cursor and leaves a cursor inside each pair, so you type the name once and it lands everywhere. Press the hotkey again with the cursors still inside to create the shared definition.
+- The inline hotkey also drops footnote brackets around every cursor, so you type the footnote text once and it lands everywhere.
+- Pasting as an inline footnote wraps the same clipboard text at every cursor.
+
+If any cursor sits where a footnote can't go, nothing is inserted anywhere. Every multi-cursor insertion ends with a single cursor after the first reference.
+
+![Multiple cursors: the numbered, named, inline, and clipboard keys put the same footnote at every cursor](README/multicursor.gif)
+
+## Navigating footnotes
+
+The insert hotkeys double as navigation. What they do depends on where your cursor is:
+
+- **On a footnote reference** (inside `[^3]` in your text): open its definition in a popup right at your cursor (or by jumping to the definition, when the footnote popup is off).
+- **On a footnote definition at the bottom** (a `[^3]: …` line): jump back to where its reference is used in your text.
+- **Anywhere else**: insert a new footnote, as described above.
+
+One hotkey takes you back and forth between a reference and its note.
+
+![Navigation: on a reference the hotkey opens its definition in the popup; on the definition it jumps back to the reference](README/navigation.gif)
+
+### Renaming a footnote
+
+Put your cursor on any reference or definition and run **Rename footnote**. It works like renaming a variable in a code editor: every reference and the definition get the new name in one step. It's also in the right-click menu when you click on a footnote, just like Obsidian's own rename for headings. Names are case-insensitive, so `[^Note]` and `[^note]` count as the same footnote. The command refuses names that are already taken and names a footnote can't have, and under a per-note prefix the new name gets the prefix added for you.
+
+![Rename footnote: every reference and the definition take the new name together](README/rename.gif)
+
+### The popup editor
+
+Creating or visiting a footnote opens its definition text in a small editor right at your cursor, so you never lose your place in the note. Close it with the same hotkey, <kbd>Escape</kbd>, or by clicking anywhere outside. Switching to Reading view closes it too. If a footnote has more than one definition, the hotkey jumps to the last definition instead (the one Reading View renders) so you can sort it out (or let the linter merge them). If you prefer the classic jump-to-the-bottom behavior, turn off **Edit footnotes in a popup** in the settings.
+
+## Keeping footnotes tidy: the linter
+
+Writing and revising can leave footnotes messy. The **Lint footnotes** command cleans up the whole note in one pass:
+
+- **Move footnote references after punctuation**: Moves references that sit before punctuation, or inside closing quotation marks, brackets, or emphasis, to sit after them (`word[^1].` becomes `word.[^1]`, and `"quote[^1]".` becomes `"quote".[^1]`), the placement every major style guide recommends.
+- **Gather definitions**: Moves every footnote definition under your specified footnote section heading, or to the bottom of the note.
+- **Fix definitions hidden by a missing blank line**: a `[^1]:` line typed directly under a paragraph is plain text to Obsidian, and its footnote never shows. The linter inserts the blank line it needs (or, with the rule off, alerts you about it).
+- **Alert/delete orphans**: Orphans are footnote references without a definition or definitions without a reference. You choose whether the plugin alerts you or deletes orphans.
+- **Merge duplicate definitions**: if you accidentally have multiple definitions for the same footnote name, the plugin can alert you or merge them into one.
+- **Reindex**: renumbers footnotes `1, 2, 3…` in the order they appear and reorders their definitions to match. Named footnotes keep their names (or get numbers too, if you enable **Renumber named footnotes**).
+
+![Lint footnotes: references move past punctuation, numbering follows the text, definitions gather at the bottom](README/lint.gif)
+
+Each rule can be toggled individually in **Settings → Footnote Shortcut → Linting**, along with 2 automatic triggers (both off by default):
+
+- **Lint on save**: lints the note whenever you press <kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<kbd>S</kbd> (vim users: `:w` works too).
+- **Lint on footnote creation**: lints the note right after you create a new footnote.
+
+The linter also watches for problems it can't fix by itself and tells you about them, naming every footnote involved: 
+
+- an empty `[^]` reference you never named, references with no definition or definitions nothing uses (while **delete orphaned references/definitions** are off)
+- a definition typed directly under a paragraph with no blank line above it as Obsidian shows it as plain text (while **Fix definitions hidden by a missing blank line** is off)
+- duplicate definitions (while **Merge duplicate definitions** is off)
+- names a footnote can't have (spaces, backticks, brackets, `#`)
+- footnotes nested inside another footnote's definition.
+
+## For chapter notes: per-note footnote prefix
+
+If you're writing a book via chapter notes (e.g. when using the [Longform](https://github.com/kevboh/longform) or [Easy Bake](https://github.com/community-archive/obsidian-easy-bake) plugins), plain numbering collides when you merge the chapters back together: every chapter has its own `[^1]`, so Obsidian confuses footnotes from chapter 1 with those from every other chapter.
+
+To fix this, turn on **Per-note footnote prefix** and give each chapter its own unique prefix, so footnotes stay unique across the whole book:
+
+1. Run the **Set footnote prefix** command and enter a prefix, e.g. `2-` for chapter 2 (this saves a `footnote-prefix` property in the note).
+2. From then on, the numbered command inserts `[^2-1]`, `[^2-2]`, … and the named command starts new references with the prefix (`[^2-]`) filled in.
+3. The linter understands prefixes too: it renumbers `[^2-x]` footnotes within their own namespace, and can also convert a note's existing plain footnotes to carry the prefix (**Apply the note's footnote prefix**, on by default).
+
+Notes without the property keep normal `[^1]`, `[^2]`, … numbering. A prefix follows the same rules as a footnote name and can't end in a digit, as then `[^2-1]` and `[^21]` would be indistinguishable.
+
+![Per-note prefix: set it once, then numbered and named footnotes carry it](README/prefix.gif)
+
+## Other settings
+
+- **Insert footnote reference at end of word** *(on by default)*: pressing the hotkey mid-word places the reference at the end of the word, past any closing quotation marks, brackets, or emphasis and the punctuation after them, so you don't have to aim.
+- **Expand selections to whole words** *(on by default)*: the selection twin of the above; a selection converted into a footnote grows to whole words first.
+- **Enable section heading** *(off by default)*: automatically adds a heading (e.g. `# Footnotes`) above your footnote definitions. The heading text is fully customizable, can span multiple lines, and if it already exists in the note it's reused instead of duplicated.
+- **Trim blank lines** *(on by default)*: removes stray blank lines from the end of the note when the first footnote is added.
+
+## More info
+
+- If you're new to footnotes, [+1creator's video tutorial](https://www.youtube.com/watch?v=HapgV7Y52dY) covers footnotes in Obsidian and includes a full walkthrough of the 0.1.3 version of this plugin. <!-- recorded on 0.1.x; popup/linting not shown -->
+- [Plugin wiki](https://github.com/MichaBrugger/obsidian-footnotes/wiki)
+  - [How footnotes work in Obsidian](https://github.com/MichaBrugger/obsidian-footnotes/wiki/Footnote-Functionality)
+  - [Debug guide](https://github.com/MichaBrugger/obsidian-footnotes/wiki/Debug-Guide)
 
 ## Background
 
-This plugin is based on the great idea by [jacob.4ristotle](https://forum.obsidian.md/u/jacob.4ristotle/summary) posted in the ["Footnote Shortcut"](https://forum.obsidian.md/t/footnote-shortcut/8872) thread.
+This plugin is based on the great idea by [jacob.4ristotle](https://forum.obsidian.md/u/jacob.4ristotle/summary) posted in the ["Footnote Shortcut"](https://forum.obsidian.md/t/footnote-shortcut/8872) thread:
 
 > **Use case or problem:**
 >
@@ -119,11 +186,14 @@ This plugin is based on the great idea by [jacob.4ristotle](https://forum.obsidi
 > - scroll to the bottom to check how many footnotes I already have
 > - type [^n] in the body of the note, where n is the next number
 > - move to the end of the note, type [^n] again, and then add my citation.
->
-> **Proposed solution:**
->
-> It would be convenient to have a shortcut to automate these steps. In particular, I envision that the shortcut would:
-> Using the smallest natural number n that has not yet been used for a footnote
->
-> - add `[^n]` at the insertion point
-> - add `[^n]: ` to the end of the note, and move the insertion point there.
+
+Created by Alexis Rondeau and Micha Brugger, maintained and expanded by Jason Qin.
+
+## For developers
+
+- **Build**: `npm install`, then `npm run build` (type-checks with `tsc` and bundles with esbuild). `npm run dev` watches for changes.
+- **Tests**: `npm test` runs the [Vitest](https://vitest.dev/) unit suite in `test/`; behavioral policies (reindexing rules, reference parsing, edge cases) are pinned there, and the [fast-check](https://fast-check.dev/) property tests fuzz both the linter and the insert commands over randomly generated documents, including a differential oracle that re-parses every document with [micromark](https://github.com/micromark/micromark) before and after linting. `manual-tests/` contains scripted in-app scenarios, and `scripts/smoke-test.mjs` drives a live Obsidian instance.
+- **Static checks**: `npm run lint` (ESLint with the Obsidian plugin guidelines plus typescript-eslint's `strict-type-checked`) and `npm run knip` (dead exports and unused files/dependencies, kept at zero findings).
+- **Mutation testing**: `npm run mutation` runs [Stryker](https://stryker-mutator.io/) locally as a pre-release audit (incremental cache makes re-runs fast). Not wired into CI on purpose.
+- **Architecture**: `src/main.ts` registers commands and settings; the command cascade and creation steps live in `src/commands/`, the shared markdown scanner and footnote grammar in `src/parsing/`, editor and caret utilities in `src/editor/`, and the linter with its pure rules in `src/linting/`.
+- Contributions welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) and [TESTING.md](TESTING.md).
