@@ -54,6 +54,18 @@ export const RenameTargetNotice =
  * raw line first and only then confirms against the masked twin (the copy
  * of the note with protected text blanked out).
  */
+/**
+ * Whether a "[^x]:" at the start of this line is a label rather than a
+ * reference. A label that starts a definition is one; so is a label inside
+ * a %% block comment, which is dead as a definition but is not a lazy
+ * label either (its own "[^x]" is not a reference; see the %% comment
+ * spec). Only a lazy label, one written directly under a line of prose,
+ * has a "[^x]" that counts as a reference.
+ */
+function labelCountsAsLabel(ctx: DocContext, line: number): boolean {
+    return ctx.definitionStarts()[line] || ctx.scan.inCommentBlock[line];
+}
+
 export function renameTargetAtCursor(
     doc: Editor,
     cursorPosition: EditorPosition,
@@ -65,7 +77,7 @@ export function renameTargetAtCursor(
         referenceOccurrences(
             lineText,
             ctx.maskedLine(cursorPosition.line),
-            ctx.definitionStarts()[cursorPosition.line],
+            labelCountsAsLabel(ctx, cursorPosition.line),
         ),
         cursorPosition.ch,
     );
@@ -80,6 +92,11 @@ export function renameTargetAtCursor(
     // calls a lazy label: Obsidian reads it as more paragraph text, not as a
     // definition (definitionStartLines decides this)
     if (!ctx.definitionStarts()[cursorPosition.line]) return null;
+    // a label inside a %% block comment is dead too: the plugin renames
+    // nothing inside a block comment, so offering the name would only lead
+    // to a rename with nothing to do (found by the release workflow's
+    // property run, 2026-09-12)
+    if (ctx.scan.inCommentBlock[cursorPosition.line]) return null;
     return lineText.slice(label.nameStart, label.nameEnd);
 }
 
@@ -118,7 +135,7 @@ export function renameTargetInSelection(
     for (const occurrence of referenceOccurrences(
         lineText,
         ctx.maskedLine(from.line),
-        ctx.definitionStarts()[from.line],
+        labelCountsAsLabel(ctx, from.line),
     )) {
         if (occurrence.start < to.ch && occurrence.end > from.ch) return occurrence.name;
     }
@@ -126,6 +143,7 @@ export function renameTargetInSelection(
     if (!label || from.ch >= label.labelEnd) return null;
     if (!definitionLabelIn(ctx.maskedLine(from.line))) return null;
     if (!ctx.definitionStarts()[from.line]) return null;
+    if (ctx.scan.inCommentBlock[from.line]) return null;
     return lineText.slice(label.nameStart, label.nameEnd);
 }
 
