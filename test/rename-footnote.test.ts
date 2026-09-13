@@ -14,6 +14,7 @@ import {
 import { simulateChanges } from "../src/editor/insertion-liveness";
 import { referenceOccurrences } from "../src/parsing/footnote-grammar";
 import {
+    definitionStartLines,
     findDefinitionBlocks,
     maskedLineAt,
     normalizeEol,
@@ -228,11 +229,23 @@ describe("rename property", () => {
                         ).toBe(false);
                         const folded = target.toLowerCase();
                         const names = new Set<string>();
+                        // the same label rule the resolver applies: a label
+                        // that starts a definition is a label, a label inside
+                        // a %% block comment is a (dead) label, and only a
+                        // LAZY label's own "[^x]" is a live reference - the
+                        // oracle used to treat every label as a label, which
+                        // only passed because every other lazy shape carries
+                        // a real reference somewhere else (found by a 4000-run
+                        // soak, 2026-09-12: "%% c %%" over a lone lazy label)
+                        const starts = definitionStartLines(lines, scan, (i) =>
+                            maskedLineAt(lines, i),
+                        );
                         for (let i = 0; i < lines.length; i++) {
                             if (!lines[i].includes("[^")) continue;
                             for (const occurrence of referenceOccurrences(
                                 lines[i],
                                 maskedLineAt(lines, i),
+                                starts[i] || scan.inCommentBlock[i],
                             )) {
                                 names.add(occurrence.name.toLowerCase());
                             }

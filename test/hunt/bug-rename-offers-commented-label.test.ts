@@ -39,6 +39,17 @@ describe("a label inside a %% block comment is no rename target", () => {
         expect(renameTargetInSelection(doc, { line: 8, ch: 0 }, { line: 8, ch: 6 })).toBeNull();
     });
 
+    it("a lazy label under a comment-only line is paragraph text, so its own [^x] is a live reference and a target", () => {
+        // the shape the property soak found after the fix above (2026-09-12):
+        // "%% c %%" is a paragraph line, the label under it is lazy, and a
+        // lazy label's "[^94]" is the live reference it really is - so
+        // offering "94" is right, and it was the property's oracle that
+        // had to learn the rule
+        const lines = ["%% c %%", "[^94]: lazy under a comment line"];
+        const doc = fakeEditor(lines, { wholeDoc: true });
+        expect(renameTargetAtCursor(doc, { line: 1, ch: 3 })).toBe("94");
+    });
+
     it("a hidden reference inside the block still is one, since Obsidian binds it", () => {
         const lines = [...LINES.slice(0, 7), "%%", "hidden[^93] reference", "%%", "", "[^93]: the definition"];
         const doc = fakeEditor(lines, { wholeDoc: true });
