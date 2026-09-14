@@ -1,0 +1,100 @@
+// Imported from the KIMI sweep of 2026-09-13 (T3 Code worktree); 9 of 9 tests were red there and carry it.fails.
+import { describe, expect, it } from "vitest";
+
+import { computeNextFootnoteNumber } from "../../src/parsing/footnote-grammar";
+import { protectedLines, scanDocument } from "../../src/parsing/markdown-scan";
+import { moveFootnoteDefinitionsToBottom } from "../../src/linting/rules/move-footnotes-to-the-bottom";
+import { reindexFootnotes } from "../../src/linting/rules/re-index-footnotes";
+
+// What a user sees: a fenced code block inside a list item that is never
+// closed ("- ```" followed by code) should die where the list item ends.
+// Instead the plugin keeps the fence open to the end of the note: every
+// line below is treated as code, so autonumbering skips live references,
+// "Move footnotes to bottom" refuses the note forever (endsProtected), and
+// "Delete orphaned definitions" leaves real orphans in place.
+//
+// Ground truth: micromark (CommonMark - a fenced code block ends with its
+// enclosing container) parses "plain[^1]" below as a live paragraph. The
+// plugin already applies this exact rule to fences inside BLOCKQUOTES
+// (bug-blockquote-fence-outlives-quote, "a fence lives in the container
+// that opened it"), and its fence state records the list item's content
+// indent for the closer - but container-DEATH is only tracked for
+// blockquote depth, so the fence outlives the list item. One step past the
+// container-fence pins: bug-list-item-fence and bug-list-fence-indented-closer
+// only cover CLOSED list fences.
+//
+// NOTE: this contradicts the last test of bug-list-fence-indented-closer
+// ("an unclosed list fence still protects to EOF"), which pins the current
+// behavior without any ground-truth note. A fix needs to re-ligate that pin.
+
+describe("an unclosed fence inside a list item dies with the item", () => {
+    it.fails("the text after an unclosed list fence is live, not code", () => {
+        expect(protectedLines("- ```\n  code\nplain[^1]".split("\n"))).toEqual([
+            true,
+            true,
+            false,
+        ]);
+    });
+
+    it.fails("a reference after the dead fence counts in autonumbering", () => {
+        expect(computeNextFootnoteNumber("- ```\n  code[^99]\nplain[^1]")).toBe(2);
+    });
+
+    it.fails("the next list item ends the fence", () => {
+        expect(computeNextFootnoteNumber("- ```\n  code[^99]\n- item[^1]")).toBe(2);
+    });
+
+    it.fails("an ordered item's fence dies the same way", () => {
+        expect(protectedLines("1. ```\n   code\nplain[^1]".split("\n"))).toEqual([
+            true,
+            true,
+            false,
+        ]);
+    });
+
+    it.fails("a nested bullet's fence dies at document level too", () => {
+        // the pinned closed shape is "- outer\n  - ```\n    fake[^1]\n    ```";
+        // unclosed, the fence must die where the nested item ends
+        expect(
+            protectedLines("- outer\n  - ```\n    code\nplain[^1]".split("\n")),
+        ).toEqual([false, true, true, false]);
+    });
+
+    it.fails("the pinned EOF-swallow shape itself (re-litigation)", () => {
+        // the existing pin expects [true,true,true,true] + endsProtected;
+        // micromark reads "swallowed" as a live paragraph
+        const scan = scanDocument("10. ```\n    code\n\nswallowed".split("\n"));
+        expect(scan.isProtected).toEqual([true, true, true, false]);
+        expect(scan.endsProtected).toBe(false);
+    });
+
+    it.fails("a bare fence line after a list fence opens a NEW fence instead of closing", () => {
+        // micromark: the list fence dies with its item, so the bare "```"
+        // OPENS a new unclosed fence at the document level and "real[^1]"
+        // is code. The plugin lets the bare line close the list fence
+        // (depth 0 matches, and 0 <= contentIndent + 3), so "real[^1]"
+        // comes out live. Same missing list arm, protection inverted:
+        // code the user sees as code gets numbered and linted.
+        expect(computeNextFootnoteNumber("- ```\n  code[^9]\n```\nreal[^1]")).toBe(1);
+        expect(protectedLines("- ```\n  code[^9]\n```\nreal[^1]".split("\n"))).toEqual([
+            true,
+            true,
+            true,
+            true,
+        ]);
+    });
+
+    it.fails("move-to-bottom is not refused below a dead list fence", () => {
+        const doc = "- ```\n  code\npara[^1]\n\n[^1]: def\n\ntail";
+        expect(moveFootnoteDefinitionsToBottom(doc)).toBe(
+            "- ```\n  code\npara[^1]\n\ntail\n\n[^1]: def",
+        );
+    });
+
+    it.fails("drop-orphans deletes a real orphan below a dead list fence", () => {
+        const doc = "- ```\n  code\nreal[^1]\n\n[^1]: def\n\n[^9]: stray";
+        expect(reindexFootnotes(doc, { keepOrphanedDefinitions: false })).toBe(
+            "- ```\n  code\nreal[^1]\n\n[^1]: def",
+        );
+    });
+});
