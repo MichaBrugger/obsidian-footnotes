@@ -1,180 +1,203 @@
 ---
 name: hunt-bugs
-description: Adversarial bug hunt for the obsidian-footnotes plugin — fan out parallel hunter agents over the plugin's attack surface, prove every suspected bug with a failing vitest probe, and pin confirmed bugs as it.fails tests. Use whenever the user wants to find bugs, hunt bugs, stress-test, fuzz, break the plugin, probe edge cases, check robustness before a release, or asks "what bugs are lurking" — even if they don't say the word "bug". Also use after landing a risky feature to sweep it for regressions.
+description: Bug hunt for the obsidian-footnotes plugin - parallel hunter agents over the attack surface, every finding proved by a failing vitest probe, confirmed bugs pinned as it.fails tests. Use when the user wants bugs found, wants the plugin stress-tested or fuzzed, is checking robustness before a release, or has just landed a risky feature.
 ---
 
 # Bug hunt: prove it or it didn't happen
 
-The goal is to find bugs Jason's manual testing can't reach. The one hard rule
-that makes this a *hunt* rather than a code review:
+The goal is bugs Jason's manual sheets can't reach. The one hard rule that
+makes this a *hunt* rather than a code review:
 
-> **A bug does not exist until a vitest probe demonstrates it against the real
-> code.** Reading the code and saying "this looks wrong" produces a hypothesis,
-> never a finding. Every finding in the final report must point at a probe test
-> that fails right now, with the failure output to show for it.
+> **A bug exists when a vitest probe goes red against the real code.**
+> Reading the code and saying "this looks wrong" is a hypothesis. Every
+> finding in the report points at a probe that is red right now, with its
+> failure output.
 
-This rule exists because plausible-looking bugs found by reading regexes are
-wrong more than half the time — the surrounding code compensates, or the
-"expected" behavior was never the spec. Running the probe settles it.
+Plausible bugs found by reading regexes are wrong more than half the time:
+the surrounding code compensates, or the "expected" behaviour was never the
+spec. Running the probe settles it.
 
 ## Ground rules for this repo
 
-- Run tests with `npx vitest run <file>` — **never bare `npm test`**, which is
-  watch mode and blocks forever.
-- Unit tests import from `../src/...`; the `obsidian` package is aliased to the
-  stub in `test/mocks/obsidian.ts` (see `vitest.config.mts`). If a probe's
-  import chain breaks on a missing obsidian export, extend the stub with a
-  no-op rather than abandoning the probe.
-- Probes live in `test/hunt/probe-<lens>-<n>.test.ts`. That directory is part
-  of the vitest include pattern, so keep probes tidy and **delete every probe
-  that didn't confirm a bug** before finishing.
-- Do not touch `scripts/smoke-test.mjs`, existing tests, or `src/` — this
-  skill finds bugs, it does not fix them.
-- This vault is Syncthing-synced, and sync has been observed to transiently
-  delete `test/hunt/` mid-hunt (2026-07-17). Hunters should keep each
-  finding's essentials (scenario, expected, actual) in their returned JSON —
-  never only in the probe file — so a vanished probe can be reconstructed.
+- Vocabulary is enforced: read `CONTEXT.md` before writing a probe name or an
+  expectation. *Reference* is the `[^1]` in the text, *definition* the
+  `[^1]:` entry, *label* its head, *lazy label* a label Obsidian reads as
+  paragraph text. The ADRs in `docs/adr/` are rulings, not bugs: nested
+  footnotes are prevented plugin-wide, and lint is never silent about what it
+  won't fix.
+- Expected values come from an **independent source of truth**: Obsidian's
+  own rendering (the manual sheets in `manual-tests/` record ground truth),
+  CommonMark and GFM footnote syntax, the README, or an existing ruling.
+  An expectation derived by re-reading the implementation is a tautology and
+  proves nothing.
+- Run tests with `npx vitest run <file>` (bare `npm test` is watch mode and
+  blocks). Unit tests import from `../src/...`; the `obsidian` package is
+  aliased to `test/mocks/obsidian.ts`. If a probe's import chain breaks on a
+  missing obsidian export, extend the stub with a no-op and keep the probe.
+- Probes live in `test/hunt/probe-<lens>-<n>.test.ts`. The directory is in
+  the vitest include pattern, so every probe that confirmed nothing is
+  deleted before the hunt ends.
+- The hunt writes only under `test/hunt/` and to the attack-surface
+  reference. `src/`, `scripts/`, and existing tests stay as they are: the
+  hunt finds bugs; fixing is Jason's call afterwards.
+- Two pins are expected-fail on purpose and already ruled on:
+  `bug-moved-definition-adopts-indented-code` and `spec-questions`. Leave
+  them alone.
+- This vault is Syncthing-synced, and sync has deleted `test/hunt/` mid-hunt
+  before (2026-07-17). Hunters keep each finding's scenario, expected, and
+  actual in their returned JSON, so a vanished probe can be rebuilt.
 
 ## The pipeline
 
 ### 1. Recon (orchestrator, cheap)
 
-Read [references/attack-surface.md](references/attack-surface.md) — the module
-map, the historical bug taxonomy, and the edge-case checklists. Then check
-whether it's stale: `git log --oneline -15` and a quick
-`grep -n "^export" src/*.ts` diffed mentally against the reference. If new
-modules or exports appeared since the reference was written, fold them into
-the hunt (and update the reference file at the end — it's part of the repo).
+1. Read `CONTEXT.md`, the two ADRs, and
+   [references/attack-surface.md](references/attack-surface.md): the module
+   map, the bug taxonomy, the lens checklists, and the open pins.
+2. Measure the **blast radius** of what changed since the reference was
+   last verified: `git log --since=<date in the reference header> --format=%s`
+   and `git diff --stat <that date>..HEAD -- src`. Modules that changed, and
+   the modules that import them, are prime ground. Weight the hunt toward
+   them: a changed module gets its own hunter even if its lens would
+   otherwise be shared.
+3. Scope to the ask. A full sweep runs every lens; a targeted request
+   ("hunt the reindexer") runs the relevant lenses plus the **interactions**
+   lens always, because single-module bugs are mostly fished out and the
+   survivors live between modules.
 
-Scope the hunt to what the user asked: a full sweep uses every lens below; a
-targeted request ("hunt the reindexer") uses only the relevant lenses but
-always includes the **interaction** lens, because single-module bugs are
-mostly fished out already — the survivors live between modules.
+Recon is done when you can name, per lens, the target modules and the
+changed code each hunter must cover.
 
 ### 2. Fan out hunters (parallel, one message)
 
 Spawn one subagent per lens with the Agent tool, all in a single message,
-with **`run_in_background: false`** on every call — parallel tool calls in one
-message still run concurrently, and blocking on them matters: if the
-orchestrator idles waiting for background children it can miss their results
-(when this skill itself runs inside a subagent, background-child notifications
-bubble past it) and, in a worktree, the idle orchestrator's still-clean tree
-gets auto-cleaned out from under the hunters.
+with `run_in_background: false` on every call: parallel tool calls in one
+message still run concurrently, and blocking on them matters (an idle
+orchestrator can miss background children's results, and in a worktree its
+still-clean tree gets auto-cleaned out from under the hunters).
 
-Set **`model: "opus"`** (or `"sonnet"`) on every hunter and skeptic — hunting
-is breadth work that doesn't need the top-tier model, and per-lens agents burn
-tokens fast (Jason's standing rule: bug-testing subagents run on Opus or
-Sonnet, never Fable).
+Set `model: "opus"` (or `"sonnet"`) on every hunter and skeptic: hunting is
+breadth work, per-lens agents burn tokens fast, and Jason's standing rule is
+that bug-testing subagents never run on the top model.
 
-Lenses, from `references/attack-surface.md`:
+Lenses, from the reference:
 
-1. **grammar** — reference/definition parsing vs. what Obsidian actually accepts
-2. **contexts** — protected regions: code, math, frontmatter, callouts, tables
-3. **offsets** — cursor/index arithmetic: boundaries, unicode, empty inputs
-4. **properties** — idempotence and invariants of the pure transforms
-5. **interactions** — feature × feature: prefix × reindex × tidy × contexts
-6. **regressions** — mutations of every historical bug in the taxonomy
+1. **grammar**: reference and definition parsing against what Obsidian accepts
+2. **contexts**: protected regions (code, math, comments, frontmatter,
+   callouts, tables) and the prose-label rule
+3. **offsets**: caret and index arithmetic (boundaries, unicode, empty input,
+   table cells, the landing convention)
+4. **properties**: idempotence, conservation, and pairing invariants of the
+   lint pipeline and the write-back
+5. **interactions**: feature x feature (prefix x reindex x move x contexts x
+   comments x selections)
+6. **regressions**: harder variants of every pinned bug and taxonomy row
 
-Each hunter gets this prompt skeleton (fill the bracketed parts):
+Each hunter gets this prompt, bracketed parts filled in, plus a paragraph
+steering it at its section of the reference and at the changed code recon
+assigned to it:
 
 ```
 You are a bug hunter for the obsidian-footnotes Obsidian plugin at
 [absolute repo path]. Your lens: [lens name].
 
-Read .claude/skills/hunt-bugs/references/attack-surface.md first — your
-lens's section lists the target functions and the edge-case checklist.
-Read the source of your target modules. Then write vitest probe tests at
-test/hunt/probe-[lens]-<n>.test.ts exercising the checklist plus any
-suspicion of your own. Base expectations on documented Markdown/Obsidian
-footnote behavior and on what a user would obviously want — when you are
-not sure what the right behavior is, still write the probe and flag it as
-a spec question instead of a bug.
+Read CONTEXT.md (the vocabulary), then
+.claude/skills/hunt-bugs/references/attack-surface.md: your lens's section
+lists target functions and an edge-case checklist. Read the source of your
+targets. Write vitest probes at test/hunt/probe-[lens]-<n>.test.ts covering
+the checklist, the changed code named below, and your own suspicions.
 
-Run each probe with: npx vitest run test/hunt/<file>  (never bare npm test
-— it watches). The obsidian package is stubbed via test/mocks/obsidian.ts;
-extend the stub with no-ops if an import fails.
+Every expected value comes from an independent source of truth: Obsidian's
+rendering as recorded in manual-tests/, CommonMark/GFM footnote syntax, the
+README, or a ruling in docs/adr/. When the right behaviour is unclear, still
+write the probe and label it a spec question rather than a bug.
 
-Iterate: most probes will pass — that is expected and fine. Delete probe
-files whose every test passes. Keep only files containing at least one
-failing test.
+Run each probe with: npx vitest run test/hunt/<file>. The obsidian package
+is stubbed via test/mocks/obsidian.ts; extend the stub with no-ops if an
+import fails.
 
-Return raw data, not prose: a JSON list of findings, each with
-{file, testName, oneLineScenario, expected, actual, bugOrSpecQuestion,
-confidence}. Return [] if nothing failed. Do not fix anything in src/.
+Most probes will pass; that is the expected shape of a hunt. Delete probe
+files whose every test passes. Keep only files with at least one red test.
+
+Return raw data: a JSON list of findings, each with {file, testName,
+oneLineScenario, expected, sourceOfTruth, actual, bugOrSpecQuestion,
+confidence}. Return [] if nothing went red. src/ stays untouched.
 ```
 
-Add a lens-specific paragraph steering each hunter at its section of the
-reference. Six hunters is the full-sweep default; scale down for targeted
-hunts, up (split a lens in two) when the user asks for a *thorough* audit.
+Six hunters is the full-sweep default; scale down for targeted hunts, up
+(split a lens, or give a changed module its own hunter) for a thorough audit.
 
 ### 3. Verify (orchestrator + skeptics)
 
 For every finding:
 
-1. **Re-run the probe yourself.** If it passes now, the hunter fooled itself —
+1. **Re-run the probe yourself.** Green now means the hunter fooled itself:
    discard.
 2. **Spawn a skeptic agent** per surviving finding (parallel, one message)
    whose job is to *refute* it: "Is the probe's `expected` actually correct
-   per Markdown/Obsidian semantics, this repo's README/TESTING.md, and the
-   intent visible in the code's comments and existing tests? Argue the
-   implementation is right and the probe is wrong." Verdicts:
-   - **CONFIRMED** — expected behavior is defensible, code misbehaves → a bug
-   - **SPEC QUESTION** — code is self-consistent but the behavior is
-     surprising/undocumented → Jason decides
-   - **PROBE ERROR** — the probe misreads the spec → delete it
+   per Obsidian's rendering, CommonMark, this repo's README, CONTEXT.md, the
+   ADRs, and the intent visible in the code's comments and existing tests?
+   Argue the implementation is right and the probe is wrong." Verdicts:
+   - **CONFIRMED**: the expectation stands on its source of truth and the
+     code misbehaves
+   - **SPEC QUESTION**: the code is self-consistent but the behaviour is
+     surprising or unruled; Jason decides
+   - **PROBE ERROR**: the probe misreads the spec; delete it
 
-Findings that survive with low confidence stay in the report, marked as such —
-better a flagged maybe than a silent miss.
+Findings that survive with low confidence stay in the report, marked as
+such: a flagged maybe beats a silent miss.
 
 ### 4. Pin and clean up
 
-- Rewrite each CONFIRMED bug's probe as a pinning test at
-  `test/hunt/bug-<short-slug>.test.ts` using vitest's **`it.fails`** modifier,
-  with a header comment: one-line scenario, hunt date, and lens. `it.fails`
-  keeps `npm test` green while the bug exists and flips red the moment the
-  bug gets fixed — so the pin can never silently rot.
-- SPEC QUESTIONs get the same treatment but with a `// spec question:` header
+- Rewrite each CONFIRMED bug's probe as a pin at
+  `test/hunt/bug-<short-slug>.test.ts` using vitest's `it.fails`, with a
+  header comment: one-line scenario, what the user would see, hunt date,
+  lens, source of truth. `it.fails` keeps the suite green while the bug
+  exists and flips red the moment the bug is fixed, so a pin can never rot.
+- SPEC QUESTIONs get the same treatment with a `// spec question:` header
   and the question spelled out.
-- Delete all remaining `probe-*.test.ts` files, then run the **full** suite
-  (`npx vitest run`) and confirm it is green before reporting. A red suite
-  here means cleanup is incomplete — fix that, don't report around it.
+- Delete every remaining `probe-*.test.ts`, then run the full suite
+  (`npx vitest run`) and confirm it is green. Red here means cleanup is
+  incomplete: finish it before reporting.
+- Update the reference: bump its "last verified" date, add the new pins to
+  the taxonomy, fold in any module the map lacks.
 
 ### 5. Report
 
-End with exactly this shape (prose, not raw JSON):
+End with exactly this shape, in plain language a non-programmer can follow,
+no em dashes:
 
 ```
-## Bug hunt results — <date>
+## Bug hunt results, <date>
 
 Hunted: <lenses run> | Probes written: N | Findings: X confirmed, Y spec questions
 
 ### Confirmed bugs
-1. <one-line scenario> — pinned at test/hunt/bug-<slug>.test.ts
-   expected <...>, got <...). Severity: <data-loss / wrong-output / annoyance>.
+1. <what the user sees, one sentence>. Pinned at test/hunt/bug-<slug>.test.ts.
+   Expected <...> (source: <...>), got <...>. Severity: <data loss / wrong output / annoyance>.
 
 ### Spec questions (Jason decides: bug or intended?)
-1. <behavior> — currently does <X>; a user might expect <Y>.
+1. <behaviour>: currently does <X>; a user might expect <Y> because <source>.
+
+### Needs a live-editor probe
+<hypotheses only the running app can settle: popup, table cell sub-editors, vim, folds>
 
 ### Came up clean
-<lenses/areas probed with no findings — one line each, so "no news" is
+<lenses and areas probed with no findings, one line each, so "no news" is
 distinguishable from "not looked at">
 ```
 
-Severity guide: anything that **loses or corrupts user text** (a transform
-eating a line, an edit landing at the wrong offset) outranks wrong numbering,
-which outranks cosmetic issues.
+Severity guide: anything that loses or corrupts user text outranks wrong
+numbering, which outranks cosmetic issues.
 
-Per this repo's conventions, each confirmed bug already has its failing test
-(the `it.fails` pin) — so the report is fix-ready. Do not start fixing unless
-Jason says to; when he picks bugs to fix, the workflow is: remove `.fails`,
-watch it go red, fix, watch it go green.
+Each confirmed bug already has its failing test, so the report is
+fix-ready. Fixing starts only when Jason picks the bugs; the workflow then
+is: remove `.fails`, watch it go red, fix, watch it go green.
 
-## What this skill does NOT do
+## What this skill does not do
 
-- No smoke-layer hunting by default: parallel agents can't share the single
-  live Obsidian instance. If a hypothesis is untestable in vitest (popup
-  behavior, table cell sub-editors, vim mode), list it in the report under
-  "needs a live-editor probe" instead of guessing — Jason can run
-  `npm run test:smoke` territory manually or ask for a serial follow-up.
-- No fixing, no refactoring, no committing of anything except the
-  `test/hunt/` pins and an updated attack-surface reference.
+- Smoke-layer hunting: parallel agents cannot share the single live Obsidian
+  instance, so hypotheses that need it go under "Needs a live-editor probe"
+  for Jason or a serial follow-up.
+- Fixing, refactoring, or committing anything beyond the `test/hunt/` pins
+  and the updated reference.
