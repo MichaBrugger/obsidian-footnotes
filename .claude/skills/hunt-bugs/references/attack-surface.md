@@ -1,19 +1,25 @@
 # Attack surface, obsidian-footnotes
 
-Last verified against the code: 2026-09-13 (after the 0.2.0 release).
-Pins so far: 78 `bug-*.test.ts` files in `test/hunt/` from three sweeps
-(2026-07-17, 2026-08-10, 2026-08-25) plus the manual passes of September.
-Two are still expected-fail and ruled on: `bug-moved-definition-adopts-
+Last verified against the code: 2026-09-13 (after the 0.2.0 release, and
+after the six-lens-plus-eleven-row sweep of the same day).
+Pins so far: 107 `bug-*.test.ts` and 31 `spec-*.test.ts` files in
+`test/hunt/` from four sweeps (2026-07-17, 2026-08-10, 2026-08-25,
+2026-09-13) plus the manual passes of September. The 2026-09-13 sweep left
+29 new bug pins and 19 new spec pins, all still expected-fail, waiting on
+Jason's fix list for 0.2.1. Two older pins are expected-fail and ruled on: `bug-moved-definition-adopts-
 indented-code` (move-to-bottom parks a definition above an indented code
 chunk, which Obsidian then reads as the definition's body) and the
 cross-line inline code span in `spec-questions` (Obsidian renders a
 backtick run across a line break as one code span; the scanner masks per
 line). Leave both alone.
 
-## Changed since the last sweep (2026-08-25 to 2026-09-13): prime ground
+## Changed since the last sweep (2026-08-25 to 2026-09-13)
 
-Nothing here has been hunted by agents yet; it was built and tested by
-hand and by the property suites.
+Every row below got its own hunter on 2026-09-13 on top of the six lenses
+(17 hunters, 25 skeptics, about 50 probe files). The pins that came out of
+each row are listed in the taxonomy under 2026-09-13. The rows stay here
+as the map of what changed; the next sweep should treat them as ordinary
+ground and put its weight on whatever changes after 2026-09-13.
 
 | Change | Where | What to attack |
 | --- | --- | --- |
@@ -115,6 +121,21 @@ files in `test/hunt/` are the full record; these are the classes.
 | 2026-09-11 | write-back and folds | see the changed-since table |
 | 2026-09-11 | math closer before a digit | `$5 or $6` is not math; the memo keeps masking linear |
 | 2026-09-12 | commented label offered for rename | a label inside a `%%` block is a dead label, not lazy |
+| 2026-09-13 | commented label counted as a reference | every reader that passes the bare `definitionStarts[i]` into `referenceOccurrences` reads a `%%`-commented label's own `[^x]` as a live reference (orphan deletion cuts the brackets, reindex and apply-prefix rename it and spend a number, rename's planner and collision check, the undo notice, the definition-to-reference jump); only the rename target resolvers use `labelCountsAsLabel`. Pin: `bug-commented-label-counted-as-reference`; open halves in `spec-commented-label-open-questions` |
+| 2026-09-13 | definition block owns a region opener | an indented `%%`, `<!--`, or fence opener inside a definition continuation is absorbed but its closer is not, so move-to-bottom, reindex's block swap, and orphan-definition deletion tear the region apart (the HTML deletion twin eats the commented-out definition); `buildDefinitionAppend`'s blocks-present branch never consults `endsProtected`; a `%%`-commented section heading anchors the append and the move. Pins: `bug-definition-block-owns-region-opener`, `bug-append-after-last-block-ignores-unclosed-region`, `bug-commented-section-heading-anchors-append` |
+| 2026-09-13 | invalid names rewritten by rules | a whitespace name (`[^my note]:`) is prose to Obsidian and to the reference-orphan rule, yet orphan-definition deletion eats the line and reindex, apply-prefix and the punctuation rule rewrite it. Pin: `bug-invalid-name-rewritten-by-rules`; the escaped `]` label in `spec-escaped-bracket-in-label` |
+| 2026-09-13 | scanner fence state | a lazy label sets `inDefinition` from the raw regex, so a four-space fence under it opens an unclosed fence; a document-level fence opened at one to three spaces accepts a closer at four to six; `definitionStartLines` reads raw CRLF lines (latent). Pins: `bug-lazy-label-opens-wide-fence`, `bug-fence-closer-indent-follows-opener`, `bug-definition-starts-crlf` |
+| 2026-09-13 | paragraph enders | a setext underline of one or two dashes, and a heading, rule, or setext underline indented one to three spaces, do not end the paragraph, so the label under them is lazy (fix-lazy inserts a blank, a press mints an empty duplicate definition); a column-0 `[!` line is taken for a callout title. Pins: `bug-definition-starts-misses-block-enders`, `bug-column-zero-callout-title`; the `$$` closer and the HTML closer with a tail are spec questions |
+| 2026-09-13 | label after a closer on the same line | `<!-- c --> [^1]: def`, `--> [^1]: def`, `%% [^1]: def`, `> %% [^1]: def`: no reader shields the label, so the punctuation rule swaps its colon on default settings (permanent) and orphan deletion cuts its brackets. Pin: `bug-label-after-comment-closer-mangled`; the `%%` classification in `spec-label-after-percent-closer-same-line` |
+| 2026-09-13 | column-0 lazy label press | the caret lookup's raw gate drops a column-0 label's own `[^1]`, so a press inside it falls through to creation and writes `[^1[^2]]`; the quoted spelling navigates. Pin: `bug-press-inside-column-zero-lazy-label-nests`; whether the press should navigate is `spec-lazy-label-press-navigates` |
+| 2026-09-13 | quoted definition continuation | a quoted label forms no block, so the definition-interior guard misses its continuation line and a press there nests a footnote. Pin: `bug-quoted-continuation-press-nests`; landing and jump-back in `spec-quoted-definition-continuation-landing` |
+| 2026-09-13 | fix-lazy under a setext underline | fixing a label above `===` reclassifies the underline, the next label turns lazy, and the loop cap stops early: not idempotent, three lint runs to settle. Pin: `bug-fix-lazy-setext-chain-not-idempotent`; the dissolved heading and the mid-table label are spec questions |
+| 2026-09-13 | fold mapping on in-line rewrites | a multi-line replacement hunk shrinks or drops a fold whose line lies inside it, and the removed-line predicate counts a surviving interior line as deleted. Pin: `bug-fold-mapping-inline-rewrite` |
+| 2026-09-13 | landing walk | the link tail stops at the first `)` (balanced parentheses in a URL get the reference written inside); the walk hops an apostrophe or a dot into the next word (`don'[^1]t`, `U.[^1]S.`); the selection expansion reuses the walk and swallows a closing quote or `**`. Pins: `bug-landing-link-balanced-parens`, `bug-landing-walk-enters-next-word`, `bug-selection-expansion-swallows-closing-mark`; class membership in `spec-landing-convention-members` |
+| 2026-09-13 | selection guards | `spanTouchesFootnote` never receives `labelIsDefinition`, so a lazy label line or a `[^x]: y` cell converts and nests; the whole-table test compares trimmed edges to the raw line, so trailing spaces or a one-space indent refuse; a cut `%%` delimiter refuses with the caret message. Pins: `bug-selection-lazy-label-nests-live-reference`, `bug-whole-table-trimmed-edges-refuse`, `bug-cut-comment-delimiter-wrong-toast` |
+| 2026-09-13 | orphan deletion side effects | deleting a quoted orphan cuts only the label line, its body flips to quoted code, and the next lint deletes an unrelated definition; a deletion the guard refuses is reported nowhere; an orphaned numbered definition inside a quote never adopts the prefix. Pins: `bug-quoted-orphan-deletion-strands-body`, `bug-refused-orphan-deletion-unreported`, `bug-apply-prefix-skips-quoted-numbered-orphan` |
+| 2026-09-13 | smaller ones | rename to the bare prefix accepted; a mistyped `settingsVersion` re-runs the migrations; the split-creation registry is never evicted; a double quote in a name loses the no-wrap span; cell offset 0 after an escaped pipe and a stale cell caret in `resolveTableCellCursor`. Pins: `bug-rename-to-bare-prefix-accepted`, `bug-mistyped-settings-version-reruns-migration`, `bug-split-creation-registry-never-evicted`, `bug-quoted-name-with-quote-loses-nowrap`, `bug-resolve-cell-cursor-escaped-start` |
+| 2026-09-13 | refuted, do not re-report | hidden references inside `%%` comments are live and the rules edit them (deletion, punctuation, reindex): ruled correct by the `%%` spec; fix-lazy then orphan-definition deletion in one pass is pinned as intended in `test/fix-lazy-definitions.test.ts`; a selection inside an inline `%%` comment converts (a caret press there is allowed too); the undo notice reports the definition's casing on purpose; the CRLF write-back probe modelled the editor wrongly (CodeMirror strips the carriage return on load); the `...` frontmatter closer is pinned in `test/mutation-hardening-scan.test.ts` |
 
 ## Lens checklists
 

@@ -1,0 +1,140 @@
+import { describe, expect, it } from "vitest";
+
+import { fakeEditor } from "../helpers/fake-editor";
+import { fakePlugin } from "../helpers/fake-plugin";
+
+import { insertAutonumFootnote } from "../../src/commands/insert-or-navigate-footnotes";
+import { lintFootnotes } from "../../src/linting/linter";
+import { lazyDefinitionLabelNames } from "../../src/linting/rules/remove-orphaned-references";
+import {
+    definitionStartLines,
+    findDefinitionBlocks,
+    maskProtectedLines,
+    scanDocument,
+} from "../../src/parsing/markdown-scan";
+
+// BUG: two kinds of line that end a paragraph in Markdown are not counted as
+// paragraph enders, so a perfectly real definition sitting under one of them
+// is mistaken for a lazy label (paragraph text that only looks like a
+// definition).
+//
+// (1) A setext underline of one or two dashes: "Heading", then "-", then
+//     "[^1]: real". Three or more dashes get the right answer by accident,
+//     because they also look like a thematic break; one and two dashes fall
+//     through to "this is still a paragraph".
+// (2) An ATX heading, a thematic break, or a setext underline indented by one
+//     to three spaces: "para", then "   # Heading", then "[^1]: real". The
+//     branch that claims indented lines as continuation of whatever is open
+//     runs first, so those spellings never reach the heading, break, or
+//     setext tests below it, even though those tests carry their own
+//     allowance for up to three spaces.
+//
+// What the user would see: their footnote renders fine in Obsidian, but the
+// plugin thinks the definition is not a definition. The fix-lazy rule then
+// "helps" by inserting a blank line above it, which in case (1) breaks the
+// heading apart: "Heading" becomes ordinary paragraph text and the lone "-"
+// becomes an empty bullet. And a press on the reference, instead of jumping
+// to the definition the user already wrote, appends a second, EMPTY
+// definition with the same name at the bottom. Obsidian renders the LAST
+// definition of a name, so the footnote goes blank.
+//
+// Hunt: 2026-09-13. Lens: the prose-label rule (attack-surface row 1).
+//
+// Source of truth: CommonMark 0.31.2 sections 4.1 (ATX headings), 4.2
+// (setext headings) and 4.3 (thematic breaks), checked against micromark:
+// "Foo" then "-" is an h2, and the setext reading beats the empty-list-item
+// reading; " # H", "  ***" and "   ___" all interrupt a paragraph; "H" then
+// "  ===" is a heading. The repo already agrees with itself here: the setext
+// guard in removeLineRanges is /^\s{0,3}(-+|=+)\s*$/, pinned in
+// test/mutation-hardening-scan.test.ts, which counts one or two dashes and
+// one to three spaces of indent as a setext underline. The heading, break and
+// setext tests inside this branch carry "{0,3}" allowances of their own that
+// the earlier indented-content branch makes unreachable.
+//
+// Still owed before a fix lands: no manual-test sheet pins the dash spelling
+// of a setext underline in Obsidian itself, so someone should confirm in
+// Reading view that "Heading" / "-" / "[^1]: real" renders the footnote.
+
+const blocksOf = (doc: string) => {
+    const lines = doc.split("\n");
+    return findDefinitionBlocks(lines, scanDocument(lines)).map((b) => `${b.name}@${b.start}`);
+};
+const startsOf = (doc: string) => {
+    const lines = doc.split("\n");
+    const scan = scanDocument(lines);
+    const masked = maskProtectedLines(lines, scan);
+    return definitionStartLines(lines, scan, (i) => masked[i]);
+};
+const lastLineStarts = (doc: string) => startsOf(doc).at(-1);
+const lazyNames = (doc: string) => {
+    const lines = doc.split("\n");
+    const scan = scanDocument(lines);
+    const masked = maskProtectedLines(lines, scan);
+    return lazyDefinitionLabelNames(lines, scan, masked, definitionStartLines(lines, scan, (i) => masked[i]));
+};
+
+describe("a setext underline of dashes ends the paragraph", () => {
+    it("the spellings the start rule already knows all work", () => {
+        // the "=" spelling, as manual sheet 25 pinned it
+        expect(blocksOf("t[^1]\n\nH\n===\n[^1]: real")).toEqual(["1@4"]);
+        expect(blocksOf("t[^1]\n\nH\n=\n[^1]: real")).toEqual(["1@4"]);
+        // three dashes, by way of the thematic-break test
+        expect(blocksOf("t[^1]\n\nH\n---\n[^1]: real")).toEqual(["1@4"]);
+    });
+
+    it.fails("one or two dashes are a setext underline too", () => {
+        expect(blocksOf("t[^1]\n\nH\n--\n[^1]: real")).toEqual(["1@4"]);
+        expect(blocksOf("t[^1]\n\nH\n-\n[^1]: real")).toEqual(["1@4"]);
+    });
+
+    it.fails("so the definition under one is not called a lazy label", () => {
+        expect(lazyNames("use[^1] here\n\nHeading\n-\n[^1]: real definition")).toEqual([]);
+    });
+
+    it.fails("and the lint leaves such a note alone", () => {
+        const doc = "use[^1] here\n\nHeading\n-\n[^1]: real definition";
+        // today the lint inserts a blank line above the label, which turns the
+        // heading into a paragraph and leaves the "-" behind as an empty bullet
+        expect(lintFootnotes(doc)).toBe(doc);
+    });
+
+    it.fails("and a press on the reference jumps instead of appending an empty duplicate", async () => {
+        const lines = ["use[^1] here", "", "Heading", "-", "[^1]: real definition"];
+        const doc = fakeEditor(lines, { cursor: { line: 0, ch: 5 }, wholeDoc: true, edits: true });
+        await insertAutonumFootnote(
+            fakePlugin({ insertAtEndOfWord: false, enablePopupEditor: false, lintOnFootnoteCreation: false }, doc),
+        );
+        // Obsidian renders only the LAST definition of a name, so a second,
+        // empty "[^1]: " at the bottom hides the body the user wrote
+        expect(doc.lines).toEqual(lines);
+    });
+});
+
+describe("a block start indented one to three spaces still ends the paragraph", () => {
+    it("the unindented spellings all work", () => {
+        expect(lastLineStarts("t[^1]\npara\n# H\n[^1]: real")).toBe(true);
+        expect(lastLineStarts("t[^1]\npara\n## H ##\n[^1]: real")).toBe(true);
+        expect(lastLineStarts("t[^1]\npara\n___\n[^1]: real")).toBe(true);
+        expect(lastLineStarts("t[^1]\npara\n***\n[^1]: real")).toBe(true);
+    });
+
+    it.fails("an ATX heading indented one to three spaces", () => {
+        expect(lastLineStarts("t[^1]\npara\n # H\n[^1]: real")).toBe(true);
+        expect(lastLineStarts("t[^1]\npara\n   # H\n[^1]: real")).toBe(true);
+    });
+
+    it.fails("a thematic break indented one to three spaces", () => {
+        expect(lastLineStarts("t[^1]\npara\n   ___\n[^1]: real")).toBe(true);
+        expect(lastLineStarts("t[^1]\npara\n  ***\n[^1]: real")).toBe(true);
+    });
+
+    it.fails("a setext underline indented one to three spaces", () => {
+        expect(lastLineStarts("t[^1]\n\nH\n  ===\n[^1]: real")).toBe(true);
+    });
+
+    it.fails("so the lint does not insert a blank line into a note that already renders", () => {
+        const doc = "use[^1]\npara\n   # Heading\n[^1]: real";
+        expect(lazyNames(doc)).toEqual([]);
+        expect(lintFootnotes(doc, { fixLazyDefinitions: true, moveDefinitionsToBottom: false })).toBe(doc);
+    });
+});
