@@ -93,9 +93,9 @@ if (readJson("window.__gif.focused()") !== true) {
 }
 evalIn(`(async () => { new Function(await app.vault.adapter.read('.gif-scene.js'))(); })(); 'fired'`);
 
-// 2. wait for the scene
+// 2. wait for the scene (the hero take runs past a minute)
 let state = null;
-for (let i = 0; i < 90; i++) {
+for (let i = 0; i < 150; i++) {
     await sleep(1000);
     try {
         state = readJson("window.__scene || null");

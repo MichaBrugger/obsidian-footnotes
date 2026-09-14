@@ -13,7 +13,7 @@ Create, navigate, and edit Obsidian footnotes all from the keyboard:
 - **Per-note footnote prefixes** keep footnotes unique even when multiple chapters are merged into a larger document, such as with the [Longform](https://github.com/kevboh/longform) or [Easy Bake](https://github.com/community-archive/obsidian-easy-bake) plugins
 - Works on Obsidian Mobile
 
-![Press the hotkey, the popup opens at the cursor, type the note, the same hotkey closes it](README/hero.gif)
+![One hotkey opens the popup at the cursor, a named footnote lands at two cursors at once, a right-click renames it everywhere, and the linter tidies up](README/hero.gif)
 
 ## Support the plugin
 

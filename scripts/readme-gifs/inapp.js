@@ -212,6 +212,7 @@
         G.timer = null;
         G.endStyle();
         document.getElementById("gif-caret")?.remove();
+        document.getElementById("gif-pointer")?.remove();
         document.querySelectorAll(".gif-key-overlay").forEach((e) => e.remove());
         const dir = ".footnote-capture/" + G.name;
         if (!(await app.vault.adapter.exists(".footnote-capture"))) await app.vault.adapter.mkdir(".footnote-capture");
@@ -337,6 +338,33 @@
     };
 
     // --- helpers for the remaining scenes ---------------------------------
+    /** Wait until the smoke note has had no disk write for `quietMs` (capped at `capMs`).
+     *  The popup's embed editor keeps saving on its own delays after the popup closes, and
+     *  Obsidian folds each write back into the main view: text typed before the last write
+     *  lands is rolled back (the hero's third take lost ". The dee", 2026-09-14). */
+    G.diskQuiet = async (quietMs, capMs) => {
+        const quiet = quietMs || 1500;
+        const cap = capMs || 6000;
+        const start = Date.now();
+        let last = start;
+        const ref = app.vault.on("modify", (f) => {
+            if (f.path === NOTE_PATH) last = Date.now();
+        });
+        try {
+            while (Date.now() - last < quiet && Date.now() - start < cap) await G.sleep(50);
+        } finally {
+            app.vault.offref(ref);
+        }
+    };
+    /** A mouse-pointer arrow at a window point for `ms`, for clicks the reader should see (hero's right-click). */
+    G.pointer = (x, y, ms) => {
+        document.getElementById("gif-pointer")?.remove();
+        const el = document.body.createDiv({ attr: { id: "gif-pointer" } });
+        Object.assign(el.style, { position: "fixed", left: x + "px", top: y + "px", zIndex: "99999", pointerEvents: "none", width: "22px", height: "30px" });
+        el.innerHTML =
+            '<svg viewBox="0 0 22 30" width="22" height="30"><path d="M2 2 L2 23 L7.5 18 L11 27 L15 25.5 L11.5 17 L19 17 Z" fill="#fff" stroke="#000" stroke-width="1.6" stroke-linejoin="round"/></svg>';
+        setTimeout(() => el.remove(), ms || 2000);
+    };
     G.setClipboard = (text) => require("electron").clipboard.writeText(text);
 
     /** The text input of the plugin's open dialog (name, rename, prefix). */
