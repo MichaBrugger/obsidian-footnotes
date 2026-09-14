@@ -15,6 +15,14 @@ Create, navigate, and edit Obsidian footnotes all from the keyboard:
 
 ![Press the hotkey, the popup opens at the cursor, type the note, the same hotkey closes it](README/hero.gif)
 
+## Support the plugin
+
+If this plugin saves you time, you can buy me a coffee.
+
+[![Support me on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/comprehensivejason)
+
+Bug-hunting and feature ideas on the [issue tracker](https://github.com/MichaBrugger/obsidian-footnotes/issues) are just as welcome.
+
 ## FIRST: set up your hotkeys
 
 The plugin adds its commands **without hotkeys**, so assign your own right after installing by going to:
@@ -188,14 +196,6 @@ This plugin is based on the great idea by [jacob.4ristotle](https://forum.obsidi
 > - move to the end of the note, type [^n] again, and then add my citation.
 
 Created by Alexis Rondeau and Micha Brugger, maintained and expanded by Jason Qin.
-
-## Support the plugin
-
-If this plugin saves you time, you can buy me a coffee. It's free, open source, and maintained in my spare time; tips go toward the hours spent on bug reports, feature requests, and keeping up with Obsidian releases.
-
-[![Support me on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/comprehensivejason)
-
-Bug reports and feature ideas on the [issue tracker](https://github.com/MichaBrugger/obsidian-footnotes/issues) are just as welcome.
 
 ## For developers
 
