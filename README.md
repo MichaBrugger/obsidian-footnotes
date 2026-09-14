@@ -17,11 +17,11 @@ Create, navigate, and edit Obsidian footnotes all from the keyboard:
 
 ## Support the plugin
 
-If this plugin saves you time, you can buy me a coffee.
+If this plugin saves you time, you can buy me a coffee. Tips go toward the hours spent on bug-hunting, feature requests, and keeping up with Obsidian releases.
 
 [![Support me on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/comprehensivejason)
 
-Bug-hunting and feature ideas on the [issue tracker](https://github.com/MichaBrugger/obsidian-footnotes/issues) are just as welcome.
+Bug reports and feature ideas on the [issue tracker](https://github.com/MichaBrugger/obsidian-footnotes/issues) are just as welcome.
 
 ## FIRST: set up your hotkeys
 
