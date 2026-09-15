@@ -62,6 +62,7 @@
         await G.sleep(900);
         await G.press(id, keys, "Same hotkey: back to the text");
         if (!(await G.waitFor(G.popupGone))) throw new Error("popup did not close");
-        await G.sleep(400);
+        // the next edit waits for the popup's saves to land (see G.diskQuiet)
+        await G.diskQuiet(1200);
     };
 })();

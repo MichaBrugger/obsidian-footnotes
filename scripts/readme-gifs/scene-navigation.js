@@ -28,6 +28,7 @@
         await G.sleep(900);
         await G.press(S.NUM, ["Alt", "0"], "Same hotkey: back to the text");
         if (!(await G.waitFor(G.popupGone))) throw new Error("popup did not close");
+        await G.diskQuiet(1200);
         await G.sleep(900);
         // now from the definition line
         const v = G.view();
