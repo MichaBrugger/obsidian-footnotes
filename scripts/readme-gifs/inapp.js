@@ -192,12 +192,22 @@
         G.beginStyle();
         G.rect = G.region(mode || "editor", maxHeight);
         G.t0 = performance.now();
+        // capturePage grabs a frame the compositor painted AFTER the call
+        // (about 80 ms later), and typing carries on in between, so a caret
+        // painted once per capture sat a character or two behind the text
+        // (Jason, 2026-09-14). Repainting it on every animation frame puts the
+        // caret and the text of each painted frame in step, whichever frame
+        // the capture ends up grabbing.
+        const caretLoop = () => {
+            G.paintCaret();
+            G.caretRaf = requestAnimationFrame(caretLoop);
+        };
+        caretLoop();
         let busy = false;
         G.timer = setInterval(async () => {
             if (busy) return;
             busy = true;
             try {
-                G.paintCaret();
                 const img = await wc.capturePage(G.rect);
                 G.frames.push({ t: performance.now() - G.t0, png: img.toPNG() });
             } finally {
@@ -210,6 +220,8 @@
         if (G.recordingRun !== G.run) return { skipped: true };
         if (G.timer) clearInterval(G.timer);
         G.timer = null;
+        if (G.caretRaf) cancelAnimationFrame(G.caretRaf);
+        G.caretRaf = null;
         G.endStyle();
         document.getElementById("gif-caret")?.remove();
         document.getElementById("gif-pointer")?.remove();
