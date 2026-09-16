@@ -46,9 +46,13 @@ describe("fix-lazy's skip verdict is state-dependent and skipped labels are neve
         expect(out).toContain("$$ tail\n\n[^3]: b");
     });
 
-    it("control: the first run's other two labels do get their blanks", () => {
+    it("control: the first run's other lazy label gets its blank; the label under a definition's lazy line needs none", () => {
+        // "[^21]: first" sits under "stray[^26] reference", which is the
+        // lazy continuation of "[^3]: b", and a label there renders as a
+        // definition already (GLM hunt cycle 3, probed in Reading view
+        // 2026-09-16), so it is not lazy and gets no blank line
         const out = fixLazyDefinitions(doc);
         expect(out).toContain("\n\n  [^37]: a");
-        expect(out).toContain("\n\n[^21]: first");
+        expect(out).toContain("stray[^26] reference\n[^21]: first");
     });
 });

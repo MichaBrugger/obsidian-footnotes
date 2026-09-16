@@ -189,7 +189,11 @@ export function tableRowLinesOf(lines: string[]): boolean[] {
             // a comment-only line ("%% c %%") is paragraph text like any
             // other (sheet 18; a table under one is no table, Kimi hunt
             // cycle 4, probed 2026-09-16); only a lone "%%" opens a block
-            const percentBlock = /^ {0,3}%%/.test(text) && (text.match(/%%/g) ?? []).length === 1;
+            // ... and a "%%" with text after it is a closer's live tail,
+            // paragraph text that a table cannot interrupt either (GLM
+            // hunt cycle 3, probed 2026-09-16); only a bare "%%" is a
+            // boundary here
+            const percentBlock = /^ {0,3}%%\s*$/.test(text);
             // a "<" opens an HTML block only as one of CommonMark's types 1
             // to 6, or as a lone complete tag (type 7) with no paragraph
             // open above it; "<3" and an inline "<span>" under prose are
@@ -662,6 +666,16 @@ export function maskLineRegions(
         deadDollarFrom = -1;
     };
     let i = 0;
+    // An image's alt text is dead: "![^1](url)" and "![alt[^1]](url)"
+    // render an embed with no footnote and no definition entry (GLM hunt
+    // cycle 3, probed in Reading view 2026-09-16), unlike a link's text,
+    // which renders. The alt is blotted up front; the "![", "](" and the
+    // destination keep their shape for the landing walk, and the
+    // destination itself is blotted by the link branch below.
+    for (const image of line.matchAll(/!\[([^[\]\n]*)\]\(/g)) {
+        if (escapedAt(line, image.index) || image[1].length === 0) continue;
+        blot(image.index + 2, image.index + 2 + image[1].length);
+    }
     // The next run of exactly `length` backticks at or after `from` that
     // is not inside a reference shape, or -1. Inside a code span a
     // backslash is an ordinary character, so this never skips escapes;
@@ -2514,6 +2528,14 @@ export function definitionStartLines(
         // comment's closer (an inline "%% ... %%" pair, say) is not a
         // definition; only the branch above starts one after a closer
         const label = definitionLabelIn(line);
+        // A plain line directly under a definition is the definition's own
+        // lazy continuation, and a label under THAT line starts a new
+        // definition: "[^1]: body", "more lazy", "[^2]: second" renders
+        // both footnotes (GLM hunt cycle 3, probed in Reading view
+        // 2026-09-16). Only under a plain paragraph is such a label lazy.
+        if (open === "definition" && label === null && lazyContinuation(bare)) {
+            continue;
+        }
         if (open !== "paragraph" && label !== null && !label.afterCloser) {
             const hit = definitionLabelWithName(line, maskedAt(i));
             if (hit) {
@@ -2646,9 +2668,14 @@ export function findDefinitionBlocks(
             !isProtected[j] &&
             tableDelimiterRow(lines[j])
         ) {
+            // a quoted row ("> | c | d |") is a blockquote of its own, not a
+            // row of the footnote's table: Reading view ends the table at
+            // it and renders it as a quote outside the footnote (GLM hunt
+            // cycle 3, probed 2026-09-16)
             const columnZeroRow = (k: number): boolean =>
                 !isProtected[k] &&
                 leadingIndentWidth(lines[k]) < 4 &&
+                !/^ {0,3}>/.test(lines[k]) &&
                 definitionLabelIn(lines[k]) === null &&
                 hasUnescapedPipe(lines[k]);
             while (j < lines.length && columnZeroRow(j)) end = j++;

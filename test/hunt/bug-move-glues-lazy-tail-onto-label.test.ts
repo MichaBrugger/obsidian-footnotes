@@ -1,4 +1,5 @@
 // Imported from the Kimi K3 cycle 3 hunt of 2026-09-16 (OpenCode worktree); 3 of 5 tests carry it.fails: 0 were red there and marked on import, the rest the hunter marked itself.
+// REVISED 2026-09-16 (GLM hunt cycle 3, probed in Reading view): a label directly under a definition's lazy continuation line renders as a definition after all, so the glued shape never demoted the second footnote in Obsidian; the plugin's own reading did, and definitionStartLines now keeps the definition open through its lazy line. The blank line the move keeps is harmless and stays, so these tests still pass.
 import { describe, expect, it } from "vitest";
 
 import { lintFootnotes } from "../../src/linting/linter";

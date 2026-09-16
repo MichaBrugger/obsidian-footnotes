@@ -99,9 +99,22 @@ export function buildDefinitionAppend(
     // That case falls through to the walk above the unclosed region below
     // (Claude sweep 2026-09-13).
     if (blocks.length > 0 && !ctx.scan.endsProtectedAt[blocks[blocks.length - 1].end]) {
-        const lastLine = blocks[blocks.length - 1].end;
-        let text = `\n[^${footnoteId}]: `;
-        const cursor = { line: lastLine + 1, ch: text.length - 1 };
+        const last = blocks[blocks.length - 1];
+        const lastLine = last.end;
+        // A block that ends on a paragraph line (a lazy continuation
+        // directly under the label, or the live tail after a comment
+        // closer one of its lines opened) needs a blank line before the
+        // new label, or that label reads as more paragraph text and the
+        // new footnote is born lazy; move-to-bottom keeps the same blank
+        // (GLM hunt cycle 3, 2026-09-16).
+        const lastText = lines[lastLine];
+        const paragraphTail =
+            lastLine > last.start &&
+            !isProtected[lastLine] &&
+            lastText.trim() !== "" &&
+            !/^(?: {4}|\t)/.test(lastText);
+        let text = paragraphTail ? `\n\n[^${footnoteId}]: ` : `\n[^${footnoteId}]: `;
+        const cursor = { line: lastLine + (paragraphTail ? 2 : 1), ch: text.length - 1 };
         if (needsSeparator(lastLine)) text += "\n";
         return {
             change: {
