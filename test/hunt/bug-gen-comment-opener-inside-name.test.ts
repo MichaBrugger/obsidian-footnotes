@@ -29,19 +29,19 @@ describe("an unclosed comment opener inside a footnote name", () => {
         expect(computeNextFootnoteNumber("see[^a<!--b] here.")).toBe(2);
     });
 
-    it.fails("drop-orphans does not delete a definition whose reference carries the opener", () => {
+    it("drop-orphans does not delete a definition whose reference carries the opener", () => {
         const doc = "[^a<!--b]: body\n\nsee[^a<!--b] here.";
         expect(reindexFootnotes(doc, { keepOrphanedDefinitions: false })).toBe(doc);
     });
 
-    it.fails("renumber-named renames reference and definition together", () => {
+    it("renumber-named renames reference and definition together", () => {
         const doc = "[^a<!--b]: body\n\nsee[^a<!--b] here.";
         expect(reindexFootnotes(doc, { renumberNamedFootnotes: true })).toBe(
             "[^1]: body\n\nsee[^1] here.",
         );
     });
 
-    it.fails("no phantom comment region: lines after the reference stay live", () => {
+    it("no phantom comment region: lines after the reference stay live", () => {
         // the phantom unclosed comment protects the rest of the note, which
         // is also what paralyses move-to-bottom (endsProtected) on it
         const doc = "see[^a<!--b] here.\n\ntail\n\n[^a<!--b]: body";

@@ -185,7 +185,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                             },
                             {
                                 name: "Fix definitions hidden by a missing blank line",
-                                desc: "Linting inserts the blank line a footnote definition needs when its \"[^7]:\" line sits directly under a paragraph, list item, quote line, or table (Obsidian reads such a line as plain text and shows no footnote). While off, linting alerts you about them instead.",
+                                desc: "Linting inserts the blank line a footnote definition needs when its \"[^7]:\" line sits directly under a paragraph, list item, or quote line (Obsidian reads such a line as plain text and shows no footnote). While off, linting alerts you about them instead.",
                                 control: { type: "toggle", key: "lintFixLazyDefinitions" },
                             },
                             {

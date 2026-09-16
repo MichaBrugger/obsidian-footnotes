@@ -61,15 +61,15 @@ describe("a callout title only exists inside a blockquote", () => {
         expect(lastLineStarts("a[^1]\n\n> [!note]\n> body\n> [^1]: mid")).toBe(false);
     });
 
-    it.fails("a column-0 line starting with '[!' is paragraph text", () => {
+    it("a column-0 line starting with '[!' is paragraph text", () => {
         expect(lastLineStarts("a[^1]\n[!note] not a callout\n[^1]: mid")).toBe(false);
     });
 
-    it.fails("and so is a badge line, an image inside a link", () => {
+    it("and so is a badge line, an image inside a link", () => {
         expect(lastLineStarts("a[^1]\n[![badge](img.svg)](https://ci.example)\n[^1]: mid")).toBe(false);
     });
 
-    it.fails("so the label under one is reported as lazy, and the fix rule fixes it", () => {
+    it("so the label under one is reported as lazy, and the fix rule fixes it", () => {
         const doc = "use[^1]\n[![badge](img.svg)](https://ci.example)\n[^1]: real";
         expect(lazyNames(doc)).toEqual(["1"]);
         expect(lintFootnotes(doc, { fixLazyDefinitions: true, moveDefinitionsToBottom: false })).toBe(
@@ -77,7 +77,7 @@ describe("a callout title only exists inside a blockquote", () => {
         );
     });
 
-    it.fails("and deleting orphaned definitions does not eat the prose line under a badge", () => {
+    it("and deleting orphaned definitions does not eat the prose line under a badge", () => {
         // nothing references "1" here, so with the label mistaken for a real
         // definition the orphan rule deletes a line the user can see
         const doc = "[![badge](img.svg)](https://ci.example)\n[^1]: plain text, not a definition";

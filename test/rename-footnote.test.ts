@@ -160,17 +160,21 @@ describe("planFootnoteRename", () => {
         ).toEqual({ kind: "noop" });
     });
 
-    it("refuses whole when the new name would kill an occurrence (comment opener)", () => {
-        // "[^a<!--]" starts an HTML comment that swallows the closing
-        // bracket - the simulation sees the reference die and refuses,
-        // renaming NOTHING rather than corrupting one copy
-        expect(
-            planFootnoteRename(
-                fakeEditor(["see [^a]", "", "[^a]: d"]),
-                "a",
-                "a<!--",
-            ),
-        ).toEqual({ kind: "dead" });
+    it("a new name containing a comment opener renames cleanly (since 2026-09-15)", () => {
+        // "[^a<!--]" used to be the example of a name that kills its own
+        // occurrence: the masker read the "<!--" as a comment opener that
+        // swallowed the closing bracket, and the simulation refused the
+        // rename as "dead". Obsidian reads a "<!--" inside a reference as
+        // part of the name (Kimi sweep 2026-09-13, verified in Reading
+        // view), so the masker now does too, and the rename goes through.
+        // The "dead" verdict stays as a safety net for shapes not yet
+        // known; no valid name reaches it today.
+        const plan = planFootnoteRename(
+            fakeEditor(["see [^a]", "", "[^a]: d"]),
+            "a",
+            "a<!--",
+        );
+        expect(plan.kind).toBe("renamed");
     });
 });
 

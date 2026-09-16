@@ -157,14 +157,18 @@ describe("planFootnoteRename's change set", () => {
     // renaming to a comment opener kills the REFERENCE two lines down while
     // the definition blocks still line up perfectly - only the reference loop
     // can catch this one.
-    it("refuses whole when only the references die", () => {
+    it("a name containing a comment opener no longer dies (since 2026-09-15)", () => {
+        // this test used to drive the "references die" branch with the
+        // name "a<!--"; a "<!--" inside a reference is part of the name
+        // now, as Obsidian reads it, so the rename succeeds. The branch
+        // itself stays as a safety net, unreachable through valid names.
         expect(
             planFootnoteRename(
                 renameDoc(["[^x]: d", "", "see [^x] here"]),
                 "x",
                 "a<!--",
-            ),
-        ).toEqual({ kind: "dead" });
+            ).kind,
+        ).toBe("renamed");
     });
 
     // L196 ConditionalExpression, `blocksAfter.length !== blocksBefore.length`
@@ -172,10 +176,12 @@ describe("planFootnoteRename's change set", () => {
     // references at all, so the reference loop never runs) where the new name
     // opens a comment that swallows the second block - the block-count check
     // is the only thing that can catch this.
-    it("refuses whole when a definition block disappears, with no references in play", () => {
+    it("two orphan definitions renamed with a comment opener in the name keep both blocks (since 2026-09-15)", () => {
+        // formerly the "definition block disappears" branch, driven by the
+        // name "a<!--"; see the test above for why that name is harmless now
         expect(
-            planFootnoteRename(renameDoc(["[^x]: d", "[^y]: e"]), "x", "a<!--"),
-        ).toEqual({ kind: "dead" });
+            planFootnoteRename(renameDoc(["[^x]: d", "[^y]: e"]), "x", "a<!--").kind,
+        ).toBe("renamed");
     });
 
     // L197 ConditionalExpression / BlockStatement, L199 ConditionalExpression

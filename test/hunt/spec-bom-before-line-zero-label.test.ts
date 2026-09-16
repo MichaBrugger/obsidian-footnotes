@@ -41,7 +41,7 @@ import { lintFootnotes } from "../../src/linting/linter";
 const BOM = "\ufeff";
 
 describe("spec question: a definition label on line 0 behind a byte order mark", () => {
-    it.fails("survives a lint", () => {
+    it("survives a lint", () => {
         const doc = `${BOM}[^1]: def\n\nProse[^1].\n`;
         expect(lintFootnotes(doc, {})).toContain("[^1]: def");
     });

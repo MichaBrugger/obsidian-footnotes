@@ -37,7 +37,10 @@ describe("a label directly under a prose line is prose, not a definition", () =>
         expect(blocksOf("a[^1]\npara\n  [^1]: mid")).toEqual([]);
         expect(blocksOf("a[^1]\n- item\n[^1]: mid")).toEqual([]);
         expect(blocksOf("a[^1]\n> quote\n[^1]: mid")).toEqual([]);
-        expect(blocksOf("a[^1]\n| x | y |\n| - | - |\n| 1 | 2 |\n[^1]: mid")).toEqual([]);
+        // a label under a TABLE row is a definition (a definition ends the
+        // table the way any block does; Jason's ruling A2, 2026-09-15), so
+        // the table case that used to sit here moved to
+        // spec-fix-lazy-label-mid-table
         // two labels under a paragraph: the first is lazy prose, so the
         // second follows prose too
         expect(blocksOf("a[^1] b[^2]\n[^2]: first\n[^1]: mid")).toEqual([]);

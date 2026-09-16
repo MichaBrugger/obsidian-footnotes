@@ -51,33 +51,32 @@ const PERCENT_QUOTED = "x[^1]\n\n> %%\n> hidden\n> %% [^1]: freed";
 const lineOf = (doc: string, index: number) => doc.split("\n")[index];
 
 describe("the punctuation rule rewrites a label that follows a comment closer", () => {
-    it.fails("a label after a multi-line HTML closer keeps its own colon", () => {
+    it("a label after a multi-line HTML closer keeps its own colon", () => {
         expect(footnoteAfterPunctuation(HTML_MULTI)).toBe(HTML_MULTI);
     });
 
-    it.fails("a label after a complete one-line HTML comment keeps its own colon", () => {
+    it("a label after a complete one-line HTML comment keeps its own colon", () => {
         expect(footnoteAfterPunctuation(HTML_ONE)).toBe(HTML_ONE);
     });
 
-    it.fails("a label after a %% closer keeps its own colon, lint included", () => {
+    it("a label after a %% closer keeps its own colon, lint included", () => {
         expect(footnoteAfterPunctuation(PERCENT)).toBe(PERCENT);
         // lintFootnotes with no options is the default settings: the
         // punctuation rule is on for everyone out of the box
         expect(lintFootnotes(PERCENT)).toContain("[^1]:");
     });
 
-    it.fails("a quoted label after a quoted %% closer keeps its own colon", () => {
+    it("a quoted label after a quoted %% closer keeps its own colon", () => {
         expect(footnoteAfterPunctuation(PERCENT_QUOTED)).toBe(PERCENT_QUOTED);
     });
 
-    it("the damage is permanent: a second pass leaves the mangled line as it is", () => {
-        // there is no self-repair to wait for. Once the colon has moved,
-        // the rule sees nothing left to do, so the footnote stays broken
+    it("fixed 2026-09-15: the rule leaves every one of these labels alone, on the first pass and the second", () => {
+        // before the fix the colon moved on the first pass and there was
+        // no self-repair to wait for; now the rule never swaps a colon
+        // that belongs to a label-shaped reference sitting after a closer
         for (const doc of [HTML_MULTI, HTML_ONE, PERCENT, PERCENT_QUOTED]) {
-            const mangled = footnoteAfterPunctuation(doc);
-            expect(mangled).not.toBe(doc);
-            expect(mangled).toContain(":[^1]");
-            expect(footnoteAfterPunctuation(mangled)).toBe(mangled);
+            expect(footnoteAfterPunctuation(doc)).toBe(doc);
+            expect(footnoteAfterPunctuation(footnoteAfterPunctuation(doc))).toBe(doc);
         }
     });
 });
@@ -93,13 +92,13 @@ describe("orphaned-reference deletion cuts the label's own brackets", () => {
         );
     });
 
-    it.fails("the multi-line HTML closer line keeps its brackets", () => {
+    it("the multi-line HTML closer line keeps its brackets", () => {
         expect(lineOf(removeOrphanedFootnoteReferences(HTML_MULTI), 4)).toBe(
             "--> [^1]: freed label",
         );
     });
 
-    it.fails("the one-line HTML comment line keeps its brackets", () => {
+    it("the one-line HTML comment line keeps its brackets", () => {
         expect(lineOf(removeOrphanedFootnoteReferences(HTML_ONE), 2)).toBe(
             "<!-- draft note --> [^1]: def",
         );

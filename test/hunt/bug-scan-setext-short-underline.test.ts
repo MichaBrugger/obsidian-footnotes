@@ -22,11 +22,11 @@ const startsOf = (doc: string) => {
 };
 
 describe("a label under a one-or-two-dash setext underline is a definition", () => {
-    it.fails("two dashes", () => {
+    it("two dashes", () => {
         expect(startsOf("H\n--\n[^1]: x")).toEqual([false, false, true]);
     });
 
-    it.fails("findDefinitionBlocks pairs the label with its reference", () => {
+    it("findDefinitionBlocks pairs the label with its reference", () => {
         const lines = "use[^1]\n\nH\n--\n[^1]: x".split("\n");
         expect(
             findDefinitionBlocks(lines, scanDocument(lines)).map((b) => b.name),

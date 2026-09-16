@@ -39,7 +39,7 @@ Of the plugin's 7 commands, the ones you'll press constantly should have hotkeys
 | Insert inline footnote                | <kbd>Alt</kbd>+<kbd>=</kbd>                  |
 | Insert inline footnote from clipboard | <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>=</kbd> |
 
-![The Hotkeys settings tab filtered to "Footnote Shortcut", with the four recommended bindings set](README/hotkeys.png)
+<img src="README/hotkeys.png" width="800" alt="The Hotkeys settings tab filtered to Footnote Shortcut, with the four recommended bindings set">
 
 The other 3 (**Lint footnotes**, **Rename footnote**, and **Set footnote prefix**) come up less often, so running them from the command palette works fine. Give them hotkeys too if they become part of your routine.
 
@@ -147,7 +147,7 @@ Each rule can be toggled individually in **Settings → Footnote Shortcut → Li
 - **Lint on save**: lints the note whenever you press <kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<kbd>S</kbd> (vim users: `:w` works too).
 - **Lint on footnote creation**: lints the note right after you create a new footnote.
 
-The linter also watches for problems it can't fix by itself and tells you about them, naming every footnote involved: 
+The linter also watches for problems it can't fix by itself and tells you about them, naming every footnote involved:
 
 - an empty `[^]` reference you never named, references with no definition or definitions nothing uses (while **delete orphaned references/definitions** are off)
 - a definition typed directly under a paragraph with no blank line above it as Obsidian shows it as plain text (while **Fix definitions hidden by a missing blank line** is off)

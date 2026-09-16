@@ -51,31 +51,31 @@ describe("indented code after a quoted heading or thematic break is misread as l
         expect(liveFlags(["> para", ">     lazy live[^1]"])).toEqual([true, true]);
     });
 
-    it.fails("quoted thematic break, code inside the quote", () => {
+    it("quoted thematic break, code inside the quote", () => {
         expect(liveFlags(["> ---", ">     code[^1]"])).toEqual([true, false]);
     });
 
-    it.fails("quoted heading, code inside the quote", () => {
+    it("quoted heading, code inside the quote", () => {
         expect(liveFlags(["> # H", ">     code[^1]"])).toEqual([true, false]);
     });
 
-    it.fails("quoted thematic break, code below the quote", () => {
+    it("quoted thematic break, code below the quote", () => {
         expect(liveFlags(["> ---", "    code[^1]"])).toEqual([true, false]);
     });
 
-    it.fails("quoted heading, code below the quote", () => {
+    it("quoted heading, code below the quote", () => {
         expect(liveFlags(["> # H", "    code[^1]"])).toEqual([true, false]);
     });
 
-    it.fails("setext heading, code below it", () => {
+    it("setext heading, code below it", () => {
         expect(liveFlags(["H", "===", "    code[^1]"])).toEqual([true, true, false]);
     });
 
-    it.fails("quoted setext heading, code inside the quote", () => {
+    it("quoted setext heading, code inside the quote", () => {
         expect(liveFlags(["> H", "> ===", ">     code[^1]"])).toEqual([true, true, false]);
     });
 
-    it.fails("the reference-shaped text in that region is a fake, not an occurrence", () => {
+    it("the reference-shaped text in that region is a fake, not an occurrence", () => {
         const lines = ["> # Notes", ">     see [^1] in code"];
         const scan = scanDocument(lines);
         const masked = maskProtectedLines(lines, scan);
@@ -84,12 +84,12 @@ describe("indented code after a quoted heading or thematic break is misread as l
 });
 
 describe("what the misreading does through the lint", () => {
-    it.fails("punctuation rule rewrites the code line", () => {
+    it("punctuation rule rewrites the code line", () => {
         const doc = "> ---\n>     see [^1]. end";
         expect(footnoteAfterPunctuation(doc)).toBe(doc);
     });
 
-    it.fails("delete orphaned references deletes text inside the code block", () => {
+    it("delete orphaned references deletes text inside the code block", () => {
         const doc = "> # Notes\n>     see [^1] in code";
         expect(removeOrphanedFootnoteReferences(doc)).toBe(doc);
     });

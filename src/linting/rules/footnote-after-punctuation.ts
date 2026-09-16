@@ -64,6 +64,17 @@ function swapInSegment(original: string, masked: string): string {
         // moves in one go.
         const punctuationEnd = referenceLandingAfter(masked, end);
         if (punctuationEnd === end) continue;
+        // A reference followed by ":" with nothing but dead text or a
+        // comment closer before it is a definition LABEL that happens to
+        // sit after "%%" or a quote marker ("%% [^3]: def", "> %% [^4]:
+        // def"). Swapping its colon would turn it into ":[^3]" for good
+        // (Claude sweep 2026-09-13, Jason's verification 2026-09-15).
+        if (
+            masked[end] === ":" &&
+            masked.slice(0, start).replace(/[>%\0\s]/g, "") === ""
+        ) {
+            continue;
+        }
         // A run of references that already comes AFTER punctuation or a
         // closing mark is where it should be. Any punctuation after it
         // belongs to the next clause, and moving the references again

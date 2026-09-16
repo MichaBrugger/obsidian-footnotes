@@ -507,6 +507,15 @@ export function maskLineRegions(
             continue;
         }
         if (line.startsWith("<!--", i)) {
+            // a "<!--" inside "[^…]" is part of the footnote's name, not a
+            // comment opener: Obsidian renders "[^a<!--b]" as a live
+            // footnote, and masking it as a comment hid the reference and
+            // let orphan deletion eat the definition (Kimi sweep
+            // 2026-09-13, verified in Reading view)
+            if (insideReferenceShape(i)) {
+                i += 4;
+                continue;
+            }
             if (line.startsWith("<!-->", i)) {
                 blot(i, i + 5);
                 i += 5;
@@ -696,6 +705,22 @@ function opensCommentBlock(
     return /^ {0,3}(?:[-+*]|\d{1,9}[.)]) +%%/.test(rest);
 }
 
+/**
+ * Whether this line, its container markers already stripped, ends the
+ * block before it outright: a "#" heading, a thematic break, or, when a
+ * paragraph is open, a setext underline of one or more "=" or "-" signs.
+ * No paragraph can be continued lazily past such a line. A thematic break
+ * needs three of its character; a setext underline of one or two dashes
+ * is a heading only because a paragraph precedes it.
+ */
+function blockEnder(rest: string, paragraphOpen: boolean): boolean {
+    return (
+        /^ {0,3}#{1,6}(?: |$)/.test(rest) ||
+        /^ {0,3}([-*_])( *\1){2,} *$/.test(rest) ||
+        (paragraphOpen && /^ {0,3}(=+|-+) *$/.test(rest))
+    );
+}
+
 /** How wide the line's leading whitespace is, each tab running to the next 4-column tab stop, as CommonMark says. */
 function leadingIndentWidth(line: string): number {
     let width = 0;
@@ -763,6 +788,24 @@ export function scanDocument(lines: string[]): DocumentScan {
     let inComment = false;
     let inMath = false;
     let regionDepth = 0;
+    // An HTML comment that OPENS at the start of a line is an HTML block
+    // (CommonMark type 2): the block runs through the line that holds the
+    // "-->", and every character of both lines belongs to it, the text
+    // after the closer included. Obsidian renders that text raw, never as
+    // markdown, so "<!-- c --> [^1]: def" is not a definition and the
+    // punctuation rule must not touch it (Claude sweep 2026-09-13, Jason's
+    // verification 2026-09-15). A comment that opens MID-line is inline
+    // HTML instead, and the text around it stays live, which is the case
+    // the boundary-line handling below was written for.
+    let commentIsBlock = false;
+    // Whether the previous line was paragraph text at the same quote
+    // depth, which is what a "setext" underline needs: a line of "=" or
+    // "-" signs (one or more) right under a paragraph turns it into a
+    // heading and ends the block, so an indented chunk under it is code
+    // and a label under it is a definition (Kimi and Claude sweeps
+    // 2026-09-13, verified in Reading view).
+    let prevParagraph = false;
+    let prevDepth = 0;
     // An open Obsidian "%%" block comment, and the blockquote depth it
     // opened at, since it lives in its container like every other region.
     // Its lines are not protected, because the references inside them are
@@ -853,6 +896,16 @@ export function scanDocument(lines: string[]): DocumentScan {
             blockBoundary = false;
             if (!src[i].includes("-->")) {
                 isProtected[i] = true; // an interior line: nothing on it is live
+                continue;
+            }
+            if (commentIsBlock) {
+                // the whole closer line belongs to the HTML block, its
+                // tail included, and the block ends here
+                isProtected[i] = true;
+                inComment = false;
+                commentIsBlock = false;
+                blockBoundary = true;
+                prevParagraph = false;
                 continue;
             }
             // The closer line keeps whatever live text follows the closer,
@@ -959,6 +1012,7 @@ export function scanDocument(lines: string[]): DocumentScan {
             // lines follow.
             blockBoundary = true;
             quote = null; // a blank line ends every open blockquote
+            prevParagraph = false;
             continue; // nothing on a blank line can open a fence or a comment
         }
         if (depth === 0) {
@@ -986,6 +1040,7 @@ export function scanDocument(lines: string[]): DocumentScan {
                     inIndentedCode = false;
                     inDefinition = false;
                     blockBoundary = false;
+                    prevParagraph = false;
                     continue;
                 }
                 // Live text: either a lazy paragraph continuation or a
@@ -994,7 +1049,13 @@ export function scanDocument(lines: string[]): DocumentScan {
                 quote.boundary = false;
             } else {
                 quote.inCode = false;
-                quote.boundary = false;
+                // A quoted heading, thematic break, or setext underline
+                // ends its block just as an unquoted one does, so an
+                // indented chunk on the next quoted line is code, not a
+                // lazy continuation (GLM and Kimi sweeps 2026-09-13,
+                // verified in Reading view). Only a paragraph can be
+                // continued lazily.
+                quote.boundary = blockEnder(rest, prevParagraph && prevDepth === depth);
                 quote.inDefinition = definitionLabelIn(src[i]) !== null;
             }
         }
@@ -1016,6 +1077,7 @@ export function scanDocument(lines: string[]): DocumentScan {
         if (indented && inIndentedCode) {
             isProtected[i] = true;
             blockBoundary = false;
+            prevParagraph = false;
             continue;
         }
         if (indented && !inDefinition && blockBoundary) {
@@ -1026,6 +1088,7 @@ export function scanDocument(lines: string[]): DocumentScan {
             inIndentedCode = true;
             isProtected[i] = true;
             blockBoundary = false;
+            prevParagraph = false;
             continue;
         }
         // A line indented that far which reaches this point is a definition
@@ -1040,7 +1103,14 @@ export function scanDocument(lines: string[]): DocumentScan {
             // definition even inside a list's live range; only a shallower
             // line decides the question again
             if (indentWidth < 4) {
-                inDefinition = DefinitionStart.test(src[i]);
+                // A label directly under a paragraph line is lazy text,
+                // not a definition (the prose-label rule), so it opens no
+                // definition here either: a "    ```" under it is then a
+                // paragraph continuation, not a fence that swallows the
+                // rest of the note (Claude sweep 2026-09-13, verified in
+                // Reading view). A label after a blank line, a block
+                // ender, or another definition does start one.
+                inDefinition = DefinitionStart.test(src[i]) && (blockBoundary || inDefinition);
             }
             // A list-item marker OPENS a container. Its content indent is
             // the marker's column, plus the marker's own width, plus the
@@ -1063,12 +1133,15 @@ export function scanDocument(lines: string[]): DocumentScan {
                 }
             }
         }
-        // Lazy continuation applies to paragraphs only. A "#" heading or a
-        // thematic break ends its block outright, so an indented chunk may
-        // open on the very next line (Sol bug #5).
-        blockBoundary =
-            thematicBreak ||
-            (depth === 0 && /^ {0,3}#{1,6}(?: |$)/.test(rest));
+        // Lazy continuation applies to paragraphs only. A "#" heading, a
+        // thematic break, or a setext underline ends its block outright,
+        // so an indented chunk may open on the very next line (Sol bug
+        // #5). That holds inside a quote too: "> # H" then "    code" at
+        // the document level is code, since the quote's last block cannot
+        // be continued lazily (GLM and Kimi sweeps 2026-09-13).
+        blockBoundary = blockEnder(rest, prevParagraph && prevDepth === depth);
+        prevParagraph = !blockBoundary && !DefinitionStart.test(src[i]);
+        prevDepth = depth;
 
         // A fence can also open on a LIST ITEM line ("- ```", "1. ~~~").
         // The list marker is a container prefix, just like the blockquote
@@ -1127,11 +1200,16 @@ export function scanDocument(lines: string[]): DocumentScan {
                 // the item's text starts (the list marker's width plus the
                 // opener's own indent) is the column the closing fence has to
                 // line up with.
-                contentIndent:
-                    listFenceContentIndent ??
-                    rest.length - fenceLine.length + open[1].length,
+                // The opener's own 0 to 3 spaces of indent do not widen
+                // that allowance: CommonMark lets a closer sit up to 3
+                // spaces past the container's content column, whatever
+                // the opener did, and Obsidian agrees (Claude sweep
+                // 2026-09-13, verified in Reading view: " ```" is not
+                // closed by "    ```").
+                contentIndent: listFenceContentIndent ?? rest.length - fenceLine.length,
             };
             isProtected[i] = true;
+            prevParagraph = false;
             continue;
         }
         // An Obsidian "%%" block comment opens on a "%%" at the start of a
@@ -1161,6 +1239,21 @@ export function scanDocument(lines: string[]): DocumentScan {
         // live definition. The same goes for an unclosed "$$" opening a
         // display-math block. The opener's own line stays live up to the
         // opener.
+        if (/^ {0,3}<!--/.test(rest) && !/^ {0,3}<!--->?>/.test(rest)) {
+            // An HTML block (see commentIsBlock above). When it closes on
+            // this same line, the whole line is dead; otherwise the block
+            // runs on, and the closer line will be dead in full too.
+            isProtected[i] = true;
+            prevParagraph = false;
+            if (src[i].indexOf("-->", src[i].indexOf("<!--") + 4) === -1) {
+                inComment = true;
+                commentIsBlock = true;
+                regionDepth = depth;
+            } else {
+                blockBoundary = true;
+            }
+            continue;
+        }
         if (src[i].includes("<!--") || src[i].includes("$$")) {
             const opened = maskLineRegions(src[i]);
             inComment = opened.endsInComment;
@@ -1401,11 +1494,16 @@ export function definitionStartLines(
             open = open === "definition" || open === "definition-gap" ? "definition-gap" : "none";
             continue;
         }
-        if (IndentedContent.test(bare) && !DefinitionStart.test(bare)) {
+        if (
+            IndentedContent.test(bare) &&
+            !DefinitionStart.test(bare) &&
+            !blockEnder(bare, open === "paragraph")
+        ) {
             // A continuation of whatever is open. After a blank line with
             // nothing open, an indent of 1 to 3 spaces starts a paragraph;
             // 4 or more would be code, which the scan already protected
-            // above.
+            // above. An indented heading or rule is not a continuation
+            // (the ender check below takes it).
             open = open === "definition" || open === "definition-gap" ? "definition" : "paragraph";
             continue;
         }
@@ -1419,6 +1517,38 @@ export function definitionStartLines(
             open = "none";
             continue;
         }
+        // A "$$" closer ends the math block the same way, so a label right
+        // under it is a definition (Claude sweep 2026-09-13, verified in
+        // Reading view). Live text after the closer on that line starts a
+        // paragraph.
+        if (scan.startsInMath[i]) {
+            open = maskedAt(i).replace(/\0/g, " ").trim() === "" ? "none" : "paragraph";
+            continue;
+        }
+        // A heading, a thematic break, a setext underline under a
+        // paragraph, a callout title, or a table row ends the block it
+        // closes, so the label under it starts a definition. These are
+        // checked BEFORE the indent rule below, because a heading or a
+        // rule indented one to three spaces is still a heading or a rule,
+        // not a paragraph continuation (Claude sweep 2026-09-13). One or
+        // two dashes under a paragraph are a heading underline, not
+        // prose (Kimi and Claude sweeps, verified in Reading view). A
+        // callout title needs its ">" marker: a column-0 line starting
+        // with "[!" is paragraph text, a README badge for instance
+        // (Claude sweep, verified). A label directly under a table row is
+        // a definition, because a definition ends the table the way any
+        // block does (Jason's ruling A2, verified in Reading view
+        // 2026-09-15).
+        if (
+            /^ {0,3}#{1,6}(?:\s|$)/.test(bare) ||
+            /^ {0,3}([-*_])(?: *\1){2,} *$/.test(bare) ||
+            (open === "paragraph" && /^ {0,3}(=+|-+) *$/.test(bare)) ||
+            (depth > 0 && /^\[![^\]]*\][+-]?/.test(bare)) ||
+            /^ {0,3}\|.*\|\s*$/.test(bare)
+        ) {
+            open = "none";
+            continue;
+        }
         if (open !== "paragraph" && definitionLabelIn(line) !== null) {
             const hit = definitionLabelWithName(line, maskedAt(i));
             if (hit) {
@@ -1426,22 +1556,6 @@ export function definitionStartLines(
                 open = "definition";
                 continue;
             }
-        }
-        if (
-            /^ {0,3}#{1,6}(?:\s|$)/.test(bare) ||
-            /^ {0,3}([-*_])(?: *\1){2,} *$/.test(bare) ||
-            // A line of "=" signs under a paragraph turns that paragraph into
-            // a heading (Markdown's "setext" heading), so the paragraph is
-            // over. "H" / "===" / "[^1]: real" is therefore a definition
-            // (ground truth 2026-09-09).
-            (open === "paragraph" && /^ {0,3}=+ *$/.test(bare)) ||
-            // A callout's title line ("> [!note]- Title") is not paragraph
-            // text, so a label right under it is a definition. A label under
-            // the callout's BODY text is not (ground truth 2026-09-09).
-            /^\[![^\]]*\][+-]?/.test(bare)
-        ) {
-            open = "none";
-            continue;
         }
         open = "paragraph";
     }

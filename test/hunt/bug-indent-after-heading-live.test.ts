@@ -43,11 +43,13 @@ describe("indented chunks after non-paragraph blocks are code", () => {
     });
 
     it("after a bare multi-line comment closer", () => {
+        // the opener and closer lines of a comment that opens at the start
+        // of a line are dead too: it is an HTML block (2026-09-15)
         const doc = "<!--\nhidden\n-->\n    chunk[^9]";
         expect(protectedLines(doc.split("\n"))).toEqual([
-            false,
             true,
-            false,
+            true,
+            true,
             true,
         ]);
     });

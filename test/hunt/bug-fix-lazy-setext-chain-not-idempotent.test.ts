@@ -68,17 +68,17 @@ describe("fixing a lazy label above a setext underline makes the next label lazy
         expect(lazyIn(SETEXT)).toEqual([1]);
     });
 
-    it.fails("the rule leaves no lazy label behind", () => {
+    it("the rule leaves no lazy label behind", () => {
         // it leaves line 4, "[^2]: b", which the fix itself turned lazy
         expect(lazyIn(fixLazyDefinitions(SETEXT))).toEqual([]);
     });
 
-    it.fails("the rule is idempotent: fixing twice is the same as fixing once", () => {
+    it("the rule is idempotent: fixing twice is the same as fixing once", () => {
         const once = fixLazyDefinitions(SETEXT);
         expect(fixLazyDefinitions(once)).toBe(once);
     });
 
-    it.fails("a longer chain of underlines is fixed in one go too", () => {
+    it("a longer chain of underlines is fixed in one go too", () => {
         // two lazy labels counted at the start, three needed: "[^3]: c" is
         // still lazy when the rule gives up
         expect(lazyIn(fixLazyDefinitions(CHAIN))).toEqual([]);
@@ -86,12 +86,12 @@ describe("fixing a lazy label above a setext underline makes the next label lazy
 });
 
 describe("the lint does not settle in one run on this shape", () => {
-    it.fails("a second lint says 'No linting needed' (sheet 25)", () => {
+    it("a second lint says 'No linting needed' (sheet 25)", () => {
         const once = lintFootnotes(SETEXT);
         expect(lintFootnotes(once)).toBe(once);
     });
 
-    it.fails("the footnote numbers do not change between the first and second lint", () => {
+    it("the footnote numbers do not change between the first and second lint", () => {
         // run one hands back "x[^2] y[^1]" and run two turns it into
         // "x[^1] y[^2]", so the reference the user reads as footnote 1
         // changes under them when they lint again
@@ -101,12 +101,12 @@ describe("the lint does not settle in one run on this shape", () => {
         expect(first).toContain("x[^1] y[^2]");
     });
 
-    it.fails("the longer chain settles in one run as well", () => {
+    it("the longer chain settles in one run as well", () => {
         const once = lintFootnotes(CHAIN);
         expect(lintFootnotes(once)).toBe(once);
     });
 
-    it.fails("lint on save does not rewrite the note on the second save (sheet 21)", () => {
+    it("lint on save does not rewrite the note on the second save (sheet 21)", () => {
         const saves = [SETEXT];
         for (let i = 0; i < 3; i++) saves.push(lintFootnotes(saves[saves.length - 1]));
         // it takes three lints to reach a note the fourth leaves alone

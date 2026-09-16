@@ -42,15 +42,15 @@ import { protectedLines, scanDocument } from "../../src/parsing/markdown-scan";
 const lines = ["prose", "[^1]: lazy label", "    ```", "live[^9] text"];
 
 describe("a lazy label must not open a four-space fence", () => {
-    it.fails("no line in the note is protected", () => {
+    it("no line in the note is protected", () => {
         expect(protectedLines(lines)).toEqual([false, false, false, false]);
     });
 
-    it.fails("the note does not end inside protected text", () => {
+    it("the note does not end inside protected text", () => {
         expect(scanDocument(lines).endsProtected).toBe(false);
     });
 
-    it.fails("the reference after the four-space run still reserves its number", () => {
+    it("the reference after the four-space run still reserves its number", () => {
         expect(
             computeNextFootnoteNumber("prose\n[^1]: lazy label\n    ```\nlive[^9] text"),
         ).toBe(10);

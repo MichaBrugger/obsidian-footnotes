@@ -32,12 +32,12 @@ import { protectedLines } from "../../src/parsing/markdown-scan";
 // four-space line stays part of the code block's content.
 
 describe("a closer indented four spaces never closes a document-level fence", () => {
-    it.fails("an opener indented one space is not closed by a four-space line", () => {
+    it("an opener indented one space is not closed by a four-space line", () => {
         const lines = [" ```", "aaa[^1]", "    ```", "bbb[^2]"];
         expect(protectedLines(lines)).toEqual([true, true, true, true]);
     });
 
-    it.fails("so the text after it is still code, and reserves no number", () => {
+    it("so the text after it is still code, and reserves no number", () => {
         expect(computeNextFootnoteNumber(" ```\naaa[^1]\n    ```\nbbb[^2]")).toBe(1);
     });
 

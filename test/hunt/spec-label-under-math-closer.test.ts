@@ -64,12 +64,12 @@ describe("a label directly under a closed $$ math block", () => {
         expect(lastLineStarts("t[^1]\npara\n<!--\nc\n-->\n[^1]: real")).toBe(true);
     });
 
-    it.fails("under reading one, the math closer ends it too", () => {
+    it("under reading one, the math closer ends it too", () => {
         expect(blocksOf("t[^1]\n\n$$\nx = 1\n$$\n[^1]: real")).toEqual(["1@5"]);
         expect(lastLineStarts("t[^1]\npara\n\n$$\nx = 1\n$$\n[^1]: real")).toBe(true);
     });
 
-    it.fails("so the definition under it would not be a lazy label", () => {
+    it("so the definition under it would not be a lazy label", () => {
         expect(lazyNames("use[^1] here\n\n$$\nx = 1\n$$\n[^1]: real definition")).toEqual([]);
     });
 
@@ -79,7 +79,7 @@ describe("a label directly under a closed $$ math block", () => {
         expect(lintFootnotes(doc)).toBe(doc);
     });
 
-    it.fails("and a press on the reference would jump instead of appending an empty duplicate", async () => {
+    it("and a press on the reference would jump instead of appending an empty duplicate", async () => {
         const lines = ["use[^1] here", "", "$$", "x = 1", "$$", "[^1]: real definition"];
         const doc = fakeEditor(lines, { cursor: { line: 0, ch: 5 }, wholeDoc: true, edits: true });
         await insertAutonumFootnote(

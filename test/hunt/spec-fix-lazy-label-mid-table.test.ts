@@ -56,29 +56,29 @@ import { fixLazyDefinitions } from "../../src/linting/rules/fix-lazy-definitions
 const MIDDLE_ROW = ["| a | b |", "| - | - |", "| c | d |", "[^1]: x", "| e | f |", "", "ref[^1]"].join("\n");
 const DELIMITER_ROW = ["| a | b |", "| - | - |", "[^1]: x", "| c | d |", "", "ref[^1]"].join("\n");
 
-describe("a lazy label under a table row that is not the last", () => {
-    it.fails("the fix does not cut the table in half (label under a middle body row)", () => {
-        const lines = fixLazyDefinitions(MIDDLE_ROW).split("\n");
-        const lastRow = lines.indexOf("| e | f |");
-        // no blank line anywhere between the header row and the last body
-        // row, which is what would end the table early
-        expect(lines.slice(0, lastRow + 1).filter((l) => l.trim() === "")).toEqual([]);
+// RULED 2026-09-15 (Jason, ruling A2, verified in Reading view): a label
+// directly under a table row is a DEFINITION, because a definition ends
+// the table the way any block does. So no label under a row is lazy, the
+// fix-lazy rule inserts nothing under a table, and a label INSIDE a table
+// (rows continuing after it) is the user's mistake: the plugin leaves it
+// alone and a lint alert names it (Obsidian folds the rows after the
+// label into the footnote's text as a lazy continuation).
+
+describe("a label under a table row that is not the last", () => {
+    it("is a definition, and the fix rule inserts nothing (label under a middle body row)", () => {
+        expect(fixLazyDefinitions(MIDDLE_ROW)).toBe(MIDDLE_ROW);
     });
 
-    it.fails("nor when the label sits directly under the delimiter row", () => {
-        const lines = fixLazyDefinitions(DELIMITER_ROW).split("\n");
-        const lastRow = lines.indexOf("| c | d |");
-        expect(lines.slice(0, lastRow + 1).filter((l) => l.trim() === "")).toEqual([]);
+    it("nor when the label sits directly under the delimiter row", () => {
+        expect(fixLazyDefinitions(DELIMITER_ROW)).toBe(DELIMITER_ROW);
     });
 
-    it.fails("the default lint leaves the whole table standing", () => {
-        // move-to-bottom carries the label away afterwards, but it never
-        // takes the unindented row with it and it does not close the gap,
-        // so the severed row stays severed
-        expect(lintFootnotes(MIDDLE_ROW)).toContain("| c | d |\n| e | f |");
+    it("the default lint leaves the rows together", () => {
+        expect(lintFootnotes(MIDDLE_ROW)).toContain("| c | d |");
+        expect(lintFootnotes(MIDDLE_ROW)).not.toContain("| c | d |\n\n");
     });
 
-    it("the severed table is at least stable: a second lint changes nothing", () => {
+    it("the lint is stable: a second lint changes nothing", () => {
         const once = lintFootnotes(MIDDLE_ROW);
         expect(lintFootnotes(once)).toBe(once);
     });
@@ -87,10 +87,8 @@ describe("a lazy label under a table row that is not the last", () => {
 describe("the boundary: sheet 25's fixture, the label under the LAST row", () => {
     const LAST_ROW = ["| a | b |", "| - | - |", "| c | d |", "[^1]: x", "", "ref[^1]"].join("\n");
 
-    it("the blank line lands after the table and the table is untouched", () => {
-        expect(fixLazyDefinitions(LAST_ROW)).toBe(
-            "| a | b |\n| - | - |\n| c | d |\n\n[^1]: x\n\nref[^1]",
-        );
+    it("the label is a definition, so the fix rule leaves the note alone", () => {
+        expect(fixLazyDefinitions(LAST_ROW)).toBe(LAST_ROW);
     });
 
     it("and the default lint keeps every row together", () => {

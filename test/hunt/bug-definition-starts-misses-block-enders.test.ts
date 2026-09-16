@@ -82,12 +82,12 @@ describe("a setext underline of dashes ends the paragraph", () => {
         expect(blocksOf("t[^1]\n\nH\n---\n[^1]: real")).toEqual(["1@4"]);
     });
 
-    it.fails("one or two dashes are a setext underline too", () => {
+    it("one or two dashes are a setext underline too", () => {
         expect(blocksOf("t[^1]\n\nH\n--\n[^1]: real")).toEqual(["1@4"]);
         expect(blocksOf("t[^1]\n\nH\n-\n[^1]: real")).toEqual(["1@4"]);
     });
 
-    it.fails("so the definition under one is not called a lazy label", () => {
+    it("so the definition under one is not called a lazy label", () => {
         expect(lazyNames("use[^1] here\n\nHeading\n-\n[^1]: real definition")).toEqual([]);
     });
 
@@ -98,7 +98,7 @@ describe("a setext underline of dashes ends the paragraph", () => {
         expect(lintFootnotes(doc)).toBe(doc);
     });
 
-    it.fails("and a press on the reference jumps instead of appending an empty duplicate", async () => {
+    it("and a press on the reference jumps instead of appending an empty duplicate", async () => {
         const lines = ["use[^1] here", "", "Heading", "-", "[^1]: real definition"];
         const doc = fakeEditor(lines, { cursor: { line: 0, ch: 5 }, wholeDoc: true, edits: true });
         await insertAutonumFootnote(
@@ -118,21 +118,21 @@ describe("a block start indented one to three spaces still ends the paragraph", 
         expect(lastLineStarts("t[^1]\npara\n***\n[^1]: real")).toBe(true);
     });
 
-    it.fails("an ATX heading indented one to three spaces", () => {
+    it("an ATX heading indented one to three spaces", () => {
         expect(lastLineStarts("t[^1]\npara\n # H\n[^1]: real")).toBe(true);
         expect(lastLineStarts("t[^1]\npara\n   # H\n[^1]: real")).toBe(true);
     });
 
-    it.fails("a thematic break indented one to three spaces", () => {
+    it("a thematic break indented one to three spaces", () => {
         expect(lastLineStarts("t[^1]\npara\n   ___\n[^1]: real")).toBe(true);
         expect(lastLineStarts("t[^1]\npara\n  ***\n[^1]: real")).toBe(true);
     });
 
-    it.fails("a setext underline indented one to three spaces", () => {
+    it("a setext underline indented one to three spaces", () => {
         expect(lastLineStarts("t[^1]\n\nH\n  ===\n[^1]: real")).toBe(true);
     });
 
-    it.fails("so the lint does not insert a blank line into a note that already renders", () => {
+    it("so the lint does not insert a blank line into a note that already renders", () => {
         const doc = "use[^1]\npara\n   # Heading\n[^1]: real";
         expect(lazyNames(doc)).toEqual([]);
         expect(lintFootnotes(doc, { fixLazyDefinitions: true, moveDefinitionsToBottom: false })).toBe(doc);

@@ -24,9 +24,11 @@ describe("unclosed comment/math regions die with their blockquote", () => {
     });
 
     it("a quoted unclosed <!-- ends at the quote's end", () => {
+        // the opener line is dead too since 2026-09-15: a comment opened
+        // at the start of a line (or of a quote's content) is an HTML block
         const doc = "> <!--\n> draft\n\nafter[^1]";
         expect(protectedLines(doc.split("\n"))).toEqual([
-            false,
+            true,
             true,
             false,
             false,

@@ -36,7 +36,8 @@ describe("fixLazyDefinitions inserts the blank line a hidden definition needs", 
     it.each([
         ["under a paragraph line", "prose\n[^1]: a\n\nx[^1]", "prose\n\n[^1]: a\n\nx[^1]"],
         ["under a list item", "- item\n[^1]: a\n\nx[^1]", "- item\n\n[^1]: a\n\nx[^1]"],
-        ["under a table", "| a |\n| - |\n| b |\n[^1]: a\n\nx[^1]", "| a |\n| - |\n| b |\n\n[^1]: a\n\nx[^1]"],
+        // a label under a table row is a definition, not a lazy label (ruling
+        // A2, 2026-09-15): that case lives in test/hunt/spec-fix-lazy-label-mid-table
         ["on the last line of the note", "x[^1]\n\ntail prose\n[^1]: a", "x[^1]\n\ntail prose\n\n[^1]: a"],
         ["inside a quote, with a bare quote line", "> prose\n> [^1]: a\n\nx[^1]", "> prose\n>\n> [^1]: a\n\nx[^1]"],
         [
@@ -182,5 +183,27 @@ describe("the lazy-definition alert and the toggle", () => {
         const plugin = fakePlugin({ lintFixLazyDefinitions: false });
         noticeLintAlerts(plugin, lintFootnotes(doc, lintOptionsFromSettings(plugin, "", doc)));
         expect(lazyAlert()).toBe(true);
+    });
+});
+
+describe("a lazy label whose blank line would swallow code stays lazy (lint property find, 2026-09-15)", () => {
+    // "%% c %%" is a paragraph line, so the label under it is lazy; the
+    // tab-indented line two lines below is CODE while the label is prose.
+    // Give the label its blank line and that chunk becomes the definition's
+    // continuation (indented, after a blank line), and the code is gone.
+    // The rule leaves such a label alone; the lazy alert still names it.
+    const doc = "%% c %%\n[^94]: lazy under a comment line\n\n\tcode-shaped[^89]";
+
+    it("inserts nothing", () => {
+        expect(fixLazyDefinitions(doc)).toBe(doc);
+    });
+
+    it("the label is still reported as lazy", () => {
+        expect(lazyIn(doc)).toEqual(["94"]);
+    });
+
+    it("but a label with plain prose below it is still fixed", () => {
+        const plain = "%% c %%\n[^94]: lazy under a comment line\n\nplain[^94] prose";
+        expect(fixLazyDefinitions(plain)).toBe("%% c %%\n\n[^94]: lazy under a comment line\n\nplain[^94] prose");
     });
 });

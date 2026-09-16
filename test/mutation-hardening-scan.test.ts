@@ -492,7 +492,7 @@ describe("scanDocument: comment/math region container depth", () => {
     // tracked as math, not comment (rules out the "&&"/bare-inMath
     // mutants that garble which flag gets set).
     it("a comment closer's live suffix can open a NEW math region", () => {
-        const doc = "<!-- x\n--> $$\nstill math\n$$\nafter[^1]";
+        const doc = "x <!-- x\n--> $$\nstill math\n$$\nafter[^1]";
         const scan = scanDocument(doc.split("\n"));
         expect(scan.startsInMath).toEqual([false, false, true, true, false]);
         // opener/closer boundary lines keep their live suffix scannable
@@ -506,12 +506,14 @@ describe("scanDocument: comment/math region container depth", () => {
     // A mutant that never sets blockBoundary here would treat the next
     // indented line as a paragraph continuation instead of code.
     it("a bare comment closer ends its block, letting indented code open right after", () => {
+        // a comment opened at the start of a line is an HTML block, so its
+        // opener and closer lines are dead in full (2026-09-15)
         const doc = "<!--\nhidden\n-->\n    code";
         const scan = scanDocument(doc.split("\n"));
-        expect(scan.isProtected).toEqual([false, true, false, true]);
+        expect(scan.isProtected).toEqual([true, true, true, true]);
     });
     it("a comment closer with live trailing text does NOT end the block (no code opens after)", () => {
-        const doc = "<!--\nhidden\n--> tail\n    cont";
+        const doc = "x <!--\nhidden\n--> tail\n    cont";
         const scan = scanDocument(doc.split("\n"));
         // "tail" is live prose, so the next indented line is a lazy/
         // paragraph continuation, not code
@@ -571,7 +573,7 @@ describe("scanDocument: comment/math region container depth", () => {
     // depth-1 line right after must then end the (new) region - which
     // only happens if regionDepth was updated to 2, not left at 1.
     it("a comment-to-math reopen at a deeper depth updates regionDepth to the new depth", () => {
-        const doc = "> <!--\n> > --> $$\n> after\nplain";
+        const doc = "> x <!--\n> > --> $$\n> after\nplain";
         const scan = scanDocument(doc.split("\n"));
         // "> after" (depth 1) is shallower than the reopened region's
         // depth (2), so the math region has already ended by the time we
@@ -1056,7 +1058,7 @@ describe("round 2", () => {
         // still on the line, wrongly opening fresh indented code right
         // after it.
         it("a comment closer with live trailing text does not open code on the next line", () => {
-            const doc = "<!--\nhidden\n--> tail\n    cont";
+            const doc = "x <!--\nhidden\n--> tail\n    cont";
             const scan = scanDocument(doc.split("\n"));
             expect(scan.isProtected).toEqual([false, true, false, false]);
         });
@@ -1072,7 +1074,7 @@ describe("round 2", () => {
         // one quote-level deeper, followed by a plain (unquoted) indented
         // line, exposes the stale wrongly-true value as bogus fresh code.
         it("a deeper same-line region reopen does not leak a stale block boundary past the quote drop", () => {
-            const doc = "> <!--\n> > --> $$\n    indented";
+            const doc = "> x <!--\n> > --> $$\n    indented";
             const scan = scanDocument(doc.split("\n"));
             expect(scan.isProtected).toEqual([false, false, false]);
         });

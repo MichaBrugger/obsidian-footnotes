@@ -9,17 +9,17 @@ import { scanDocument } from "../../src/parsing/markdown-scan";
 // renumbers and orphan-deletes the fake references inside the code.
 
 describe("indented code after a quoted heading or thematic break", () => {
-    it.fails("a document-level chunk after a quoted heading is code", () => {
+    it("a document-level chunk after a quoted heading is code", () => {
         const scan = scanDocument(["> # h", "    code[^9]", "", "[^9]: nine"]);
         expect(scan.isProtected).toEqual([false, true, false, false]);
     });
 
-    it.fails("a document-level chunk after a quoted thematic break is code", () => {
+    it("a document-level chunk after a quoted thematic break is code", () => {
         const scan = scanDocument(["> ***", "    code[^9]", "", "[^9]: nine"]);
         expect(scan.isProtected).toEqual([false, true, false, false]);
     });
 
-    it.fails("a quoted chunk after a quoted heading is code inside the quote", () => {
+    it("a quoted chunk after a quoted heading is code inside the quote", () => {
         const scan = scanDocument(["> # h", ">     code[^9]", "", "[^9]: nine"]);
         expect(scan.isProtected).toEqual([false, true, false, false]);
     });

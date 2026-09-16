@@ -17,9 +17,8 @@ data.json
 # Inkscape auto-backup copies (timestamped crash-recovery files)
 icons/*.svg.*.svg
 
-# claude skill-eval scaffolding and agent worktrees
-.claude/skills/hunt-bugs-workspace/
-.claude/worktrees/
+# Claude Code's folder (skills, worktrees, scaffolding) stays local, never in the repo
+.claude/
 scripts/.smoke-settings.bak.json
 
 # Stryker mutation testing (local pre-release audit — npm run mutation)
