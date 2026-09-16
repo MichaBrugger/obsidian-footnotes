@@ -197,6 +197,22 @@ const specialBlockArb = fc.constantFrom(
     "- item\n\n    [^113]: in-item label",
     "%%\n[^114]: before closer %%",
     "see <ftp:x/y[^115]> here\n\n[^115]: autolink twin",
+    // shapes from the 2026-09-16 hunt (cycle 5): a quoted definition whose
+    // lazy continuation a setext underline pulls out as a heading, an
+    // orphan reference glued to a one- or two-character setext run (the
+    // cut must be refused), a table-looking run under a "<" line that is
+    // plain paragraph text, and a code span closing inside a fence-shaped
+    // line whose info string holds a backtick (not a fence, per CommonMark
+    // 4.5). Two more shapes stay OUT of the shared generator on purpose:
+    // "para\n[^119]%%\nmore text" and "[^116]: body\ncont\n===" trip real
+    // bugs the hunt pins in test/hunt (bug-orphan-delete-comment-opener-
+    // residue, bug-definition-chunk-after-ender), and feeding them to the
+    // non-it.fails invariants would turn the suite flaky red until the
+    // fixes land. Re-add them here once those are fixed.
+    "> [^117]: quoted body\n> cont\n> ===",
+    "para\n[^118]==\n\ntext[^1]\n\n[^1]: d",
+    "<3\n| a | b |\n| --- | --- |\n[^120]: d",
+    "para `code [^121]\n``` `x`",
 );
 
 const blockArb = fc.oneof(

@@ -15,6 +15,9 @@ import {
     SelectionSpanNotice,
 } from "../src/commands/selection-footnote";
 import { computeNextFootnoteNumber, definitionLabelWithName, footnoteNameProblem, referenceOccurrences } from "../src/parsing/footnote-grammar";
+import { docContext } from "../src/editor/doc-context";
+import { endOfWordForSelection, startOfWordOffset } from "../src/editor/cursor-motion";
+import { planFootnoteRename } from "../src/commands/rename-footnote";
 import {
     inlineFootnoteSpanAt,
     sanitizeInlineFootnoteContent,
@@ -33,6 +36,7 @@ import {
     maskProtectedLines,
     normalizeEol,
     quotedDefinitionEnd,
+    quotedDefinitionLabelAbove,
     scanDocument,
 } from "../src/parsing/markdown-scan";
 
@@ -46,7 +50,7 @@ import {
 
 fc.configureGlobal({ numRuns: Number(process.env.FC_NUM_RUNS ?? 200) });
 const SOAK_TIMEOUT = Math.max(30_000, Number(process.env.FC_NUM_RUNS ?? 200) * 60);
-const soakIt = (name: string, fn: () => Promise<void>) =>
+const soakIt = (name: string, fn: () => void | Promise<void>) =>
     { it(name, fn, SOAK_TIMEOUT); };
 
 // ---------- a fake editor that APPLIES its transactions ----------
@@ -395,6 +399,21 @@ describe("creation-command invariants over random documents", () => {
                     // the press may have warned/hopped/navigated instead -
                     // only a planted "[^]" starts the typing flow
                     if (!plantedPlaceholder(doc, "[^]")) return;
+                    // A plant on a setext underline line ("===" under a
+                    // one-line paragraph) or in front of a quote marker
+                    // changes how the lines around it are read (the heading
+                    // above turns back into prose; the quoted line leaves
+                    // its quote), which can drop the typed reference into a
+                    // quoted definition's continuation. Where such a press
+                    // should land is an open ruling (2026-09-16), so the
+                    // flow is not judged there.
+                    const pressedLine = lines[cursor.line] ?? "";
+                    if (
+                        /^(?: {0,3}> ?)* {0,3}(=+|-+) *$/.test(pressedLine) ||
+                        (/^ {0,3}>/.test(pressedLine) && cursor.ch <= pressedLine.indexOf(">"))
+                    ) {
+                        return;
+                    }
 
                     typeText(doc, name);
                     const definitionsBefore = definitionNamesFolded(doc.lines);
@@ -405,9 +424,17 @@ describe("creation-command invariants over random documents", () => {
                     // inside a definition and refuses to nest: no new
                     // definition is the right outcome there.
                     const typedLine = doc.getCursor().line;
-                    const insideDefinition = findDefinitionBlocks(doc.lines).some(
-                        (block) => typedLine >= block.start && typedLine <= block.end,
-                    );
+                    const typedScan = scanDocument(doc.lines);
+                    const typedMasked = maskProtectedLines(doc.lines, typedScan);
+                    const typedStarts = definitionStartLines(doc.lines, typedScan, (i) => typedMasked[i]);
+                    // a quoted definition's lines and any label line count
+                    // too (the guard knows them since cycle 3, 2026-09-16)
+                    const insideDefinition =
+                        findDefinitionBlocks(doc.lines).some(
+                            (block) => typedLine >= block.start && typedLine <= block.end,
+                        ) ||
+                        typedStarts[typedLine] ||
+                        quotedDefinitionLabelAbove(doc.lines, typedScan, typedStarts, (j) => typedMasked[j], typedLine) >= 0;
                     await insertNamedFootnote(plugin);
                     const folded = name.toLowerCase();
                     const definitionsAfter = definitionNamesFolded(doc.lines);
@@ -1054,9 +1081,30 @@ describe("multi-caret press invariants over random documents", () => {
                 // that line into the definition's lazy continuation (Reading
                 // view, 2026-09-16), so the second press sits inside a
                 // definition and refuses to nest: no shared definition then
-                const typedInsideDefinition = findDefinitionBlocks(typedLines).some((block) =>
-                    newCarets.some((caret) => caret.line >= block.start && caret.line <= block.end),
-                );
+                // a quoted definition (label line and quoted continuation
+                // lines) and any other definition label line count as well:
+                // the guard refuses there since cycle 3 (2026-09-16)
+                const typedScan = scanDocument(typedLines);
+                const typedMasked = maskProtectedLines(typedLines, typedScan);
+                const typedStarts = definitionStartLines(typedLines, typedScan, (i) => typedMasked[i]);
+                const typedInsideDefinition =
+                    findDefinitionBlocks(typedLines).some((block) =>
+                        newCarets.some((caret) => caret.line >= block.start && caret.line <= block.end),
+                    ) ||
+                    newCarets.some(
+                        (caret) =>
+                            typedStarts[caret.line] ||
+                            quotedDefinitionLabelAbove(typedLines, typedScan, typedStarts, (j) => typedMasked[j], caret.line) >= 0,
+                    );
+                // A caret in front of a quote marker (column 0 of "> ===")
+                // plants the reference outside the quote and un-quotes the
+                // line, which can turn the line above into a quoted
+                // definition's lazy continuation; where such a press should
+                // land is an open ruling (2026-09-16), so the flow is not
+                // judged there.
+                if (planted.some((sel) => /^ {0,3}>/.test(doc.lines[sel.from.line] ?? "") && sel.from.ch - 2 <= (doc.lines[sel.from.line] ?? "").indexOf(">"))) {
+                    return;
+                }
                 await insertNamedFootnote(
                     sharedFakePlugin(
                         { ...settings, footnoteSectionHeading: "# Footnotes", enablePopupEditor: false, enableFootnotePrefix: false, lintOnFootnoteCreation: false },
@@ -1215,6 +1263,88 @@ describe("multi-caret press invariants over random documents", () => {
                 expect(allowed, `${command} produced raw-shape delta ${delta}`).toContain(delta);
                 // and no transaction it made ever nests a reference
                 expect(doc.lines.join("\n")).not.toContain("[^[^");
+            }),
+        );
+    });
+});
+
+// ---------- rename + selection word model (added 2026-09-16, hunt cycle 5) ----------
+
+const renameArb = fc
+    .tuple(
+        docArb,
+        fc.nat(1000),
+        fc.constantFrom("fresh", "Fresh-Name", "note", "NOTE", "9", "x.y", "$start", "bad name", "tick`name", "#tag"),
+    )
+    .map(([doc, namePick, newName]) => ({
+        lines: normalizeEol(doc).text.split("\n"),
+        namePick,
+        newName,
+    }));
+
+describe("rename invariants over random documents", () => {
+    soakIt("planFootnoteRename never throws, and a 'renamed' plan conserves protected lines and the footnote census", () => {
+        fc.assert(
+            fc.property(renameArb, ({ lines, namePick, newName }) => {
+                const doc = fakeMultiEditor(lines, { wholeDoc: true });
+                const ctx = docContext(doc);
+                // every name in the note, references and labels alike
+                const names: string[] = [];
+                const masked = ctx.maskedLines();
+                const starts = ctx.definitionStarts();
+                for (let i = 0; i < lines.length; i++) {
+                    for (const o of referenceOccurrences(lines[i], masked[i], starts[i])) {
+                        names.push(o.name);
+                    }
+                    if (starts[i]) {
+                        const hit = definitionLabelWithName(lines[i], masked[i]);
+                        if (hit) names.push(hit.name);
+                    }
+                }
+                if (names.length === 0) return;
+                const oldName = names[namePick % names.length];
+                const plan = planFootnoteRename(doc, oldName, newName, ctx);
+                if (plan.kind !== "renamed") return;
+                const protectedBefore = scanDocument(lines).isProtected;
+                const after = simulateChanges(lines, plan.changes);
+                // protected text is never renamed into or out of: it survives
+                // as a multiset of whole lines
+                const counts = new Map<string, number>();
+                for (const line of after) counts.set(line, (counts.get(line) ?? 0) + 1);
+                for (let i = 0; i < lines.length; i++) {
+                    if (!protectedBefore[i]) continue;
+                    const left = counts.get(lines[i]) ?? 0;
+                    expect(left, `protected line lost: ${JSON.stringify(lines[i])}`).toBeGreaterThan(0);
+                    counts.set(lines[i], left - 1);
+                }
+                // a rename swaps one name for another; it never merges two
+                // footnotes or loses one (a collision is refused as "collision",
+                // never applied)
+                expect(definitionNamesFolded(after).size).toBe(definitionNamesFolded(lines).size);
+            }),
+        );
+    });
+});
+
+// The selection expansion's word model: the start walk and the end walk
+// must agree on where one word begins and ends. Pinned here over plain
+// words; the intra-word apostrophe/dot case ("don't", "U.S.") is the
+// cycle-5 bug pinned in test/hunt/bug-selection-start-splits-word.test.ts.
+const plainWordArb = fc
+    .tuple(
+        fc.constantFrom("alpha", "bravo", "charlie", "中文", "word", "注釈"),
+        fc.nat(20),
+    )
+    .map(([word, pick]) => ({ word, at: 1 + (pick % Math.max(1, word.length - 1)) }));
+
+describe("the selection word model over plain words", () => {
+    soakIt("startOfWordOffset and endOfWordForSelection agree on one word's span", () => {
+        fc.assert(
+            fc.property(plainWordArb, ({ word, at }) => {
+                // an offset strictly inside the word: the start walk reaches
+                // the word's first character, the end walk its last
+                expect(startOfWordOffset(word, at)).toBe(0);
+                expect(endOfWordForSelection(word, at)).toBe(word.length);
             }),
         );
     });

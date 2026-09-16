@@ -600,6 +600,49 @@ describe("single-rule invariants over random documents", () => {
             }),
         );
     });
+
+    // added 2026-09-16, hunt cycle 5: the guard in remove-orphaned-references
+    // exists so that a cut never changes how a kept line is read; the most
+    // visible reading a line has is whether it STARTS a definition. Lines
+    // are never removed by this rule, so the indices align across the cut.
+    soakIt("orphan-reference deletion never changes which lines start a definition", () => {
+        const countStarts = (text: string): number => {
+            const lines = normalizeEol(text).text.split("\n");
+            const scan = scanDocument(lines);
+            const masked = maskProtectedLines(lines, scan);
+            return definitionStartLines(lines, scan, (i) => masked[i]).filter(Boolean).length;
+        };
+        fc.assert(
+            fc.property(docArb, fc.constantFrom("", ...PREFIXES), (doc, prefix) => {
+                const out = removeOrphanedFootnoteReferences(doc, prefix);
+                expect(countStarts(out)).toBe(countStarts(doc));
+            }),
+        );
+    });
+
+    // added 2026-09-16, hunt cycle 5: the punctuation rule may MOVE a
+    // reference across punctuation, but it may never invent, drop, or rename
+    // one - the names on each line, as a multiset, are conserved.
+    soakIt("the punctuation rule conserves each line's reference names as a multiset", () => {
+        const namesOn = (text: string): string[] => {
+            const lines = normalizeEol(text).text.split("\n");
+            const scan = scanDocument(lines);
+            const masked = maskProtectedLines(lines, scan);
+            const starts = definitionStartLines(lines, scan, (i) => masked[i]);
+            const out: string[] = [];
+            for (let i = 0; i < lines.length; i++) {
+                for (const { name } of referenceOccurrences(lines[i], masked[i], starts[i])) {
+                    out.push(name.toLowerCase());
+                }
+            }
+            return out.sort();
+        };
+        fc.assert(
+            fc.property(docArb, (doc) => {
+                expect(namesOn(footnoteAfterPunctuation(doc))).toEqual(namesOn(doc));
+            }),
+        );
+    });
 });
 
 // ---------- editor-side invariants ----------

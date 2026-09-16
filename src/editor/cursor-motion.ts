@@ -193,15 +193,33 @@ export function startOfWordOffset(text: string, offset: number): number {
     // code point's start before the checks below run
     const unitAt = text.charCodeAt(start);
     if (unitAt >= 0xdc00 && unitAt <= 0xdfff) start--;
+    // an apostrophe (straight or curly) or a dot between two word
+    // characters belongs to the word, the same rule the end walk applies
+    // ("don't", "example.com"): the walk back crosses it instead of
+    // stopping behind it (Kimi hunt cycle 5, 2026-09-16)
+    const joinsWord = (at: number): boolean => {
+        const c = text[at - 1];
+        return (
+            (c === "'" || c === "\u2019" || c === ".") &&
+            isWordCp(cpBefore(text, at - 1)) &&
+            isWordCp(text.codePointAt(at))
+        );
+    };
     if (
         !isWordCp(text.codePointAt(start)) ||
-        !isWordCp(cpBefore(text, start))
+        (!isWordCp(cpBefore(text, start)) && !joinsWord(start))
     ) {
         return start;
     }
     for (;;) {
         const cp = cpBefore(text, start);
-        if (!isWordCp(cp)) break;
+        if (!isWordCp(cp)) {
+            if (joinsWord(start)) {
+                start--;
+                continue;
+            }
+            break;
+        }
         start -= (cp as number) > 0xffff ? 2 : 1;
     }
     return start;

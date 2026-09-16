@@ -182,22 +182,31 @@ export function tableRowLinesOf(lines: string[]): boolean[] {
     const paragraphTextAbove = (i: number): boolean => {
         if (i === 0) return false;
         const depth = blockquoteDepth(lines[i]).depth;
-        const plainText = (line: string): boolean => {
+        const plainText = (j: number): boolean => {
+            const line = lines[j];
             const text = (line.endsWith("\r") ? line.slice(0, -1) : line).replace(BlockquotePrefix, "");
             if (text.trim() === "" || leadingIndentWidth(text) >= 4) return false;
             // a comment-only line ("%% c %%") is paragraph text like any
             // other (sheet 18; a table under one is no table, Kimi hunt
             // cycle 4, probed 2026-09-16); only a lone "%%" opens a block
             const percentBlock = /^ {0,3}%%/.test(text) && (text.match(/%%/g) ?? []).length === 1;
-            return !percentBlock && !/^ {0,3}(?:#{1,6}(?: |$)|([-*_])( *\1){2,} *$|(?:=+|-+) *$|`{3,}|~{3,}|<|\[\^|\[![^\]]*\])/.test(text) && !hasUnescapedPipe(text);
+            // a "<" opens an HTML block only as one of CommonMark's types 1
+            // to 6, or as a lone complete tag (type 7) with no paragraph
+            // open above it; "<3" and an inline "<span>" under prose are
+            // paragraph text (Kimi hunt cycle 5, 2026-09-16)
+            const paragraphOpen = j > 0 && lines[j - 1].replace(BlockquotePrefix, "").trim() !== "";
+            const htmlBlock =
+                /^ {0,3}<(?:!--|\?|![A-Za-z]|!\[CDATA\[|\/?(?:script|pre|style|textarea|address|article|aside|blockquote|details|dialog|div|dl|figure|footer|form|h[1-6]|header|hr|main|nav|ol|p|section|summary|table|ul)(?:[ >/]|$))/i.test(text) ||
+                (!paragraphOpen && /^ {0,3}<\/?[A-Za-z][A-Za-z0-9-]*(?:\s+[^<>]*)?\/?>\s*$/.test(text));
+            return !percentBlock && !htmlBlock && !/^ {0,3}(?:#{1,6}(?: |$)|([-*_])( *\1){2,} *$|(?:=+|-+) *$|`{3,}|~{3,}|\[\^|\[![^\]]*\])/.test(text) && !hasUnescapedPipe(text);
         };
-        if (blockquoteDepth(lines[i - 1]).depth !== depth || !plainText(lines[i - 1])) return false;
+        if (blockquoteDepth(lines[i - 1]).depth !== depth || !plainText(i - 1)) return false;
         // the paragraph above is a definition's lazy continuation when the
         // run of plain lines it belongs to starts at a label: a table does
         // start under such a line ("[^1]: x", "lazy", then a table renders
         // the table outside the footnote; probed 2026-09-16)
         let top = i - 1;
-        while (top > 0 && blockquoteDepth(lines[top - 1]).depth === depth && plainText(lines[top - 1])) top--;
+        while (top > 0 && blockquoteDepth(lines[top - 1]).depth === depth && plainText(top - 1)) top--;
         const aboveRun = top > 0 ? lines[top - 1].replace(BlockquotePrefix, "") : "";
         return !(blockquoteDepth(lines[top - 1] ?? "").depth === depth && /^ {0,3}\[\^[^\]\s]+\]:/.test(aboveRun));
     };
@@ -1198,15 +1207,44 @@ export function scanDocument(lines: string[]): DocumentScan {
     // ordered item not numbered 1, a label line, plain text) carries the
     // paragraph on. Verified in Reading view 2026-09-16 (Kimi hunt cycles
     // 1 and 3): the reference after such an opener is live.
+    // Obsidian makes a setext heading only of a ONE-line paragraph:
+    // "para", "more", "===" renders as a paragraph with a literal "==="
+    // (Kimi hunt cycle 3, probed in Reading view 2026-09-16), and so an
+    // indented line after that "===" is the paragraph's lazy continuation,
+    // not code, and a code span crosses it (cycle 5). The run of plain
+    // lines above `i` at this depth is counted, stopping at a block of its
+    // own and at a definition label that starts after a boundary (a label
+    // directly under prose is lazy text and counts as a paragraph line).
+    const oneLineParagraphAbove = (i: number, depth: number): boolean => {
+        let count = 0;
+        for (let j = i - 1; j >= 0; j--) {
+            const { depth: d, rest: t } = blockquoteDepth(src[j]);
+            if (isProtected[j] || d !== depth || t.trim() === "") break;
+            if (/^ {0,3}(?:#{1,6}(?: |$)|([-*_])( *\1){2,} *$|`{3,}|~{3,}|<|\|)/.test(t)) break;
+            if (DefinitionStart.test(t)) {
+                // a label that starts after a boundary is a block of its
+                // own and not part of the paragraph; one directly under
+                // prose is lazy text and counts
+                const above = j > 0 ? blockquoteDepth(src[j - 1]) : null;
+                if (above === null || above.depth !== depth || above.rest.trim() === "" || isProtected[j - 1]) break;
+            }
+            count++;
+        }
+        return count === 1;
+    };
     const paragraphGoesOn = (k: number, openerDepth: number): boolean => {
         const { depth: lineDepth, rest: text } = blockquoteDepth(src[k]);
         if (lineDepth !== openerDepth || tableRows[k]) return false;
         if (text.trim() === "") return false;
         return !(
-            /^ {0,3}(`{3,}|~{3,})/.test(text) ||
+            // a backtick fence may not carry a backtick in its info string
+            // (CommonMark 4.5): "``` `x`" is paragraph text and a span
+            // closes inside it (Kimi hunt cycle 5, probed in Reading view
+            // 2026-09-16); a tilde fence may
+            /^ {0,3}(?:~{3,}|`{3,}[^`]*$)/.test(text) ||
             /^ {0,3}#{1,6}(?: |$)/.test(text) ||
             /^ {0,3}([-*_])( *\1){2,} *$/.test(text) ||
-            /^ {0,3}(=+|-+) *$/.test(text) ||
+            (/^ {0,3}(=+|-+) *$/.test(text) && oneLineParagraphAbove(k, openerDepth)) ||
             /^ {0,3}>/.test(text) ||
             /^ {0,3}[-*+] +\S/.test(text) ||
             /^ {0,3}1[.)] +\S/.test(text) ||
@@ -1713,8 +1751,13 @@ export function scanDocument(lines: string[]): DocumentScan {
                 // lazy continuation (GLM and Kimi sweeps 2026-09-13,
                 // verified in Reading view). Only a paragraph can be
                 // continued lazily.
-                quote.boundary = blockEnder(rest, prevParagraph && prevDepth === depth);
-                quote.inDefinition = definitionLabelIn(src[i]) !== null;
+                quote.boundary = blockEnder(rest, prevParagraph && prevDepth === depth && oneLineParagraphAbove(i, depth));
+                // a quoted definition stays open through its lazy
+                // continuation lines, so the indented quoted chunk after
+                // a blank quote line is still its content, as Reading
+                // view renders it ("body cont chunk"; Kimi hunt cycle 5,
+                // probed 2026-09-16); a block of its own ends it
+                quote.inDefinition = definitionLabelIn(src[i]) !== null || (quote.inDefinition && !quote.boundary);
             }
         }
         const indentWidth = leadingIndentWidth(src[i]);
@@ -1837,7 +1880,13 @@ export function scanDocument(lines: string[]): DocumentScan {
         // starts afresh (Jason's ruling A2 for the label; GLM hunt cycle 1
         // for the scan's own state, 2026-09-16)
         const paragraphOpenBefore = prevParagraph;
-        blockBoundary = blockEnder(rest, prevParagraph && prevDepth === depth) || tableRows[i];
+        blockBoundary =
+            blockEnder(rest, prevParagraph && prevDepth === depth && oneLineParagraphAbove(i, depth)) || tableRows[i];
+        // a block of its own (a heading, a rule, a link reference
+        // definition, a setext heading, a table row) ends an open
+        // definition too, so the indented chunk after it is code, as
+        // Reading view renders it (Kimi hunt cycle 5, probed 2026-09-16)
+        if (blockBoundary && depth === 0) inDefinition = false;
         prevParagraph = !blockBoundary && !DefinitionStart.test(src[i]);
         prevDepth = depth;
 
@@ -1973,6 +2022,10 @@ export function scanDocument(lines: string[]): DocumentScan {
             };
             isProtected[i] = true;
             prevParagraph = false;
+            // a fence that opens at the document level (not the indented
+            // one a definition's continuation owns) ends the definition:
+            // the chunk after its closer is code (cycle 5, probed)
+            if (depth === 0 && listFenceContentIndent !== 4) inDefinition = false;
             continue;
         }
         // An Obsidian "%%" block comment opens on a "%%" at the start of a
@@ -2266,6 +2319,9 @@ export function definitionStartLines(
     type Open = "none" | "paragraph" | "definition" | "definition-gap";
     let open = "none" as Open;
     let previousDepth = 0;
+    // the line above was a link reference definition, whose title may
+    // follow on this line
+    let lrdAbove = false;
     for (let i = 0; i < lines.length; i++) {
         // a trailing carriage return is dropped before the line is judged,
         // as scanDocument drops it, so the end-anchored patterns below
@@ -2324,6 +2380,16 @@ export function definitionStartLines(
             continue;
         }
         const bare = line.replace(BlockquotePrefix, "");
+        // A link reference definition's title may sit on the line under
+        // it ('  "title"', CommonMark 4.7), so the block runs two lines
+        // and the label under the title still starts a definition (Kimi
+        // hunt cycle 5, probed in Reading view 2026-09-16).
+        const lrdTitle = lrdAbove && /^ {0,3}(?:"[^"]*"|'[^']*'|\([^)]*\))\s*$/.test(bare);
+        lrdAbove = false;
+        if (lrdTitle) {
+            open = "none";
+            continue;
+        }
         if (bare.trim() === "") {
             open = open === "definition" || open === "definition-gap" ? "definition-gap" : "none";
             continue;
@@ -2375,6 +2441,7 @@ export function definitionStartLines(
         // a footnote label and takes the path below.
         if (open !== "paragraph" && /^ {0,3}\[(?!\^)[^\]]+\]:(?:\s|$)/.test(bare)) {
             open = "none";
+            lrdAbove = true;
             continue;
         }
         // A "$$" closer ends the math block the same way, so a label right
@@ -2691,9 +2758,19 @@ export function quotedDefinitionEnd(
         j < lines.length &&
         (scan.startsInComment[j] || scan.startsInMath[j] || scan.startsInFence[j] || scan.startsInCode[j] > 0) &&
         depthOf(lines[j]) === depth;
+    // a plain quoted line that a setext underline follows is a heading,
+    // not a continuation, exactly as the column-0 walker reads it ("[^1]:
+    // body", "cont", "===" renders "cont" as a heading outside the
+    // footnote; Kimi hunt cycle 5, 2026-09-16)
+    const underlineNext = (j: number): boolean =>
+        j + 1 < lines.length &&
+        !scan.isProtected[j + 1] &&
+        depthOf(lines[j + 1]) === depth &&
+        /^ {0,3}(=+|-+) *$/.test(inner(j + 1));
     let end = start;
     let j = start + 1;
     while (continues(j) || regionLine(j)) {
+        if (!regionLine(j) && inner(j).trim() !== "" && !/^ {4}/.test(inner(j)) && underlineNext(j)) break;
         if (regionLine(j) || inner(j).trim() !== "") {
             end = j++;
             continue;

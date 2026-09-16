@@ -314,6 +314,13 @@ function blockKind(line: string): string {
     if (/^ {0,3}[-*+](?: |$)/.test(text)) return "bullet";
     if (/^ {0,3}\d{1,9}[.)](?: |$)/.test(text)) return "ordered";
     if (/^ {0,3}(`{3,}|~{3,})/.test(text)) return "fence";
+    // a lone "%%" opens an Obsidian comment block that hides the rest of
+    // the note, a run of "=" or "-" under a paragraph line is a setext
+    // underline that turns THAT line into a heading, and a "<" tag line
+    // can open an HTML block (Kimi hunt cycle 5, 2026-09-16)
+    if (/^ {0,3}%%/.test(text) && (text.match(/%%/g) ?? []).length === 1) return "percent";
+    if (/^ {0,3}(=+|-+) *$/.test(text)) return "underline";
+    if (/^ {0,3}<[A-Za-z/!?]/.test(text)) return "html";
     return "text";
 }
 

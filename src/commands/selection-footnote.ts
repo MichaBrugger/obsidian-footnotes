@@ -3,6 +3,7 @@ import { Editor, EditorChange, EditorPosition } from "obsidian";
 import type FootnotePlugin from "../main";
 import { ValidatedTextModal } from "./validated-text-modal";
 import {
+    escapedAt,
     footnoteNameProblem,
     idListIncludes,
     referenceOccurrences,
@@ -556,6 +557,9 @@ function spanTouchesFootnote(
         (i = masked.indexOf("[^]", i)) !== -1;
         i += "[^]".length
     ) {
+        // an escaped "\[^]" is prose about footnotes, not a placeholder
+        // (Kimi hunt cycle 5, 2026-09-16; the alert already knew)
+        if (escapedAt(lineText, i)) continue;
         if (i < to && i + "[^]".length > from) return true;
     }
     for (let i = 0; i < masked.length - 1; i++) {
