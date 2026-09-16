@@ -587,6 +587,14 @@ export function createMatchingFootnoteDefinition(
         );
         return true;
     }
+    // A reference sitting inside another footnote's definition (on a
+    // continuation line, lazy or indented) would get a definition of its
+    // own here, and that completes a nested footnote, which the plugin
+    // refuses to create everywhere (ADR 1). The same guard the creation
+    // steps run. Found by the named-flow property once a plain line under
+    // a definition counted as its continuation (GLM hunt cycle 1,
+    // 2026-09-16).
+    if (warnDefinitionCaretIfInside(doc, null, cursorPosition, ctx)) return true;
 
     const list = listExistingFootnoteDefinitions(doc, ctx);
 

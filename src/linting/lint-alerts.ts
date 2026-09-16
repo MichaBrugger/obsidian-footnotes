@@ -238,7 +238,7 @@ function noticeOrphanedDefinitions(
 function noticeDuplicateDefinitions(
     plugin: FootnotePlugin,
     markdown: string,
-    precomputed: { lines: string[]; scan: DocumentScan },
+    precomputed: { lines: string[]; scan: DocumentScan; masked: string[]; starts: boolean[] },
 ) {
     if (plugin.settings.lintMergeDuplicateDefinitions) return;
     const names = duplicateFootnoteDefinitionNames(markdown, precomputed);
@@ -508,7 +508,7 @@ export function noticeLintAlerts(plugin: FootnotePlugin, markdown: string) {
     noticeCommentedDefinitions(markdown);
     noticeDefinitionsInsideTables(markdown);
     noticeOrphanedDefinitions(plugin, markdown, { lines, scan, masked, starts });
-    noticeDuplicateDefinitions(plugin, markdown, { lines, scan });
+    noticeDuplicateDefinitions(plugin, markdown, { lines, scan, masked, starts });
     noticeNestedFootnotes(lines, scan, masked, starts);
     noticeInvalidNames(lines, scan, masked, starts);
 }

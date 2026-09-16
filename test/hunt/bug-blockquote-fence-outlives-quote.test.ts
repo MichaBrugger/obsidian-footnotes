@@ -30,16 +30,10 @@ describe("fixed 2026-08-10: a blockquoted fence dies with its blockquote", () =>
             "[^1]: one",
             "tail",
         ].join("\n");
-        const expected = [
-            "> ```",
-            "> sample[^99]",
-            "body[^1]",
-            "",
-            "tail",
-            "",
-            "[^1]: one",
-        ].join("\n");
-
-        expect(moveFootnoteDefinitionsToBottom(input)).toBe(expected);
+        // "tail" sits directly under the definition, so it is the
+        // definition's lazy continuation (Reading view renders one footnote
+        // "one tail"; GLM hunt cycle 1, probed 2026-09-16) and moves with
+        // it; the block is already at the bottom, so nothing changes
+        expect(moveFootnoteDefinitionsToBottom(input)).toBe(input);
     });
 });

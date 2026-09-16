@@ -1076,9 +1076,15 @@ describe("round 2", () => {
         // one quote-level deeper, followed by a plain (unquoted) indented
         // line, exposes the stale wrongly-true value as bogus fresh code.
         it("a deeper same-line region reopen does not leak a stale block boundary past the quote drop", () => {
+            // Since 2026-09-16 (Kimi hunt cycle 2, probed in Reading view)
+            // an indented column-0 line right after a quote line is code
+            // in Obsidian whatever the quote's block state, so the last
+            // line reads protected for that reason; the stale-boundary
+            // mutant this test was written for is no longer told apart by
+            // it.
             const doc = "> x <!--\n> > --> $$\n    indented";
             const scan = scanDocument(doc.split("\n"));
-            expect(scan.isProtected).toEqual([false, false, false]);
+            expect(scan.isProtected).toEqual([false, false, true]);
         });
 
         // line 459: the math-branch mirror of the two checks above.
@@ -1088,9 +1094,10 @@ describe("round 2", () => {
             expect(scan.isProtected).toEqual([false, true, false, false]);
         });
         it("a deeper same-line comment reopen (from a math closer) does not leak a stale block boundary", () => {
+            // the same 2026-09-16 note as above: code after a quote line
             const doc = "> $$\n> > $$ <!--\n    indented";
             const scan = scanDocument(doc.split("\n"));
-            expect(scan.isProtected).toEqual([false, false, false]);
+            expect(scan.isProtected).toEqual([false, false, true]);
         });
     });
 

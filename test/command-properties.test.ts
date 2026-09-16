@@ -395,9 +395,25 @@ describe("creation-command invariants over random documents", () => {
 
                     typeText(doc, name);
                     const definitionsBefore = definitionNamesFolded(doc.lines);
+                    // A placeholder planted on the blank line right under a
+                    // definition and then named turns that line into the
+                    // definition's lazy continuation (Reading view, GLM hunt
+                    // cycle 1, 2026-09-16), so the second press now sits
+                    // inside a definition and refuses to nest: no new
+                    // definition is the right outcome there.
+                    const typedLine = doc.getCursor().line;
+                    const insideDefinition = findDefinitionBlocks(doc.lines).some(
+                        (block) => typedLine >= block.start && typedLine <= block.end,
+                    );
                     await insertNamedFootnote(plugin);
                     const folded = name.toLowerCase();
                     const definitionsAfter = definitionNamesFolded(doc.lines);
+                    if (insideDefinition) {
+                        expect([...definitionsAfter].sort()).toEqual(
+                            [...definitionsBefore].sort(),
+                        );
+                        return;
+                    }
 
                     if (footnoteNameProblem(name) !== null) {
                         // spaces/backticks/"#": warned about, nothing

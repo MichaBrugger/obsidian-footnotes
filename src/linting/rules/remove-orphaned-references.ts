@@ -1,6 +1,5 @@
 import {
     definitionLabelWithName,
-    isValidFootnoteName,
     referenceOccurrences,
 } from "../../parsing/footnote-grammar";
 import {
@@ -99,7 +98,14 @@ function isOrphan(
     const folded = name.toLowerCase();
     if (definitions.has(folded)) return false;
     if (lazyLabels.has(folded)) return false;
-    if (!isValidFootnoteName(name)) return false;
+    // a name holding whitespace is prose to Obsidian ("[^my note]" renders
+    // as text), so deleting it would destroy ordinary writing. A name
+    // holding a backtick is refused for CREATION but renders as a footnote
+    // (probed in Reading view 2026-09-16), so an orphaned one is an orphan
+    // like any other; exempting it let reindex rename it into a plain
+    // orphan that the next lint then ate, so lint twice was not lint once
+    // (Kimi hunt cycle 2)
+    if (/\s/.test(name)) return false;
     if (orphanSafeFolded !== "" && folded === orphanSafeFolded) return false;
     return true;
 }

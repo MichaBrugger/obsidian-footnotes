@@ -1,7 +1,10 @@
 import {
     definitionLabelIn,
+    definitionLabelWithName,
+    definitionStartLines,
     DocumentScan,
     findDefinitionBlocks,
+    maskProtectedLines,
     normalizeEol,
     removeLineRanges,
     scanDocument,
@@ -46,7 +49,7 @@ export function duplicateFootnoteDefinitionNames(
     // The alerts all share ONE pass of normalizing the line endings and
     // scanning the note, done once and handed round (2026-08-11 review, a
     // speed fix). Anything calling this on its own leaves it out.
-    precomputed?: { lines: string[]; scan: DocumentScan },
+    precomputed?: { lines: string[]; scan: DocumentScan; masked?: string[]; starts?: boolean[] },
 ): string[] {
     // No "[^" anywhere in the note means no definitions, and so no
     // duplicates. Worth checking first, because this runs on every single
@@ -54,19 +57,37 @@ export function duplicateFootnoteDefinitionNames(
     if (!markdown.includes("[^")) return [];
     const lines = precomputed?.lines ?? normalizeEol(markdown).text.split("\n");
     const scan = precomputed?.scan ?? scanDocument(lines);
-    const blocks = findDefinitionBlocks(lines, scan);
+    const masked = precomputed?.masked ?? maskProtectedLines(lines, scan);
+    const starts = precomputed?.starts ?? definitionStartLines(lines, scan, (i) => masked[i]);
+    // Every definition the alert should count: the column-0 blocks, and
+    // the labels after a "%%" closer, which form no block but are real
+    // definitions (Jason's verification 2026-09-15). Obsidian renders only
+    // the LAST definition of a name, so a copy on a closer line silently
+    // hides or is hidden by its twin; the alert used to read the blocks
+    // alone and never said so (GLM hunt cycle 1, 2026-09-16). Definitions
+    // inside a blockquote or callout stay outside this alert, as the C22
+    // ruling recorded below.
+    const found: { name: string; line: number }[] = findDefinitionBlocks(lines, scan, masked, starts).map(
+        (block) => ({ name: block.name, line: block.start }),
+    );
+    for (let i = 0; i < lines.length; i++) {
+        if (!starts[i]) continue;
+        const hit = definitionLabelWithName(lines[i], masked[i]);
+        if (hit?.label.afterCloser) found.push({ name: hit.name, line: i });
+    }
+    found.sort((a, b) => a.line - b.line);
     const counts = new Map<string, number>();
-    for (const block of blocks) {
-        const folded = block.name.toLowerCase();
+    for (const entry of found) {
+        const folded = entry.name.toLowerCase();
         counts.set(folded, (counts.get(folded) ?? 0) + 1);
     }
     const names: string[] = [];
     const seen = new Set<string>();
-    for (const block of blocks) {
-        const folded = block.name.toLowerCase();
+    for (const entry of found) {
+        const folded = entry.name.toLowerCase();
         if ((counts.get(folded) ?? 0) < 2 || seen.has(folded)) continue;
         seen.add(folded);
-        names.push(block.name);
+        names.push(entry.name);
     }
     return names;
 }
