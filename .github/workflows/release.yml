@@ -9,9 +9,15 @@ on:
   # draft afterwards leaves no trace.
   workflow_dispatch:
 
-# gh release create needs write access even when the repo default is read-only
+# gh release create needs write access even when the repo default is read-only.
+# The other two are for the build-provenance attestation of the release
+# assets: an OIDC token to sign with, and the right to store the
+# attestation. Obsidian's community-page scorecard reported the assets as
+# "Missing GitHub artifact attestations" (2026-09-16).
 permissions:
   contents: write
+  id-token: write
+  attestations: write
 
 jobs:
   build:
@@ -63,6 +69,20 @@ jobs:
 
       - name: Build plugin
         run: npm run build
+
+      # Sign a statement that these exact files came out of this workflow
+      # run, so anyone (Obsidian's scanner included) can verify the release
+      # assets were built here and not swapped afterwards. The beta manifest
+      # copy below happens after this, so the attested manifest.json is the
+      # one in the repo; the beta release ships manifest-beta.json's content
+      # under that name and is not attested as such.
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: |
+            main.js
+            manifest.json
+            styles.css
 
       - name: Create release
         env:
