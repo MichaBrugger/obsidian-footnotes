@@ -14,6 +14,7 @@ import {
 import { simulateChanges } from "../src/editor/insertion-liveness";
 import { referenceOccurrences } from "../src/parsing/footnote-grammar";
 import {
+    definitionLabelWithName,
     definitionStartLines,
     findDefinitionBlocks,
     maskedLineAt,
@@ -253,6 +254,23 @@ describe("rename property", () => {
                             )) {
                                 names.add(occurrence.name.toLowerCase());
                             }
+                        }
+                        // every definition START carries a name: the
+                        // column-0 blocks, AND the labels findDefinitionBlocks
+                        // never collects: quoted ones and labels after a %%
+                        // closer (both live definitions). The resolver's own
+                        // label rule (starts + definitionLabelWithName) is
+                        // what planFootnoteRename renames, so the oracle must
+                        // count them too (found by a soak flake, 2026-09-16:
+                        // an afterCloser label with no reference anywhere
+                        // else)
+                        for (let i = 0; i < lines.length; i++) {
+                            if (!starts[i]) continue;
+                            const hit = definitionLabelWithName(
+                                lines[i],
+                                maskedLineAt(lines, i),
+                            );
+                            if (hit) names.add(hit.name.toLowerCase());
                         }
                         for (const block of findDefinitionBlocks(lines, scan)) {
                             names.add(block.name.toLowerCase());

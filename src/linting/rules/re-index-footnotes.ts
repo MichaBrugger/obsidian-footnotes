@@ -81,6 +81,11 @@ function referenceAppearanceOrder(
         // (bug-masked-name-identity). And a lazy label's own "[^x]" really
         // is a reference, so it takes its place in the order here.
         for (const { name } of referenceOccurrences(lines[i], maskedLines[i], starts[i])) {
+            // a name holding whitespace is prose to Obsidian; the rewrite
+            // never renames it, so it takes no slot in the order either
+            // (Kimi hunt cycle 1, 2026-09-16: the slot went unused and the
+            // real footnotes started at 2)
+            if (/\s/.test(name)) continue;
             const id = name.toLowerCase();
             if (!seen.has(id)) {
                 seen.add(id);

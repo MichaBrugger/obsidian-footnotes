@@ -15,6 +15,7 @@ import { DocContext, docLines } from "../editor/doc-context";
 import {
     maskInlineRegions,
     maskedLineAt,
+    linkLikeEndAt,
 } from "../parsing/markdown-scan";
 import {
     cellCaret,
@@ -94,8 +95,16 @@ export function warnProtectedCaretIfInside(
     let inside: boolean;
     if (cell) {
         // a cell's text is a single line, so masking that one line is enough
+        const cellText = cell.state.doc.toString();
+        // a caret inside a link, a wikilink, or a web address is not in
+        // protected text: the landing walk steps out past the construct
+        // (Jason's landing rulings 2026-09-15), and a landing that stays
+        // inside is caught by the born-dead check afterwards. The masked
+        // twin blots link destinations and addresses since 2026-09-16
+        // (Kimi hunt cycle 1), which is why this is spelled out here.
+        if (linkLikeEndAt(cellText, cellCaret(cell)) !== -1) return false;
         inside = caretInsideMaskedSpan(
-            maskInlineRegions(cell.state.doc.toString()),
+            maskInlineRegions(cellText),
             cellCaret(cell),
             false,
             false,
@@ -103,6 +112,10 @@ export function warnProtectedCaretIfInside(
     } else {
         const { scan } = ctx;
         const line = cursorPosition.line;
+        // the same allowance for a caret inside a link on an ordinary line
+        if (!scan.isProtected[line] && linkLikeEndAt(ctx.lines[line] ?? "", cursorPosition.ch) !== -1) {
+            return false;
+        }
         // right at the start or end of a line, whether the caret is
         // "inside" depends on whether an open region crosses that edge. A
         // caret at position 0 of the line that CLOSES a comment, or at the

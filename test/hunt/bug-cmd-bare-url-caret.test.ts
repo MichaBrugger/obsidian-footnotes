@@ -44,13 +44,19 @@ function fakePlugin(doc: FakeEditor): FootnotePlugin {
 }
 
 describe("caret inside a bare URL or autolink (end-of-word walk)", () => {
-    it("lands after the whole bare URL, not between domain segments", async () => {
+    // Reading view takes a reference glued to a bare address INTO the
+    // address ("https://example.com[^1]" is one link, no footnote; probed
+    // 2026-09-16, Kimi hunt cycle 1), so the walk's landing after the
+    // address is born dead and the press refuses it, as it refuses any
+    // born-dead insertion. Where such a press should land instead (after a
+    // space, before the address) is an open question for Jason.
+    it("does not write a reference glued to the address, where it would be dead", async () => {
         const doc = fakeEditor(
             ["see https://example.com end"],
             "see https://exa".length,
         );
         await insertAutonumFootnote(fakePlugin(doc));
-        expect(doc.lines[0]).toBe("see https://example.com[^1] end");
+        expect(doc.lines[0]).toBe("see https://example.com end");
     });
 
     it("lands after the whole autolink, not inside the scheme", async () => {

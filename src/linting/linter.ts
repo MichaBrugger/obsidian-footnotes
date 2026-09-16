@@ -10,7 +10,7 @@ import { jumpToFootnoteDefinition } from "../commands/navigation";
 import { docContext } from "../editor/doc-context";
 import { replaceMinimal } from "../editor/write-back";
 import { rewriteDocument } from "./rewrite-document";
-import { definitionLabel, definitionLabelWithName } from "../parsing/footnote-grammar";
+import { definitionLabel, definitionLabelWithName, quotedReference } from "../parsing/footnote-grammar";
 import { footnotePrefix, footnotePrefixProblem } from "../parsing/footnote-prefix";
 import {
     findDefinitionBlocks,
@@ -165,6 +165,9 @@ export function lintFootnotes(
     markdown: string,
     options: LintOptions = {},
 ): string {
+    if (options.sectionHeading && sectionHeadingProblem(options.sectionHeading) !== null) {
+        options = { ...options, sectionHeading: "" };
+    }
     // Notes can use any line endings. rewriteDocument converts them to plain
     // LF once here, so every step below sees the same thing, and puts the
     // note's original endings back once on the way out.
@@ -354,6 +357,27 @@ export function lintBlockedByPrefix(markdown: string): string | null {
 }
 
 /**
+ * Why the configured section heading cannot be used, or null when it can.
+ * A heading whose text holds a footnote reference ("# Footnotes [^9]")
+ * can never be found again after a lint: the rules renumber, prefix, or
+ * move that reference, so the text in the note stops matching the setting
+ * and every lint appended one more copy of the heading (Kimi hunt cycle 1,
+ * 2026-09-16). The pure lint ignores such a heading; the lint commands
+ * cancel with this message instead, so the setting gets fixed.
+ */
+export function sectionHeadingProblem(heading: string): string | null {
+    const reference = heading.match(/\[\^[^[\]]+\]/);
+    if (!reference) return null;
+    return `${LintingCanceled}the footnote section heading setting contains a footnote reference (${quotedReference(reference[0].slice(2, -1))}), which the lint rules would renumber. Take it out of the heading in the plugin settings.`;
+}
+
+/** The lint-cancelling message for the section heading in the settings, or null. */
+function lintBlockedBySectionHeading(plugin: FootnotePlugin): string | null {
+    const heading = configuredSectionHeading(plugin);
+    return heading ? sectionHeadingProblem(heading) : null;
+}
+
+/**
  * The safety check both automatic triggers share (lint-on-save and
  * lint-on-footnote-creation each used to spell it out separately). It
  * returns the active markdown view and its editor, or null when the lint
@@ -411,7 +435,7 @@ function lintActiveNoteIfSafe(plugin: FootnotePlugin) {
         return;
     }
     const before = doc.getValue();
-    const blocked = lintBlockedByPrefix(before);
+    const blocked = lintBlockedByPrefix(before) ?? lintBlockedBySectionHeading(plugin);
     if (blocked) {
         showNotice(blocked, 8000);
         return;
@@ -637,7 +661,7 @@ export function lintAfterFootnoteCreation(
     const before = doc.getValue();
     // Say nothing when a bad prefix blocks the lint. The insert that just
     // happened has already told the user about it.
-    if (lintBlockedByPrefix(before)) return null;
+    if (lintBlockedByPrefix(before) ?? lintBlockedBySectionHeading(plugin)) return null;
     const after = lintFootnotes(
         before,
         lintOptionsFromSettings(plugin, configuredSectionHeading(plugin), before),
@@ -693,7 +717,7 @@ export async function runFootnoteTransformCommand(
         // An invalid footnote-prefix cancels the lint outright. Left to
         // run, reindex would treat the prefixed references as plain
         // numbers and renumber them.
-        const blocked = lintBlockedByPrefix(before);
+        const blocked = lintBlockedByPrefix(before) ?? lintBlockedBySectionHeading(plugin);
         if (blocked) {
             showNotice(blocked, 8000);
             return;

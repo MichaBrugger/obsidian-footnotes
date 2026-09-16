@@ -93,6 +93,13 @@ function isWordCharAt(text: string, i: number): boolean {
     return cp !== undefined && /[\p{L}\p{N}\p{M}]/u.test(String.fromCodePoint(cp));
 }
 
+/** Whether the character at `index` has an odd run of backslashes in front of it: escaped, literal text. (footnote-grammar has the same helper; it sits above this module, so a copy keeps this one a leaf.) */
+function escapedAt(line: string, index: number): boolean {
+    let backslashes = 0;
+    for (let j = index - 1; j >= 0 && line[j] === "\\"; j--) backslashes++;
+    return backslashes % 2 === 1;
+}
+
 /** The index of the ")" that closes the "(" at `open`, counting nested round brackets, or -1. */
 function balancedParenEnd(text: string, open: number): number {
     let depth = 0;
@@ -145,6 +152,8 @@ export interface DefinitionBlock {
     /** the block's line range, both ends included, continuation lines and all */
     start: number;
     end: number;
+    /** The label sits after a "%%" block comment's closer on its line. The definition is real and counts for the orphan ALERT, but its line is never cut out: that would leave the comment open over the rest of the note. */
+    holdsCloser?: true;
 }
 
 /**
@@ -531,7 +540,11 @@ export function maskLineRegions(
         startInCode === 0 &&
         !line.includes("`") &&
         !line.includes("<!--") &&
-        !line.includes("$")
+        !line.includes("$") &&
+        !line.includes("](") &&
+        !line.includes("[[") &&
+        !line.includes("://") &&
+        !/www\./i.test(line)
     ) {
         return { masked: line, endsInComment: false, endsInMath: false, endsInCode: 0, unmatchedRuns };
     }
@@ -763,9 +776,71 @@ export function maskLineRegions(
             i = close + 1;
             continue;
         }
+        // Text inside a link's "(destination)", an image's, a wikilink's
+        // "[[...]]", an autolink's "<scheme://...>", or a bare web address
+        // is dead: Obsidian's Reading view puts a "[^1]" written there
+        // into the address and renders no footnote, and a bare address
+        // even takes a "[^1]" glued to its end (probed 2026-09-16, Kimi
+        // hunt cycle 1). Link TEXT stays live: "[x[^1]](url)" renders the
+        // footnote. The brackets and parentheses themselves stay visible,
+        // so the landing walk still recognises a link's tail.
+        if (c === "]" && line[i + 1] === "(") {
+            const close = balancedParenEnd(line, i + 1);
+            if (close !== -1) {
+                blot(i + 2, close);
+                i = close + 1;
+                continue;
+            }
+        }
+        if (c === "[" && line[i + 1] === "[" && !escapedAt(line, i)) {
+            const close = line.indexOf("]]", i + 2);
+            if (close !== -1) {
+                blot(i + 2, close);
+                i = close + 2;
+                continue;
+            }
+        }
+        if (c === "<") {
+            const autolink = /^<[A-Za-z][A-Za-z0-9+.-]*:\/\/[^\s<>]*>/.exec(line.slice(i));
+            if (autolink) {
+                blot(i + 1, i + autolink[0].length - 1);
+                i += autolink[0].length;
+                continue;
+            }
+        }
+        if ((c === "h" || c === "H" || c === "w" || c === "W") && !/[\p{L}\p{N}_/]/u.test(line[i - 1] ?? "")) {
+            const end = bareUrlEnd(line, i);
+            if (end !== -1) {
+                blot(i, end);
+                i = end;
+                continue;
+            }
+        }
         i++;
     }
     return { masked: chars.join(""), endsInComment: false, endsInMath: false, endsInCode: 0, unmatchedRuns };
+}
+
+/**
+ * Where the bare web address starting at `at` ends, or -1 when no address
+ * starts there. GFM's autolink literal: "http://", "https://", or "www."
+ * then everything up to whitespace or "<", minus trailing punctuation and
+ * a closing parenthesis with no opening one inside the address. A
+ * reference glued to the address ("https://e.com[^1]") belongs to it, as
+ * Reading view renders it.
+ */
+function bareUrlEnd(line: string, at: number): number {
+    if (!/^(?:https?:\/\/|www\.)/i.test(line.slice(at, at + 8))) return -1;
+    let end = at;
+    while (end < line.length && !/[\s<]/.test(line[end])) end++;
+    while (end > at && /[?!.,:*_~'"]/.test(line[end - 1])) end--;
+    if (line[end - 1] === ")") {
+        const body = line.slice(at, end);
+        const opens = (body.match(/\(/g) ?? []).length;
+        const closes = (body.match(/\)/g) ?? []).length;
+        if (closes > opens) end--;
+    }
+    return end > at + 4 ? end : -1;
 }
 
 /** The per-line facts the whole-document walk produces. */
@@ -990,10 +1065,22 @@ export function scanDocument(lines: string[]): DocumentScan {
         for (let k = from; k < src.length; k++) {
             const text = src[k];
             if (text.trim() === "") return false;
+            // Every construct that ends a paragraph ends the search: a
+            // fence, a heading, a rule, a setext underline, a blockquote
+            // marker, a bullet, an ordered item numbered 1, and an HTML
+            // block opener. Only a lazy continuation (an ordered item not
+            // numbered 1, plain text) carries the paragraph on. Verified
+            // in Reading view 2026-09-16 (Kimi hunt cycle 1): the
+            // reference after such an opener is live.
             if (
                 /^ {0,3}(`{3,}|~{3,})/.test(text) ||
                 /^ {0,3}#{1,6}(?: |$)/.test(text) ||
-                /^ {0,3}([-*_])( *\1){2,} *$/.test(text)
+                /^ {0,3}([-*_])( *\1){2,} *$/.test(text) ||
+                /^ {0,3}(=+|-+) *$/.test(text) ||
+                /^ {0,3}>/.test(text) ||
+                /^ {0,3}[-*+] +\S/.test(text) ||
+                /^ {0,3}1[.)] +\S/.test(text) ||
+                /^ {0,3}<(?:!--|\?|![A-Za-z]|!\[CDATA\[|\/?(?:script|pre|style|textarea|address|article|aside|blockquote|details|dialog|div|dl|figure|footer|form|h[1-6]|header|hr|main|nav|ol|p|section|summary|table|ul)(?:[ >/]|$))/i.test(text)
             ) {
                 return false;
             }
@@ -1043,6 +1130,29 @@ export function scanDocument(lines: string[]): DocumentScan {
     // live, but a definition appended inside it would be dead, so
     // endsProtected does count it (see DocumentScan.inCommentBlock).
     let commentBlock: { depth: number } | null = null;
+    // An open CommonMark HTML block of type 1, 3, 4, 5, or 6 (type 2, the
+    // comment, is `commentIsBlock` above; type 7, any other tag alone on
+    // a line, is not read). Its lines are dead text through to its
+    // closer, or, for a type-6 block, to the next blank line. Obsidian's
+    // Reading view agrees: a "[^x]:" inside <div>, <script>, <?php, or
+    // <![CDATA[ is raw HTML and defines nothing, while <!DOCTYPE html>
+    // ends at its own ">" and the label under it is a definition (probed
+    // 2026-09-16, Kimi hunt cycle 1). Document level only.
+    let htmlBlock: { closer: RegExp | null } | null = null;
+    const htmlBlockOpener = (text: string): { closer: RegExp | null } | null => {
+        if (/^ {0,3}<(?:script|pre|style|textarea)(?:\s|>|$)/i.test(text)) {
+            return { closer: /<\/(?:script|pre|style|textarea)>/i };
+        }
+        if (/^ {0,3}<\?/.test(text)) return { closer: /\?>/ };
+        if (/^ {0,3}<!\[CDATA\[/.test(text)) return { closer: /\]\]>/ };
+        if (/^ {0,3}<![A-Za-z]/.test(text)) return { closer: />/ };
+        if (
+            /^ {0,3}<\/?(?:address|article|aside|base|basefont|blockquote|body|caption|center|col|colgroup|dd|details|dialog|dir|div|dl|dt|fieldset|figcaption|figure|footer|form|frame|frameset|h[1-6]|head|header|hr|html|iframe|legend|li|link|main|menu|menuitem|nav|noframes|ol|optgroup|option|p|param|search|section|summary|table|tbody|td|tfoot|th|thead|title|tr|track|ul)(?:\s|\/?>|$)/i.test(text)
+        ) {
+            return { closer: null };
+        }
+        return null;
+    };
     // An unclosed region inside a blockquote can't reach a line appended at
     // the end of the note: that appended line ends the quote, exactly as it
     // does for a fence inside a blockquote.
@@ -1053,7 +1163,8 @@ export function scanDocument(lines: string[]): DocumentScan {
     const endsProtectedNow = (): boolean =>
         ((inComment || inMath) && regionDepth === 0) ||
         (fence !== null && fence.depth === 0 && fence.listColumn === null) ||
-        (commentBlock !== null && commentBlock.depth === 0);
+        (commentBlock !== null && commentBlock.depth === 0) ||
+        htmlBlock !== null;
     const endsProtectedAt = new Array<boolean>(lines.length).fill(false);
     // The indented-code state (case C21). `blockBoundary` marks a place
     // where indented code may OPEN: the start of the document, blank lines,
@@ -1107,6 +1218,29 @@ export function scanDocument(lines: string[]): DocumentScan {
         // count in. Fences and comment or math regions live in the
         // container that opened them.
         const { depth, rest } = blockquoteDepth(src[i]);
+        // Inside an open HTML block every line is dead until the closer
+        // line (dead too), or until the blank line that ends a type-6
+        // block (the blank line itself is ordinary, and handled below).
+        if (htmlBlock) {
+            if (htmlBlock.closer === null) {
+                if (src[i].trim() === "") {
+                    htmlBlock = null;
+                    blockBoundary = true;
+                    prevParagraph = false;
+                } else {
+                    isProtected[i] = true;
+                    continue;
+                }
+            } else {
+                isProtected[i] = true;
+                if (htmlBlock.closer.test(src[i])) {
+                    htmlBlock = null;
+                    blockBoundary = true;
+                    prevParagraph = false;
+                }
+                continue;
+            }
+        }
         // A FENCE opened inside a LIST ITEM ends where the item ends: at
         // the first non-blank line indented less than the item's content
         // column (blank lines stay inside the item). Obsidian reads it so
@@ -1627,6 +1761,22 @@ export function scanDocument(lines: string[]): DocumentScan {
             }
             continue;
         }
+        // The other HTML block kinds open here, at the document level. A
+        // block whose closer sits on its own opening line ("<!DOCTYPE
+        // html>", "<?php ... ?>") is one dead line and a block boundary.
+        if (depth === 0 && /^ {0,3}</.test(rest)) {
+            const opener = htmlBlockOpener(rest);
+            if (opener) {
+                isProtected[i] = true;
+                prevParagraph = false;
+                if (opener.closer && opener.closer.test(src[i].slice(src[i].indexOf("<") + 1))) {
+                    blockBoundary = true;
+                } else {
+                    htmlBlock = opener;
+                }
+                continue;
+            }
+        }
         if (src[i].includes("<!--") || src[i].includes("$$") || src[i].includes("`")) {
             const opened = maskWithCodeSpans(i, {});
             inComment = opened.endsInComment;
@@ -1924,6 +2074,15 @@ export function definitionStartLines(
             open = "none";
             continue;
         }
+        // A link reference definition ("[foo]: /url") is a block of its
+        // own, not paragraph text, so the label right under it starts a
+        // definition (Kimi hunt cycle 1, verified in Reading view
+        // 2026-09-16). The label shape "[^x]:" is excluded here: that is
+        // a footnote label and takes the path below.
+        if (open !== "paragraph" && /^ {0,3}\[(?!\^)[^\]]+\]:(?:\s|$)/.test(bare)) {
+            open = "none";
+            continue;
+        }
         // A "$$" closer ends the math block the same way, so a label right
         // under it is a definition (Claude sweep 2026-09-13, verified in
         // Reading view). Live text after the closer on that line starts a
@@ -2159,7 +2318,13 @@ export function lazyDefinitionLabelLines(
         // definition one blank line short of working, so there is nothing
         // to report and nothing to fix
         if (scan.isProtected[i] || starts[i] || scan.inCommentBlock[i]) continue;
-        if (definitionLabelWithName(lines[i], masked[i])) out.push(i);
+        const hit = definitionLabelWithName(lines[i], masked[i]);
+        // a label behind a "%%" that is not a block's closer sits inside a
+        // one-line "%% ... %%" pair: Obsidian hides it, and no blank line
+        // can ever make it a definition, so it is neither reported nor
+        // "fixed" (Kimi hunt cycle 1, 2026-09-16: fix-lazy pushed a blank
+        // line in above it on every lint)
+        if (hit && !hit.label.afterCloser) out.push(i);
     }
     return out;
 }

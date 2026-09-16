@@ -12,6 +12,7 @@ import {
     scanDocument,
 } from "../parsing/markdown-scan";
 import {
+    escapedAt,
     footnoteNameProblem,
     InvalidNameCharacters,
     quotedDefinitionLabel,
@@ -85,6 +86,11 @@ export function countEmptyFootnoteReferences(
                 (i = line.indexOf(needle, i)) !== -1;
                 i += needle.length
             ) {
+                // a backslash in front of the "[" makes it literal text,
+                // as everywhere else in the plugin: "\[^]" is prose about
+                // footnote syntax, not an abandoned placeholder (Kimi hunt
+                // cycle 1, 2026-09-16; renders literally in Reading view)
+                if (escapedAt(raw, i)) continue;
                 count++;
             }
         }

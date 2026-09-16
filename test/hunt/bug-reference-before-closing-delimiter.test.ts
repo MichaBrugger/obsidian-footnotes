@@ -94,7 +94,11 @@ describe("the lint rule moves references past closing marks the same way", () =>
         ["This is ==some bravo[^8]==.", "This is ==some bravo==.[^8]"],
         ["This is ~~some bravo[^9]~~.", "This is ~~some bravo~~.[^9]"],
         ["see [some bravo[^1]](https://x.y/z).", "see [some bravo](https://x.y/z).[^1]"],
-        ["see [[some bravo[^1]]].", "see [[some bravo]].[^1]"],
+        // a "[^1]" inside a wikilink's own brackets is part of the link
+        // target, not a reference: Reading view renders no footnote there
+        // (probed 2026-09-16, Kimi hunt cycle 1), so the rule leaves the
+        // link alone rather than editing its target
+        ["see [[some bravo[^1]]].", "see [[some bravo[^1]]]."],
         // a run of references moves as one unit, as before
         ["(bravo[^1][^2]).", "(bravo).[^1][^2]"],
     ])("%s", (before, after) => {

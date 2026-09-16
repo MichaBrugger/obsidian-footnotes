@@ -35,6 +35,7 @@ import {
     warnDefinitionCaretIfInside,
     warnPrefilledReferenceIfInside,
     warnProtectedCaretIfInside,
+    warnTableEdgeCaretIfOutside,
 } from "./press-guards";
 
 import { MultiCaretNestedNotice, showNotice } from "../editor/notice";
@@ -251,6 +252,9 @@ function multiCaretTargets(
         // its own message, exactly as the single-caret creation guards do.
         if (warnProtectedCaretIfInside(doc, null, pos, ctx)) return "handled";
         if (warnDefinitionCaretIfInside(doc, null, pos, ctx)) return "handled";
+        // and a caret at a table row's edge or on its delimiter row, where
+        // the single-caret press refuses too (Kimi hunt cycle 1, 2026-09-16)
+        if (warnTableEdgeCaretIfOutside(null, pos, ctx)) return "handled";
     }
     const adjusted = ranges.map((range) =>
         adjustFootnotePosition(

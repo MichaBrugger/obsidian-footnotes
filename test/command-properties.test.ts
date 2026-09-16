@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { docArb } from "./arbitraries";
 import { noticeCalls } from "./mocks/obsidian";
 import { resetNotices } from "./helpers/notices";
+import { fakeEditor as fakeMultiEditor } from "./helpers/fake-editor";
 import { fakePlugin as sharedFakePlugin } from "./helpers/fake-plugin";
 import FootnotePlugin from "../src/main";
 import { simulateChanges } from "../src/editor/insertion-liveness";
@@ -907,6 +908,100 @@ describe("creation-command invariants over random documents", () => {
                     }
                 },
             ),
+        );
+    });
+});
+
+// ---------- multi-caret presses (added 2026-09-16, hunt) ----------
+// The two-caret twin of the single-caret invariants above: same footnote
+// at every caret, atomically (one transaction), and inside the same
+// raw-shape envelope the single-caret contract implies. The shared fake
+// editor (test/helpers/fake-editor.ts) reports the generated carets and
+// applies transactions through simulateChanges, exactly like the single
+// -caret harness here.
+
+const multiPressArb = fc
+    .tuple(
+        docArb,
+        fc.nat(1000),
+        fc.nat(1000),
+        fc.nat(1000),
+        fc.nat(1000),
+        fc.constantFrom<CommandName>("autonum", "named", "inline", "paste"),
+        settingsArb,
+    )
+    .map(([doc, linePick, chPick, linePick2, chPick2, command, settings]) => {
+        const lines = normalizeEol(doc).text.split("\n");
+        const line = linePick % lines.length;
+        const line2 = linePick2 % lines.length;
+        return {
+            lines,
+            carets: [
+                { line, ch: chPick % (lines[line].length + 1) },
+                { line: line2, ch: chPick2 % (lines[line2].length + 1) },
+            ],
+            command,
+            settings,
+        };
+    });
+
+// raw shapes a two-caret press may physically add: nothing (guard/toast/
+// hop/navigation), a definition label for a definition-less reference
+// (every command), or - autonum only - the shared reference at up to two
+// carets plus its one label
+const ALLOWED_MULTI_DELTAS: Record<CommandName, number[]> = {
+    autonum: [0, 1, 2, 3],
+    named: [0, 1],
+    inline: [0, 1],
+    paste: [0, 1],
+};
+
+describe("multi-caret press invariants over random documents", () => {
+    soakIt("a two-caret press never throws, edits atomically, and stays in the shape envelope", async () => {
+        await fc.assert(
+            fc.asyncProperty(multiPressArb, async ({ lines, carets, command, settings }) => {
+                const shapesBefore = rawShapeCount(lines);
+                // a caret strictly inside an existing raw shape (an escaped
+                // "\[^80]" is lifeless text no guard owns) lets the
+                // insertion SPLIT that shape - one extra -1 per such caret,
+                // mirroring the single-caret property
+                let splits = 0;
+                for (const caret of carets) {
+                    for (const match of lines[caret.line].matchAll(RawReferenceShape)) {
+                        const start = match.index;
+                        if (caret.ch > start && caret.ch < start + match[0].length) {
+                            splits++;
+                        }
+                    }
+                }
+                const doc = fakeMultiEditor(lines, {
+                    carets,
+                    edits: true,
+                    wholeDoc: true,
+                    words: true,
+                });
+                const plugin = sharedFakePlugin(
+                    {
+                        ...settings,
+                        footnoteSectionHeading: "# Footnotes",
+                        enablePopupEditor: false,
+                        enableFootnotePrefix: false,
+                        lintOnFootnoteCreation: false,
+                    },
+                    doc,
+                );
+                await COMMANDS[command](plugin);
+                // atomicity: at most one transaction carrying changes
+                expect(doc.transactions).toBeLessThanOrEqual(1);
+                const delta = rawShapeCount(doc.lines) - shapesBefore;
+                const allowed: number[] = [];
+                for (const base of ALLOWED_MULTI_DELTAS[command]) {
+                    for (let s = 0; s <= splits; s++) allowed.push(base - s);
+                }
+                expect(allowed, `${command} produced raw-shape delta ${delta}`).toContain(delta);
+                // and no transaction it made ever nests a reference
+                expect(doc.lines.join("\n")).not.toContain("[^[^");
+            }),
         );
     });
 });

@@ -155,6 +155,16 @@ const specialBlockArb = fc.constantFrom(
     "> %%\n> [^95]: quoted commented label",
     "- %%\n  hidden[^96]\n  %%",
     "%%text\nmore[^97]\n%% after",
+    // an inline %% pair holding a label: not a block opener (two %% on the
+    // line), the label inside is dead text - pinned by
+    // test/hunt/bug-lazy-label-in-inline-comment.test.ts
+    "%% [^98]: inline comment label %%",
+    // a label after a real %% block's closer on the same line: a live
+    // definition (Jason's verification 2026-09-15, sheet 18)
+    "%%\nhidden\n%% [^99]: after the closer",
+    // a small GFM table, with a label right under it (Jason's ruling A2:
+    // a label directly under a table row is a definition)
+    "| a | b |\n| --- | --- |\n| c[^100] | d |",
 );
 
 const blockArb = fc.oneof(

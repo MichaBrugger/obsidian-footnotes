@@ -10,7 +10,7 @@ import { PREFIXES } from "./helpers/prefixes";
 import { docArb } from "./arbitraries";
 import { inlineFootnoteSpanAt, sanitizeInlineFootnoteContent } from "../src/commands/inline-footnotes";
 import { endOfWordOffset } from "../src/editor/cursor-motion";
-import { footnoteReferenceMatches } from "../src/parsing/footnote-grammar";
+import { footnoteReferenceMatches, referenceOccurrences } from "../src/parsing/footnote-grammar";
 import { lintFootnotes, LintOptions } from "../src/linting/linter";
 import { fixLazyDefinitions } from "../src/linting/rules/fix-lazy-definitions";
 import { lazyDefinitionLabelNames } from "../src/linting/rules/remove-orphaned-references";
@@ -316,6 +316,36 @@ describe("lint invariants over random documents", () => {
             }),
         );
     });
+
+    soakIt("fixLazyDefinitions on its own is idempotent", () => {
+        fc.assert(
+            fc.property(docArb, (doc) => {
+                const once = fixLazyDefinitions(doc);
+                expect(fixLazyDefinitions(once)).toBe(once);
+            }),
+        );
+    });
+
+    soakIt("every occurrence's raw slice is exactly its bracket text", () => {
+        fc.assert(
+            fc.property(docArb, (doc) => {
+                // the masked-twin/raw-line dance (bug-masked-name-identity)
+                // must never report a position whose raw slice is not the
+                // reference it claims to be
+                const lines = normalizeEol(doc).text.split("\n");
+                const scan = scanDocument(lines);
+                const masked = maskProtectedLines(lines, scan);
+                const starts = definitionStartLines(lines, scan, (i) => masked[i]);
+                for (let i = 0; i < lines.length; i++) {
+                    for (const occurrence of referenceOccurrences(lines[i], masked[i], starts[i])) {
+                        expect(lines[i].slice(occurrence.start, occurrence.end)).toBe(
+                            `[^${occurrence.name}]`,
+                        );
+                    }
+                }
+            }),
+        );
+    });
 });
 
 // ---------- scanner invariants ----------
@@ -343,6 +373,29 @@ describe("scanner invariants over random documents", () => {
                 expect(maskedLineAt(lines, i)).toBe(
                     maskProtectedLines(lines)[i],
                 );
+            }),
+        );
+    });
+
+    soakIt("the masked twin only ever blots to NUL, never rewrites a character", () => {
+        fc.assert(
+            fc.property(docArb, (doc) => {
+                // positions line up with the raw line (the masked-twin
+                // contract): every character is either its raw self or a
+                // NUL. A mask that rewrote a character would misplace
+                // every reference found past it (bug-masked-name-identity's
+                // family).
+                const lines = normalizeEol(doc).text.split("\n");
+                const masked = maskProtectedLines(lines);
+                for (let i = 0; i < lines.length; i++) {
+                    expect(masked[i].length).toBe(lines[i].length);
+                    for (let j = 0; j < lines[i].length; j++) {
+                        expect(
+                            masked[i][j] === "\0" || masked[i][j] === lines[i][j],
+                            `line ${i} col ${j}: raw ${JSON.stringify(lines[i][j])} became ${JSON.stringify(masked[i][j])}`,
+                        ).toBe(true);
+                    }
+                }
             }),
         );
     });

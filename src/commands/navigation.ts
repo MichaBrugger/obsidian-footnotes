@@ -14,7 +14,7 @@ import {
     referenceOccurrences,
 } from "../parsing/footnote-grammar";
 import { openFootnotePopup, popupEditingAvailable } from "./footnote-popup";
-import { definitionLabelIn } from "../parsing/markdown-scan";
+import { definitionLabelIn, quotedDefinitionEnd } from "../parsing/markdown-scan";
 
 import { addReferenceOrDeleteDefinition, showNotice } from "../editor/notice";
 // The jump half of the decision cascade. From a definition it jumps to the
@@ -160,12 +160,19 @@ function quotedDefinitionAbove(ctx: DocContext, line: number): string | null {
     const depthOf = (text: string): number =>
         (/^(?: {0,3}> ?)+/.exec(text)?.[0].match(/>/g) ?? []).length;
     const depth = depthOf(ctx.lines[line]);
+    // walk up to the nearest quoted label at this depth, then let the one
+    // reading of a quoted definition's extent (quotedDefinitionEnd, the
+    // same walk the orphan rules use) say whether it reaches this line: a
+    // blank quote line followed by an indented quoted line is still inside
+    // the definition (Kimi hunt cycle 1, 2026-09-16: the old walk stopped
+    // at the blank line and the press nested a footnote into the body)
     for (let j = line - 1; j >= 0; j--) {
         const text = ctx.lines[j];
         if (depthOf(text) !== depth) return null;
-        if (text.replace(/^(?: {0,3}> ?)+/, "").trim() === "") return null;
         const hit = definitionLabelWithName(text, ctx.maskedLine(j));
-        if (hit) return ctx.definitionStarts()[j] ? hit.name : null;
+        if (!hit) continue;
+        if (!ctx.definitionStarts()[j]) return null;
+        return quotedDefinitionEnd(ctx.lines, ctx.scan, ctx.definitionStarts(), j) >= line ? hit.name : null;
     }
     return null;
 }
