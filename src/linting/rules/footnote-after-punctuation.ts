@@ -37,7 +37,11 @@ const AlreadyPlacedAfter = new RegExp(
 // built from the original line. Otherwise a footnote name could come out
 // with the blanking characters in it.
 function swapInSegment(original: string, masked: string): string {
-    const occurrences = referenceOccurrences(original, masked);
+    // a name holding whitespace is prose to Obsidian, not a reference to
+    // move (Claude sweep 2026-09-13)
+    const occurrences = referenceOccurrences(original, masked).filter(
+        (occurrence) => !/\s/.test(occurrence.name),
+    );
     let out = "";
     let copied = 0;
     let k = 0;

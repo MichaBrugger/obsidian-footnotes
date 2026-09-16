@@ -105,8 +105,13 @@ describe("reindex with a code-span-named footnote (fixed 2026-08-10)", () => {
         expect(reindexFootnotes(doc, { keepOrphanedDefinitions: false })).toBe(doc);
     });
 
+    // The comment span carries no whitespace: a name holding whitespace is
+    // prose to Obsidian and to micromark alike (probed 2026-09-16:
+    // "see[^a<!-- -->b]" renders as a plain link), so since B6 no rule
+    // renames such a name, and the identity check needs a name that IS a
+    // footnote.
     it("the same split through a name containing an HTML comment span", () => {
-        const commentNamed = "see[^a<!-- -->b].\n\n[^a<!-- -->b]: hi";
+        const commentNamed = "see[^a<!--x-->b].\n\n[^a<!--x-->b]: hi";
         expect(reindexFootnotes(commentNamed, { renumberNamedFootnotes: true })).toBe(
             "see[^1].\n\n[^1]: hi",
         );

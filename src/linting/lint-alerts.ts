@@ -338,7 +338,12 @@ export function nestedFootnoteDefinitionNames(
         if (!starts[i]) continue;
         const hit = definitionLabelWithName(lines[i], masked[i]);
         if (!hit?.label.quoted) continue;
-        spans.push({ name: hit.name, start: i, end: quotedDefinitionEnd(lines, scan, starts, i) });
+        // a label after a "%%" closer has its line to itself
+        spans.push({
+            name: hit.name,
+            start: i,
+            end: hit.label.afterCloser ? i : quotedDefinitionEnd(lines, scan, starts, i),
+        });
     }
     for (const span of spans) {
         let nested = false;

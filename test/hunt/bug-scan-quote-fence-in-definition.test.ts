@@ -18,7 +18,7 @@ describe("a fence inside a blockquote inside a definition continuation", () => {
         "use[^1]",
     ];
 
-    it.fails("protects the quoted fence lines", () => {
+    it("protects the quoted fence lines", () => {
         const scan = scanDocument(lines);
         expect(scan.isProtected).toEqual([
             false,
@@ -30,7 +30,7 @@ describe("a fence inside a blockquote inside a definition continuation", () => {
         ]);
     });
 
-    it.fails("a reference-shaped string in the code does not reserve a number", () => {
+    it("a reference-shaped string in the code does not reserve a number", () => {
         expect(
             computeNextFootnoteNumber(
                 "[^1]: para\n    > ```\n    > code[^9]\n    > ```\n\nuse[^1]",

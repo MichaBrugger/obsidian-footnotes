@@ -144,7 +144,13 @@ export function referenceOccurrenceAtCursor(
     doc: Editor,
     ctx?: DocContext,
 ): { target: ReferenceOccurrence; ctx: DocContext } | null {
-    const rawReferences = footnoteReferenceMatches(lineText).map((match) => ({
+    // The gate asks only whether reference-shaped text sits at the caret,
+    // so a label-shaped start of the line counts here too: whether it is a
+    // definition's label or a lazy label's live reference is decided past
+    // the gate, against the document's definition starts (Claude sweep
+    // 2026-09-13: a column-0 lazy label never got that far, and a press
+    // inside it fell through to creation)
+    const rawReferences = footnoteReferenceMatches(lineText, false).map((match) => ({
         footnote: match[0],
         startIndex: match.index ?? 0,
     }));

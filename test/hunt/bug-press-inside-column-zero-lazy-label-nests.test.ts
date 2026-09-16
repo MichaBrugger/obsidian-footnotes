@@ -87,7 +87,7 @@ describe("the caret inside a column-0 lazy label's own reference", () => {
         expect(doc.cursor.line).toBe(3);
     });
 
-    it.fails("the shared caret lookup finds the reference at column 0 as well", () => {
+    it("the shared caret lookup finds the reference at column 0 as well", () => {
         const doc = editorOf(mixed, 1, 3);
         expect(referenceOccurrenceAtCursor(mixed[1], { line: 1, ch: 3 }, doc)?.target.name).toBe("1");
     });

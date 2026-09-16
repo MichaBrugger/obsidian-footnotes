@@ -85,7 +85,12 @@ function scanReferences(
         // does keep the definition it points at alive. So only real
         // definition starts are recorded here.
         labelStartAt[i] = hit.label.nameStart - 2;
-        if (hit.label.quoted) {
+        // A label after a "%%" closer defines its footnote, but its line
+        // holds the closer, so it is never a block this rule may cut out:
+        // deleting the line would leave the comment open over the rest of
+        // the note. Such a definition stays, whether or not anything
+        // references it.
+        if (hit.label.quoted && !hit.label.afterCloser) {
             blocks.push({
                 name: hit.name,
                 start: i,

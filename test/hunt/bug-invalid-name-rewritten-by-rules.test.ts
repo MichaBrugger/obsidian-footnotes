@@ -38,35 +38,35 @@ import { removeOrphanedFootnoteReferences } from "../../src/linting/rules/remove
 // warn. Seeing them is fine. Rewriting them is the bug.
 
 describe("a whitespace name is prose, and no rule may rewrite it", () => {
-    it.fails("deleting orphaned definitions does not eat a [^1 ]: prose line", () => {
+    it("deleting orphaned definitions does not eat a [^1 ]: prose line", () => {
         const before = "Alpha.\n\n[^1 ]: prose that only looks like a label\n";
         expect(reindexFootnotes(before, { keepOrphanedDefinitions: false })).toContain(
             "prose that only looks like a label",
         );
     });
 
-    it.fails("deleting orphaned definitions does not eat a real citation line", () => {
+    it("deleting orphaned definitions does not eat a real citation line", () => {
         // The shape a person actually writes. Today the whole line goes and
         // the note comes back as just "Alpha.\n".
         const before = "Alpha.\n\n[^my note]: The full citation goes here.\n";
         expect(removeOrphanedFootnoteDefinitions(before)).toBe(before);
     });
 
-    it.fails("reindex does not renumber a whitespace name into a live footnote", () => {
+    it("reindex does not renumber a whitespace name into a live footnote", () => {
         // With "renumber named footnotes" on, the prose "[^ 1]" is rewritten
         // to "[^1]", which turns a piece of writing into a real reference.
         const before = "Alpha[^ 1] and bravo[^2].\n\n[^2]: two\n";
         expect(reindexFootnotes(before, { renumberNamedFootnotes: true })).toContain("[^ 1]");
     });
 
-    it.fails("apply-prefix does not stamp a prefix onto a whitespace name", () => {
+    it("apply-prefix does not stamp a prefix onto a whitespace name", () => {
         // Today this produces "[^2. 1]", a name that is still not a footnote
         // and no longer what the user typed.
         const before = "Alpha[^ 1] here.\n";
         expect(applyFootnotePrefix(before, "2.")).toBe(before);
     });
 
-    it.fails("the punctuation rule does not move prose around a whitespace name", () => {
+    it("the punctuation rule does not move prose around a whitespace name", () => {
         // This one runs on the default settings, so it is the easiest of the
         // set for a user to hit by accident.
         const before = "Alpha[^ 1]. Bravo.\n";

@@ -91,11 +91,17 @@ describe("a setext underline of dashes ends the paragraph", () => {
         expect(lazyNames("use[^1] here\n\nHeading\n-\n[^1]: real definition")).toEqual([]);
     });
 
-    it.fails("and the lint leaves such a note alone", () => {
+    it("and the lint leaves the heading whole", () => {
         const doc = "use[^1] here\n\nHeading\n-\n[^1]: real definition";
-        // today the lint inserts a blank line above the label, which turns the
-        // heading into a paragraph and leaves the "-" behind as an empty bullet
-        expect(lintFootnotes(doc)).toBe(doc);
+        // the fix-lazy rule leaves the definition alone: it is a definition
+        expect(lintFootnotes(doc, { moveDefinitionsToBottom: false })).toBe(doc);
+        // move-to-bottom puts its usual blank line between the last block
+        // and the definitions it gathers, which leaves the heading whole (a
+        // blank line under a setext underline changes nothing), and a
+        // second lint changes nothing more
+        const out = lintFootnotes(doc);
+        expect(out).toBe("use[^1] here\n\nHeading\n-\n\n[^1]: real definition");
+        expect(lintFootnotes(out)).toBe(out);
     });
 
     it("and a press on the reference jumps instead of appending an empty duplicate", async () => {

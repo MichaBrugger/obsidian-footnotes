@@ -11,7 +11,12 @@
  * as a definition, even sitting directly under another definition, where it
  * starts a NEW footnote rather than continuing the one above (review A2).
  */
-const DefinitionStart = /^ {0,3}\[\^([^[\]]+)\]:/;
+// A name holding whitespace is refused by Obsidian's parser outright, so
+// "[^my note]: text" is a line of prose, never a label: no rule may treat
+// it as a definition to move, renumber, or delete (Claude sweep 2026-09-13;
+// the reference pattern stays permissive so the invalid-name alert can
+// still see such shapes and say so).
+const DefinitionStart = /^ {0,3}\[\^([^[\]\s]+)\]:/;
 
 /**
  * The trailing punctuation an insert hops over on its way to the end of a
@@ -228,7 +233,15 @@ function blockquoteDepth(line: string): { depth: number; rest: string } {
  * the raw line. It has to: a code span inside the name masks to NULs.
  */
 export function definitionLabelIn(line: string): DefinitionLabel | null {
-    const prefix = line.match(BlockquotePrefix)?.[0].length ?? 0;
+    let prefix = line.match(BlockquotePrefix)?.[0].length ?? 0;
+    // A "%%" right after the markers is the closer of a block comment, and
+    // the text after it is outside the comment: a label there is a
+    // definition to Obsidian ("%% [^3]: def" and "> %% [^4]: def" both
+    // render; Jason's verification 2026-09-15). Whether the "%%" really
+    // closes a block is the scan's to say, so definitionStartLines checks
+    // afterCloser against the comment-block facts before it starts one.
+    const afterCloser = line.startsWith("%%", prefix);
+    if (afterCloser) prefix += 2;
     const match = line.slice(prefix).match(DefinitionStart);
     if (!match) return null;
     // whatever DefinitionStart matched before the "[^": the 0 to 3 spaces
@@ -240,6 +253,7 @@ export function definitionLabelIn(line: string): DefinitionLabel | null {
         nameEnd: nameStart + match[1].length,
         labelEnd: prefix + match[0].length,
         quoted: prefix > 0,
+        ...(afterCloser ? { afterCloser: true } : {}),
     };
 }
 
@@ -254,6 +268,8 @@ export interface DefinitionLabel {
     nameEnd: number;
     labelEnd: number;
     quoted: boolean;
+    /** The label sits after a "%%" on its line: the closer of a block comment, or a "%%" that is not a closer at all, which the scan tells apart. Such a label never forms a block and is never cut out as an orphan, since its line holds the closer. */
+    afterCloser?: true;
 }
 
 /**
@@ -856,6 +872,14 @@ export function scanDocument(lines: string[]): DocumentScan {
         depth: number;
         contentIndent: number;
         listColumn: number | null;
+        /**
+         * The fence opened behind a ">" that itself sits at a definition's
+         * four-space continuation indent ("    > ```"). The depth reading
+         * at the top of the loop cannot see a quote marker behind four
+         * spaces, so the fence's interior and closer lines are read again
+         * with the indent stripped (Kimi sweep 2026-09-13).
+         */
+        definitionQuote: boolean;
     } | null = null;
     // Comment and math regions live in the CONTAINER that opened them, just
     // as fences do (Sol bug #4, verified against metadataCache).
@@ -1066,8 +1090,17 @@ export function scanDocument(lines: string[]): DocumentScan {
             }
             continue;
         }
+        // A fence inside a quote inside a definition's continuation: its
+        // lines carry the four-space indent and then the quote marker,
+        // which the depth reading above cannot see, so they are read here
+        // with the indent stripped. Everywhere else the line's own depth
+        // and text stand.
+        const quotedInDefinition =
+            fence?.definitionQuote ? blockquoteDepth(src[i].replace(/^ {4,7}/, "")) : null;
+        const fenceDepth = quotedInDefinition ? quotedInDefinition.depth : depth;
+        const closerRest = quotedInDefinition ? quotedInDefinition.rest : rest;
         // a fence lives in the CONTAINER that opened it, per CommonMark
-        if (fence && depth < fence.depth) {
+        if (fence && fenceDepth < fence.depth) {
             // The fence's blockquote ended and took the fence with it
             // (bug-blockquote-fence-outlives-quote). This line is ordinary
             // text and gets the full treatment below, so a bare "```" here
@@ -1092,14 +1125,14 @@ export function scanDocument(lines: string[]): DocumentScan {
             // content (bug-blockquote-closes-bare-fence), and a "```" at
             // the document level can't close a fence inside a blockquote,
             // which the branch above already handled by ending it.
-            if (depth === fence.depth) {
+            if (fenceDepth === fence.depth) {
                 // the closer's indent is measured against the fence's
                 // container: up to contentIndent + 3 leading spaces
                 let lead = 0;
-                while (lead < rest.length && rest[lead] === " ") lead++;
+                while (lead < closerRest.length && closerRest[lead] === " ") lead++;
                 const close =
                     lead <= fence.contentIndent + 3
-                        ? rest.slice(lead).match(/^(`{3,}|~{3,})\s*$/)
+                        ? closerRest.slice(lead).match(/^(`{3,}|~{3,})\s*$/)
                         : null;
                 if (
                     close &&
@@ -1397,6 +1430,7 @@ export function scanDocument(lines: string[]): DocumentScan {
                     listFenceContentIndent === 4 && listStack.length === 0
                         ? null
                         : innermostListColumn(depth),
+                definitionQuote: markersDepth > 0 && listFenceContentIndent === 4,
             };
             isProtected[i] = true;
             prevParagraph = false;
@@ -1687,7 +1721,24 @@ export function definitionStartLines(
         // on the same line starts a paragraph.
         if (scan.inCommentBlock[i]) {
             const close = scan.commentBlockCloseAt[i];
-            if (close >= 0) open = line.slice(close).trim() === "" ? "none" : "paragraph";
+            if (close >= 0) {
+                // a label right after the closer is a definition (Jason's
+                // verification 2026-09-15: "%% [^3]: def" renders, and so
+                // does its quoted twin), as long as nothing but spaces sit
+                // between the closer and the label
+                const label = definitionLabelIn(line);
+                if (
+                    label?.afterCloser &&
+                    label.nameStart - 2 >= close &&
+                    line.slice(close, label.nameStart - 2).trim() === "" &&
+                    definitionLabelWithName(line, maskedAt(i))
+                ) {
+                    starts[i] = true;
+                    open = "definition";
+                    continue;
+                }
+                open = line.slice(close).trim() === "" ? "none" : "paragraph";
+            }
             continue;
         }
         const bare = line.replace(BlockquotePrefix, "");
@@ -1750,7 +1801,11 @@ export function definitionStartLines(
             open = "none";
             continue;
         }
-        if (open !== "paragraph" && definitionLabelIn(line) !== null) {
+        // a label behind a "%%" that the scan did not record as a block
+        // comment's closer (an inline "%% ... %%" pair, say) is not a
+        // definition; only the branch above starts one after a closer
+        const label = definitionLabelIn(line);
+        if (open !== "paragraph" && label !== null && !label.afterCloser) {
             const hit = definitionLabelWithName(line, maskedAt(i));
             if (hit) {
                 starts[i] = true;

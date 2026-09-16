@@ -82,11 +82,11 @@ describe("the punctuation rule rewrites a label that follows a comment closer", 
 });
 
 describe("orphaned-reference deletion cuts the label's own brackets", () => {
-    it.fails("the %% shape is left alone completely", () => {
+    it("the %% shape is left alone completely", () => {
         expect(removeOrphanedFootnoteReferences(PERCENT)).toBe(PERCENT);
     });
 
-    it.fails("the quoted %% shape is left alone completely", () => {
+    it("the quoted %% shape is left alone completely", () => {
         expect(removeOrphanedFootnoteReferences(PERCENT_QUOTED)).toBe(
             PERCENT_QUOTED,
         );

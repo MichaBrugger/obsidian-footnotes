@@ -33,6 +33,9 @@ export function rewriteFootnoteNames(
     let result = "";
     let copied = 0;
     for (const { name, start, end } of referenceOccurrences(line, masked, labelIsDefinition)) {
+        // a name holding whitespace is prose to Obsidian, not a footnote,
+        // so it is never renamed into one (Claude sweep 2026-09-13)
+        if (/\s/.test(name)) continue;
         const newName = resolve(name);
         if (newName === null) continue;
         result += line.slice(copied, start) + referenceText(newName);
