@@ -652,6 +652,10 @@ export function lintAfterFootnoteCreation(
     seededBody?: string,
 ): string | null {
     if (!plugin.settings.lintOnFootnoteCreation) return null;
+    // with every rule off, lint is off and its alerts stay silent, as the
+    // command and the save trigger already hold (Kimi hunt cycle 2,
+    // 2026-09-16)
+    if (lintRulesAllDisabled(plugin)) return null;
     // The shared safety check covers Reading view as well. That is belt and
     // braces: the creation commands already refuse it, but this also stops
     // code calling in directly from editing the hidden buffer.

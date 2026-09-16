@@ -165,6 +165,22 @@ const specialBlockArb = fc.constantFrom(
     // a small GFM table, with a label right under it (Jason's ruling A2:
     // a label directly under a table row is a definition)
     "| a | b |\n| --- | --- |\n| c[^100] | d |",
+    // shapes from the 2026-09-16 hunt (cycle 2): a label under a comment
+    // closer's tail line (the plugin reads it as a definition; micromark
+    // interrupts the paragraph too, so the oracle judges both sides), a
+    // label under a link reference definition (a block, not a paragraph),
+    // setext underlines of both kinds, a callout title with its label, a
+    // quoted definition at depth two, an ordered-paren list item with a
+    // label, and a code span that wraps across lines (sheet 18's B30)
+    "x <!-- a\n--> tail\n[^101]: after comment tail",
+    "[foo]: /url\n[^102]: after lrd",
+    "setext para\n===\n[^103]: after setext h1",
+    "setext para\n-\n[^104]: after setext h2",
+    "> [!note] title\n> [^105]: callout label",
+    "> > [^106]: depth two quoted",
+    "1) item\n   [^107]: under ordered paren",
+    "a `code\nspan` tail[^108]",
+    "| a | b |\n| --- | --- |\n| c[^109] | d |\n[^109]: under table",
 );
 
 const blockArb = fc.oneof(

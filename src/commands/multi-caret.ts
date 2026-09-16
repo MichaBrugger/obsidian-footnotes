@@ -172,6 +172,17 @@ function multiCaretContinuation(
     // either. Its meaning is "wrap the clipboard", so carets on references
     // of the same name are refused for that key.
     if (!allowDefinitionContinuation) return refuse();
+    // A reference sitting inside another footnote's definition (a name
+    // typed on the line right under a definition is its lazy continuation)
+    // would complete a nested footnote once the shared definition exists,
+    // which the plugin refuses everywhere (ADR 1). The single-caret press
+    // refuses through this guard at its one caret; here every caret is
+    // checked, since only the first one goes on to create. Found by the
+    // named-flow property's 1500-run soak after Kimi hunt cycle 2
+    // (2026-09-16).
+    for (const caret of carets) {
+        if (warnDefinitionCaretIfInside(doc, null, caret, ctx)) return "handled";
+    }
     const name = names[0];
     if (idListIncludes(listExistingFootnoteDefinitions(doc, ctx), name)) {
         // The footnote already works, so there is nothing to carry on

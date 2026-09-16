@@ -1113,9 +1113,15 @@ export function scanDocument(lines: string[]): DocumentScan {
     // stops at a blank line and at a line that starts a block of its own
     // (a fence, a heading, a rule), because a code span lives inside one
     // paragraph.
-    const closesAhead = (from: number, length: number): boolean => {
+    const closesAhead = (from: number, length: number, openerDepth: number): boolean => {
         for (let k = from; k < src.length; k++) {
-            const text = src[k];
+            // the search stays inside the paragraph the span opened in: a
+            // quoted paragraph continues on quoted lines at the same depth
+            // (Reading view renders "> a `code" then "> span` b" as one
+            // span; Kimi hunt cycle 2, probed 2026-09-16), while a change
+            // of depth, a table row, or any block start ends it
+            const { depth: lineDepth, rest: text } = blockquoteDepth(src[k]);
+            if (lineDepth !== openerDepth || tableRows[k]) return false;
             if (text.trim() === "") return false;
             // Every construct that ends a paragraph ends the search: a
             // fence, a heading, a rule, a setext underline, a blockquote
@@ -1136,7 +1142,7 @@ export function scanDocument(lines: string[]): DocumentScan {
             ) {
                 return false;
             }
-            if (maskLineRegions(text, { code: length }).endsInCode === 0) return true;
+            if (maskLineRegions(src[k], { code: length }).endsInCode === 0) return true;
         }
         return false;
     };
@@ -1147,8 +1153,14 @@ export function scanDocument(lines: string[]): DocumentScan {
     // region facts from.
     const maskWithCodeSpans = (i: number, startsIn: { comment?: boolean; math?: boolean; code?: number }) => {
         let masked = maskLineRegions(src[i], startsIn);
+        // a heading's inline content ends with its line, and so does a table
+        // cell's, so a run opened there never closes on a later line
+        // (Reading view keeps the reference in "# a `code [^1]" live; Kimi
+        // hunt cycle 2, probed 2026-09-16)
+        const opener = blockquoteDepth(src[i]);
+        const carriesOn = !/^ {0,3}#{1,6}(?: |$)/.test(opener.rest) && !tableRows[i];
         for (const run of masked.unmatchedRuns) {
-            if (closesAhead(i + 1, run.length)) {
+            if (carriesOn && closesAhead(i + 1, run.length, opener.depth)) {
                 masked = maskLineRegions(src[i], { ...startsIn, codeOpenerAt: run.at });
                 codeOpenerAt[i] = run.at;
                 break;

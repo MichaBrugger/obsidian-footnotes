@@ -973,6 +973,98 @@ const ALLOWED_MULTI_DELTAS: Record<CommandName, number[]> = {
 };
 
 describe("multi-caret press invariants over random documents", () => {
+    soakIt("the FULL MULTI-CARET NAMED flow: plant, type the name once, re-press creates the ONE shared definition (2026-09-16 hunt)", async () => {
+        await fc.assert(
+            fc.asyncProperty(multiPressArb, typedNameArb, async ({ lines, carets, settings }, name) => {
+                const plugin0 = sharedFakePlugin(
+                    {
+                        ...settings,
+                        footnoteSectionHeading: "# Footnotes",
+                        enablePopupEditor: false,
+                        enableFootnotePrefix: false,
+                        lintOnFootnoteCreation: false,
+                    },
+                    undefined,
+                );
+                const doc = fakeMultiEditor(lines, { carets, edits: true, wholeDoc: true, words: true });
+                await insertNamedFootnote(
+                    sharedFakePlugin(
+                        { ...settings, footnoteSectionHeading: "# Footnotes", enablePopupEditor: false, enableFootnotePrefix: false, lintOnFootnoteCreation: false },
+                        doc,
+                    ),
+                );
+                void plugin0;
+                // the flow starts only when both carets got a "[^]" with a cursor inside each
+                const planted = doc.selections;
+                if (!planted || planted.length !== 2) return;
+                for (const sel of planted) {
+                    const line = doc.lines[sel.from.line] ?? "";
+                    if (line.slice(sel.from.ch - 2, sel.from.ch + 1) !== "[^]") return;
+                }
+                // type the name once: CodeMirror repeats it at every cursor
+                const typedLines = simulateChanges(
+                    doc.lines,
+                    planted.map((sel) => ({ from: sel.from, text: name })),
+                );
+                // each caret rides to the end of its own typed name; when both
+                // sit on one line the earlier insertion shifts the later one
+                const sameLine = planted[0].from.line === planted[1].from.line;
+                const newCarets = sameLine
+                    ? planted[0].from.ch < planted[1].from.ch
+                        ? [
+                              { line: planted[0].from.line, ch: planted[0].from.ch + name.length },
+                              { line: planted[1].from.line, ch: planted[1].from.ch + 2 * name.length },
+                          ]
+                        : [
+                              { line: planted[1].from.line, ch: planted[1].from.ch + name.length },
+                              { line: planted[0].from.line, ch: planted[0].from.ch + 2 * name.length },
+                          ]
+                    : planted.map((sel) => ({ line: sel.from.line, ch: sel.from.ch + name.length }));
+                const doc2 = fakeMultiEditor(typedLines, { carets: newCarets, edits: true, wholeDoc: true, words: true });
+                // typing the placeholder can itself reclassify a neighbour
+                // (a lone "[^name]" is a paragraph line, so a label directly
+                // under it goes lazy) - that is legitimate, exactly like
+                // typing the text by hand, and outside the press's contract
+                const defsTyped = definitionNamesFolded(typedLines);
+                if ([...defsTyped].sort().join() !== [...definitionNamesFolded(lines)].sort().join()) {
+                    return;
+                }
+                // a name typed on the line right under a definition turns
+                // that line into the definition's lazy continuation (Reading
+                // view, 2026-09-16), so the second press sits inside a
+                // definition and refuses to nest: no shared definition then
+                const typedInsideDefinition = findDefinitionBlocks(typedLines).some((block) =>
+                    newCarets.some((caret) => caret.line >= block.start && caret.line <= block.end),
+                );
+                await insertNamedFootnote(
+                    sharedFakePlugin(
+                        { ...settings, footnoteSectionHeading: "# Footnotes", enablePopupEditor: false, enableFootnotePrefix: false, lintOnFootnoteCreation: false },
+                        doc2,
+                    ),
+                );
+                const defsAfter = definitionNamesFolded(doc2.lines);
+                if (footnoteNameProblem(name) !== null || typedInsideDefinition) {
+                    // spaces/backticks/"#": warned about, nothing created;
+                    // likewise a name typed inside a definition
+                    expect([...defsAfter].sort()).toEqual([...defsTyped].sort());
+                    return;
+                }
+                if (defsTyped.has(name.toLowerCase())) {
+                    // the name already works: the second press navigates or refuses, no duplicate
+                    expect([...defsAfter].sort()).toEqual([...defsTyped].sort());
+                    return;
+                }
+                // fresh valid name: ONE shared definition exists, both typed
+                // references survived, nothing nested
+                expect(defsAfter.has(name.toLowerCase())).toBe(true);
+                const text = doc2.lines.join("\n");
+                expect(text).not.toContain("[^[^");
+                const occurrences = text.split(`[^${name}]`).length - 1;
+                expect(occurrences).toBeGreaterThanOrEqual(2);
+            }),
+        );
+    });
+
     soakIt("a two-caret press never throws, edits atomically, and stays in the shape envelope", async () => {
         await fc.assert(
             fc.asyncProperty(multiPressArb, async ({ lines, carets, command, settings }) => {

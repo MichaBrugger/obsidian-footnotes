@@ -11,6 +11,7 @@ import { docArb } from "./arbitraries";
 import { inlineFootnoteSpanAt, sanitizeInlineFootnoteContent } from "../src/commands/inline-footnotes";
 import { endOfWordOffset } from "../src/editor/cursor-motion";
 import { footnoteReferenceMatches, referenceOccurrences } from "../src/parsing/footnote-grammar";
+import { lineDiffChanges, mapFoldLines } from "../src/editor/document-diff";
 import { lintFootnotes, LintOptions } from "../src/linting/linter";
 import { fixLazyDefinitions } from "../src/linting/rules/fix-lazy-definitions";
 import { lazyDefinitionLabelNames } from "../src/linting/rules/remove-orphaned-references";
@@ -395,6 +396,59 @@ describe("scanner invariants over random documents", () => {
                             `line ${i} col ${j}: raw ${JSON.stringify(lines[i][j])} became ${JSON.stringify(masked[i][j])}`,
                         ).toBe(true);
                     }
+                }
+            }),
+        );
+    });
+});
+
+// ---------- write-back invariants (added 2026-09-16, hunt cycle 2) ----------
+// The lint hands its result to the editor through replaceMinimal, whose
+// edits come from lineDiffChanges and whose fold restoration comes from
+// mapFoldLines (src/editor/document-diff.ts + write-back.ts). These pin
+// the two halves over the same random documents and option combos the
+// transform properties use.
+
+/** apply offset changes (offsets into `before`, ordered, non-overlapping) */
+function applyChanges(before: string, changes: { from: number; to: number; text: string }[]): string {
+    let out = "";
+    let copied = 0;
+    for (const change of changes) {
+        out += before.slice(copied, change.from) + change.text;
+        copied = change.to;
+    }
+    return out + before.slice(copied);
+}
+
+describe("write-back invariants over random documents", () => {
+    soakIt("lineDiffChanges produces ordered, non-overlapping edits that apply to the linted text", () => {
+        fc.assert(
+            fc.property(docArb, optionsArb, (doc, options) => {
+                const after = lintFootnotes(doc, options);
+                const changes = lineDiffChanges(doc, after);
+                for (let i = 1; i < changes.length; i++) {
+                    expect(changes[i].from).toBeGreaterThanOrEqual(changes[i - 1].to);
+                }
+                expect(applyChanges(doc, changes)).toBe(after);
+            }),
+        );
+    });
+
+    soakIt("mapFoldLines keeps every fold in range and non-inverted", () => {
+        fc.assert(
+            fc.property(docArb, optionsArb, fc.nat(50), fc.nat(50), (doc, options, fromPick, spanPick) => {
+                const after = lintFootnotes(doc, options);
+                const beforeLines = doc.split("\n").length;
+                if (beforeLines < 2) return;
+                const from = fromPick % (beforeLines - 1);
+                // a real fold spans at least one line past its heading line
+                const fold = { from, to: from + 1 + (spanPick % (beforeLines - from - 1)) };
+                const changes = lineDiffChanges(doc, after);
+                const afterLines = after.split("\n").length;
+                for (const mapped of mapFoldLines([fold], changes, doc)) {
+                    expect(mapped.from).toBeGreaterThanOrEqual(0);
+                    expect(mapped.to).toBeGreaterThan(mapped.from);
+                    expect(mapped.to).toBeLessThan(afterLines);
                 }
             }),
         );
