@@ -237,18 +237,43 @@ export function removeOrphanedFootnoteDefinitions(markdown: string): string {
     const { text, eol } = normalizeEol(markdown);
     const lines = text.split("\n");
     const scan = scanDocument(lines);
-    const dead = orphanedDefinitionBlocks(lines, scan);
-    if (dead.length === 0) return markdown;
-    const out = removeLineRanges(lines, dead);
+    if (orphanedDefinitionBlocks(lines, scan).length === 0) return markdown;
     // The same promise the orphan-reference rule makes: a deletion that
-    // changes how Obsidian reads a line it did not touch is refused
-    // outright, and the orphans stay for the user to sort out (the alert
-    // names them). Cutting a block can put the line below it under a
-    // setext underline or a blank line, which turns a lazy label there
-    // into a real definition that the NEXT lint then deletes as an orphan,
-    // so lint twice was not lint once (Kimi hunt cycle 2, 2026-09-16).
-    if (linesReadDifferently(lines, scan, dead, out)) return markdown;
-    return restoreEol(out.join("\n"), eol);
+    // changes how Obsidian reads a line it did not touch is refused, and
+    // that orphan stays for the user to sort out (the alert names it).
+    // Cutting a block can put the line below it under a setext underline
+    // or a blank line, which turns a lazy label there into a real
+    // definition that the NEXT lint then deletes as an orphan, so lint
+    // twice was not lint once (Kimi hunt cycle 2, 2026-09-16).
+    //
+    // The whole set of orphans goes in one cut when that cut changes
+    // nothing else. When it would, each block is tried on its own, in
+    // order, and the note is read again after every cut so a chain still
+    // dies all the way down: one refused block used to veto every safe
+    // deletion in the note, and the alert then blamed the safe ones too
+    // (Kimi hunt cycle 4, 2026-09-16).
+    let current = lines;
+    let currentScan = scan;
+    for (;;) {
+        const dead = orphanedDefinitionBlocks(current, currentScan);
+        if (dead.length === 0) break;
+        const whole = removeLineRanges(current, dead);
+        let next: string[] | null = linesReadDifferently(current, currentScan, dead, whole) ? null : whole;
+        if (next === null) {
+            for (const block of dead) {
+                const one = removeLineRanges(current, [block]);
+                if (!linesReadDifferently(current, currentScan, [block], one)) {
+                    next = one;
+                    break;
+                }
+            }
+        }
+        if (next === null) break;
+        current = next;
+        currentScan = scanDocument(current);
+    }
+    if (current === lines) return markdown;
+    return restoreEol(current.join("\n"), eol);
 }
 
 /**

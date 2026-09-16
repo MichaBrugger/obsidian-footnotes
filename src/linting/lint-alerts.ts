@@ -22,7 +22,7 @@ import {
     referenceText,
 } from "../parsing/footnote-grammar";
 import { inlineFootnoteSpanAt } from "../commands/inline-footnotes";
-import { duplicateFootnoteDefinitionNames } from "./rules/merge-duplicate-definitions";
+import { duplicateFootnoteDefinitionNames, mergeDuplicateFootnoteDefinitions } from "./rules/merge-duplicate-definitions";
 import {
     orphanedFootnoteDefinitionNames,
     removeOrphanedFootnoteDefinitions,
@@ -96,6 +96,13 @@ export function countEmptyFootnoteReferences(
                 // footnote syntax, not an abandoned placeholder (Kimi hunt
                 // cycle 1, 2026-09-16; renders literally in Reading view)
                 if (escapedAt(raw, i)) continue;
+                // "^[^]" is an inline footnote whose body is a caret, and
+                // a "[^]" inside a longer inline footnote's body is that
+                // body's literal text: Reading view renders both as inline
+                // footnotes (Kimi hunt cycle 4, probed 2026-09-16), so
+                // neither is a placeholder the user abandoned
+                if (i > 0 && raw[i - 1] === "^" && !escapedAt(raw, i - 1)) continue;
+                if (inlineFootnoteSpanAt(raw, i) !== null) continue;
                 count++;
             }
         }
@@ -214,10 +221,19 @@ function noticeOrphanedReferences(
     prefix: string,
     precomputed: { lines: string[]; masked: string[]; scan: DocumentScan; starts: boolean[] },
 ) {
-    const names = orphanedFootnoteReferenceNames(markdown, prefix, precomputed);
+    let names = orphanedFootnoteReferenceNames(markdown, prefix, precomputed);
     if (names.length === 0) return;
     if (plugin.settings.lintDeleteOrphanedReferences) {
-        if (removeOrphanedFootnoteReferences(markdown, prefix) !== markdown) return;
+        // Each orphan is judged on its own by the rule now (Kimi hunt
+        // cycle 4, 2026-09-16), so the ones it would still leave are the
+        // refused ones: those are named, and one the next lint deletes is
+        // not.
+        const after = removeOrphanedFootnoteReferences(markdown, prefix);
+        if (after !== markdown) {
+            const left = new Set(orphanedFootnoteReferenceNames(after, prefix).map((n) => n.toLowerCase()));
+            names = names.filter((name) => left.has(name.toLowerCase()));
+        }
+        if (names.length === 0) return;
         showNotice(
             names.length === 1
                 ? `This note has a footnote reference with no definition (${referenceList(names)}) that the lint left in place: deleting it would change how the lines around it are read. Write its definition or delete the reference by hand.`
@@ -242,16 +258,22 @@ function noticeOrphanedDefinitions(
     markdown: string,
     precomputed: { lines: string[]; scan: DocumentScan; masked: string[]; starts: boolean[] },
 ) {
-    const names = orphanedFootnoteDefinitionNames(markdown, precomputed);
+    let names = orphanedFootnoteDefinitionNames(markdown, precomputed);
     if (names.length === 0) return;
     if (plugin.settings.lintDeleteOrphanedDefinitions) {
         // With the toggle ON, an orphaned definition still in the note is
         // one the rule refused to cut (the cut would change how a nearby
         // line is read, or the line holds a comment's closer); say so
         // rather than pass it over (ADR 2; Kimi hunt cycle 2, 2026-09-16).
-        // After a single-rule command an orphan a full lint WOULD delete
-        // goes unreported, as before.
-        if (removeOrphanedFootnoteDefinitions(markdown) !== markdown) return;
+        // Each orphan is judged on its own by the rule now (cycle 4), so
+        // the ones it would still leave are the refused ones: those are
+        // named, and one the next lint deletes is not.
+        const after = removeOrphanedFootnoteDefinitions(markdown);
+        if (after !== markdown) {
+            const left = new Set(orphanedFootnoteDefinitionNames(after).map((n) => n.toLowerCase()));
+            names = names.filter((name) => left.has(name.toLowerCase()));
+        }
+        if (names.length === 0) return;
         showNotice(
             names.length === 1
                 ? `This note has a footnote definition nothing references (${referenceList(names)}) that the lint left in place: deleting it would change how the lines around it are read, or cut a comment's closer. Add its reference in the text, or delete the definition by hand.`
@@ -278,9 +300,24 @@ function noticeDuplicateDefinitions(
     markdown: string,
     precomputed: { lines: string[]; scan: DocumentScan; masked: string[]; starts: boolean[] },
 ) {
-    if (plugin.settings.lintMergeDuplicateDefinitions) return;
     const names = duplicateFootnoteDefinitionNames(markdown, precomputed);
     if (names.length === 0) return;
+    if (plugin.settings.lintMergeDuplicateDefinitions) {
+        // With the toggle on, a duplicate the merge rule can still not
+        // touch is one with a copy on the line of a "%%" comment's closer
+        // (that line is never merged away). It is named with that reason
+        // rather than passed over (ADR 2; Kimi hunt cycle 4, 2026-09-16).
+        // A duplicate the merge WOULD fix, left behind by a single-rule
+        // command, waits for the next lint as before.
+        if (mergeDuplicateFootnoteDefinitions(markdown) !== markdown) return;
+        showNotice(
+            names.length === 1
+                ? `This note defines ${referenceList(names)} more than once, and the lint could not merge them: one copy sits on the line of a "%%" comment's closer. Obsidian renders only the last definition. Merge them by hand.`
+                : `This note defines ${names.length} footnotes more than once (${referenceList(names)}), and the lint could not merge them: a copy sits on the line of a "%%" comment's closer. Obsidian renders only each one's last definition. Merge them by hand.`,
+            8000,
+        );
+        return;
+    }
     showNotice(
         names.length === 1
             ? `This note defines ${referenceList(names)} more than once. Obsidian renders only the last definition. Merge them, or turn on "Merge duplicate definitions".`

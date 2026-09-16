@@ -71,16 +71,20 @@ describe("an orphaned reference the rule refused to delete is reported nowhere",
         expect(messages().some((m) => m.includes("[^42]"))).toBe(true);
     });
 
-    it("a second orphan the guard also held back is reported as well", () => {
-        // "[^99]" sits in ordinary prose and could have been deleted on its
-        // own. The guard works on the whole note at once, so the refusal
-        // over "[^42]" keeps "[^99]" too, and neither is mentioned.
+    it("a second, safe orphan is deleted on its own and only the refused one is named (revised 2026-09-16)", () => {
+        // "[^99]" sits in ordinary prose and can be deleted on its own.
+        // The guard used to work on the whole note at once, so the refusal
+        // over "[^42]" kept "[^99]" too; each orphan is judged on its own
+        // now (Kimi hunt cycle 4), so "[^99]" goes and the alert names
+        // "[^42]" alone, with the reason that is true of it.
         const doc = "[^1]: alpha\n\n[^42]\n\n    indented code[^73]\n\nother[^99] here";
         const after = lintFootnotes(doc, { ...pipeline, removeOrphanedReferences: true });
-        expect(after).toContain("other[^99] here");
+        expect(after).toContain("other here");
+        expect(after).toContain("[^42]");
         resetNotices();
         noticeLintAlerts(pluginWithDeletionOn(), after);
-        expect(messages().some((m) => m.includes("[^99]"))).toBe(true);
+        expect(messages().some((m) => m.includes("[^42]"))).toBe(true);
+        expect(messages().some((m) => m.includes("[^99]"))).toBe(false);
     });
 });
 

@@ -13,8 +13,18 @@ import { endOfWordOffset } from "../src/editor/cursor-motion";
 import { footnoteReferenceMatches, referenceOccurrences } from "../src/parsing/footnote-grammar";
 import { lineDiffChanges, mapFoldLines } from "../src/editor/document-diff";
 import { lintFootnotes, LintOptions } from "../src/linting/linter";
+import { applyFootnotePrefix } from "../src/linting/rules/apply-footnote-prefix";
 import { fixLazyDefinitions } from "../src/linting/rules/fix-lazy-definitions";
-import { lazyDefinitionLabelNames } from "../src/linting/rules/remove-orphaned-references";
+import { footnoteAfterPunctuation } from "../src/linting/rules/footnote-after-punctuation";
+import { mergeDuplicateFootnoteDefinitions } from "../src/linting/rules/merge-duplicate-definitions";
+import { moveFootnoteDefinitionsToBottom } from "../src/linting/rules/move-footnotes-to-the-bottom";
+import { reindexFootnotes } from "../src/linting/rules/re-index-footnotes";
+import { removeOrphanedFootnoteDefinitions } from "../src/linting/rules/remove-orphaned-definitions";
+import {
+    lazyDefinitionLabelNames,
+    orphanedFootnoteReferenceNames,
+    removeOrphanedFootnoteReferences,
+} from "../src/linting/rules/remove-orphaned-references";
 import {
     definitionStartLines,
     findDefinitionBlocks,
@@ -449,6 +459,143 @@ describe("write-back invariants over random documents", () => {
                     expect(mapped.from).toBeGreaterThanOrEqual(0);
                     expect(mapped.to).toBeGreaterThan(mapped.from);
                     expect(mapped.to).toBeLessThan(afterLines);
+                }
+            }),
+        );
+    });
+});
+
+// ---------- single-rule invariants (added 2026-09-16, hunt cycle 4) ----------
+// The pipeline properties prove the whole lint settles; these pin each rule
+// on its own, so a rule that drifts (an insertion it forgot to recheck, a
+// swap that never terminates) is caught at its own door instead of through
+// the full pipeline.
+
+describe("single-rule invariants over random documents", () => {
+    soakIt("footnoteAfterPunctuation on its own is idempotent", () => {
+        fc.assert(
+            fc.property(docArb, (doc) => {
+                const once = footnoteAfterPunctuation(doc);
+                expect(footnoteAfterPunctuation(once)).toBe(once);
+            }),
+        );
+    });
+
+    soakIt("mergeDuplicateFootnoteDefinitions on its own is idempotent", () => {
+        fc.assert(
+            fc.property(docArb, (doc) => {
+                const once = mergeDuplicateFootnoteDefinitions(doc);
+                expect(mergeDuplicateFootnoteDefinitions(once)).toBe(once);
+            }),
+        );
+    });
+
+    soakIt("removeOrphanedFootnoteReferences on its own is idempotent, for every prefix", () => {
+        fc.assert(
+            fc.property(docArb, fc.constantFrom("", ...PREFIXES), (doc, prefix) => {
+                const once = removeOrphanedFootnoteReferences(doc, prefix);
+                expect(removeOrphanedFootnoteReferences(once, prefix)).toBe(once);
+            }),
+        );
+    });
+
+    soakIt("removeOrphanedFootnoteDefinitions on its own is idempotent", () => {
+        fc.assert(
+            fc.property(docArb, (doc) => {
+                const once = removeOrphanedFootnoteDefinitions(doc);
+                expect(removeOrphanedFootnoteDefinitions(once)).toBe(once);
+            }),
+        );
+    });
+
+    soakIt("moveFootnoteDefinitionsToBottom on its own is idempotent, for every heading", () => {
+        fc.assert(
+            fc.property(
+                docArb,
+                fc.constantFrom("", "# Footnotes", "---\n## Footnotes"),
+                (doc, heading) => {
+                    const once = moveFootnoteDefinitionsToBottom(doc, heading);
+                    expect(moveFootnoteDefinitionsToBottom(once, heading)).toBe(once);
+                },
+            ),
+        );
+    });
+
+    soakIt("applyFootnotePrefix on its own is idempotent, for every valid prefix", () => {
+        fc.assert(
+            fc.property(docArb, fc.constantFrom(...PREFIXES), (doc, prefix) => {
+                const once = applyFootnotePrefix(doc, prefix);
+                expect(applyFootnotePrefix(once, prefix)).toBe(once);
+            }),
+        );
+    });
+
+    soakIt("reindexFootnotes on its own is idempotent, for every option combo", () => {
+        fc.assert(
+            fc.property(
+                docArb,
+                fc.record({
+                    renumberNamedFootnotes: fc.boolean(),
+                    keepOrphanedDefinitions: fc.boolean(),
+                    prefix: fc.constantFrom("", ...PREFIXES),
+                }),
+                (doc, options) => {
+                    const once = reindexFootnotes(doc, options);
+                    expect(reindexFootnotes(once, options)).toBe(once);
+                },
+            ),
+        );
+    });
+
+    soakIt("an orphaned name is deleted whole or left whole (never half)", () => {
+        // The rule judges each orphaned NAME on its own since 2026-09-16
+        // (Kimi hunt cycle 4): a name whose cut would change how a kept
+        // line is read stays, every one of its references, while the safe
+        // names go, every one of theirs. Kimi's original property expected
+        // every orphan gone whenever anything was deleted, which was the
+        // old all-or-nothing behavior.
+        const liveCounts = (text: string): Map<string, number> => {
+            const lines = normalizeEol(text).text.split("\n");
+            const scan = scanDocument(lines);
+            const masked = maskProtectedLines(lines, scan);
+            const starts = definitionStartLines(lines, scan, (i) => masked[i]);
+            const counts = new Map<string, number>();
+            for (let i = 0; i < lines.length; i++) {
+                for (const { name } of referenceOccurrences(lines[i], masked[i], starts[i])) {
+                    const folded = name.toLowerCase();
+                    counts.set(folded, (counts.get(folded) ?? 0) + 1);
+                }
+            }
+            return counts;
+        };
+        fc.assert(
+            fc.property(docArb, fc.constantFrom("", ...PREFIXES), (doc, prefix) => {
+                const out = removeOrphanedFootnoteReferences(doc, prefix);
+                if (out === doc) return; // every cut refused: nothing deleted
+                const before = liveCounts(doc);
+                const after = liveCounts(out);
+                for (const name of orphanedFootnoteReferenceNames(doc, prefix).map((n) => n.toLowerCase())) {
+                    const left = after.get(name) ?? 0;
+                    expect(
+                        left === 0 || left === before.get(name),
+                        `orphan [^${name}] was half deleted: ${left} of ${before.get(name) ?? 0} left`,
+                    ).toBe(true);
+                }
+            }),
+        );
+    });
+
+    soakIt("a literal opener is never masked away (scan and mask agree)", () => {
+        fc.assert(
+            fc.property(docArb, (doc) => {
+                const lines = normalizeEol(doc).text.split("\n");
+                const scan = scanDocument(lines);
+                const masked = maskProtectedLines(lines, scan);
+                for (let i = 0; i < lines.length; i++) {
+                    if (!scan.literalOpeners[i]) continue;
+                    // literalOpeners says the unclosed "<!--" or "$$" on this
+                    // line is plain text: the masked twin must still show it
+                    expect(masked[i]).not.toBe("\0".repeat(lines[i].length));
                 }
             }),
         );

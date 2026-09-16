@@ -185,7 +185,11 @@ export function tableRowLinesOf(lines: string[]): boolean[] {
         const plainText = (line: string): boolean => {
             const text = (line.endsWith("\r") ? line.slice(0, -1) : line).replace(BlockquotePrefix, "");
             if (text.trim() === "" || leadingIndentWidth(text) >= 4) return false;
-            return !/^ {0,3}(?:#{1,6}(?: |$)|([-*_])( *\1){2,} *$|(?:=+|-+) *$|`{3,}|~{3,}|<|%%|\[\^|\[![^\]]*\])/.test(text) && !hasUnescapedPipe(text);
+            // a comment-only line ("%% c %%") is paragraph text like any
+            // other (sheet 18; a table under one is no table, Kimi hunt
+            // cycle 4, probed 2026-09-16); only a lone "%%" opens a block
+            const percentBlock = /^ {0,3}%%/.test(text) && (text.match(/%%/g) ?? []).length === 1;
+            return !percentBlock && !/^ {0,3}(?:#{1,6}(?: |$)|([-*_])( *\1){2,} *$|(?:=+|-+) *$|`{3,}|~{3,}|<|\[\^|\[![^\]]*\])/.test(text) && !hasUnescapedPipe(text);
         };
         if (blockquoteDepth(lines[i - 1]).depth !== depth || !plainText(lines[i - 1])) return false;
         // the paragraph above is a definition's lazy continuation when the
@@ -1206,7 +1210,10 @@ export function scanDocument(lines: string[]): DocumentScan {
             /^ {0,3}>/.test(text) ||
             /^ {0,3}[-*+] +\S/.test(text) ||
             /^ {0,3}1[.)] +\S/.test(text) ||
-            /^ {0,3}%%/.test(text) ||
+            // a "%%" BLOCK opener: the only "%%" on its line. An inline
+            // pair ("%% c %%") is an ordinary paragraph line, sheet 18;
+            // Kimi hunt cycle 4 caught the walk stopping there (2026-09-16)
+            (/^ {0,3}%%/.test(text) && (text.match(/%%/g) ?? []).length === 1) ||
             /^ {0,3}<(?:!--|\?|![A-Za-z]|!\[CDATA\[|\/?(?:script|pre|style|textarea|address|article|aside|blockquote|details|dialog|div|dl|figure|footer|form|h[1-6]|header|hr|main|nav|ol|p|section|summary|table|ul)(?:[ >/]|$))/i.test(text)
         );
     };
@@ -2513,11 +2520,17 @@ export function findDefinitionBlocks(
     // protected and indented as well, yet it ends the block. Only the
     // four-space column, past the 3-space cap an ordinary block start
     // allows, marks a construct the definition owns.
+    // A code span that opened on a line of the block and runs on (B30)
+    // is such a region too: its no-backtick interior lines are protected
+    // in full and belong to the footnote's body, as Reading view renders
+    // it (Kimi hunt cycle 4, 2026-09-16: the move left them behind and the
+    // dead reference inside the span woke up).
     const absorbable = (j: number) =>
         isProtected[j] &&
         (scan.startsInComment[j] ||
             scan.startsInMath[j] ||
             scan.startsInFence[j] ||
+            scan.startsInCode[j] > 0 ||
             /^ {4}/.test(lines[j]));
     const blocks: DefinitionBlock[] = [];
     for (let i = 0; i < lines.length; i++) {
@@ -2660,7 +2673,7 @@ export function findDefinitionBlocks(
  */
 export function quotedDefinitionEnd(
     lines: string[],
-    scan: Pick<DocumentScan, "isProtected" | "startsInComment" | "startsInMath" | "startsInFence">,
+    scan: Pick<DocumentScan, "isProtected" | "startsInComment" | "startsInMath" | "startsInFence" | "startsInCode">,
     starts: boolean[],
     start: number,
 ): number {
@@ -2676,7 +2689,7 @@ export function quotedDefinitionEnd(
     // opener gone and the hidden text alive (Kimi hunt cycle 2, 2026-09-16)
     const regionLine = (j: number): boolean =>
         j < lines.length &&
-        (scan.startsInComment[j] || scan.startsInMath[j] || scan.startsInFence[j]) &&
+        (scan.startsInComment[j] || scan.startsInMath[j] || scan.startsInFence[j] || scan.startsInCode[j] > 0) &&
         depthOf(lines[j]) === depth;
     let end = start;
     let j = start + 1;
@@ -2709,7 +2722,7 @@ export function quotedDefinitionEnd(
  */
 export function quotedDefinitionLabelAbove(
     lines: string[],
-    scan: Pick<DocumentScan, "isProtected" | "startsInComment" | "startsInMath" | "startsInFence">,
+    scan: Pick<DocumentScan, "isProtected" | "startsInComment" | "startsInMath" | "startsInFence" | "startsInCode">,
     starts: boolean[],
     maskedAt: (i: number) => string,
     line: number,

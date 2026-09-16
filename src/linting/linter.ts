@@ -10,10 +10,11 @@ import { jumpToFootnoteDefinition } from "../commands/navigation";
 import { docContext } from "../editor/doc-context";
 import { replaceMinimal } from "../editor/write-back";
 import { rewriteDocument } from "./rewrite-document";
-import { definitionLabel, definitionLabelWithName, quotedReference } from "../parsing/footnote-grammar";
+import { definitionLabel, definitionLabelWithName, quotedReference, referenceOccurrences } from "../parsing/footnote-grammar";
 import { footnotePrefix, footnotePrefixProblem } from "../parsing/footnote-prefix";
 import {
     findDefinitionBlocks,
+    maskInlineRegions,
 } from "../parsing/markdown-scan";
 import { AppWithCommands, AppWithPlugins, readingViewActive, viewEditor, WindowWithVim } from "../editor/obsidian-internals";
 import { activeTableCellEditor, nestedSubEditorOwnsFocus, runOutsideTableCell } from "../editor/table-cursor";
@@ -366,9 +367,13 @@ export function lintBlockedByPrefix(markdown: string): string | null {
  * cancel with this message instead, so the setting gets fixed.
  */
 export function sectionHeadingProblem(heading: string): string | null {
-    const reference = heading.match(/\[\^[^[\]]+\]/);
-    if (!reference) return null;
-    return `${LintingCanceled}the footnote section heading setting contains a footnote reference (${quotedReference(reference[0].slice(2, -1))}), which the lint rules would renumber. Take it out of the heading in the plugin settings.`;
+    // only a LIVE reference can desync the heading from its copy in the
+    // note: an escaped "\[^9]" is literal prose and a "[^9]" in a code
+    // span is dead text, and no rule renames either (Kimi hunt cycle 4,
+    // 2026-09-16)
+    const live = referenceOccurrences(heading, maskInlineRegions(heading));
+    if (live.length === 0) return null;
+    return `${LintingCanceled}the footnote section heading setting contains a footnote reference (${quotedReference(live[0].name)}), which the lint rules would renumber. Take it out of the heading in the plugin settings.`;
 }
 
 /** The lint-cancelling message for the section heading in the settings, or null. */

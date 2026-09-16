@@ -14,7 +14,7 @@ import {
     SelectionCommandNotice,
     SelectionSpanNotice,
 } from "../src/commands/selection-footnote";
-import { definitionLabelWithName, footnoteNameProblem, referenceOccurrences } from "../src/parsing/footnote-grammar";
+import { computeNextFootnoteNumber, definitionLabelWithName, footnoteNameProblem, referenceOccurrences } from "../src/parsing/footnote-grammar";
 import {
     inlineFootnoteSpanAt,
     sanitizeInlineFootnoteContent,
@@ -907,6 +907,24 @@ describe("creation-command invariants over random documents", () => {
                     expect(noticeCalls.some((args) => args[0] === expected)).toBe(true);
                 },
             ),
+        );
+    });
+
+    soakIt("the autonum press mints exactly the next free number (2026-09-16 hunt)", async () => {
+        await fc.assert(
+            fc.asyncProperty(pressArb, async ({ lines, cursor, command, settings }) => {
+                if (command !== "autonum") return;
+                const shapesBefore = rawShapeCount(lines);
+                const defsBefore = definitionNamesFolded(lines);
+                const doc = await press(lines, cursor, command, settings);
+                // only a fresh creation adds exactly a reference and its label
+                if (rawShapeCount(doc.lines) !== shapesBefore + 2) return;
+                const defsAfter = definitionNamesFolded(doc.lines);
+                const minted = [...defsAfter].find((name) => !defsBefore.has(name));
+                // the minted name is the next free number over the masked
+                // twin: dead text reserves nothing (the #41 rule)
+                expect(minted).toBe(String(computeNextFootnoteNumber(lines.join("\n"))));
+            }),
         );
     });
 

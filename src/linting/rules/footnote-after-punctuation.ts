@@ -36,7 +36,7 @@ const AlreadyPlacedAfter = new RegExp(
 // The searching is done on the masked twin, but the text handed back is
 // built from the original line. Otherwise a footnote name could come out
 // with the blanking characters in it.
-function swapInSegment(original: string, masked: string): string {
+function swapInSegment(original: string, masked: string, insideBody = false, mayBeLabel = true): string {
     // a name holding whitespace is prose to Obsidian, not a reference to
     // move (Claude sweep 2026-09-13)
     const occurrences = referenceOccurrences(original, masked).filter(
@@ -68,12 +68,25 @@ function swapInSegment(original: string, masked: string): string {
         // moves in one go.
         const punctuationEnd = referenceLandingAfter(masked, end);
         if (punctuationEnd === end) continue;
-        // A reference followed by ":" with nothing but dead text or a
-        // comment closer before it is a definition LABEL that happens to
-        // sit after "%%" or a quote marker ("%% [^3]: def", "> %% [^4]:
-        // def"). Swapping its colon would turn it into ":[^3]" for good
-        // (Claude sweep 2026-09-13, Jason's verification 2026-09-15).
+        // A SINGLE reference followed by ":" with nothing but whitespace,
+        // quote markers, or dead text before it is a label the label reader
+        // did not claim: one indented past three spaces inside a list item
+        // ("    [^113]: def", a definition to Obsidian that the plugin does
+        // not model yet), or one after a "%%" that is not a block's
+        // closer. Swapping its colon would turn it into ":[^113]" for
+        // good (Claude sweep 2026-09-13). Such a label can only sit after a
+        // blank line or at the top of the note; the same shape directly
+        // under prose is lazy paragraph text, a live reference before a
+        // colon, and crosses it. A RUN of two or more references
+        // is never a label, and neither is a reference at the start of a
+        // definition's BODY: "[^1][^2]: x" is two live references and a
+        // literal colon to Obsidian, and "[^1]: [^2]: x" a definition whose
+        // body starts with a reference (Kimi hunt cycle 4, probed
+        // 2026-09-16); both cross the colon like any punctuation.
         if (
+            occurrences[last].start === start &&
+            !insideBody &&
+            mayBeLabel &&
             masked[end] === ":" &&
             masked.slice(0, start).replace(/[>%\0\s]/g, "") === ""
         ) {
@@ -117,10 +130,19 @@ export function footnoteAfterPunctuation(markdown: string): string {
             // blockquote or a callout ("> [^1]: def.") are labels just the
             // same (C22); the swap used to mangle those into
             // "> :[^1] def."
-            const prefixLength = definitionLabelIn(line)?.labelEnd ?? 0;
+            // a byte order mark in front of a line-0 label is not text
+            // the label reader sees, so it is stepped over first (the old
+            // colon guard happened to cover it; spec-bom-before-line-zero-label)
+            const bom = line.startsWith("\ufeff") ? 1 : 0;
+            const prefixLength = bom + (definitionLabelIn(line.slice(bom))?.labelEnd ?? 0);
             return (
                 line.slice(0, prefixLength) +
-                swapInSegment(line.slice(prefixLength), masked.slice(prefixLength))
+                swapInSegment(
+                    line.slice(prefixLength),
+                    masked.slice(prefixLength),
+                    prefixLength > bom,
+                    i === 0 || lines[i - 1].trim() === "",
+                )
             );
         });
         return result.join("\n");

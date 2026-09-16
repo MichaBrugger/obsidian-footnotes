@@ -212,38 +212,27 @@ export function removeOrphanedFootnoteReferences(
     ]);
     const orphanSafeFolded = orphanSafePrefix.toLowerCase();
 
-    const out = lines.map((line, i) => {
-        if (scan.isProtected[i]) return line;
-        let result = "";
-        let copied = 0;
-        let changed = false;
-        for (const { name, start, end } of referenceOccurrences(
-            line,
-            masked[i],
-            starts[i],
-        )) {
-            if (!isOrphan(name, definitions, lazyLabels, orphanSafeFolded)) continue;
-            result += line.slice(copied, start);
-            copied = end;
-            // Closing the gap: a space just after the cut is dropped when
-            // the text before the cut already ends in a space, or when the
-            // cut was at the very start of the line.
-            if (
-                line[copied] === " " &&
-                (result === "" || result.endsWith(" "))
-            ) {
-                copied++;
-            }
-            changed = true;
-        }
-        if (!changed) return line;
+    // One orphan's cut, with the gap closed the way the user would close
+    // it: a space just after the cut goes when the text before the cut
+    // already ends in a space or the cut was at the line's very start, and
+    // a reference that ended the line takes the space in front of it.
+    const cutOne = (line: string, start: number, end: number): string => {
+        const head = line.slice(0, start);
+        let copied = end;
+        if (line[copied] === " " && (head === "" || head.endsWith(" "))) copied++;
         const tail = line.slice(copied);
-        // A reference that ended the line leaves the space in front of it
-        // hanging, so trim it. If there is any text left after the cut,
-        // then whatever spaces the line ends with were already the user's.
-        return tail === "" ? result.replace(/[ \t]+$/, "") : result + tail;
-    });
-    if (out.every((line, i) => line === lines[i])) return markdown;
+        return tail === "" ? head.replace(/[ \t]+$/, "") : head + tail;
+    };
+    // the orphans on each line, rightmost first so that cutting one keeps
+    // the offsets of the ones before it
+    const orphansOn = (i: number): { start: number; end: number }[] =>
+        scan.isProtected[i]
+            ? []
+            : referenceOccurrences(lines[i], masked[i], starts[i])
+                  .filter(({ name }) => isOrphan(name, definitions, lazyLabels, orphanSafeFolded))
+                  .map(({ start, end }) => ({ start, end }))
+                  .reverse();
+    if (!lines.some((_, i) => orphansOn(i).length > 0)) return markdown;
 
     // Deleting reference text can change how Obsidian reads a line far
     // away. Emptying the paragraph between a definition and an indented
@@ -251,25 +240,81 @@ export function removeOrphanedFootnoteReferences(
     // the definition, because Obsidian carries a definition on across any
     // number of blank lines. (Verified against metadataCache, 2026-08-10;
     // found by the idempotence property.) The next lint would then edit
-    // text this one promised to leave alone.
+    // text this one promised to leave alone. Emptying the line above a
+    // lazy label would turn that label into a real definition (second
+    // review, 2026-09-09). And a leftover marker can turn a kept line into
+    // a block of another kind: "#[^9] tail" is prose ("#" needs a space
+    // after it) and "# tail" a heading, "-[^9]" is prose and "-" a bullet
+    // (Kimi hunt cycle 4, 2026-09-16). A cut that changes any of these for
+    // ANY line is refused, and the orphan stays for the user to sort out.
     //
-    // So a deletion that changes whether ANY other line counts as protected
-    // is refused outright. The orphaned references stay, for the user to
-    // sort out.
-    const scanAfter = scanDocument(out);
+    // Each orphaned NAME is judged on its own, all of its references
+    // together: one refused cut used to veto every safe one in the note
+    // (Kimi hunt cycle 4), and a name half deleted would confuse the alert
+    // that speaks in names. The whole set is tried first, since that is
+    // the common case and costs one scan.
+    const readsDifferently = (before: string[], scanBefore: DocumentScan, startsBefore: boolean[], after: string[]): boolean => {
+        const scanAfter = scanDocument(after);
+        for (let i = 0; i < before.length; i++) {
+            if (scanBefore.isProtected[i] !== scanAfter.isProtected[i]) return true;
+        }
+        const maskedAfter = maskProtectedLines(after, scanAfter);
+        const startsAfter = definitionStartLines(after, scanAfter, (i) => maskedAfter[i]);
+        for (let i = 0; i < before.length; i++) {
+            if (startsBefore[i] !== startsAfter[i]) return true;
+            if (before[i] !== after[i] && blockKind(before[i]) !== blockKind(after[i])) return true;
+        }
+        return false;
+    };
+    const all = lines.map((line, i) => orphansOn(i).reduce((text, { start, end }) => cutOne(text, start, end), line));
+    if (!readsDifferently(lines, scan, starts, all)) return restoreEol(all.join("\n"), eol);
+
+    const orphanNames: string[] = [];
     for (let i = 0; i < lines.length; i++) {
-        if (scan.isProtected[i] !== scanAfter.isProtected[i]) return markdown;
+        if (scan.isProtected[i]) continue;
+        for (const { name } of referenceOccurrences(lines[i], masked[i], starts[i])) {
+            const folded = name.toLowerCase();
+            if (isOrphan(name, definitions, lazyLabels, orphanSafeFolded) && !orphanNames.includes(folded)) {
+                orphanNames.push(folded);
+            }
+        }
     }
-    // The same promise again, this time about the prose-label rule.
-    // Emptying the line above a lazy label would turn that label into a
-    // real definition (second review, 2026-09-09). That is another change
-    // of meaning this deletion is not allowed to make.
-    const maskedAfter = maskProtectedLines(out, scanAfter);
-    const startsAfter = definitionStartLines(out, scanAfter, (i) => maskedAfter[i]);
-    for (let i = 0; i < lines.length; i++) {
-        if (starts[i] !== startsAfter[i]) return markdown;
+    let current = lines;
+    let currentScan = scan;
+    let currentMasked = masked;
+    let currentStarts = starts;
+    for (const folded of orphanNames) {
+        const trial = current.map((line, i) => {
+            if (currentScan.isProtected[i]) return line;
+            return referenceOccurrences(line, currentMasked[i], currentStarts[i])
+                .filter(({ name }) => name.toLowerCase() === folded)
+                .reverse()
+                .reduce((text, { start, end }) => cutOne(text, start, end), line);
+        });
+        if (trial.every((line, i) => line === current[i])) continue;
+        if (readsDifferently(current, currentScan, currentStarts, trial)) continue;
+        current = trial;
+        currentScan = scanDocument(current);
+        currentMasked = maskProtectedLines(current, currentScan);
+        currentStarts = definitionStartLines(current, currentScan, (i) => currentMasked[i]);
     }
-    return restoreEol(out.join("\n"), eol);
+    if (current === lines) return markdown;
+    return restoreEol(current.join("\n"), eol);
+}
+
+/**
+ * What kind of block a line starts, as far as a leftover marker can change
+ * it: a heading, a thematic break, a bullet, an ordered item, a fence, or
+ * plain text. Quote markers in front are stripped first.
+ */
+function blockKind(line: string): string {
+    const text = line.replace(/^(?: {0,3}> ?)+/, "");
+    if (/^ {0,3}#{1,6}(?: |$)/.test(text)) return "heading";
+    if (/^ {0,3}([-*_])( *\1){2,} *$/.test(text)) return "rule";
+    if (/^ {0,3}[-*+](?: |$)/.test(text)) return "bullet";
+    if (/^ {0,3}\d{1,9}[.)](?: |$)/.test(text)) return "ordered";
+    if (/^ {0,3}(`{3,}|~{3,})/.test(text)) return "fence";
+    return "text";
 }
 
 /**
