@@ -10,6 +10,7 @@ import {
     normalizeEol,
     quotedDefinitionEnd,
     scanDocument,
+    tableRowLinesOf,
 } from "../parsing/markdown-scan";
 import {
     escapedAt,
@@ -28,6 +29,7 @@ import {
 } from "./rules/remove-orphaned-definitions";
 import {
     lazyDefinitionLabelNames,
+    underlinedDefinitionLabelNames,
     orphanedFootnoteReferenceNames,
     removeOrphanedFootnoteReferences,
 } from "./rules/remove-orphaned-references";
@@ -170,6 +172,24 @@ function noticeLazyDefinitions(lines: string[], scan: DocumentScan, masked: stri
         names.length === 1
             ? `This note has a footnote definition that Obsidian reads as plain text because there is no blank line above it (${labelList(names)}). Add a blank line above it.`
             : `This note has ${names.length} footnote definitions that Obsidian reads as plain text because there is no blank line above them (${labelList(names)}). Add a blank line above each.`,
+        8000,
+    );
+}
+
+// A "[^x]:" line with a setext underline ("===", "---", "--") directly
+// under it is a heading to Obsidian, not a definition, and inside a longer
+// paragraph it is plain text that a blank line above would turn into a
+// heading. Either way the blank line that helps is the one BETWEEN the
+// label and the underline, so these labels get their own alert and are
+// left out of the lazy one and its fix (Kimi hunt cycle 3, probed in
+// Reading view 2026-09-16). Never silent, like every alert.
+function noticeUnderlinedDefinitions(lines: string[], scan: DocumentScan, masked: string[], starts: boolean[]) {
+    const names = underlinedDefinitionLabelNames(lines, scan, masked, starts);
+    if (names.length === 0) return;
+    showNotice(
+        names.length === 1
+            ? `This note has a footnote definition that Obsidian reads as a heading because a line of "=" or "-" sits right under it (${labelList(names)}). Put a blank line between the definition and that line.`
+            : `This note has ${names.length} footnote definitions that Obsidian reads as headings because a line of "=" or "-" sits right under them (${labelList(names)}). Put a blank line between each definition and that line.`,
         8000,
     );
 }
@@ -438,10 +458,14 @@ export function commentedDefinitionNames(markdown: string): string[] {
     const seen = new Set<string>();
     for (let i = 0; i < lines.length; i++) {
         if (!scan.inCommentBlock[i] || scan.isProtected[i]) continue;
-        // the closer line's text after "%%" is outside the comment
-        if (scan.commentBlockCloseAt[i] >= 0) continue;
         const hit = definitionLabelWithName(lines[i], masked[i]);
         if (!hit) continue;
+        // On the closer line only the text after the "%%" is outside the
+        // comment. A label BEFORE the closer ("[^1]: dead %%") is hidden
+        // like any interior line, and it used to be passed over in
+        // silence (Kimi hunt cycle 3, probed in Reading view 2026-09-16).
+        const close = scan.commentBlockCloseAt[i];
+        if (close >= 0 && hit.label.nameStart - 2 > close) continue;
         const folded = hit.name.toLowerCase();
         if (seen.has(folded)) continue;
         seen.add(folded);
@@ -461,10 +485,13 @@ function noticeCommentedDefinitions(markdown: string) {
     );
 }
 
-// A pipe-delimited table row: a line that starts and ends with "|" after
-// up to three spaces of indent. Close enough for an alert; the scanner's
-// definition-start rule uses the same shape.
-const TableRow = /^ {0,3}\|.*\|\s*$/;
+// A line shaped like a table row for the alert's "row below the label"
+// question: it holds a pipe and is not itself a label. The scanner's own
+// table reader answers the "row above" question, so a pipe-less GFM table
+// ("a | b" over "--- | ---") counts like a piped one (Kimi hunt cycle 3,
+// 2026-09-16: Reading view breaks both the same way, folding the rows
+// after the label into the footnote's text).
+const rowShaped = (line: string): boolean => line.includes("|") && line.trim() !== "" && !/^ {0,3}\[\^/.test(line);
 
 /**
  * The names of definitions that sit INSIDE a table: a table row directly
@@ -478,11 +505,12 @@ export function definitionsInsideTableNames(markdown: string): string[] {
     const scan = scanDocument(lines);
     const masked = maskProtectedLines(lines, scan);
     const starts = definitionStartLines(lines, scan, (i) => masked[i]);
+    const rows = tableRowLinesOf(lines);
     const names: string[] = [];
     const seen = new Set<string>();
     for (let i = 1; i + 1 < lines.length; i++) {
         if (!starts[i]) continue;
-        if (!TableRow.test(lines[i - 1]) || !TableRow.test(lines[i + 1])) continue;
+        if (!rows[i - 1] || !rowShaped(lines[i + 1])) continue;
         const hit = definitionLabelWithName(lines[i], masked[i]);
         if (!hit) continue;
         const folded = hit.name.toLowerCase();
@@ -523,6 +551,7 @@ export function noticeLintAlerts(plugin: FootnotePlugin, markdown: string) {
     noticeEmptyReferences(markdown, prefix, masked);
     noticeOrphanedReferences(plugin, markdown, prefix, { lines, masked, scan, starts });
     noticeLazyDefinitions(lines, scan, masked, starts);
+    noticeUnderlinedDefinitions(lines, scan, masked, starts);
     noticeCommentedDefinitions(markdown);
     noticeDefinitionsInsideTables(markdown);
     noticeOrphanedDefinitions(plugin, markdown, { lines, scan, masked, starts });

@@ -431,12 +431,15 @@ describe("the named key converts a selection through its modal (2026-08-13)", ()
     });
 
     it("refuses a born-dead conversion, in the selection's words", () => {
-        const before = ["> $$", "> quoted math[^75]"];
-        const doc = fakeEditor(before, { line: 0, ch: 0 });
+        // converting "or" leaves "$5 [^dead] $x": the reference sits in
+        // an inline-math pair it completed (the old fixture, ">" of
+        // "> $$", strands nothing now: an unclosed opener is literal text unless a later line of its paragraph closes it (Kimi hunt cycle 3, probed in Reading view 2026-09-16))
+        const before = ["$5 or$x tail"];
+        const doc = fakeEditor(before, { line: 0, ch: 3 });
         const problem = convertSelectionToNamed(
             fakePlugin(doc),
             doc,
-            { from: { line: 0, ch: 0 }, to: { line: 0, ch: 1 }, text: ">", lead: "" },
+            { from: { line: 0, ch: 3 }, to: { line: 0, ch: 5 }, text: "or", lead: "" },
             "dead",
         );
         expect(problem).toBeNull();

@@ -27,6 +27,7 @@ import {
 import {
     maskInlineRegions,
     maskedLineAt,
+    quotedDefinitionLabelAbove,
     scanDocument,
 } from "../parsing/markdown-scan";
 import {
@@ -378,9 +379,15 @@ export function selectionPressHandled(
     // block. It needs its own check (second review 2026-09-09: selecting
     // the body of "> [^1]: text" converted it, which nested the new
     // footnote into the old one's line).
+    // Its quoted continuation lines belong to it too (Reading view folds
+    // "> [^q]: body" and "> more" into one footnote), so a selection on
+    // one of them nests just the same (Kimi hunt cycle 3, 2026-09-16).
     const starts = ctx.definitionStarts();
     for (let line = trimmed.from.line; line <= trimmed.to.line; line++) {
-        if (starts[line]) {
+        if (
+            starts[line] ||
+            quotedDefinitionLabelAbove(ctx.lines, ctx.scan, starts, (j) => ctx.maskedLine(j), line) >= 0
+        ) {
             showNotice(NestedFootnoteNotice, 8000);
             return true;
         }
@@ -1092,8 +1099,14 @@ function convertCellSelection(
     ) {
         return;
     }
+    // The cell editor has written the reference back into the row by now,
+    // and when that row is the note's LAST line the append point moved
+    // with it: the context built above still holds the old row, and the
+    // append landed inside the new one, splitting the reference and the
+    // row (Kimi hunt cycle 3, 2026-09-16; the numbered cell press had the
+    // same bug, sheet 07). So the note is read again here.
     const definition = seedDefinitionBody(
-        buildDefinitionAppend(doc, footnoteId, isFirstFootnote, plugin, ctx),
+        buildDefinitionAppend(doc, footnoteId, isFirstFootnote, plugin, docContext(doc)),
         footnoteId,
         selection.text,
     );

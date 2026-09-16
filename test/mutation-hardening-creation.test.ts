@@ -247,11 +247,14 @@ describe("createAutonumFootnote", () => {
     // path is the one that must run): a reference that would demote the quote
     // and strand its own definition refuses, consumes the press, and edits
     // nothing.
-    it("refuses and consumes the press when the insertion would strand its definition", () => {
-        const before = ["> $$", "> quoted math[^75]"];
-        const doc = fakeEditor(before, { line: 0, ch: 0 });
+    it("refuses and consumes the press when the insertion would land the reference in dead text", () => {
+        // "$5 or [^1]$x" completes an inline-math pair the moment the
+        // reference lands (the old fixture, "[^1]" at column 0 of "> $$",
+        // no longer strands anything: an unclosed opener is literal text unless a later line of its paragraph closes it (Kimi hunt cycle 3, probed in Reading view 2026-09-16))
+        const before = ["$5 or $x tail"];
+        const doc = fakeEditor(before, { line: 0, ch: 6 });
         expect(
-            createAutonumFootnote("> $$", { line: 0, ch: 0 }, fakePlugin(doc), doc),
+            createAutonumFootnote("$5 or $x tail", { line: 0, ch: 6 }, fakePlugin(doc), doc),
         ).toBe(true);
         expect(doc.lines).toEqual(before);
         expect(noticed(ProtectedCreationNotice)).toBe(true);

@@ -125,10 +125,18 @@ describe("the protected-caret guard at a line's edges", () => {
         expect(noticeCalls).toEqual([]);
     });
 
-    it("refuses end of a line whose tail opens a comment the next line continues", () => {
+    it("refuses end of a line whose tail opens a comment the next line closes", () => {
+        // an unclosed opener is literal text unless a later line of its paragraph closes it (Kimi hunt cycle 3, probed in Reading view 2026-09-16)
+        expect(
+            guard(["text <!-- open", "hidden -->"], { line: 0, ch: "text <!-- open".length }),
+        ).toBe(true);
+    });
+
+    it("allows end of a line whose tail opens a comment nothing closes (literal text)", () => {
         expect(
             guard(["text <!-- open", "hidden"], { line: 0, ch: "text <!-- open".length }),
-        ).toBe(true);
+        ).toBe(false);
+        expect(noticeCalls).toEqual([]);
     });
 
     it("refuses end of a line whose tail opens MATH the next line continues", () => {
@@ -151,10 +159,10 @@ describe("the protected-caret guard at a line's edges", () => {
 
     it("refuses end of the LAST line while a region reaches EOF", () => {
         // there is no next line to ask, so the document-wide endsProtected
-        // fact stands in for the off-line neighbor
-        expect(guard(["text <!-- open"], { line: 0, ch: "text <!-- open".length })).toBe(
-            true,
-        );
+        // fact stands in for the off-line neighbor; block math opened at
+        // the start of the line's content runs to the end of the note
+        // (a mid-line "<!--" nothing closes is literal text now)
+        expect(guard(["$$ open"], { line: 0, ch: "$$ open".length })).toBe(true);
     });
 
     it("allows end of an earlier line when the region only opens BELOW it", () => {

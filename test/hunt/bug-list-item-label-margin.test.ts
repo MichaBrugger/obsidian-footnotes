@@ -1,0 +1,84 @@
+// Imported from the Kimi K3 cycle 3 hunt of 2026-09-16 (OpenCode worktree); 5 of 7 tests carry it.fails: 0 were red there and marked on import, the rest the hunter marked itself.
+// VERIFIED IN READING VIEW 2026-09-16, NOT YET FIXED: a label indented into a list item (absolute indent 4 under "- item", 7 under "10. item") renders as a definition, and one indented 6 under "- item" is code, exactly as pinned. The plugin has never recognized definitions inside list items (labels read relative to the document margin, like the C22 quoted-definition rule); fixing it touches every label reader, so it waits for Jason's ruling on whether definitions inside list items are in scope.
+import { describe, expect, it } from "vitest";
+
+import { orphanedFootnoteReferenceNames } from "../../src/linting/rules/remove-orphaned-references";
+import {
+    definitionStartLines,
+    findDefinitionBlocks,
+    maskProtectedLines,
+    scanDocument,
+} from "../../src/parsing/markdown-scan";
+
+// A footnote label may be indented up to three spaces past the margin of
+// the block it sits in. For a label inside a LIST ITEM that margin is the
+// item's content column, which the scanner already knows everywhere else
+// (list-relative fence indent, list-relative indented code). micromark
+// agrees: "- item", blank, "    [^1]: def" parses a footnoteDefinition
+// INSIDE the listItem (relative indent 2), "1. item", blank, "    [^1]:
+// def" the same (relative 1), and "10. item", blank, "       [^1]: def"
+// (relative 3) - while a relative indent of 4 is indented code. The
+// plugin's DefinitionStart measures its "up to three spaces" from the
+// DOCUMENT margin instead, so a label at absolute indent 4 or more inside
+// an item is no label at all: not a definition, not a lazy label (the
+// fix/alert pair needs a label to see), just a paragraph line carrying a
+// live "[^1]" with no definition anywhere.
+//
+// What the user sees: Reading view renders their in-list footnote, but
+// the lint's missing-definition alert nags about it; the hotkey on the
+// "[^1]" APPENDS a second "[^1]:" definition at the bottom instead of
+// navigating, and Obsidian then renders only the last one.
+//
+// Source of truth: micromark + mdast-util-gfm-footnote (the repo's
+// designated oracle; no manual sheet records Reading view disagreeing on
+// list-item labels - sheet 25's rule is about paragraphs, and the
+// definition's up-to-3-spaces indent is CommonMark's own allowance). GFM
+// footnote definitions inside list items indent from the item's content
+// column like any other block.
+//
+// Settings involved: every definition-driven rule and alert inherits the
+// scan; the creation press inherits it through listExistingFootnoteDefinitions.
+
+function startsOf(doc: string): boolean[] {
+    const lines = doc.split("\n");
+    const scan = scanDocument(lines);
+    const masked = maskProtectedLines(lines, scan);
+    return definitionStartLines(lines, scan, (i) => masked[i]);
+}
+
+describe("a definition label indented into a list item (relative indent 1-3)", () => {
+    it.fails("dash item, relative indent 2 (absolute 4): a definition start", () => {
+        expect(startsOf("- item\n\n    [^1]: def\n\nuse[^1]")[2]).toBe(true);
+    });
+
+    it.fails("ordered item, relative indent 1 (absolute 4): a definition start", () => {
+        expect(startsOf("1. item\n\n    [^1]: def\n\nuse[^1]")[2]).toBe(true);
+    });
+
+    it.fails("double-digit ordered item, relative indent 3 (absolute 7): a definition start", () => {
+        expect(startsOf("10. item\n\n       [^1]: def\n\nuse[^1]")[2]).toBe(true);
+    });
+
+    it.fails("the block walker finds the block, so the reference is not an orphan", () => {
+        const lines = "- item\n\n    [^1]: def\n\nuse[^1]".split("\n");
+        const scan = scanDocument(lines);
+        const masked = maskProtectedLines(lines, scan);
+        const starts = definitionStartLines(lines, scan, (i) => masked[i]);
+        expect(findDefinitionBlocks(lines, scan, masked, starts).map((b) => b.name)).toEqual(["1"]);
+    });
+
+    it.fails("the missing-definition alert stays silent about it", () => {
+        expect(orphanedFootnoteReferenceNames("- item\n\n    [^1]: def\n\nuse[^1]")).toEqual([]);
+    });
+
+    it("control: dash item, relative indent 0 (absolute 2) is already seen", () => {
+        expect(startsOf("- item\n\n  [^1]: def\n\nuse[^1]")[2]).toBe(true);
+    });
+
+    it("control: dash item, relative indent 4 (absolute 6) is indented code to both parsers", () => {
+        const doc = "- item\n\n      [^1]: def\n\nuse[^1]";
+        const lines = doc.split("\n");
+        expect(scanDocument(lines).isProtected[2]).toBe(true);
+        expect(startsOf(doc)[2]).toBe(false);
+    });
+});

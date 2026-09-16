@@ -16,7 +16,10 @@ import { buildDefinitionAppend } from "../../src/commands/definition-append";
 
 describe("the append above an unclosed opener near the top of a long note", () => {
     it("is fast", () => {
-        const lines = ["prose[^9]?", "", "text <!-- opens here"];
+        // an HTML block comment ("<!--" at the start of a line) runs to
+        // its closer or the end of the note; a mid-line opener nothing
+        // closes is literal text since 2026-09-16 (Kimi hunt cycle 3)
+        const lines = ["prose[^9]?", "", "<!-- opens here"];
         for (let i = 0; i < 3000; i++) lines.push(`hidden line ${i}`);
         const doc = fakeEditor(lines, { cursor: { line: 0, ch: 0 }, wholeDoc: true });
         const started = performance.now();

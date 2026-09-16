@@ -164,41 +164,69 @@ export interface DefinitionBlock {
  * tableRowLines in the editor's table module, which sits above this one
  * and reads protection facts this scan has not worked out yet.
  */
-function tableRowLinesOf(lines: string[]): boolean[] {
+export function tableRowLinesOf(lines: string[]): boolean[] {
     const rows = new Array<boolean>(lines.length).fill(false);
-    const hasPipe = (text: string): boolean => {
-        for (let i = 0; i < text.length; i++) {
-            if (text[i] === "\\") i++;
-            else if (text[i] === "|") return true;
-        }
-        return false;
-    };
-    const isDelimiterRow = (text: string): boolean => {
-        const stripped = text.replace(/^(\s*>)+\s?/, "");
-        const cells = stripped.replace(/^\s*\|/, "").replace(/\|\s*$/, "").split("|");
-        return cells.length > 0 && cells.every((cell) => /^\s*:?-+:?\s*$/.test(cell));
-    };
     // A definition label whose text starts a table ("[^1]: | a | b |") is a
-    // label, and the table lives INSIDE the definition, on its indented
-    // continuation lines; neither is a row of a document-level table. A
-    // line indented four or more is a continuation line or code, never a
-    // row either.
+    // label, and the table lives INSIDE the definition (the block walker
+    // owns its rows); it is not a row of a document-level table. A line
+    // indented four or more is a continuation line or code, never a row
+    // either.
     const rowShaped = (text: string): boolean =>
-        leadingIndentWidth(text) < 4 && definitionLabelIn(text) === null && hasPipe(text);
+        leadingIndentWidth(text) < 4 && definitionLabelIn(text) === null && hasUnescapedPipe(text);
+    // A table cannot interrupt a paragraph: "text" directly over "| a | b |"
+    // and its delimiter row renders as one paragraph with literal pipes
+    // (Kimi hunt cycle 3, probed in Reading view 2026-09-16). So a header
+    // row needs something other than plain paragraph text above it: a
+    // blank line, a heading, a rule, a fence line, a label, a quote at
+    // another depth, or the start of the note.
+    const paragraphTextAbove = (i: number): boolean => {
+        if (i === 0) return false;
+        const depth = blockquoteDepth(lines[i]).depth;
+        const plainText = (line: string): boolean => {
+            const text = (line.endsWith("\r") ? line.slice(0, -1) : line).replace(BlockquotePrefix, "");
+            if (text.trim() === "" || leadingIndentWidth(text) >= 4) return false;
+            return !/^ {0,3}(?:#{1,6}(?: |$)|([-*_])( *\1){2,} *$|(?:=+|-+) *$|`{3,}|~{3,}|<|%%|\[\^|\[![^\]]*\])/.test(text) && !hasUnescapedPipe(text);
+        };
+        if (blockquoteDepth(lines[i - 1]).depth !== depth || !plainText(lines[i - 1])) return false;
+        // the paragraph above is a definition's lazy continuation when the
+        // run of plain lines it belongs to starts at a label: a table does
+        // start under such a line ("[^1]: x", "lazy", then a table renders
+        // the table outside the footnote; probed 2026-09-16)
+        let top = i - 1;
+        while (top > 0 && blockquoteDepth(lines[top - 1]).depth === depth && plainText(lines[top - 1])) top--;
+        const aboveRun = top > 0 ? lines[top - 1].replace(BlockquotePrefix, "") : "";
+        return !(blockquoteDepth(lines[top - 1] ?? "").depth === depth && /^ {0,3}\[\^[^\]\s]+\]:/.test(aboveRun));
+    };
     let i = 0;
     while (i < lines.length) {
-        if (!rowShaped(lines[i])) {
+        if (!rowShaped(lines[i]) || paragraphTextAbove(i)) {
             i++;
             continue;
         }
         let end = i;
         while (end + 1 < lines.length && rowShaped(lines[end + 1])) end++;
-        if (end > i && isDelimiterRow(lines[i + 1])) {
+        if (end > i && tableDelimiterRow(lines[i + 1])) {
             for (let k = i; k <= end; k++) rows[k] = true;
         }
         i = end + 1;
     }
     return rows;
+}
+
+/** Whether the text holds a pipe that is not escaped. */
+function hasUnescapedPipe(text: string): boolean {
+    for (let i = 0; i < text.length; i++) {
+        if (text[i] === "\\") i++;
+        else if (text[i] === "|") return true;
+    }
+    return false;
+}
+
+/** Whether the line is a table's delimiter row ("| --- | :-: |"), quote markers allowed in front. */
+function tableDelimiterRow(text: string): boolean {
+    const stripped = text.replace(/^(\s*>)+\s?/, "");
+    const cells = stripped.replace(/^\s*\|/, "").replace(/\|\s*$/, "").split("|");
+    return cells.length > 0 && cells.every((cell) => /^\s*:?-+:?\s*$/.test(cell));
 }
 
 /**
@@ -562,6 +590,12 @@ export function maskLineRegions(
          * literal backticks, as it always was.
          */
         codeOpenerAt?: number;
+        /**
+         * An unclosed "<!--" or "$$" on this line is literal text, because
+         * scanDocument found no closer in the rest of its paragraph. Without
+         * it, an unclosed opener runs to the end of the line and on.
+         */
+        literalOpeners?: boolean;
     } = {},
 ): {
     masked: string;
@@ -576,6 +610,7 @@ export function maskLineRegions(
     const startInMath = startsIn.math ?? false;
     const startInCode = startsIn.code ?? 0;
     const codeOpenerAt = startsIn.codeOpenerAt ?? -1;
+    const literalOpeners = startsIn.literalOpeners ?? false;
     const unmatchedRuns: { at: number; length: number }[] = [];
     // The quick way out: nothing on this line could open or close any of
     // the constructs, so there is nothing to mask.
@@ -589,7 +624,8 @@ export function maskLineRegions(
         !line.includes("](") &&
         !line.includes("[[") &&
         !line.includes("://") &&
-        !/www\./i.test(line)
+        !/www\./i.test(line) &&
+        !/<[^\s<>]*@/.test(line)
     ) {
         return { masked: line, endsInComment: false, endsInMath: false, endsInCode: 0, unmatchedRuns };
     }
@@ -745,6 +781,12 @@ export function maskLineRegions(
             }
             const close = line.indexOf("-->", i + 4);
             if (close === -1) {
+                // literal text when the scan found no closer in the
+                // paragraph (Reading view shows "x <!--" as typed)
+                if (literalOpeners) {
+                    i += 4;
+                    continue;
+                }
                 // a multi-line comment opens here and runs past the end of
                 // the line
                 blot(i, line.length);
@@ -769,6 +811,12 @@ export function maskLineRegions(
             if (line.startsWith("$$", i)) {
                 const close = line.indexOf("$$", i + 2);
                 if (close === -1) {
+                    // literal text when the scan found no closer in the
+                    // paragraph, same as an unclosed comment opener
+                    if (literalOpeners) {
+                        i += 2;
+                        continue;
+                    }
                     // display math opens here and runs past the end of the
                     // line
                     blot(i, line.length);
@@ -846,7 +894,15 @@ export function maskLineRegions(
             }
         }
         if (c === "<") {
-            const autolink = /^<[A-Za-z][A-Za-z0-9+.-]*:\/\/[^\s<>]*>/.exec(line.slice(i));
+            // Two autolink shapes, both dead text inside: a scheme with
+            // "://", and an email address, which to Obsidian is anything
+            // in angle brackets with an "@" in it ("<mailto:a@b.c[^1]>",
+            // "<foo@bar.com[^1]>", even "<xmpp:a@b[^1]>" all render as
+            // links with the reference swallowed; "<ftp:x/y[^1]>",
+            // "<tel:+1[^1]>", and "<mailto:x[^1]>" without an "@" stay
+            // literal text with a live reference). Kimi hunt cycle 3,
+            // probed in Reading view 2026-09-16.
+            const autolink = /^<(?:[A-Za-z][A-Za-z0-9+.-]*:\/\/[^\s<>]*|[^\s<>@]*@[^\s<>]*)>/.exec(line.slice(i));
             if (autolink) {
                 blot(i + 1, i + autolink[0].length - 1);
                 i += autolink[0].length;
@@ -927,6 +983,15 @@ export interface DocumentScan {
      */
     startsInFence: boolean[];
     /**
+     * Line `i` holds an unclosed "<!--" or "$$" opener that is literal text:
+     * nothing in the rest of its paragraph closes it. Obsidian renders such
+     * an opener as typed and the next paragraph stays live; a closer after a
+     * blank line or a block start pairs with nothing (Kimi hunt cycle 3,
+     * probed in Reading view 2026-09-16). The masker needs this fact to mask
+     * the line the way the scan read it.
+     */
+    literalOpeners: boolean[];
+    /**
      * A line appended at the end of the note would itself be protected,
      * because an unclosed comment, math block, or DOCUMENT-LEVEL fence runs
      * all the way to the end. A fence inside a blockquote or a list item
@@ -936,7 +1001,10 @@ export interface DocumentScan {
      */
     endsProtected: boolean;
     /**
-     * `endsProtected` as of line `i`: what a note cut off right after line
+     * `endsProtected` as of line `i`, as the whole note reads it: an opener
+     * that a later line of its paragraph closes counts as open here, even
+     * though a note cut off right after line `i` would read it as literal
+     * text (the append needs the whole note's answer). Otherwise, what a note cut off right after line
      * `i` would report. The definition append walks up from the end of the
      * note, and it used to cut and re-scan the whole prefix once per line,
      * which on a long note with an unclosed opener near the top took time
@@ -1058,6 +1126,7 @@ export function scanDocument(lines: string[]): DocumentScan {
     const isProtected = new Array<boolean>(lines.length).fill(false);
     const startsInComment = new Array<boolean>(lines.length).fill(false);
     const startsInMath = new Array<boolean>(lines.length).fill(false);
+    const literalOpeners = new Array<boolean>(lines.length).fill(false);
     const startsInCode = new Array<number>(lines.length).fill(0);
     const codeOpenerAt = new Array<number>(lines.length).fill(-1);
     const startsInFence = new Array<boolean>(lines.length).fill(false);
@@ -1113,45 +1182,92 @@ export function scanDocument(lines: string[]): DocumentScan {
     // stops at a blank line and at a line that starts a block of its own
     // (a fence, a heading, a rule), because a code span lives inside one
     // paragraph.
+    // Whether line `k` carries on the paragraph a construct opened in, at
+    // blockquote depth `openerDepth`: a quoted paragraph continues on
+    // quoted lines at the same depth (Reading view renders "> a `code"
+    // then "> span` b" as one span; Kimi hunt cycle 2, probed
+    // 2026-09-16), while a change of depth, a table row, a blank line, or
+    // any block start ends it. Every construct that ends a paragraph
+    // counts: a fence, a heading, a rule, a setext underline, a blockquote
+    // marker, a bullet, an ordered item numbered 1, an HTML block opener,
+    // and a "%%" block comment opener. Only a lazy continuation (an
+    // ordered item not numbered 1, a label line, plain text) carries the
+    // paragraph on. Verified in Reading view 2026-09-16 (Kimi hunt cycles
+    // 1 and 3): the reference after such an opener is live.
+    const paragraphGoesOn = (k: number, openerDepth: number): boolean => {
+        const { depth: lineDepth, rest: text } = blockquoteDepth(src[k]);
+        if (lineDepth !== openerDepth || tableRows[k]) return false;
+        if (text.trim() === "") return false;
+        return !(
+            /^ {0,3}(`{3,}|~{3,})/.test(text) ||
+            /^ {0,3}#{1,6}(?: |$)/.test(text) ||
+            /^ {0,3}([-*_])( *\1){2,} *$/.test(text) ||
+            /^ {0,3}(=+|-+) *$/.test(text) ||
+            /^ {0,3}>/.test(text) ||
+            /^ {0,3}[-*+] +\S/.test(text) ||
+            /^ {0,3}1[.)] +\S/.test(text) ||
+            /^ {0,3}%%/.test(text) ||
+            /^ {0,3}<(?:!--|\?|![A-Za-z]|!\[CDATA\[|\/?(?:script|pre|style|textarea|address|article|aside|blockquote|details|dialog|div|dl|figure|footer|form|h[1-6]|header|hr|main|nav|ol|p|section|summary|table|ul)(?:[ >/]|$))/i.test(text)
+        );
+    };
     const closesAhead = (from: number, length: number, openerDepth: number): boolean => {
         for (let k = from; k < src.length; k++) {
-            // the search stays inside the paragraph the span opened in: a
-            // quoted paragraph continues on quoted lines at the same depth
-            // (Reading view renders "> a `code" then "> span` b" as one
-            // span; Kimi hunt cycle 2, probed 2026-09-16), while a change
-            // of depth, a table row, or any block start ends it
-            const { depth: lineDepth, rest: text } = blockquoteDepth(src[k]);
-            if (lineDepth !== openerDepth || tableRows[k]) return false;
-            if (text.trim() === "") return false;
-            // Every construct that ends a paragraph ends the search: a
-            // fence, a heading, a rule, a setext underline, a blockquote
-            // marker, a bullet, an ordered item numbered 1, and an HTML
-            // block opener. Only a lazy continuation (an ordered item not
-            // numbered 1, plain text) carries the paragraph on. Verified
-            // in Reading view 2026-09-16 (Kimi hunt cycle 1): the
-            // reference after such an opener is live.
-            if (
-                /^ {0,3}(`{3,}|~{3,})/.test(text) ||
-                /^ {0,3}#{1,6}(?: |$)/.test(text) ||
-                /^ {0,3}([-*_])( *\1){2,} *$/.test(text) ||
-                /^ {0,3}(=+|-+) *$/.test(text) ||
-                /^ {0,3}>/.test(text) ||
-                /^ {0,3}[-*+] +\S/.test(text) ||
-                /^ {0,3}1[.)] +\S/.test(text) ||
-                /^ {0,3}<(?:!--|\?|![A-Za-z]|!\[CDATA\[|\/?(?:script|pre|style|textarea|address|article|aside|blockquote|details|dialog|div|dl|figure|footer|form|h[1-6]|header|hr|main|nav|ol|p|section|summary|table|ul)(?:[ >/]|$))/i.test(text)
-            ) {
-                return false;
-            }
+            if (!paragraphGoesOn(k, openerDepth)) return false;
             if (maskLineRegions(src[k], { code: length }).endsInCode === 0) return true;
         }
         return false;
+    };
+    // Whether a later line of the same paragraph holds `closer` ("-->" or
+    // "$$"): the one thing that lets an opener with no closer on its own
+    // line run on. Text inside a comment is literal, so the first closer
+    // anywhere on a line counts.
+    const regionClosesAhead = (from: number, closer: string, openerDepth: number): boolean => {
+        for (let k = from; k < src.length; k++) {
+            if (!paragraphGoesOn(k, openerDepth)) return false;
+            if (src[k].includes(closer)) return true;
+        }
+        return false;
+    };
+    // An opener with no closer on its line ("x <!--", "x $$") runs on only
+    // when a later line of the SAME paragraph closes it. Otherwise it is
+    // literal text: Reading view shows "x <!--" as typed and keeps the
+    // next paragraph live, and a closer after a blank line or a block
+    // start pairs with nothing (Kimi hunt cycle 3, probed 2026-09-16, at
+    // the document level and inside a quote alike; the scan used to hide
+    // the rest of the note). A "$$" that starts the line's content is
+    // block math and keeps running to its closer or the end of the note,
+    // as before. `mask` masks line `i` with the given facts; the line is
+    // masked again with the opener known to be literal.
+    type StartsIn = { comment?: boolean; math?: boolean; code?: number; literalOpeners?: boolean };
+    const settleOpeners = (
+        i: number,
+        startsIn: StartsIn,
+        mask: (startsIn: StartsIn) => ReturnType<typeof maskLineRegions>,
+    ): ReturnType<typeof maskLineRegions> => {
+        let masked = mask(startsIn);
+        if (masked.endsInComment || masked.endsInMath) {
+            const { depth, rest } = blockquoteDepth(src[i]);
+            // an opener that starts the line's content is a block of its
+            // own, not an inline opener inside a paragraph: "$$" opens
+            // block math, and "    <!--" on a definition's continuation
+            // line opens a comment block inside the definition (Reading
+            // view hides the lines under it, probed 2026-09-16); both
+            // keep running as before
+            const atContentStart = masked.endsInMath ? /^\s*\$\$/.test(rest) : /^\s*<!--/.test(rest);
+            const closer = masked.endsInComment ? "-->" : "$$";
+            if (!atContentStart && !regionClosesAhead(i + 1, closer, depth)) {
+                literalOpeners[i] = true;
+                masked = mask({ ...startsIn, literalOpeners: true });
+            }
+        }
+        return masked;
     };
     // The masking of an ordinary line's tail, with cross-line code spans
     // settled: the first backtick run nothing on the line closes that IS
     // closed further down the paragraph opens a span, and the line is
     // masked again with that known. Returns the masking to read the other
     // region facts from.
-    const maskWithCodeSpans = (i: number, startsIn: { comment?: boolean; math?: boolean; code?: number }) => {
+    const maskWithCodeSpans = (i: number, startsIn: StartsIn) => {
         let masked = maskLineRegions(src[i], startsIn);
         // a heading's inline content ends with its line, and so does a table
         // cell's, so a run opened there never closes on a later line
@@ -1403,7 +1519,7 @@ export function scanDocument(lines: string[]): DocumentScan {
             startsInCode[i] = codeRun;
             inIndentedCode = false;
             blockBoundary = false;
-            const closed = maskWithCodeSpans(i, { code: codeRun });
+            const closed = settleOpeners(i, { code: codeRun }, (o) => maskWithCodeSpans(i, o));
             if (closed.endsInCode > 0 && codeOpenerAt[i] === -1) {
                 isProtected[i] = true;
                 continue;
@@ -1437,7 +1553,7 @@ export function scanDocument(lines: string[]): DocumentScan {
             // The closer line keeps whatever live text follows the closer,
             // and that text can itself open code, another comment, math,
             // even a NEW multi-line region of either kind.
-            const closed = maskLineRegions(src[i], { comment: true });
+            const closed = settleOpeners(i, { comment: true }, (o) => maskLineRegions(src[i], o));
             inComment = closed.endsInComment;
             inMath = closed.endsInMath;
             // A new region opened by that live text belongs to this line's
@@ -1464,7 +1580,7 @@ export function scanDocument(lines: string[]): DocumentScan {
                 isProtected[i] = true; // an interior line: nothing on it is live
                 continue;
             }
-            const closed = maskLineRegions(src[i], { math: true });
+            const closed = settleOpeners(i, { math: true }, (o) => maskLineRegions(src[i], o));
             inMath = closed.endsInMath;
             inComment = closed.endsInComment;
             // Same as the comment branch: a region reopened here belongs to
@@ -1927,7 +2043,7 @@ export function scanDocument(lines: string[]): DocumentScan {
             }
         }
         if (src[i].includes("<!--") || src[i].includes("$$") || src[i].includes("`")) {
-            const opened = maskWithCodeSpans(i, {});
+            const opened = settleOpeners(i, {}, (o) => maskWithCodeSpans(i, o));
             inComment = opened.endsInComment;
             inMath = opened.endsInMath;
             if (inComment || inMath) regionDepth = depth;
@@ -1941,6 +2057,7 @@ export function scanDocument(lines: string[]): DocumentScan {
         startsInCode,
         codeOpenerAt,
         startsInFence,
+        literalOpeners,
         endsProtected: endsProtectedNow(),
         endsProtectedAt,
         inCommentBlock,
@@ -1991,8 +2108,8 @@ export function maskProtectedLines(
                   math: scan.startsInMath[i],
                   code: scan.startsInCode[i],
                   codeOpenerAt: scan.codeOpenerAt[i],
-              })
-                  .masked,
+                  literalOpeners: scan.literalOpeners[i],
+              }).masked,
     );
 }
 
@@ -2018,7 +2135,7 @@ export function maskedLineAt(lines: string[], i: number): string {
  */
 export function maskLineWithScan(
     lines: string[],
-    scan: Pick<DocumentScan, "isProtected" | "startsInComment" | "startsInMath" | "startsInCode" | "codeOpenerAt">,
+    scan: Pick<DocumentScan, "isProtected" | "startsInComment" | "startsInMath" | "startsInCode" | "codeOpenerAt" | "literalOpeners">,
     i: number,
 ): string {
     if (i < 0 || i >= lines.length) return "";
@@ -2030,6 +2147,7 @@ export function maskLineWithScan(
               math: scan.startsInMath[i],
               code: scan.startsInCode[i],
               codeOpenerAt: scan.codeOpenerAt[i],
+              literalOpeners: scan.literalOpeners[i],
           }).masked;
 }
 
@@ -2125,7 +2243,7 @@ export function definitionStartLines(
     lines: string[],
     scan: Pick<
         DocumentScan,
-        "isProtected" | "startsInComment" | "startsInMath" | "startsInCode" | "codeOpenerAt" | "startsInFence" | "inCommentBlock" | "commentBlockCloseAt"
+        "isProtected" | "startsInComment" | "startsInMath" | "startsInCode" | "codeOpenerAt" | "literalOpeners" | "startsInFence" | "inCommentBlock" | "commentBlockCloseAt"
     >,
     maskedAt: (i: number) => string,
 ): boolean[] {
@@ -2212,8 +2330,15 @@ export function definitionStartLines(
             // nothing open, an indent of 1 to 3 spaces starts a paragraph;
             // 4 or more would be code, which the scan already protected
             // above. An indented heading or rule is not a continuation
-            // (the ender check below takes it).
-            open = open === "definition" || open === "definition-gap" ? "definition" : "paragraph";
+            // (the ender check below takes it). After a definition's blank
+            // gap only a four-column indent continues the definition; one
+            // to three spaces start a paragraph there too, and the label
+            // under that paragraph is lazy (Kimi hunt cycle 3, probed in
+            // Reading view 2026-09-16).
+            open =
+                open === "definition" || (open === "definition-gap" && leadingIndentWidth(bare) >= 4)
+                    ? "definition"
+                    : "paragraph";
             continue;
         }
         // An HTML comment line is an HTML block (CommonMark type 2), not
@@ -2267,14 +2392,25 @@ export function definitionStartLines(
         // a definition, because a definition ends the table the way any
         // block does (Jason's ruling A2, verified in Reading view
         // 2026-09-15).
+        // Obsidian turns a setext underline into a heading only when ONE
+        // line sits above it: "para", "more", "===" renders as a paragraph
+        // with a literal "===", and so does "para", "[^1]: a", "===" (a
+        // lazy label being paragraph text), so the label under such a run
+        // is lazy too (Kimi hunt cycle 3, probed in Reading view
+        // 2026-09-16). A three-dash run is a thematic break either way.
+        const setextUnderline = /^ {0,3}(=+|-+) *$/.test(bare);
+        const thematicBreak = /^ {0,3}([-*_])(?: *\1){2,} *$/.test(bare);
         if (
             /^ {0,3}#{1,6}(?:\s|$)/.test(bare) ||
-            /^ {0,3}([-*_])(?: *\1){2,} *$/.test(bare) ||
-            (open === "paragraph" && /^ {0,3}(=+|-+) *$/.test(bare)) ||
+            thematicBreak ||
+            (open === "paragraph" && setextUnderline && paragraphLinesAbove(i, depth) === 1) ||
             (depth > 0 && /^\[![^\]]*\][+-]?/.test(bare)) ||
             tableRows[i]
         ) {
             open = "none";
+            continue;
+        }
+        if (open === "paragraph" && setextUnderline) {
             continue;
         }
         // a label behind a "%%" that the scan did not record as a block
@@ -2284,6 +2420,16 @@ export function definitionStartLines(
         if (open !== "paragraph" && label !== null && !label.afterCloser) {
             const hit = definitionLabelWithName(line, maskedAt(i));
             if (hit) {
+                // A setext underline directly under the label line makes
+                // the whole line a heading: "[^1]: x" over "===" (or over
+                // "---") renders as a heading reading "1: x" with no
+                // footnote, at column 0 and inside a quote alike (Kimi
+                // hunt cycle 3, probed in Reading view 2026-09-16). The
+                // label is heading text, so it starts nothing.
+                if (setextUnderlineUnder(i, depth)) {
+                    open = "paragraph";
+                    continue;
+                }
                 starts[i] = true;
                 open = "definition";
                 continue;
@@ -2292,6 +2438,27 @@ export function definitionStartLines(
         open = "paragraph";
     }
     return starts;
+
+    /** Whether the line under `i`, at the same quote depth and unprotected, is a setext underline. */
+    function setextUnderlineUnder(i: number, depth: number): boolean {
+        if (i + 1 >= lines.length || scan.isProtected[i + 1]) return false;
+        const next = lines[i + 1].endsWith("\r") ? lines[i + 1].slice(0, -1) : lines[i + 1];
+        const under = blockquoteDepth(next);
+        return under.depth === depth && /^ {0,3}(=+|-+) *$/.test(under.rest);
+    }
+
+    /** How many lines the open paragraph above line `i` holds: contiguous non-blank, unprotected lines at the same depth, stopping at a definition start. */
+    function paragraphLinesAbove(i: number, depth: number): number {
+        let count = 0;
+        for (let j = i - 1; j >= 0; j--) {
+            const text = lines[j].endsWith("\r") ? lines[j].slice(0, -1) : lines[j];
+            const above = blockquoteDepth(text);
+            if (scan.isProtected[j] || above.depth !== depth || above.rest.trim() === "") break;
+            count++;
+            if (starts[j]) break;
+        }
+        return count;
+    }
 }
 
 /**
@@ -2321,7 +2488,7 @@ export function findDefinitionBlocks(
     lines: string[],
     scan: Pick<
         DocumentScan,
-        "isProtected" | "startsInComment" | "startsInMath" | "startsInCode" | "codeOpenerAt" | "startsInFence" | "inCommentBlock" | "commentBlockCloseAt"
+        "isProtected" | "startsInComment" | "startsInMath" | "startsInCode" | "codeOpenerAt" | "literalOpeners" | "startsInFence" | "inCommentBlock" | "commentBlockCloseAt"
     > = scanDocument(lines),
     maskedLines?: string[],
     starts?: boolean[],
@@ -2364,6 +2531,25 @@ export function findDefinitionBlocks(
 
         let end = i;
         let j = i + 1;
+        // A table that starts on the label line ("[^1]: | a | b |") goes on
+        // with column-0 rows, and Reading view renders the whole table
+        // inside the footnote (Kimi hunt cycle 3, probed 2026-09-16), so
+        // its delimiter row and the rows after it are the block's. A table
+        // that starts UNDER the label, on its own line, is a table of its
+        // own outside the footnote (probed the same day).
+        if (
+            hasUnescapedPipe(lines[i].slice(hit.label.labelEnd)) &&
+            j < lines.length &&
+            !isProtected[j] &&
+            tableDelimiterRow(lines[j])
+        ) {
+            const columnZeroRow = (k: number): boolean =>
+                !isProtected[k] &&
+                leadingIndentWidth(lines[k]) < 4 &&
+                definitionLabelIn(lines[k]) === null &&
+                hasUnescapedPipe(lines[k]);
+            while (j < lines.length && columnZeroRow(j)) end = j++;
+        }
         while (j < lines.length) {
             // A line inside a region that a line already in the block
             // opened belongs to the block, whatever it looks like: the
@@ -2395,6 +2581,21 @@ export function findDefinitionBlocks(
                 end = j++;
                 continue;
             }
+            // A setext-shaped line ("===", "--") directly under an INDENTED
+            // continuation line is the footnote's body text, not an
+            // underline: Reading view renders "[^1]: x", "    y", "===" as
+            // one footnote reading "x y ===" (Kimi hunt cycle 3, probed
+            // 2026-09-16). Three or more dashes are a thematic break there
+            // and end the block like any rule.
+            if (
+                end === j - 1 &&
+                !isProtected[j - 1] &&
+                leadingIndentWidth(lines[j - 1]) >= 4 &&
+                /^ {0,3}(=+|-{1,2}) *$/.test(lines[j])
+            ) {
+                end = j++;
+                continue;
+            }
             // A plain line directly under a block line, no blank between,
             // is a lazy continuation of the definition's paragraph and
             // belongs to the block, as Reading view renders it ("[^1]:
@@ -2402,7 +2603,16 @@ export function findDefinitionBlocks(
             // probed 2026-09-16). Anything that starts a block of its own
             // (a label, a heading, a rule, a fence, a quote, a list item,
             // an HTML line, a table row, a %% marker) ends the block here.
-            if (end === j - 1 && lines[j].trim() !== "" && lazyContinuation(lines[j])) {
+            // A plain line that a setext underline follows is a heading,
+            // not a continuation: "[^1]: x", "lazy", "===" renders "lazy"
+            // as a heading outside the footnote (probed 2026-09-16, "---"
+            // included), so the block ends above it.
+            if (
+                end === j - 1 &&
+                lines[j].trim() !== "" &&
+                lazyContinuation(lines[j]) &&
+                !(j + 1 < lines.length && !isProtected[j + 1] && /^ {0,3}(=+|-+) *$/.test(lines[j + 1]))
+            ) {
                 end = j++;
                 continue;
             }
@@ -2412,10 +2622,16 @@ export function findDefinitionBlocks(
             // construct the block may absorb
             let k = j;
             while (k < lines.length && lines[k].trim() === "") k++;
+            // after the gap the continuation needs the full four columns
+            // of indent (or a tab): "   prose" indented one to three is a
+            // new paragraph outside the footnote, as Reading view renders
+            // it, and the old one-space test let orphan deletion eat such
+            // a paragraph as the footnote's body (Kimi hunt cycle 3,
+            // probed 2026-09-16)
             if (
                 k < lines.length &&
                 ((!isProtected[k] &&
-                    IndentedContent.test(lines[k]) &&
+                    leadingIndentWidth(lines[k]) >= 4 &&
                     !DefinitionStart.test(lines[k])) ||
                     absorbable(k))
             ) {
@@ -2481,6 +2697,37 @@ export function quotedDefinitionEnd(
     return end;
 }
 
+/**
+ * The line of the quoted definition label that owns `line`, or -1. A quoted
+ * definition never forms a block (C22), so the block list cannot answer
+ * "is this line inside a definition" for it; this walks up through quoted
+ * lines at the same depth to the nearest label and asks quotedDefinitionEnd
+ * whether its extent reaches `line`. The label line itself counts. Used by
+ * the jump and by the nesting guards (Kimi hunt cycle 3, 2026-09-16: the
+ * multi-caret and selection presses planted footnotes inside quoted
+ * definitions the single-caret press refused).
+ */
+export function quotedDefinitionLabelAbove(
+    lines: string[],
+    scan: Pick<DocumentScan, "isProtected" | "startsInComment" | "startsInMath" | "startsInFence">,
+    starts: boolean[],
+    maskedAt: (i: number) => string,
+    line: number,
+): number {
+    const depthOf = (text: string): number =>
+        (text.match(BlockquotePrefix)?.[0].match(/>/g) ?? []).length;
+    const depth = depthOf(lines[line]);
+    if (depth === 0) return -1;
+    for (let j = line; j >= 0; j--) {
+        if (depthOf(lines[j]) !== depth) return -1;
+        const hit = definitionLabelWithName(lines[j], maskedAt(j));
+        if (!hit) continue;
+        if (!starts[j]) return -1;
+        return quotedDefinitionEnd(lines, scan, starts, j) >= line ? j : -1;
+    }
+    return -1;
+}
+
 /** Whether a non-blank, unindented line can lazily continue a definition's paragraph: it is not a label and starts no block of its own. */
 function lazyContinuation(line: string): boolean {
     if (DefinitionStart.test(line)) return false;
@@ -2511,7 +2758,48 @@ export function lazyDefinitionLabelLines(
         // can ever make it a definition, so it is neither reported nor
         // "fixed" (Kimi hunt cycle 1, 2026-09-16: fix-lazy pushed a blank
         // line in above it on every lint)
-        if (hit && !hit.label.afterCloser) out.push(i);
+        if (!hit || hit.label.afterCloser) continue;
+        // a label with a setext underline right under it is heading text
+        // (or, inside a longer paragraph, plain text that a blank line
+        // above would turn INTO a heading), so a blank line above cannot
+        // fix it; the underlined-label alert names it instead (Kimi hunt
+        // cycle 3, probed in Reading view 2026-09-16: fix-lazy piled
+        // twenty blank lines above such a label)
+        if (setextUnderlineUnderLine(lines, scan, i)) continue;
+        out.push(i);
     }
     return out;
+}
+
+/**
+ * The lines of labels that a setext underline ("===", "---", "--") sits
+ * directly under, at the same quote depth. Obsidian reads the label as a
+ * heading, or as plain text when it continues a longer paragraph, and a
+ * blank line between the label and the underline is what makes it a
+ * definition. Protected lines, labels inside "%%" block comments, and
+ * labels behind a "%%" closer are not listed.
+ */
+export function underlinedDefinitionLabelLines(
+    lines: string[],
+    scan: DocumentScan,
+    masked: string[],
+    starts: boolean[],
+): number[] {
+    const out: number[] = [];
+    for (let i = 0; i < lines.length; i++) {
+        if (scan.isProtected[i] || starts[i] || scan.inCommentBlock[i]) continue;
+        const hit = definitionLabelWithName(lines[i], masked[i]);
+        if (!hit || hit.label.afterCloser) continue;
+        if (setextUnderlineUnderLine(lines, scan, i)) out.push(i);
+    }
+    return out;
+}
+
+/** Whether the line under `i`, at the same quote depth and unprotected, is a setext underline. */
+function setextUnderlineUnderLine(lines: string[], scan: Pick<DocumentScan, "isProtected">, i: number): boolean {
+    if (i + 1 >= lines.length || scan.isProtected[i + 1]) return false;
+    const depth = blockquoteDepth(lines[i]).depth;
+    const next = lines[i + 1].endsWith("\r") ? lines[i + 1].slice(0, -1) : lines[i + 1];
+    const under = blockquoteDepth(next);
+    return under.depth === depth && /^ {0,3}(=+|-+) *$/.test(under.rest);
 }

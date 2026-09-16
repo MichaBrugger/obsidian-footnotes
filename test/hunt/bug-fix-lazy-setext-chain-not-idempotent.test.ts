@@ -7,7 +7,19 @@ import {
     lazyDefinitionLabelLines,
     maskProtectedLines,
     scanDocument,
+    underlinedDefinitionLabelLines,
 } from "../../src/parsing/markdown-scan";
+
+// REVISED 2026-09-16 (Kimi hunt cycle 3, probed in Reading view): Obsidian
+// turns a setext underline into a heading only under a ONE-line paragraph.
+// "para" / "[^1]: a" / "===" / "[^2]: b" renders as a single paragraph
+// with a literal "===", so BOTH labels are plain text there, not just the
+// first. The first label has the underline right under it, which a blank
+// line above would turn into a heading ("[^1]: a" / "===" renders as an H1
+// reading "1: a"), so it is not a lazy label the fix can help; the
+// underlined-label alert names it. The second is an ordinary lazy label.
+// The scenario below is kept as written on 2026-09-13; the premise test
+// now states the Reading-view reading.
 
 // Scenario: a note holding "para" / "[^1]: a" / "===" / "[^2]: b", where the
 // "===" line sits between two labels. Fixing the first lazy label changes
@@ -62,10 +74,15 @@ const SETEXT = ["para", "[^1]: a", "===", "[^2]: b", "", "x[^1] y[^2]"].join("\n
 const CHAIN = ["para", "[^1]: a", "===", "[^2]: b", "===", "[^3]: c", "", "x[^1] y[^2] z[^3]"].join("\n");
 
 describe("fixing a lazy label above a setext underline makes the next label lazy", () => {
-    it("before the fix, only the first label is lazy", () => {
-        // the "===" closes the paragraph, so "[^2]: b" under it is a real
-        // definition and has nothing wrong with it
-        expect(lazyIn(SETEXT)).toEqual([1]);
+    it("before the fix, the second label is the lazy one and the first is underlined (Reading view, 2026-09-16)", () => {
+        // the "===" under a two-line paragraph is literal text, so
+        // "[^2]: b" under it is lazy; "[^1]: a" has the underline right
+        // under it and belongs to the underlined-label alert instead
+        expect(lazyIn(SETEXT)).toEqual([3]);
+        const lines = SETEXT.split("\n");
+        const scan = scanDocument(lines);
+        const masked = maskProtectedLines(lines, scan);
+        expect(underlinedDefinitionLabelLines(lines, scan, masked, definitionStartLines(lines, scan, (i) => masked[i]))).toEqual([1]);
     });
 
     it("the rule leaves no lazy label behind", () => {

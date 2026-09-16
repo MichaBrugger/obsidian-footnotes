@@ -181,6 +181,22 @@ const specialBlockArb = fc.constantFrom(
     "1) item\n   [^107]: under ordered paren",
     "a `code\nspan` tail[^108]",
     "| a | b |\n| --- | --- |\n| c[^109] | d |\n[^109]: under table",
+    // shapes from the 2026-09-16 hunt (cycle 3): a quoted definition with
+    // a lazy continuation line (Reading view folds it into the footnote;
+    // the multi-caret and selection claims must refuse to nest there), a
+    // pipe-less GFM table with a definition inside it (the in-table alert
+    // must name it), a 1-3 space indented line after a definition's blank
+    // gap (NOT its continuation - micromark), a definition label indented
+    // into a list item (a definition from the item's content column), a
+    // label before the closer on a %% comment's closer line (dead, but the
+    // alert must name it), and a reference inside a no-// autolink (dead
+    // text per CommonMark)
+    "> [^110]: quoted body\n> continuation[^110] here",
+    "a | b\n--- | ---\nc[^111] | d\n[^111]: under pipe-less",
+    "[^112]: stray\n\n   thin prose[^112]",
+    "- item\n\n    [^113]: in-item label",
+    "%%\n[^114]: before closer %%",
+    "see <ftp:x/y[^115]> here\n\n[^115]: autolink twin",
 );
 
 const blockArb = fc.oneof(

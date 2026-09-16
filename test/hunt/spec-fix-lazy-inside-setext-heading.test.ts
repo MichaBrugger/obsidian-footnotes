@@ -37,11 +37,19 @@ import { fixLazyDefinitions } from "../../src/linting/rules/fix-lazy-definitions
 // setext fixture, so nothing in the sheets settles this.
 //
 // The assertion below is written for reading one, so it is red today.
+//
+// RESOLVED 2026-09-16 (Kimi hunt cycle 3, probed in Reading view): the
+// shape renders as ONE PARAGRAPH with a literal "===" (Obsidian makes a
+// setext heading only under a one-line paragraph), and a blank line above
+// the label would turn "[^1]: a" / "===" into an H1 reading "1: a", with
+// no footnote either way. So the fix leaves the label alone, and the
+// underlined-label alert names it with the remedy that works: a blank
+// line between the label and the underline.
 
 const HEADING = ["para", "[^1]: a", "===", "", "x[^1]"].join("\n");
 
 describe("a label that is part of a setext heading", () => {
-    it.fails("is left alone, so the heading stays one heading", () => {
+    it("is left alone, so the heading stays one heading", () => {
         // today it comes back as "para" / blank / "[^1]: a" / "===" / blank
         // / "x[^1]": the heading is gone and the "===" is orphaned
         expect(fixLazyDefinitions(HEADING)).toBe(HEADING);

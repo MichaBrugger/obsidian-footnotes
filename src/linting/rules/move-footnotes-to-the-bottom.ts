@@ -88,9 +88,21 @@ export function moveFootnoteDefinitionsToBottom(
         // their references.
         if (scan.endsProtected) return text;
 
-        const definitions = blocks
-            .map((block) => lines.slice(block.start, block.end + 1).join("\n"))
-            .join("\n");
+        // Packed label to label, except after a block whose last line is
+        // a lazy continuation (a plain column-0 line): the next label
+        // directly under such a line would read as more lazy text and
+        // stop rendering, so a blank line keeps it a definition (Kimi hunt
+        // cycle 3, 2026-09-16: the move demoted the second footnote and
+        // fix-lazy fought it back every lint).
+        const packed: string[] = [];
+        blocks.forEach((block, index) => {
+            packed.push(lines.slice(block.start, block.end + 1).join("\n"));
+            const last = lines[block.end];
+            const lazyTail =
+                block.end > block.start && !isProtected[block.end] && !/^(?: {4}|\t)/.test(last) && last.trim() !== "";
+            if (lazyTail && index < blocks.length - 1) packed.push("");
+        });
+        const definitions = packed.join("\n");
 
         // Everything that is staying put, still in order. removeLineRanges
         // also closes the gap: when cutting a block leaves two blank lines

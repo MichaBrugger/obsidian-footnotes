@@ -16,6 +16,7 @@ import {
     maskInlineRegions,
     maskedLineAt,
     linkLikeEndAt,
+    quotedDefinitionLabelAbove,
 } from "../parsing/markdown-scan";
 import {
     cellCaret,
@@ -163,10 +164,24 @@ export function warnDefinitionCaretIfInside(
     ctx: DocContext,
 ): boolean {
     if (cell) return false;
-    const inside = ctx.blocks().some(
-        (block) =>
-            cursorPosition.line >= block.start && cursorPosition.line <= block.end,
-    );
+    // a column-0 definition block, or a quoted definition, which forms no
+    // block but owns its label line and its quoted continuation lines all
+    // the same, or any other definition label line (one after a "%%"
+    // closer, say), where a reference in the body nests just the same
+    // (Kimi hunt cycle 3, 2026-09-16, the second found by its property)
+    const inside =
+        ctx.definitionStarts()[cursorPosition.line] ||
+        ctx.blocks().some(
+            (block) =>
+                cursorPosition.line >= block.start && cursorPosition.line <= block.end,
+        ) ||
+        quotedDefinitionLabelAbove(
+            ctx.lines,
+            ctx.scan,
+            ctx.definitionStarts(),
+            (j) => ctx.maskedLine(j),
+            cursorPosition.line,
+        ) >= 0;
     if (!inside) return false;
     showNotice(NestedFootnoteNotice, 8000);
     return true;

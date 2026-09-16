@@ -24,10 +24,17 @@ const DOCS = [
 ];
 
 describe("scanDocument.endsProtectedAt", () => {
-    it("equals the old prefix probe on every line", () => {
+    it("equals the old prefix probe on every line, except where a later line closes an opener", () => {
+        // REVISED 2026-09-16 (Kimi hunt cycle 3): an opener nothing in its
+        // paragraph closes is literal text, and the scan looks ahead to
+        // know. The prefix probe cannot see the closer, so on a line whose
+        // NEXT line still carries the region the two disagree by design:
+        // the full note's answer is the one the append needs.
         for (const lines of DOCS) {
             const scan = scanDocument(lines);
             for (let i = 0; i < lines.length; i++) {
+                const nextCarriesRegion = i + 1 < lines.length && (scan.startsInComment[i + 1] || scan.startsInMath[i + 1]);
+                if (nextCarriesRegion) continue;
                 expect(scan.endsProtectedAt[i], `${JSON.stringify(lines)} @${i}`).toBe(
                     scanDocument(lines.slice(0, i + 1)).endsProtected,
                 );

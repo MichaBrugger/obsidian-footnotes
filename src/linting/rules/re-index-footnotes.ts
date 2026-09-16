@@ -262,6 +262,13 @@ function reindexOnce(
             } else if (/^\d+$/.test(name)) {
                 renames.set(name, String(nextNumber++));
             } else if (renumberNamed) {
+                // the bare-prefix placeholder ("[^3.]" under a "3." prefix)
+                // is a footnote the user is still naming: the unnamed
+                // alert counts it as unfilled and orphan deletion leaves
+                // it alone, so renumbering it away would silence that
+                // alert and hijack the name the user goes on to type (Kimi
+                // hunt cycle 3, 2026-09-16)
+                if (prefixOut !== "" && name === prefixFolded) continue;
                 renames.set(
                     name,
                     prefixOut

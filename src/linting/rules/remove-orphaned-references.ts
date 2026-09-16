@@ -6,6 +6,7 @@ import {
     definitionStartLines,
     DocumentScan,
     lazyDefinitionLabelLines,
+    underlinedDefinitionLabelLines,
     maskProtectedLines,
     normalizeEol,
     restoreEol,
@@ -66,6 +67,33 @@ function definitionNamesFolded(lines: string[], masked: string[], starts: boolea
  * delete. The fix is a blank line, and deleting the reference would throw
  * the user's work away (2026-09-09).
  */
+/**
+ * The names of labels that a setext underline sits directly under: heading
+ * text to Obsidian, or plain text inside a longer paragraph, and one blank
+ * line (between the label and the underline) short of a definition. Like
+ * the lazy labels above, a reference pointing at one is not an orphan to
+ * delete: the user wrote the definition (Kimi hunt cycle 3, probed in
+ * Reading view 2026-09-16).
+ */
+export function underlinedDefinitionLabelNames(
+    lines: string[],
+    scan: DocumentScan,
+    masked: string[],
+    starts: boolean[],
+): string[] {
+    const names: string[] = [];
+    const seen = new Set<string>();
+    for (const i of underlinedDefinitionLabelLines(lines, scan, masked, starts)) {
+        const hit = definitionLabelWithName(lines[i], masked[i]);
+        if (!hit) continue;
+        const folded = hit.name.toLowerCase();
+        if (seen.has(folded)) continue;
+        seen.add(folded);
+        names.push(hit.name);
+    }
+    return names;
+}
+
 export function lazyDefinitionLabelNames(
     lines: string[],
     scan: DocumentScan,
@@ -135,9 +163,11 @@ export function orphanedFootnoteReferenceNames(
     const masked = precomputed?.masked ?? maskProtectedLines(lines, scan);
     const starts = precomputed?.starts ?? definitionStartLines(lines, scan, (i) => masked[i]);
     const definitions = definitionNamesFolded(lines, masked, starts);
-    const lazyLabels = new Set(
-        lazyDefinitionLabelNames(lines, scan, masked, starts).map((n) => n.toLowerCase()),
-    );
+    const lazyLabels = new Set([
+        ...lazyDefinitionLabelNames(lines, scan, masked, starts).map((n) => n.toLowerCase()),
+        // and an underlined label, one blank line short in the other direction
+        ...underlinedDefinitionLabelNames(lines, scan, masked, starts).map((n) => n.toLowerCase()),
+    ]);
     const orphanSafeFolded = orphanSafePrefix.toLowerCase();
 
     const names: string[] = [];
@@ -175,9 +205,11 @@ export function removeOrphanedFootnoteReferences(
     const masked = maskProtectedLines(lines, scan);
     const starts = definitionStartLines(lines, scan, (i) => masked[i]);
     const definitions = definitionNamesFolded(lines, masked, starts);
-    const lazyLabels = new Set(
-        lazyDefinitionLabelNames(lines, scan, masked, starts).map((n) => n.toLowerCase()),
-    );
+    const lazyLabels = new Set([
+        ...lazyDefinitionLabelNames(lines, scan, masked, starts).map((n) => n.toLowerCase()),
+        // and an underlined label, one blank line short in the other direction
+        ...underlinedDefinitionLabelNames(lines, scan, masked, starts).map((n) => n.toLowerCase()),
+    ]);
     const orphanSafeFolded = orphanSafePrefix.toLowerCase();
 
     const out = lines.map((line, i) => {

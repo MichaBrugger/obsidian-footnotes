@@ -14,7 +14,7 @@ import {
     SelectionCommandNotice,
     SelectionSpanNotice,
 } from "../src/commands/selection-footnote";
-import { footnoteNameProblem } from "../src/parsing/footnote-grammar";
+import { definitionLabelWithName, footnoteNameProblem, referenceOccurrences } from "../src/parsing/footnote-grammar";
 import {
     inlineFootnoteSpanAt,
     sanitizeInlineFootnoteContent,
@@ -28,8 +28,11 @@ import {
 import { orphanedFootnoteDefinitionNames } from "../src/linting/rules/remove-orphaned-definitions";
 import { orphanedFootnoteReferenceNames } from "../src/linting/rules/remove-orphaned-references";
 import {
+    definitionStartLines,
     findDefinitionBlocks,
+    maskProtectedLines,
     normalizeEol,
+    quotedDefinitionEnd,
     scanDocument,
 } from "../src/parsing/markdown-scan";
 
@@ -1061,6 +1064,91 @@ describe("multi-caret press invariants over random documents", () => {
                 expect(text).not.toContain("[^[^");
                 const occurrences = text.split(`[^${name}]`).length - 1;
                 expect(occurrences).toBeGreaterThanOrEqual(2);
+            }),
+        );
+    });
+
+    // The names nesting inside a QUOTED definition ("> [^q]: body" plus
+    // its continuation): a live reference to a defined footnote sitting in
+    // the definition's body. The generator plants one deliberately
+    // ("> [^110]: quoted body\n> continuation[^110] here"), so the contract
+    // is that a press never ADDS to the set - hand-typed nesting survives,
+    // created nesting is ADR-0001's refusal.
+    const nestedQuotedNames = (lines: string[]): Set<string> => {
+        const scan = scanDocument(lines);
+        const masked = maskProtectedLines(lines, scan);
+        const starts = definitionStartLines(lines, scan, (i) => masked[i]);
+        const defined = new Set<string>();
+        for (let i = 0; i < lines.length; i++) {
+            if (!starts[i]) continue;
+            const hit = definitionLabelWithName(lines[i], masked[i]);
+            if (hit) defined.add(hit.name.toLowerCase());
+        }
+        const nested = new Set<string>();
+        for (let i = 0; i < lines.length; i++) {
+            if (!starts[i]) continue;
+            const hit = definitionLabelWithName(lines[i], masked[i]);
+            if (!hit?.label.quoted) continue;
+            const end = hit.label.afterCloser ? i : quotedDefinitionEnd(lines, scan, starts, i);
+            for (let j = i; j <= end; j++) {
+                for (const o of referenceOccurrences(lines[j], masked[j], starts[j])) {
+                    if (defined.has(o.name.toLowerCase())) nested.add(o.name.toLowerCase());
+                }
+            }
+        }
+        return nested;
+    };
+    // Kimi hunt cycle 3 (2026-09-16): the claim's definition-interior
+    // guard used to know column-0 blocks only, so a caret inside a quoted
+    // definition's body got an insertion; the guard now asks
+    // quotedDefinitionLabelAbove as well
+    const quotedInteriorPressArb = fc
+        .tuple(
+            docArb,
+            fc.nat(1000),
+            fc.nat(1000),
+            fc.nat(1000),
+            settingsArb,
+        )
+        .map(([doc, innerPick, linePick, chPick, settings]) => {
+            const lines = normalizeEol(doc).text.split("\n");
+            const scan = scanDocument(lines);
+            const masked = maskProtectedLines(lines, scan);
+            const starts = definitionStartLines(lines, scan, (i) => masked[i]);
+            const interiors: number[] = [];
+            for (let i = 0; i < lines.length; i++) {
+                if (!starts[i]) continue;
+                const hit = definitionLabelWithName(lines[i], masked[i]);
+                if (!hit?.label.quoted) continue;
+                const end = hit.label.afterCloser ? i : quotedDefinitionEnd(lines, scan, starts, i);
+                for (let j = i; j <= end; j++) interiors.push(j);
+            }
+            if (interiors.length === 0) return null;
+            const innerLine = interiors[innerPick % interiors.length];
+            const otherLine = linePick % lines.length;
+            return {
+                lines,
+                carets: [
+                    { line: innerLine, ch: chPick % (lines[innerLine].length + 1) },
+                    { line: otherLine, ch: (chPick * 7) % (lines[otherLine].length + 1) },
+                ],
+                settings,
+            };
+        })
+        .filter((press): press is NonNullable<typeof press> => press !== null);
+    soakIt("a two-caret press never adds a nested footnote inside a quoted definition", async () => {
+        await fc.assert(
+            fc.asyncProperty(quotedInteriorPressArb, async (press) => {
+                const { lines, carets, settings } = press;
+                const before = nestedQuotedNames(lines);
+                const doc = fakeMultiEditor(lines, {
+                    carets,
+                    edits: true,
+                    wholeDoc: true,
+                    words: true,
+                });
+                await insertAutonumFootnote(fakePlugin(doc, settings));
+                expect(nestedQuotedNames(doc.lines)).toEqual(before);
             }),
         );
     });

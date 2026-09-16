@@ -19,11 +19,18 @@ describe("fixed 2026-08-10: a cut stranding '---' at document start manufactures
     });
 
     it("reindex drop-orphans keeps the definition whose reference sits after a stranded '---'", () => {
+        // "[^9]: orphan" over "---" is an H2 heading to Obsidian, not a
+        // definition (Kimi hunt cycle 3, probed in Reading view
+        // 2026-09-16), so its "[^9]" is a bare reference that reindex may
+        // renumber; the live definition must survive under whatever
+        // number its reference gets
         const doc = "[^9]: orphan\n---\ntext[^1]\n---\n\n[^1]: def";
         const out = reindexFootnotes(doc, {
             keepOrphanedDefinitions: false,
         });
-        expect(out).toContain("[^1]: def");
+        const reference = /text\[\^([^\]]+)\]/.exec(out);
+        expect(reference).not.toBeNull();
+        expect(out).toContain(`[^${reference?.[1] ?? ""}]: def`);
     });
 
     it("the composed lint does not manufacture frontmatter either", () => {

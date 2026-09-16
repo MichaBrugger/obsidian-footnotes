@@ -221,13 +221,23 @@ describe("never appending into an unclosed region at EOF (2026-08-11 bug #10)", 
         expect(cursor).toEqual({ line: 2, ch: 6 });
     });
 
-    it("lands the definition above an unclosed comment opener line", () => {
+    it("lands the definition after a comment a later line of the paragraph closes", () => {
+        // an unclosed opener is literal text unless a later line of its
+        // paragraph closes it (Kimi hunt cycle 3, probed in Reading view
+        // 2026-09-16); a closer on the next line makes it a real comment,
+        // which ends there, so the note ends live and the definition goes
+        // after the closer
+        const doc = fakeEditor(["alpha[^1].", "", "text <!-- open", "hidden -->"]);
+        const { change } = buildDefinitionAppend(doc, "2", false, fakePlugin());
+        expect(change.from).toEqual({ line: 3, ch: "hidden -->".length });
+        expect(change.text).toBe("\n\n[^2]: ");
+    });
+
+    it("lands the definition at the end when the opener is never closed (literal text)", () => {
         const doc = fakeEditor(["alpha[^1].", "", "text <!-- open", "hidden"]);
         const { change } = buildDefinitionAppend(doc, "2", false, fakePlugin());
-        expect(change).toEqual({
-            from: { line: 0, ch: "alpha[^1].".length },
-            text: "\n\n[^2]: ",
-        });
+        expect(change.from).toEqual({ line: 3, ch: "hidden".length });
+        expect(change.text).toBe("\n\n[^2]: ");
     });
 
     it("keeps the unclosed opener out of the definition with a blank separator", () => {

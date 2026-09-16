@@ -156,11 +156,15 @@ export function activeTableCellEditor(editor: Editor): TableCellEditor | null {
 export function tableRowCellSpans(lineText: string): { from: number; to: number }[] {
     const spans: { from: number; to: number }[] = [];
     // a row need not start with a pipe: "A | B" is a valid row in
-    // GitHub-flavored Markdown. Without one, the first cell starts at
-    // column 0 instead of just after a "|"
-    const leadingPipe = lineText.match(/^\s*\|/);
-    let start = leadingPipe ? leadingPipe[0].length : 0;
-    let sawPipe = leadingPipe !== null;
+    // GitHub-flavored Markdown. Without one, the first cell starts right
+    // after the quote markers, if any, instead of just after a "|". The
+    // markers of a quoted row ("> | a | b |") are not a cell: a caret on
+    // them is outside every cell, and a reference written there un-quotes
+    // the row or adds a cell the delimiter row does not have (Kimi hunt
+    // cycle 3, 2026-09-16).
+    const lead = lineText.match(/^\s*(?:>\s?)*\s*(\|)?/);
+    let start = lead?.[0].length ?? 0;
+    let sawPipe = lead?.[1] !== undefined;
     for (let i = start; i < lineText.length; i++) {
         const c = lineText[i];
         if (c === "\\") {

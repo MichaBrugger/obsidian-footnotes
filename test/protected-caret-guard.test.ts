@@ -151,9 +151,10 @@ describe("footnote creation is blocked inside protected text", () => {
         expect(reads.count).toBe(0);
     });
 
-    it("end of a line whose tail opens an unclosed comment", async () => {
+    it("end of a line whose tail opens a comment the next line closes", async () => {
+        // an unclosed opener is literal text unless a later line of its paragraph closes it (Kimi hunt cycle 3, probed in Reading view 2026-09-16)
         const line = "text <!-- open";
-        await expectBlocked(insertAutonumFootnote, [line, "hidden"], {
+        await expectBlocked(insertAutonumFootnote, [line, "hidden -->"], {
             line: 0,
             ch: line.length,
         });
@@ -191,17 +192,12 @@ describe("footnote creation is blocked inside protected text", () => {
         });
     });
 
-    it("a reference that would DEMOTE a quote and strand its own definition", async () => {
-        // found by the command-press property suite (2026-08-12): "[^1]"
-        // at column 0 of "> $$" breaks the blockquote, the now doc-level
-        // "$$" swallows everything below - including the definition the
-        // same transaction appends. The simulate-and-verify refusal
-        // catches it before any edit.
-        await expectBlocked(
-            insertAutonumFootnote,
-            ["> $$", "> quoted math[^75]"],
-            { line: 0, ch: 0 },
-        );
+    it("a numbered reference that would COMPLETE an inline-math pair and be swallowed", async () => {
+        // the simulate-and-verify refusal catches a reference that is live
+        // where the caret sits and dead once it lands. The old fixture
+        // ("[^1]" at column 0 of "> $$" demoting the quote) strands nothing
+        // now: an unclosed opener is literal text unless a later line of its paragraph closes it (Kimi hunt cycle 3, probed in Reading view 2026-09-16)
+        await expectBlocked(insertAutonumFootnote, ["$5 or $x tail"], { line: 0, ch: 6 });
     });
 });
 
