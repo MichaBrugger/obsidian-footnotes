@@ -137,6 +137,17 @@ interface MarkdownEmbed {
     /** The section's text as it stood at the last set() call, NOT what the
      * editor is showing right now. save() reads this when it retries. */
     text?: string;
+    /**
+     * The whole file as the embed last joined it: the text before the
+     * section, the section, and the text after. save(text, false) fills it
+     * with the join for `text` WITHOUT writing the file (probed live
+     * 2026-09-16), which is how the popup hands its definition to the main
+     * editor instead of letting the embed write the file itself.
+     */
+    data?: string;
+    /** The file's text in front of the section the embed edits, label included ("...\n\n[^1]: "), and the text after it. Stable across saves. */
+    before?: string;
+    after?: string;
     editMode?: {
         editor?: {
             focus(): void;

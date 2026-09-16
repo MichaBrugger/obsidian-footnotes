@@ -10,6 +10,8 @@ import {
     readingViewActive,
 } from "../editor/obsidian-internals";
 import { popupCanBind, PopupWaitingNotice, retryUntilShown } from "./popup-retry";
+import { replaceMinimal } from "../editor/write-back";
+import { findDefinitionBlocks } from "../parsing/markdown-scan";
 
 import { showNotice } from "../editor/notice";
 // A small popup anchored at the cursor. Inside it sits Obsidian's own
@@ -28,14 +30,16 @@ let activePopup: ActivePopup | null = null;
 /** Obsidian's core "Toggle reading view" command. */
 const TogglePreviewCommand = "markdown:toggle-preview";
 
-// Resolves once no closed popup still has file work in flight.
+// Resolves once a closed popup's definition has landed in the note.
 //
-// A popup that has just closed still saves the definition the user typed,
-// on a short delay. That is correct, but the save writes the whole file as
-// the EMBED last knew it. Any edit made to the document before the save
-// lands is therefore wiped out, and the conflict reload that follows dumps
-// the cursor at the top of the note (regression, reported 2026-07-16). So
-// every command that edits the document waits on this first.
+// Since 2026-09-16 the close path writes the popup's text into the note
+// through the main editor, so in the ordinary case this resolves as soon as
+// that edit is in, without any file write. It still gates the fallback,
+// where the embed writes the file itself the old way: that save writes the
+// whole file as the EMBED last knew it, so any edit made before it lands
+// is wiped out, and the reload that follows dumps the cursor at the top of
+// the note (regression, reported 2026-07-16). Every command that edits the
+// document waits on this first.
 let pendingTeardown: Promise<void> | null = null;
 
 /** True while a popup is open, or while a closed one's save is still in flight. Automatic edits must keep their hands off the document while it is true. */
@@ -458,75 +462,166 @@ export async function openFootnotePopup(
             placeCursorAfterReference();
         }
 
-        // hold document edits back until the typed definition has fully
-        // landed (that is what settleFootnotePopupWithFeedback waits on),
-        // so the save cannot clobber them
+        // hold document edits back until the popup's definition has landed
+        // in the note (that is what settleFootnotePopupWithFeedback waits
+        // on), so nothing edits the note halfway through
         let settle: () => void;
         const teardownPromise = new Promise<void>((resolve) => {
             settle = resolve;
         });
         pendingTeardown = teardownPromise;
-        void (async () => {
-            // the embed saves edits on its own delay of 1 to 2 seconds.
-            // Force that save NOW and wait for exactly it to finish. This
-            // wait holds up the next footnote command, so every millisecond
-            // spent here is felt when creating footnotes in quick
-            // succession.
-            //
-            // The forced save passes the inline editor's CURRENT text and
-            // write=true (see the note on the save signature in
-            // obsidian-internals). The old call passed no arguments, which
-            // made set(undefined) throw and poisoned embed.text, so the
-            // embed's own later saves crashed with nothing catching them
-            // (reported and root-caused live, 2026-08-13).
-            try {
-                if (embed.dirty && !embed.saving) {
-                    const text = embed.editMode?.editor?.getValue?.() ?? embed.text;
-                    if (typeof text === "string") await embed.save?.(text, true);
-                }
-            } catch {
-                // carry on regardless: the polling below is the safety net
+
+        // The embed's own delayed save is cancelled FIRST. It was armed two
+        // seconds after each keystroke inside the popup and wrote the whole
+        // file as the embed knew it; when it landed after the popup had
+        // closed, Obsidian folded the file back into the main editor and
+        // wiped whatever had been typed there in the meantime (verification
+        // note 19, reproduced on video roughly one take in four,
+        // 2026-09-14). From here on the MAIN EDITOR is the only writer: the
+        // popup's final text goes into the note as an ordinary edit below,
+        // and the embed never writes the file after the popup is gone. (A
+        // timer still armed at unload would also have fired against
+        // cleared embed state and thrown, 2026-08-13.)
+        try {
+            embed.requestSave?.cancel?.();
+            embed.requestSaveFolds?.cancel?.();
+        } catch {
+            // private API: a throw here changes nothing below
+        }
+
+        // Obsidian's own join of the popup's text into the file, worked out
+        // by the embed's save with writing switched off (probed live
+        // 2026-09-16: save(text, false) fills embed.data with the joined
+        // file and touches nothing on disk), written into the note through
+        // the main editor as the smallest edit that gets there. The note is
+        // read AFTER that join, because the user may already be typing in
+        // it: that typing is the whole point, and it must survive. The
+        // section is found by its label rather than by its old offset for
+        // the same reason. Reports false when the section cannot be found,
+        // in which case the embed stays the writer.
+        const writeThroughMainEditor = async (): Promise<boolean> => {
+            const text = embed.editMode?.editor?.getValue?.() ?? embed.text;
+            const { before, after } = embed;
+            if (
+                typeof text !== "string" ||
+                typeof embed.save !== "function" ||
+                typeof before !== "string" ||
+                typeof after !== "string"
+            ) {
+                return false;
             }
-            // the safety net for saves the forced one did not cover (a
-            // queued saveAgain, or a save already in flight). It usually
-            // clears on the very first check. Unloading in the middle of a
-            // save would clear the state that save reads.
+            await embed.save(text, false);
+            const joined = embed.data;
+            if (
+                typeof joined !== "string" ||
+                joined.length < before.length + after.length ||
+                !joined.startsWith(before) ||
+                !joined.endsWith(after)
+            ) {
+                return false;
+            }
+            // the definition's new text, continuation indent and all, as
+            // Obsidian itself would have written it
+            const section = joined.slice(before.length, joined.length - after.length);
+            const current = editor.getValue();
+            // `before` ends with the label line's start ("[^1]: ", or
+            // "> [^1]: " inside a quote). It sits where it was unless
+            // something above it changed; then the last such label wins,
+            // which is the one Obsidian renders.
+            const label = before.slice(before.lastIndexOf("\n") + 1);
+            let labelAt = before.length - label.length;
+            if (!current.startsWith(label, labelAt) || (labelAt > 0 && current[labelAt - 1] !== "\n")) {
+                const found = current.lastIndexOf("\n" + label);
+                labelAt = found !== -1 ? found + 1 : current.startsWith(label) ? 0 : -1;
+            }
+            if (labelAt === -1) return false;
+            const sectionStart = labelAt + label.length;
+            let sectionEnd: number;
+            if (current.endsWith(after) && current.length - after.length >= sectionStart) {
+                sectionEnd = current.length - after.length;
+            } else {
+                // something below the definition changed as well: bound
+                // the section by the plugin's own reading of the block
+                const lines = current.split("\n");
+                const labelLine = current.slice(0, labelAt).split("\n").length - 1;
+                const block = findDefinitionBlocks(lines).find((candidate) => candidate.start === labelLine);
+                if (!block) return false;
+                sectionEnd = lines.slice(0, block.end + 1).join("\n").length;
+            }
+            const updated = current.slice(0, sectionStart) + section + current.slice(sectionEnd);
+            if (updated !== current) replaceMinimal(editor, current, updated, mdView);
+            embed.dirty = false;
+            return true;
+        };
+
+        void (async () => {
+            const pause = (ms: number) => new Promise<void>((resolve) => win.setTimeout(resolve, ms));
+            // A save the embed already had in flight lands on disk whatever
+            // happens here, so wait for it, and then give Obsidian one beat
+            // to fold the written file back into the view; the edit below
+            // then carries only what was typed after that save started. In
+            // practice this clears on the first check.
+            let wroteToDisk = false;
             let attempts = 0;
-            const teardown = () => {
-                if ((embed.dirty || embed.saving || embed.saveAgain) && attempts++ < 160) {
-                    win.setTimeout(teardown, 30);
-                    return;
-                }
+            while ((embed.saving || embed.saveAgain) && attempts++ < 160) {
+                wroteToDisk = true;
+                await pause(30);
+            }
+            if (wroteToDisk) await pause(50);
+
+            let landed = !embed.dirty;
+            if (!landed) {
                 try {
-                    // a delayed-save timer armed by the last keystrokes
-                    // would fire AFTER the unload below and read the
-                    // cleared embed state: that is the rapid-succession
-                    // crash. Everything unsaved was already forced out
-                    // above, so cancelling these timers loses nothing.
-                    embed.requestSave?.cancel?.();
-                    embed.requestSaveFolds?.cancel?.();
-                    embed.unload();
+                    landed = await writeThroughMainEditor();
                 } catch {
-                    // this is private API. A throw here must not skip the
-                    // settle below, or every later footnote command would
-                    // wait on pendingTeardown for ever (E29).
+                    landed = false;
                 }
-                // give Obsidian one beat to fold the written file back into
-                // the main view before anyone edits it. A timer on purpose,
-                // not requestAnimationFrame: rAF stalls completely while
-                // the window is hidden.
-                win.setTimeout(() => {
-                    // only clear the slot if a LATER teardown has not
-                    // already taken it. Clearing a successor's promise
-                    // would drop the busy gate while that successor's save
-                    // is still in flight (2026-08-11 review bug #14).
-                    if (pendingTeardown === teardownPromise) {
-                        pendingTeardown = null;
+            }
+            if (!landed) {
+                // The fallback, the old route: the embed writes the file
+                // itself, now, with the inline editor's CURRENT text and
+                // write=true (see the note on the save signature in
+                // obsidian-internals), and the busy gate holds every
+                // command until the write has landed.
+                wroteToDisk = true;
+                try {
+                    const text = embed.editMode?.editor?.getValue?.() ?? embed.text;
+                    if (embed.dirty && !embed.saving && typeof text === "string") {
+                        await embed.save?.(text, true);
                     }
-                    settle();
-                }, 50);
+                } catch {
+                    // carry on regardless: the polling below is the safety net
+                }
+                attempts = 0;
+                while ((embed.dirty || embed.saving || embed.saveAgain) && attempts++ < 160) {
+                    await pause(30);
+                }
+            }
+            try {
+                embed.requestSave?.cancel?.();
+                embed.requestSaveFolds?.cancel?.();
+                embed.unload();
+            } catch {
+                // this is private API. A throw here must not skip the
+                // settle below, or every later footnote command would
+                // wait on pendingTeardown for ever (E29).
+            }
+            const finish = () => {
+                // only clear the slot if a LATER teardown has not already
+                // taken it. Clearing a successor's promise would drop the
+                // busy gate while that successor's save is still in flight
+                // (2026-08-11 review bug #14).
+                if (pendingTeardown === teardownPromise) {
+                    pendingTeardown = null;
+                }
+                settle();
             };
-            teardown();
+            // after a disk write, give Obsidian one beat to fold the file
+            // back into the main view before anyone edits it. A timer on
+            // purpose, not requestAnimationFrame: rAF stalls completely
+            // while the window is hidden.
+            if (wroteToDisk) win.setTimeout(finish, 50);
+            else finish();
         })();
     };
 

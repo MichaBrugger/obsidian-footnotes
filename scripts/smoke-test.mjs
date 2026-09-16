@@ -614,6 +614,59 @@ async function main() {
         }
     });
 
+    await test("typing right after the popup closes is never wiped by the popup's own save (B31, 2026-09-16)", async () => {
+        // Verification note 19 (Kimi/Claude sweeps, reproduced on video
+        // 2026-09-14): the popup's embedded editor saved the WHOLE file on
+        // its own delay, and when that write landed after the popup had
+        // closed, Obsidian folded the file back into the main editor and
+        // wiped whatever had been typed there in between. The close and
+        // the typing happen in ONE eval here, so the typing always beats
+        // the write; before the fix this test lost " echo foxtrot" every
+        // time, after it the main editor is the only writer.
+        resetSettings({ enablePopupEditor: true });
+        await setupNote("Alpha bravo charlie");
+        setCursorAndRun(0, 8, CMD_AUTONUM);
+        await pollUntil(
+            "popup open and focused",
+            `(() => { const p = document.querySelector('.footnote-shortcut-popup:not(.footnote-shortcut-popup-loading)');
+                return !!p && p.contains(document.activeElement); })()`,
+            (v) => v === true,
+        );
+        // type the definition in the popup, as a person would
+        action(`document.execCommand('insertText', false, 'the definition');`);
+        await pollUntil(
+            "definition typed into the popup",
+            `(() => { const c = document.querySelector('.footnote-shortcut-popup .cm-content'); return c ? c.textContent : null; })()`,
+            (v) => typeof v === "string" && v.includes("the definition"),
+        );
+        // close with the hotkey and type in the note in the same tick,
+        // before any write from the embed can land. The typing goes
+        // through the editor API: a keystroke is an editor edit, and the
+        // race is between that edit and the embed's file write, however
+        // the edit is made (execCommand right after the focus hand-back
+        // did not reliably reach the main editor from the CLI).
+        action(
+            `app.commands.executeCommandById('${CMD_AUTONUM}'); ` +
+            `const v=${EDITOR}; v.editor.replaceRange(' echo foxtrot', {line:0, ch: v.editor.getLine(0).length});`,
+        );
+        await pollUntil(
+            "the typed words on the line",
+            `(${EDITOR}).editor.getLine(0)`,
+            (v) => v === "Alpha bravo[^1] charlie echo foxtrot",
+        );
+        // the embed's delayed save used to land in this window
+        await sleep(3000);
+        const text = readJson(`(${EDITOR}).editor.getValue()`);
+        const expected = "Alpha bravo[^1] charlie echo foxtrot\n\n[^1]: the definition";
+        if (typeof text !== "string" || text.replace(/\n+$/, "") !== expected) {
+            throw new Error(`typed text or definition lost: ${jsLiteral(text)}`);
+        }
+        const cursor = readJson(`(${EDITOR}).editor.getCursor()`);
+        if (!cursor || cursor.line !== 0) {
+            throw new Error(`caret jumped after the close: ${jsLiteral(cursor)}`);
+        }
+    });
+
     await test("popup opens promptly despite a definition-shaped decoy in a code span", async () => {
         // regression (reported 2026-08-26): the popup's buffer-caught-up
         // poll searched the RAW view buffer for "[^id]:", so a code-span
