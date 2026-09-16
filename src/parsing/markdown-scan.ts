@@ -1132,7 +1132,9 @@ function blockEnder(rest: string, paragraphOpen: boolean): boolean {
 }
 
 /** A link reference definition line, "[foo]: /url"; a footnote label "[^x]:" is not one. */
-const LinkReferenceDefinition = /^ {0,3}\[(?!\^)[^\]]+\]:(?:\s|$)/;
+// "[foo]:" alone is paragraph text, not a definition (GLM hunt cycle 5,
+// probed in Reading view 2026-09-16); the destination has to follow
+const LinkReferenceDefinition = /^ {0,3}\[(?!\^)[^\]]+\]:\s+\S/;
 
 /** How wide the line's leading whitespace is, each tab running to the next 4-column tab stop, as CommonMark says. */
 function leadingIndentWidth(line: string): number {
@@ -2503,7 +2505,7 @@ export function definitionStartLines(
         // definition (Kimi hunt cycle 1, verified in Reading view
         // 2026-09-16). The label shape "[^x]:" is excluded here: that is
         // a footnote label and takes the path below.
-        if (open !== "paragraph" && /^ {0,3}\[(?!\^)[^\]]+\]:(?:\s|$)/.test(bare)) {
+        if (open !== "paragraph" && LinkReferenceDefinition.test(bare)) {
             open = "none";
             lrdAbove = true;
             continue;
@@ -2911,7 +2913,14 @@ export function quotedDefinitionLabelAbove(
 /** Whether a non-blank, unindented line can lazily continue a definition's paragraph: it is not a label and starts no block of its own. */
 function lazyContinuation(line: string): boolean {
     if (DefinitionStart.test(line)) return false;
-    return !/^ {0,3}(?:#{1,6}(?: |$)|([-*_])( *\1){2,} *$|(?:=+|-+) *$|>|[-*+] +\S|\d{1,9}[.)] +\S|`{3,}|~{3,}|<|\|.*\|\s*$|%%|\[(?!\^)[^\]]+\]:(?:\s|$))/.test(line);
+    // The same block starts the paragraph walk (paragraphGoesOn) knows,
+    // probed in Reading view (GLM hunt cycle 5, 2026-09-16): an ordered
+    // item numbered 1 interrupts, "2. item text" carries the footnote on;
+    // a backtick fence with a backtick in its info is no fence; "<3" and
+    // an inline "<span>" are text, only an HTML block opener of types 1
+    // to 6 interrupts; a comment-only "%% c %%" line is text, a lone "%%"
+    // opens a block; a link reference definition needs a destination.
+    return !/^ {0,3}(?:#{1,6}(?: |$)|([-*_])( *\1){2,} *$|(?:=+|-+) *$|>|[-*+] +\S|1[.)] +\S|~{3,}|`{3,}[^`]*$|<(?:!--|\?|![A-Za-z]|!\[CDATA\[|\/?(?:script|pre|style|textarea|address|article|aside|blockquote|details|dialog|div|dl|figure|footer|form|h[1-6]|header|hr|main|nav|ol|p|section|summary|table|ul)(?:[ >/]|$))|\|.*\|\s*$|%%\s*$|\[(?!\^)[^\]]+\]:\s+\S)/i.test(line);
 }
 
 /**

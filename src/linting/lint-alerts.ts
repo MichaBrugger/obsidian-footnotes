@@ -502,7 +502,11 @@ export function commentedDefinitionNames(markdown: string): string[] {
         // like any interior line, and it used to be passed over in
         // silence (Kimi hunt cycle 3, probed in Reading view 2026-09-16).
         const close = scan.commentBlockCloseAt[i];
-        if (close >= 0 && hit.label.nameStart - 2 > close) continue;
+        // a label at or after the closer's end (commentBlockCloseAt is the
+        // index just past the "%%") is outside the comment, glued to it or
+        // not ("%%[^1]: def" renders a footnote; GLM hunt cycle 5, probed
+        // in Reading view 2026-09-16)
+        if (close >= 0 && hit.label.nameStart - 2 >= close) continue;
         const folded = hit.name.toLowerCase();
         if (seen.has(folded)) continue;
         seen.add(folded);
