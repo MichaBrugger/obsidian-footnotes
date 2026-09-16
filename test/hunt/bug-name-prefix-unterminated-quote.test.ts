@@ -18,7 +18,7 @@ import { footnotePrefix, footnotePrefixProblem } from "../../src/parsing/footnot
 // the value as `"2.` and accepts it as a valid prefix.
 
 describe("prefix reader vs YAML-unparseable values", () => {
-    it.fails("an unterminated quote is not a usable prefix", () => {
+    it("an unterminated quote is not a usable prefix", () => {
         const prefix = footnotePrefix('---\nfootnote-prefix: "2.\n---\nbody[^1]');
         // Obsidian shows NO property here (js-yaml throws on the block),
         // so there is no prefix to honor
@@ -29,8 +29,14 @@ describe("prefix reader vs YAML-unparseable values", () => {
         expect(footnotePrefix('---\nfootnote-prefix: "2."\n---\nbody[^1]')).toBe("2.");
     });
 
-    it.fails("the stray-quote value is at least not accepted as VALID", () => {
+    // Rewritten to the fix (2026-09-16): the reader now answers "" for the
+    // unreadable block, exactly as for a note with no prefix, so the value
+    // with the stray quote never reaches the validity check at all. What
+    // matters is that nothing carrying the stray quote is ever handed on
+    // as the note's prefix.
+    it("nothing carrying the stray quote is handed on as a prefix", () => {
         const prefix = footnotePrefix('---\nfootnote-prefix: "2.\n---\nbody[^1]');
-        expect(footnotePrefixProblem(prefix)).not.toBeNull();
+        expect(prefix).not.toMatch(/["']/);
+        expect(footnotePrefixProblem(prefix)).toBeNull();
     });
 });

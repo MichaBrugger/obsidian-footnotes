@@ -16,11 +16,11 @@ import { footnotePrefix } from "../../src/parsing/footnote-prefix";
 // /^footnote-prefix:(?:\s+(.*))?$/ misses it.
 
 describe("prefix reader vs space before the colon", () => {
-    it.fails("reads a prefix written with a space before the colon", () => {
+    it("reads a prefix written with a space before the colon", () => {
         expect(footnotePrefix("---\nfootnote-prefix : 2.\n---\nbody[^1]")).toBe("2.");
     });
 
-    it.fails("reads a prefix written with a tab before the colon", () => {
+    it("reads a prefix written with a tab before the colon", () => {
         expect(footnotePrefix("---\nfootnote-prefix\t: 2.\n---\nbody[^1]")).toBe("2.");
     });
 

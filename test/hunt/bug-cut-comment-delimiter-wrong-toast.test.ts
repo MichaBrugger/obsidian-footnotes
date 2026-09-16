@@ -93,7 +93,7 @@ describe("a selection taking the %% closer plus the line under it", () => {
         expect(messages().length).toBe(1);
     });
 
-    it.fails("says the selection message, not the caret one", async () => {
+    it("says the selection message, not the caret one", async () => {
         const doc = fakeEditor(LINES, { line: 3, ch: 0 }, { line: 4, ch: 10 });
         await insertAutonumFootnote(fakePlugin(doc));
         expect(noticed(ProtectedSelectionNotice)).toBe(true);
@@ -109,7 +109,7 @@ describe("a selection taking the line above plus the %% opener", () => {
         expect(messages().length).toBe(1);
     });
 
-    it.fails("says the selection message, not the caret one", async () => {
+    it("says the selection message, not the caret one", async () => {
         const doc = fakeEditor(LINES, { line: 0, ch: 0 }, { line: 1, ch: 2 });
         await insertAutonumFootnote(fakePlugin(doc));
         expect(noticed(ProtectedSelectionNotice)).toBe(true);

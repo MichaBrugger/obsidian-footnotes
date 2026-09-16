@@ -30,7 +30,6 @@ import {
     TableSelectionNotice,
     absorbLeadingSpace,
 } from "../src/commands/selection-footnote";
-import { ProtectedCreationNotice } from "../src/editor/insertion-liveness";
 import { commandHotkeys } from "../src/editor/obsidian-internals";
 import { NestedFootnoteNotice } from "../src/editor/notice";
 import { TableCellEditor } from "../src/editor/table-cursor";
@@ -431,7 +430,7 @@ describe("the named key converts a selection through its modal (2026-08-13)", ()
         expect(noticed(SelectionChangedNotice)).toBe(true);
     });
 
-    it("refuses a born-dead conversion like autonum does", () => {
+    it("refuses a born-dead conversion, in the selection's words", () => {
         const before = ["> $$", "> quoted math[^75]"];
         const doc = fakeEditor(before, { line: 0, ch: 0 });
         const problem = convertSelectionToNamed(
@@ -442,7 +441,9 @@ describe("the named key converts a selection through its modal (2026-08-13)", ()
         );
         expect(problem).toBeNull();
         expect(doc.lines).toEqual(before);
-        expect(noticed(ProtectedCreationNotice)).toBe(true);
+        // the same refusal the numbered key makes, but worded for a
+        // selection: what the user did was select (2026-09-16, B27)
+        expect(noticed(ProtectedSelectionNotice)).toBe(true);
     });
 });
 
@@ -796,7 +797,7 @@ describe("selections that refuse", () => {
         });
         await insertAutonumFootnote(fakePlugin(doc));
         expect(doc.lines).toEqual(before);
-        expect(noticed(ProtectedCreationNotice)).toBe(true);
+        expect(noticed(ProtectedSelectionNotice)).toBe(true);
     });
 
     it("a multi-line selection that CUTS a fence refuses (opener grabbed, closer left)", async () => {

@@ -32,18 +32,21 @@ describe("a quoted name containing a double quote", () => {
         expect(footnoteNameProblem('say"hi')).toBeNull();
     });
 
-    it.fails("rides in a no-wrap span like every other quoted name", () => {
+    it("rides in a no-wrap span like every other quoted name", () => {
         // the pattern reads "the quote, "[^", any run of characters that are
         // neither a quote nor "]", then "]" and a closing quote". The name's
         // own quote ends that run early, so nothing matches at all
         expect(nowrapped(`left ${quotedReference('say"hi')} right`)).toEqual(['"[^say"hi]"']);
     });
 
-    it("control: other names in the SAME toast keep their spans", () => {
-        // only the offending name loses its span; the pattern picks up again
-        // after it, so a toast naming several footnotes is not spoiled as a
-        // whole
-        expect(nowrapped(`a "[^ok]" and ${quotedReference('say"hi')} end`)).toEqual(['"[^ok]"']);
+    it("every quoted name in the same toast rides in its own span", () => {
+        // before the fix only the plain name had a span; the pattern picked
+        // up again after the offending one, so the rest of the toast was
+        // never spoiled, and now the offending name has its span as well
+        expect(nowrapped(`a "[^ok]" and ${quotedReference('say"hi')} end`)).toEqual([
+            '"[^ok]"',
+            '"[^say"hi]"',
+        ]);
     });
 
     it("control: names made of other markup characters ride in the span", () => {

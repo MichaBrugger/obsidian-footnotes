@@ -1651,7 +1651,11 @@ export function definitionStartLines(
     let open = "none" as Open;
     let previousDepth = 0;
     for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
+        // a trailing carriage return is dropped before the line is judged,
+        // as scanDocument drops it, so the end-anchored patterns below
+        // (a rule, a setext underline, a table row) still match a note
+        // read with Windows line endings (Claude sweep 2026-09-13)
+        const line = lines[i].endsWith("\r") ? lines[i].slice(0, -1) : lines[i];
         const { depth } = blockquoteDepth(line);
         // A deeper blockquote marker opens a container, and a quote does
         // interrupt a paragraph: "prose" followed by "> [^1]: quoted" is a

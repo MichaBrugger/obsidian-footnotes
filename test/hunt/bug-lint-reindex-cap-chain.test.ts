@@ -22,12 +22,12 @@ const chainDoc = (depth: number): string => {
 describe("reindex fixpoint cap vs a deep nested-renumber chain", () => {
     const doc = chainDoc(32);
 
-    it.fails("reindex is idempotent (f(f(doc)) === f(doc))", () => {
+    it("reindex is idempotent (f(f(doc)) === f(doc))", () => {
         const once = reindexFootnotes(doc);
         expect(reindexFootnotes(once)).toBe(once);
     });
 
-    it.fails("reindex reaches the settled state in one call", () => {
+    it("reindex reaches the settled state in one call", () => {
         const once = reindexFootnotes(doc);
         // settled: blocks renumbered 1..32 in chain order, each body
         // referencing the next
@@ -41,7 +41,7 @@ describe("reindex fixpoint cap vs a deep nested-renumber chain", () => {
         expect(once).toBe(settled);
     });
 
-    it.fails("the full lint is idempotent on the same document", () => {
+    it("the full lint is idempotent on the same document", () => {
         const once = lintFootnotes(doc);
         expect(lintFootnotes(once)).toBe(once);
     });

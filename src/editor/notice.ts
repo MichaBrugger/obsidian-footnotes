@@ -56,7 +56,11 @@ export function invalidPrefixMessage(opener: string, prefix: string, problem: st
  * `"[^name]"`, including the empty `"[^]"` and bare-prefix `"[^2.]"`
  * placeholders, and the quoted label `"[^name]:"` that the lazy-definition
  * alert uses. */
-const QuotedReference = /"\[\^[^"\]]*\]:?"/g;
+// A name may contain a double quote (only whitespace, backticks, brackets
+// and "#" are refused), so the run inside the brackets stops at "]" alone;
+// stopping at a quote too left such a name to wrap (Claude sweep
+// 2026-09-13).
+const QuotedReference = /"\[\^[^\]]*\]:?"/g;
 
 /** The message cut into runs. A run marked `nowrap` is a quoted reference,
  * which must not be broken across two lines. */

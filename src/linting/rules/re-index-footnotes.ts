@@ -127,11 +127,15 @@ export function reindexFootnotes(
     // Deleting orphaned definitions does not drive this loop: it follows
     // chains of any length within ONE pass, see orphanedDefinitionBlocks.
     //
-    // The limit of 30 is a pure safety net, in case of a loop longer than
-    // that. None has ever been seen.
+    // The limit is a pure safety net, in case of a loop longer than that.
+    // None has ever been seen. It was 30, which a chain of definitions
+    // each citing the next, 32 deep and in reverse order, ran past: the
+    // stray name drifts one block per pass, so the note needed a second
+    // save to settle (Kimi sweep 2026-09-13). 200 passes over a note is
+    // still cheap, and a real note never needs anywhere near it.
     let current = markdown;
     const seen: string[] = [];
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 200; i++) {
         const next = reindexOnce(current, options);
         if (next === current) return current;
         const cycleStart = seen.indexOf(next);

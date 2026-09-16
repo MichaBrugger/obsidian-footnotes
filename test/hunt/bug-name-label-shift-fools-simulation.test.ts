@@ -10,7 +10,7 @@ import { planFootnoteRename } from "../../src/commands/rename-footnote";
 // ("[^a]: see [^a]"). The rename is perfectly safe; the refusal is wrong.
 
 describe("rename with a self-reference on the definition label line", () => {
-    it.fails("renaming to a LONGER name survives", () => {
+    it("renaming to a LONGER name survives", () => {
         const doc = fakeEditor(["see [^a] then", "", "[^a]: body with [^a] inside"], {
             wholeDoc: true,
         });
@@ -18,7 +18,7 @@ describe("rename with a self-reference on the definition label line", () => {
         expect(plan.kind).toBe("renamed");
     });
 
-    it.fails("renaming to a SHORTER name survives", () => {
+    it("renaming to a SHORTER name survives", () => {
         const doc = fakeEditor(["see [^abc] then", "", "[^abc]: body with [^abc] inside"], {
             wholeDoc: true,
         });
@@ -26,7 +26,7 @@ describe("rename with a self-reference on the definition label line", () => {
         expect(plan.kind).toBe("renamed");
     });
 
-    it.fails("the label line alone (self-reference, no other reference) renames", () => {
+    it("the label line alone (self-reference, no other reference) renames", () => {
         const doc = fakeEditor(["[^a]: body with [^a] inside"], { wholeDoc: true });
         const plan = planFootnoteRename(doc, "a", "bb");
         expect(plan.kind).toBe("renamed");
@@ -40,7 +40,7 @@ describe("rename with a self-reference on the definition label line", () => {
         expect(plan.kind).toBe("renamed");
     });
 
-    it.fails("a blockquoted label with a self-reference renames to a longer name", () => {
+    it("a blockquoted label with a self-reference renames to a longer name", () => {
         const doc = fakeEditor(["see [^a]", "", "> [^a]: body with [^a] inside"], {
             wholeDoc: true,
         });
@@ -48,7 +48,7 @@ describe("rename with a self-reference on the definition label line", () => {
         expect(plan.kind).toBe("renamed");
     });
 
-    it.fails("a label line referencing the footnote twice renames to a longer name", () => {
+    it("a label line referencing the footnote twice renames to a longer name", () => {
         const doc = fakeEditor(["see [^a]", "", "[^a]: [^a] and [^a] again"], {
             wholeDoc: true,
         });

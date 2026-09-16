@@ -20,7 +20,6 @@ import { DocContext, docContext, listExistingFootnoteDefinitions } from "../edit
 import { inlineFootnoteSpanAt, insertionLandsIntact, sanitizeInlineFootnoteContent } from "./inline-footnotes";
 import {
     caretInsideMaskedSpan,
-    ProtectedCreationNotice,
     simulateChanges,
     simulatedAnchor,
     verifyLiveFootnoteInsertion,
@@ -935,7 +934,11 @@ function normalizedMainSelection(
 // born-dead insertion is one that would not be a real footnote the moment
 // it landed. So the new span has to survive on the masked twin of the
 // simulated line. A selection inside protected text dies here, and so does
-// one whose removal completes some construct around it.
+// one whose removal completes some construct around it. The refusal
+// speaks in the selection's words, "the selection cuts through ... select
+// all of it or none of it", never the caret's: what the user did was
+// select, and that advice is the fix (Claude sweep 2026-09-13, a drag over
+// one "%%" delimiter without its partner).
 function convertMainSelectionToInline(
     plugin: FootnotePlugin,
     doc: Editor,
@@ -948,7 +951,7 @@ function convertMainSelectionToInline(
     ]);
     const masked = maskedLineAt(simulated, selection.from.line);
     if (!insertionLandsIntact(masked, selection.from.ch, text)) {
-        showNotice(ProtectedCreationNotice, 8000);
+        showNotice(ProtectedSelectionNotice, 8000);
         return;
     }
     const after = { line: selection.from.line, ch: selection.from.ch + text.length };
@@ -1036,7 +1039,7 @@ function convertMainSelection(
         simulated,
     });
     if (!verified) {
-        showNotice(ProtectedCreationNotice, 8000);
+        showNotice(ProtectedSelectionNotice, 8000);
         return;
     }
 

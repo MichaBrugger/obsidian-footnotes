@@ -338,10 +338,20 @@ function renameSurvives(
     const simulatedMasked = maskProtectedLines(simulated, simulatedScan);
     const startsBefore = ctx.definitionStarts();
     const startsAfter = definitionStartLines(simulated, simulatedScan, (i) => simulatedMasked[i]);
+    const labelLineSet = new Set(labelLines);
     for (const line of referenceLines) {
         const before = referenceOccurrences(ctx.lines[line], ctx.maskedLine(line), startsBefore[line]);
         const expected: { start: number; name: string }[] = [];
+        // On the definition's own label line, the label is renamed too and
+        // sits before every reference in the body, so the references
+        // start out shifted by the label's change of length. Forgetting
+        // that refused a perfectly safe rename whenever a definition's
+        // body mentioned its own footnote (Kimi sweep 2026-09-13).
         let shift = 0;
+        if (labelLineSet.has(line)) {
+            const hit = definitionLabelWithName(ctx.lines[line], ctx.maskedLine(line));
+            if (hit && hit.name.toLowerCase() === oldFolded) shift = newName.length - hit.name.length;
+        }
         for (const occurrence of before) {
             const renamed = occurrence.name.toLowerCase() === oldFolded;
             expected.push({

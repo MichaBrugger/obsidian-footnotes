@@ -232,14 +232,15 @@ export function resolveTableCellCursor(editor: Editor): EditorPosition | null {
     // addition landed one column short per escape, which read a caret just
     // inside a reference as being OUTSIDE it and nested a new reference
     // there (bug-table-escape-offset).
+    // The cell's text begins at its first non-space column. Searching for
+    // the cell editor's text inside the raw cell instead skipped the
+    // backslash of a leading escaped pipe, and a caret read raw rather
+    // than through cellCaret walked a stale offset onto the closing pipe
+    // (Claude sweep 2026-09-13).
     const rawCell = lineText.slice(span.from, span.to);
     const cellText = cellView.state.doc.toString();
-    let start = rawCell.length - rawCell.trimStart().length;
-    if (cellText.length > 0) {
-        const idx = rawCell.indexOf(cellText);
-        if (idx >= 0) start = idx;
-    }
-    const head = cellView.state.selection.main.head;
+    const start = rawCell.length - rawCell.trimStart().length;
+    const head = cellCaret(cellView);
     let raw = start;
     for (let c = 0; c < head && raw < rawCell.length; c++) {
         if (rawCell[raw] === "\\" && rawCell[raw + 1] === cellText[c]) {

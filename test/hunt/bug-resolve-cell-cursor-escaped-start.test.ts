@@ -79,7 +79,7 @@ describe("a cell whose text begins with an escaped pipe", () => {
     // backslash, column 3 the pipe it protects.
     const line = "| \\| | b |";
 
-    it.fails("cell offset 0 maps to the cell's first column, not into the escape", () => {
+    it("cell offset 0 maps to the cell's first column, not into the escape", () => {
         // the resolver looks for the cell editor's text inside the raw cell
         // and finds the bare "|" at column 3, skipping past the backslash
         // that belongs to it
@@ -94,7 +94,7 @@ describe("a cell whose text begins with an escaped pipe", () => {
 describe("a cell that begins with an escaped pipe and carries more text", () => {
     const line = "| \\|x | b |";
 
-    it.fails("cell offset 0 maps to the cell's first column", () => {
+    it("cell offset 0 maps to the cell's first column", () => {
         expect(resolve(line, "|x", 0)?.ch).toBe(2);
     });
 
@@ -106,7 +106,7 @@ describe("a cell that begins with an escaped pipe and carries more text", () => 
 describe("a stale cell caret reported past the end of the cell text", () => {
     const line = "| alpha | bravo |";
 
-    it.fails("is clamped to just past the cell's text, the way cellCaret clamps it", () => {
+    it("is clamped to just past the cell's text, the way cellCaret clamps it", () => {
         // Obsidian can report a caret belonging to the LONGER text the cell
         // held before a rebuild, which is why cellCaret exists. Walking that
         // stale head runs the mapping off the end of the cell and parks it

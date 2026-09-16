@@ -36,7 +36,7 @@ const NEVER_SPLIT = "hunt-plain-2026-09-13";
 const refs = (names: string[]) => names.map(quotedReference).join(", ");
 
 describe("the split-creation registry outlives the creation it describes", () => {
-    it.fails("a later undo of the same name that the plugin did not split gets no promise", () => {
+    it("a later undo of the same name that the plugin did not split gets no promise", () => {
         // one table-cell creation, in whatever note the user happened to be
         // in at the time
         noteSplitCreation(SPLIT_IN_A_CELL);

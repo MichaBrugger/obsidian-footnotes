@@ -40,7 +40,7 @@ const starts = (lines: string[]) => {
 };
 
 describe("a trailing carriage return must not change what starts a definition", () => {
-    it.fails("a label under a thematic break starts a definition", () => {
+    it("a label under a thematic break starts a definition", () => {
         expect(starts(["prose\r", "\r", "---\r", "[^1]: real\r"])).toEqual([
             false,
             false,
@@ -49,7 +49,7 @@ describe("a trailing carriage return must not change what starts a definition", 
         ]);
     });
 
-    it.fails("a label under a setext underline starts a definition", () => {
+    it("a label under a setext underline starts a definition", () => {
         expect(starts(["H\r", "===\r", "[^1]: real\r"])).toEqual([false, false, true]);
     });
 

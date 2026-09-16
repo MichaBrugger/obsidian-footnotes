@@ -34,10 +34,28 @@ const stripCrLine = (line: string): string =>
  * validity rules below refuse it with the ordinary invalid-prefix toast
  * instead of quietly reading it as "2.".
  */
-function parsePrefixValue(captured: string | undefined): string {
+function parsePrefixValue(captured: string | undefined): string | null {
     const value = (captured ?? "").trim();
     const quoted = value.match(/^(["'])(.*)\1$/);
-    return quoted ? quoted[2] : value;
+    if (quoted) {
+        // Inside the quotes, YAML's own escapes are resolved the way
+        // Obsidian resolves them before it shows the value: a doubled
+        // single quote is one quote, and a backslash escapes a quote, a
+        // slash, or another backslash in a double-quoted value (Kimi
+        // sweep 2026-09-13). Without this the plugin namespaced the note
+        // as [^a\"b1] while the Properties panel said the prefix was a"b.
+        return quoted[1] === "'"
+            ? quoted[2].replace(/''/g, "'")
+            : quoted[2].replace(/\\(["\\/])/g, "$1");
+    }
+    // A quote that opens and never closes makes the whole frontmatter
+    // block unreadable to YAML, so Obsidian shows no properties at all,
+    // and there is no prefix to honor (Kimi sweep 2026-09-13; the same
+    // reasoning as an unclosed block, below). A quote that closes with
+    // more text after it ("2." # chapter) is a different case: the value
+    // is read whole and refused as invalid, per the "#" ruling above.
+    if (/^(["'])(?:(?!\1).)*$/.test(value)) return null;
+    return value;
 }
 
 /**
@@ -77,11 +95,18 @@ export function footnotePrefix(markdownText: string): string {
             // "footnote-prefix:2." is just a line of text to YAML, not a
             // property, and Obsidian does not show it as one, so the
             // pattern insists on the space (bug-prefix-yaml-comment).
-            const match = line.match(/^footnote-prefix:(?:\s+(.*))?$/);
+            // Spaces or tabs between the key and the colon are fine to
+            // YAML, and Obsidian shows such a property (Kimi sweep
+            // 2026-09-13), so they are fine here.
+            const match = line.match(/^footnote-prefix[ \t]*:(?:\s+(.*))?$/);
             // The "(?:\s+(.*))?" part of the pattern is optional on
             // purpose. match[1] is undefined when the property is written
             // with no value after it at all.
-            if (match) value = parsePrefixValue(match[1]);
+            if (match) {
+                const parsed = parsePrefixValue(match[1]);
+                if (parsed === null) return ""; // the block is unreadable as YAML
+                value = parsed;
+            }
         }
         if (lineEnd === markdownText.length) return ""; // ran off the end, so the block never closed
         lineStart = lineEnd + 1;

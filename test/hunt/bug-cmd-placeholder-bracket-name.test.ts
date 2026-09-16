@@ -53,7 +53,7 @@ async function plantAndType(
 }
 
 describe("a bracket typed into the named-footnote placeholder", () => {
-    it.fails("']' warns about the invalid name instead of nesting a second placeholder", async () => {
+    it("']' warns about the invalid name instead of nesting a second placeholder", async () => {
         const doc = sharedFakeEditor(["note "], {
             cursor: { line: 0, ch: 5 },
             edits: true,

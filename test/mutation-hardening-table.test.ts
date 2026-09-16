@@ -560,12 +560,13 @@ describe("resolveTableCellCursor (mutation hardening)", () => {
         expect(resolveTableCellCursor(editor)).toEqual({ line: 7, ch: 3 });
     });
 
-    // line 151 col 9 (ConditionalExpression -> false) and line 151 col 30
-    // (BlockStatement -> {}): with a NON-EMPTY cellText that IS locatable in
-    // the raw cell at an index different from the leading-whitespace count,
-    // both mutants would skip the reassignment and wrongly keep the
-    // whitespace-count fallback.
-    it("anchors on the located cell text, not the leading-whitespace fallback, when found", () => {
+    // Since 2026-09-16 (B27) the resolver no longer searches for the cell
+    // editor's text inside the raw cell: the cell's text begins at its
+    // first non-space column, full stop. The search skipped the backslash
+    // of a leading escaped pipe. These two fixtures, which used to pin the
+    // search, now pin that the first non-space column wins even when the
+    // shown text could be found somewhere else in the raw cell.
+    it("starts at the cell's first non-space column even when the shown text also appears later", () => {
         const headerRow = {};
         const bodyRow = {};
         const table = { rows: [headerRow, bodyRow] };
@@ -578,8 +579,8 @@ describe("resolveTableCellCursor (mutation hardening)", () => {
                 return null;
             },
         };
-        // cellIndex 0 raw span is "  xxab  " (2 leading spaces, so the
-        // whitespace-fallback would be 2); "ab" is actually located at index 4.
+        // cellIndex 0 raw span is "  xxab  " (2 leading spaces); "ab" could
+        // be found at index 4, but the cell's text starts at index 2
         const editor = buildRowScenario({
             active,
             table,
@@ -588,15 +589,11 @@ describe("resolveTableCellCursor (mutation hardening)", () => {
             cellText: "ab",
             head: 0,
         });
-        // span.from = 1; idx-based start = 4 -> ch = 1 + 4 = 5
-        expect(resolveTableCellCursor(editor)).toEqual({ line: 7, ch: 5 });
+        // span.from = 1; start = 2 -> ch = 1 + 2 = 3
+        expect(resolveTableCellCursor(editor)).toEqual({ line: 7, ch: 3 });
     });
 
-    // line 153 col 13 (EqualityOperator idx >= 0 -> idx > 0, and
-    // ConditionalExpression -> false): only observable at the idx === 0
-    // boundary, where the cell text is found starting at the very first
-    // character of the raw cell.
-    it("accepts an idx of exactly 0 as a valid match", () => {
+    it("starts at the cell's first non-space column even when the shown text carries the padding", () => {
         const headerRow = {};
         const bodyRow = {};
         const table = { rows: [headerRow, bodyRow] };
@@ -609,8 +606,8 @@ describe("resolveTableCellCursor (mutation hardening)", () => {
                 return null;
             },
         };
-        // cellIndex 0 raw span is "  xy  "; cellText "  xy" matches at idx 0
-        // (whitespace-fallback would instead be 2).
+        // cellIndex 0 raw span is "  xy  "; a cellText of "  xy" would be
+        // found at index 0, but the cell's text starts at index 2
         const editor = buildRowScenario({
             active,
             table,
@@ -619,8 +616,8 @@ describe("resolveTableCellCursor (mutation hardening)", () => {
             cellText: "  xy",
             head: 0,
         });
-        // span.from = 1; idx-based start = 0 -> ch = 1 + 0 = 1
-        expect(resolveTableCellCursor(editor)).toEqual({ line: 7, ch: 1 });
+        // span.from = 1; start = 2 -> ch = 1 + 2 = 3
+        expect(resolveTableCellCursor(editor)).toEqual({ line: 7, ch: 3 });
     });
 
     // line 157 col 33 (ConditionalExpression -> true, and EqualityOperator

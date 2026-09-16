@@ -379,8 +379,9 @@ export function landCellDefinitionAppend(opts: {
 }): void {
     // the reference is already in the cell (one history step); the
     // definition below is the next one - the partial-undo notice may
-    // promise that a second undo removes the reference too
-    noteSplitCreation(opts.footnoteId);
+    // promise that a second undo removes the reference too, for the undo
+    // that brings the note back to the text it has right now
+    noteSplitCreation(opts.footnoteId, opts.doc.getValue());
     // Stryker disable next-line ConditionalExpression, BlockStatement: the unit tests all run with the popup off, so which route is taken is only ever checked by the smoke tests, and the full smoke suite drives both
     if (popupEditingAvailable(opts.plugin)) {
         // Stryker disable all: this is the popup route. The unit tests all
@@ -667,6 +668,20 @@ export function createFootnoteReference(
         // corrupts the table. The caret lands inside the brackets and
         // focus stays in the cell, ready for you to type the name.
         insertInTableCell(cell, plugin, referenceText(prefix), 2 + prefix.length);
+        return true;
+    }
+
+    // A "]" typed as the placeholder's name closes it early: the line reads
+    // "[^]" then the typed "]", with the caret between them. That is a
+    // name that can't be, not an empty placeholder to hop out of, and
+    // every other guard looks past it, so a second press used to plant a
+    // second "[^]" right there (Kimi sweep 2026-09-13). Say what is wrong
+    // with the name instead, and leave the line alone.
+    if (
+        lineText.slice(0, cursorPosition.ch).endsWith("[^]") &&
+        lineText[cursorPosition.ch] === "]"
+    ) {
+        showNotice(InvalidNameCharacters, 8000);
         return true;
     }
 

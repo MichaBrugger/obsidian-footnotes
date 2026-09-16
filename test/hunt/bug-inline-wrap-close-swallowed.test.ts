@@ -8,6 +8,7 @@ import { fakePlugin as sharedFakePlugin } from "../helpers/fake-plugin";
 import FootnotePlugin from "../../src/main";
 import { selectionPressHandled } from "../../src/commands/selection-footnote";
 import { pasteInlineFootnote } from "../../src/commands/insert-or-navigate-footnotes";
+import { ProtectedSelectionNotice } from "../../src/commands/selection-footnote";
 import { ProtectedCreationNotice } from "../../src/editor/insertion-liveness";
 import { inlineWrapLandsIntact } from "../../src/commands/inline-footnotes";
 
@@ -50,8 +51,10 @@ afterEach(() => {
     vi.unstubAllGlobals();
 });
 
-const refused = () =>
-    noticeCalls.some((args) => args[0] === ProtectedCreationNotice);
+// a selection refuses in the selection's words, a caret press in the
+// caret's (2026-09-16, B27)
+const refused = (notice: string = ProtectedCreationNotice) =>
+    noticeCalls.some((args) => args[0] === notice);
 
 describe("an emergent math span swallowing the inline wrapper's close bracket", () => {
     it("the selection conversion refuses instead of landing a corrupted wrap", () => {
@@ -67,7 +70,7 @@ describe("an emergent math span swallowing the inline wrapper's close bracket", 
         });
         selectionPressHandled(fakePlugin(doc), doc, null, "inline");
         expect(doc.lines[0]).toBe(BEFORE);
-        expect(refused()).toBe(true);
+        expect(refused(ProtectedSelectionNotice)).toBe(true);
     });
 
     it("the paste insert refuses the same shape at a bare caret", async () => {

@@ -248,7 +248,23 @@ export default class FootnotePlugin extends Plugin {
   }
 
   async loadSettings() {
-    const saved = parseSavedSettings(await this.loadData());
+    const raw: unknown = await this.loadData();
+    const saved = parseSavedSettings(raw);
+    // The parser drops a settingsVersion saved with the wrong type (the
+    // string "2", or null, from a hand edit or a sync merge), and version
+    // 0 would then re-run every shape-based migration over data a current
+    // build wrote: the heading-mangle bug through a different door (Claude
+    // sweep 2026-09-13). A file that has the key at all was written by a
+    // build that knew about versions, so a numeric string is read as its
+    // number and anything else counts as current.
+    const rawVersion =
+      typeof raw === "object" && raw !== null && "settingsVersion" in raw
+        ? (raw as Record<string, unknown>).settingsVersion
+        : undefined;
+    if (rawVersion !== undefined && typeof rawVersion !== "number") {
+      const asNumber = typeof rawVersion === "string" ? Number(rawVersion) : NaN;
+      saved.settingsVersion = Number.isFinite(asNumber) ? asNumber : CURRENT_SETTINGS_VERSION;
+    }
     this.settings = Object.assign({}, DEFAULT_SETTINGS, saved);
 
     // One-time migrations of legacy settings, gated on settingsVersion.

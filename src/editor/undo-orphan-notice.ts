@@ -97,28 +97,38 @@ function namesIn(lines: string[]): { defined: Map<string, string>; referenced: S
 // replaces the old notice rather than stacking toasts up.
 let standing: { notice: Notice; names: string[] } | null = null;
 
-// The footnotes whose creation the plugin itself had to split into two
-// history steps (the reference through a table cell's editor, the
-// definition through the main editor). Only for those is "undo again to
-// remove the reference too" a promise the plugin can keep: the reference
-// step is exactly the previous one. For any other undo that strands a
+// The one footnote whose creation the plugin itself last had to split
+// into two history steps (the reference through a table cell's editor, the
+// definition through the main editor). Only for it is "undo again to
+// remove the reference too" a promise the plugin can keep, and only for
+// the undo that takes that definition back out: the reference step is
+// exactly the previous one THEN. For any other undo that strands a
 // reference - a definition typed by hand, a definition press after a
-// hand-typed reference - the notice states the fact and stops there
-// (Jason's report 2026-09-11: the promise was made for every such undo).
-// Names are kept lowercased, as ids fold case.
-const splitCreations = new Set<string>();
+// hand-typed reference, or the same name in another note weeks later -
+// the notice states the fact and stops there (Jason's report 2026-09-11:
+// the promise was made for every such undo). The record used to be a set
+// of names that was never emptied and knew nothing of which note or which
+// moment, so one cell creation made its name promising forever,
+// everywhere (Claude sweep 2026-09-13). Now it is the note's text as it
+// stood before the definition landed: an undo that takes the definition
+// out leaves the note reading exactly that, and nothing else does.
+let lastSplit: { name: string; textBefore: string } | null = null;
 
-/** Record that `name`'s reference and definition landed in two separate history steps, the reference first. */
-export function noteSplitCreation(name: string): void {
-    splitCreations.add(name.toLowerCase());
+/** Record that `name`'s reference and definition are landing in two separate history steps, the reference first; `textBefore` is the note's text just before the definition's step. Without it, no promise is ever made for the name. */
+export function noteSplitCreation(name: string, textBefore?: string): void {
+    lastSplit = textBefore === undefined ? null : { name: name.toLowerCase(), textBefore };
 }
 
-/** The notice for `orphaned` (already quoted and joined as `refs`): the second-undo guidance only when every name came from a split creation. Exported for the unit tests. */
-export function undoOrphanMessage(orphaned: string[], refs: string): string {
+/** The notice for `orphaned` (already quoted and joined as `refs`): the second-undo guidance only when the one orphaned name is the last split creation and `textAfterUndo` is the note as it stood before that creation's definition landed. Exported for the unit tests. */
+export function undoOrphanMessage(orphaned: string[], refs: string, textAfterUndo?: string): string {
     const one = orphaned.length === 1;
-    const promise = orphaned.every((name) => splitCreations.has(name.toLowerCase()))
-        ? ` Undo again to remove the ${one ? "reference" : "references"} too.`
-        : "";
+    const promise =
+        one &&
+        lastSplit !== null &&
+        orphaned[0].toLowerCase() === lastSplit.name &&
+        textAfterUndo === lastSplit.textBefore
+            ? ` Undo again to remove the reference too.`
+            : "";
     // "the footnote reference" spelled out, so the toast says what is left
     // behind rather than leaving it to the quoted name (Jason, 2026-09-11)
     return `The undo removed the footnote definition, but the footnote ${one ? "reference" : "references"} ${refs} ${one ? "is" : "are"} still in the note.${promise}`;
@@ -172,7 +182,7 @@ export function undoOrphanNoticeExtension() {
         const refs = orphaned.map(quotedReference).join(", ");
         standing?.notice.hide();
         standing = {
-            notice: showNotice(undoOrphanMessage(orphaned, refs), 8000),
+            notice: showNotice(undoOrphanMessage(orphaned, refs, update.state.doc.toString()), 8000),
             names: orphaned,
         };
     });

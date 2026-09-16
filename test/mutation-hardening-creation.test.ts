@@ -967,7 +967,9 @@ describe("the inline selection conversion", () => {
             selectionPressHandled(fakePlugin(doc), doc, null, "inline"),
         ).not.toThrow();
         expect(doc.lines).toEqual(before);
-        expect(noticed(ProtectedCreationNotice)).toBe(true);
+        // in the selection's words since 2026-09-16 (B27: what the user
+        // did was select, so the advice to take all of it or none fits)
+        expect(noticed(ProtectedSelectionNotice)).toBe(true);
     });
 });
 

@@ -40,7 +40,7 @@ function withSaved(data: Record<string, unknown>): {
 }
 
 describe("a settingsVersion whose type does not match its default", () => {
-    it.fails('a version saved as the string "2" leaves the heading alone', async () => {
+    it('a version saved as the string "2" leaves the heading alone', async () => {
         // the parser keeps only values whose type matches the type of their
         // default, so "2" is dropped, the version reads as 0, and the v1
         // heading rewrite prepends "# " to a value the user chose on purpose
@@ -55,7 +55,7 @@ describe("a settingsVersion whose type does not match its default", () => {
         expect(saves()).toBe(0);
     });
 
-    it.fails("a null version does the same", async () => {
+    it("a null version does the same", async () => {
         const { plugin } = withSaved({
             settingsVersion: null,
             footnoteSectionHeading: "**Footnotes**",
