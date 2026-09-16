@@ -37,6 +37,13 @@ const stripCrLine = (line: string): string =>
 function parsePrefixValue(captured: string | undefined): string | null {
     const value = (captured ?? "").trim();
     const quoted = value.match(/^(["'])(.*)\1$/);
+    // A closing quote that YAML itself escapes ("2.\"" with an odd run
+    // of backslashes before it, '2.'' with a doubled quote at the end)
+    // never closes the value: Obsidian's Properties panel shows "Invalid
+    // properties" for the note (probed 2026-09-16, GLM hunt cycle 6), so
+    // there is no prefix the user can see, and none to honor.
+    if (quoted && quoted[1] === '"' && /(?<!\\)(?:\\\\)*\\$/.test(quoted[2])) return null;
+    if (quoted && quoted[1] === "'" && quoted[2].endsWith("'") && !/^(?:''|[^'])*$/.test(quoted[2])) return null;
     if (quoted) {
         // Inside the quotes, YAML's own escapes are resolved the way
         // Obsidian resolves them before it shows the value: a doubled

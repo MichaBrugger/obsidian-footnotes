@@ -2379,6 +2379,9 @@ export function definitionStartLines(
     // the line above was a link reference definition, whose title may
     // follow on this line
     let lrdAbove = false;
+    // the line above was a link reference label alone ("[foo]:") whose
+    // destination follows on this line
+    let lrdDestinationNext = false;
     for (let i = 0; i < lines.length; i++) {
         // a trailing carriage return is dropped before the line is judged,
         // as scanDocument drops it, so the end-anchored patterns below
@@ -2453,6 +2456,29 @@ export function definitionStartLines(
         const lrdTitle = lrdAbove && /^ {0,3}(?:"[^"]*"|'[^']*'|\([^)]*\))\s*$/.test(bare);
         lrdAbove = false;
         if (lrdTitle) {
+            open = "none";
+            continue;
+        }
+        // The destination may sit on the line under the label too
+        // ("[foo]:" then "/url", CommonMark 4.7): Reading view renders
+        // the link and the footnote label under the pair as a definition
+        // (GLM hunt cycle 6, probed 2026-09-16). "[foo]:" with nothing
+        // under it is paragraph text.
+        if (lrdDestinationNext) {
+            lrdDestinationNext = false;
+            open = "none";
+            lrdAbove = true;
+            continue;
+        }
+        if (
+            open !== "paragraph" &&
+            /^ {0,3}\[(?!\^)[^\]]+\]:\s*$/.test(bare) &&
+            i + 1 < lines.length &&
+            !scan.isProtected[i + 1] &&
+            /^\s*\S+\s*$/.test(lines[i + 1].replace(BlockquotePrefix, "")) &&
+            blockquoteDepth(lines[i + 1]).depth === depth
+        ) {
+            lrdDestinationNext = true;
             open = "none";
             continue;
         }
