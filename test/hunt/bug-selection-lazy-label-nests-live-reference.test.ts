@@ -128,14 +128,14 @@ describe("a selection holding a lazy label", () => {
         expect(docContext(doc).definitionStarts()[5]).toBe(true);
     });
 
-    it.fails("selecting the lazy label line refuses instead of nesting its reference", async () => {
+    it("selecting the lazy label line refuses instead of nesting its reference", async () => {
         const doc = fakeEditor(LINES, { line: 1, ch: 0 }, { line: 1, ch: LINES[1].length });
         await insertAutonumFootnote(fakePlugin(doc));
         expect(doc.lines).toEqual(LINES);
         expect(noticed(NestedFootnoteNotice)).toBe(true);
     });
 
-    it.fails("selecting the paragraph line through the lazy label refuses too", async () => {
+    it("selecting the paragraph line through the lazy label refuses too", async () => {
         const doc = fakeEditor(LINES, { line: 0, ch: 0 }, { line: 1, ch: LINES[1].length });
         await insertAutonumFootnote(fakePlugin(doc));
         expect(doc.lines).toEqual(LINES);
@@ -146,7 +146,7 @@ describe("a selection holding a lazy label", () => {
 describe("a table cell whose whole text is label-shaped", () => {
     const cellLines = ["| [^x]: y | b |", "| --- | --- |", "| 1 | 2 |"];
 
-    it.fails("selecting the whole cell refuses instead of nesting its reference", () => {
+    it("selecting the whole cell refuses instead of nesting its reference", () => {
         const { cell, dispatched } = fakeCell("[^x]: y", 0, "[^x]: y".length);
         const doc = fakeCellEditor(cellLines, 3);
         const handled = selectionPressHandled(fakePlugin(doc), doc, cell, "autonum", {

@@ -49,30 +49,46 @@ function fakePlugin(doc: FakeEditor): FootnotePlugin {
     );
 }
 
-const LINES = ["prose", "[^1]: lazy body", "", "[^1]: real body"];
+// RULED 2026-09-15 (Jason): a lazy label is treated as the definition the
+// user meant, so a press inside its "[^1]" behaves as on a real definition
+// label: it jumps to the footnote's reference in the text, or explains that
+// nothing references it, and never inserts. (The sweep expected the other
+// half of the cascade to claim it and jump to the real definition below;
+// the ruling picked the definition reading.)
 
-describe("a caret on a lazy label line's live reference", () => {
-    it.fails("numbered: jumps to the real definition instead of nesting inside the reference", async () => {
+const LINES = ["prose", "[^1]: lazy body", "", "use[^1] here", "", "[^1]: real body"];
+
+describe("a caret on a lazy label line's own reference", () => {
+    it("numbered: jumps to the reference in the text instead of nesting inside the label", async () => {
         const doc = fakeEditor(LINES, { line: 1, ch: 2 });
         await insertAutonumFootnote(fakePlugin(doc));
         expect(doc.transactions).toBe(0);
-        expect(doc.getCursor()).toEqual({ line: 3, ch: "[^1]: real body".length });
+        expect(doc.getCursor()).toEqual({ line: 3, ch: "use[^1]".length });
         expect(doc.lines.join("\n")).toBe(LINES.join("\n"));
     });
 
-    it.fails("named: jumps to the real definition instead of planting a placeholder inside the reference", async () => {
+    it("named: jumps to the reference instead of planting a placeholder inside the label", async () => {
         const doc = fakeEditor(LINES, { line: 1, ch: 2 });
         await insertNamedFootnote(fakePlugin(doc));
         expect(doc.transactions).toBe(0);
-        expect(doc.getCursor()).toEqual({ line: 3, ch: "[^1]: real body".length });
+        expect(doc.getCursor()).toEqual({ line: 3, ch: "use[^1]".length });
         expect(doc.lines.join("\n")).toBe(LINES.join("\n"));
     });
 
-    it.fails("inline: jumps to the real definition instead of wrapping a placeholder inside the reference", async () => {
+    it("inline: jumps to the reference instead of wrapping a placeholder inside the label", async () => {
         const doc = fakeEditor(LINES, { line: 1, ch: 2 });
         await insertInlineFootnote(fakePlugin(doc));
         expect(doc.transactions).toBe(0);
-        expect(doc.getCursor()).toEqual({ line: 3, ch: "[^1]: real body".length });
+        expect(doc.getCursor()).toEqual({ line: 3, ch: "use[^1]".length });
         expect(doc.lines.join("\n")).toBe(LINES.join("\n"));
+    });
+
+    it("with no reference anywhere else, the press changes nothing and moves nowhere", async () => {
+        const lonely = ["prose", "[^1]: lazy body", "", "[^1]: real body"];
+        const doc = fakeEditor(lonely, { line: 1, ch: 2 });
+        await insertAutonumFootnote(fakePlugin(doc));
+        expect(doc.transactions).toBe(0);
+        expect(doc.getCursor()).toEqual({ line: 1, ch: 2 });
+        expect(doc.lines.join("\n")).toBe(lonely.join("\n"));
     });
 });

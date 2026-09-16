@@ -47,14 +47,14 @@ function press(doc: ReturnType<typeof fakeEditor>): boolean {
 }
 
 describe("a press on a quoted definition's continuation line", () => {
-    it.fails("never nests a new footnote inside the quoted definition", () => {
+    it("never nests a new footnote inside the quoted definition", () => {
         const doc = fakeEditor(LINES, { cursor: CURSOR, edits: true });
         const handled = press(doc);
         expect(handled).toBe(true);
         expect(doc.lines).toEqual(LINES);
     });
 
-    it.fails("jumps back to the reference, like a column-0 continuation line", () => {
+    it("jumps back to the reference, like a column-0 continuation line", () => {
         const doc = fakeEditor(LINES, { cursor: CURSOR, edits: true });
         press(doc);
         expect(doc.moves).toEqual([{ line: 0, ch: 8 }]);

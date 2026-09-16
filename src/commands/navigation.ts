@@ -44,7 +44,16 @@ export function shouldJumpFromDefinitionToReference(
     // the caret on the LAST continuation line on purpose, and pressing the
     // hotkey there used to insert a new footnote instead of jumping back
     // (bug reported 2026-07-17).
-    if (definitionLabelIn(lineText) === null && !/^\s+\S/.test(lineText)) return false;
+    // A quoted line ("> cont line") may be a quoted definition's
+    // continuation, so it passes the cheap check too (Kimi and Claude sweeps
+    // 2026-09-13: a press at the end of such a line nested a footnote).
+    if (
+        definitionLabelIn(lineText) === null &&
+        !/^\s+\S/.test(lineText) &&
+        !/^ {0,3}>/.test(lineText)
+    ) {
+        return false;
+    }
 
     // #41: a "[^x]:" inside a code block is not a definition, and a
     // reference inside code is not somewhere to jump to. So look the
@@ -63,6 +72,9 @@ export function shouldJumpFromDefinitionToReference(
             cursorPosition.line <= candidate.end,
     );
     let definitionName: string | null = null;
+    // the line whose own "[^x]" must not count as the reference to jump
+    // to: a lazy label's, since its label reads as a reference
+    let ownLabelLine = -1;
     if (block) {
         definitionName = block.name;
     } else {
@@ -74,8 +86,29 @@ export function shouldJumpFromDefinitionToReference(
             lineText,
             ctx.maskedLine(cursorPosition.line),
         );
-        if (hit?.label.quoted && ctx.definitionStarts()[cursorPosition.line]) {
+        const line = cursorPosition.line;
+        if (hit?.label.quoted && ctx.definitionStarts()[line]) {
             definitionName = hit.name;
+        } else if (
+            hit &&
+            !ctx.definitionStarts()[line] &&
+            !ctx.scan.isProtected[line] &&
+            !ctx.scan.inCommentBlock[line]
+        ) {
+            // A LAZY label: a "[^x]:" line directly under prose, which
+            // Obsidian reads as paragraph text. The user almost certainly
+            // meant a definition and lost the blank line, so a press here
+            // behaves as on a real definition label: it jumps to the
+            // footnote's reference in the text, and never inserts (Jason's
+            // ruling, 2026-09-15). Its own "[^x]" is a live reference to
+            // Obsidian, so the search below skips this line.
+            definitionName = hit.name;
+            ownLabelLine = line;
+        } else if (!hit && /^ {0,3}>/.test(lineText)) {
+            // a quoted definition's continuation line: the quoted label
+            // above it, reached through unbroken quoted lines at the same
+            // depth, owns this line
+            definitionName = quotedDefinitionAbove(ctx, line);
         }
     }
     if (definitionName !== null) {
@@ -94,6 +127,7 @@ export function shouldJumpFromDefinitionToReference(
         // the exclusion was centralized 2026-09-08).
         const useStarts = ctx.definitionStarts();
         for (let i = 0; i < masked.length; i++) {
+            if (i === ownLabelLine) continue;
             for (const use of referenceOccurrences(lines[i], masked[i], useStarts[i])) {
                 if (use.name.toLowerCase() !== name) continue;
                 const newCursorPos = { line: i, ch: use.end };
@@ -113,6 +147,27 @@ export function shouldJumpFromDefinitionToReference(
         return true;
     }
     return false;
+}
+
+/**
+ * The name of the quoted definition whose continuation the quoted line
+ * `line` is, or null. Walking up from the line, every line must carry the
+ * same number of ">" markers and hold text: a blank quote line or a change
+ * of depth ends the definition (Obsidian's Reading view, 2026-09-16: "> [^1]:
+ * quoted" then "> cont line" renders as one footnote).
+ */
+function quotedDefinitionAbove(ctx: DocContext, line: number): string | null {
+    const depthOf = (text: string): number =>
+        (/^(?: {0,3}> ?)+/.exec(text)?.[0].match(/>/g) ?? []).length;
+    const depth = depthOf(ctx.lines[line]);
+    for (let j = line - 1; j >= 0; j--) {
+        const text = ctx.lines[j];
+        if (depthOf(text) !== depth) return null;
+        if (text.replace(/^(?: {0,3}> ?)+/, "").trim() === "") return null;
+        const hit = definitionLabelWithName(text, ctx.maskedLine(j));
+        if (hit) return ctx.definitionStarts()[j] ? hit.name : null;
+    }
+    return null;
 }
 
 /** Move the caret to the end of the named footnote's definition, counting its indented continuation lines as part of it. */

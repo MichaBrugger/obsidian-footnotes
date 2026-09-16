@@ -6,7 +6,6 @@ import { resetNotices } from "../helpers/notices";
 
 import {
     shouldJumpFromDefinitionToReference,
-    shouldJumpFromReferenceToDefinition,
 } from "../../src/commands/navigation";
 
 // spec question: when the caret sits inside the brackets of a lazy label
@@ -47,20 +46,25 @@ beforeEach(() => {
     resetNotices();
 });
 
+// RULED 2026-09-15 (Jason): the DEFINITION half owns the press. A lazy
+// label is treated as the definition the user meant, so the press jumps to
+// the footnote's reference in the text (none here, so it explains that and
+// moves nowhere), and the reference half is never reached.
 describe("a press inside a lazy label's own reference", () => {
-    it("control: the definition half of the cascade does not claim it", () => {
+    it("the definition half of the cascade claims it", () => {
         const doc = fakeEditor(mixed, { wholeDoc: true });
         expect(
             shouldJumpFromDefinitionToReference(mixed[1], at, fakePlugin({ enablePopupEditor: false }, doc), doc),
-        ).toBeFalsy();
+        ).toBe(true);
         expect(doc.moves).toEqual([]);
     });
 
-    it.fails("under reading one, the reference half claims it and lands on the real definition", () => {
-        const doc = fakeEditor(mixed, { wholeDoc: true });
+    it("with a reference elsewhere, it jumps there", () => {
+        const withUse = ["some prose paragraph", "[^1]: lazy label, paragraph text", "", "use[^1] here", "", "[^1]: the real definition"];
+        const doc = fakeEditor(withUse, { wholeDoc: true });
         expect(
-            shouldJumpFromReferenceToDefinition(mixed[1], at, fakePlugin({ enablePopupEditor: false }, doc), doc),
+            shouldJumpFromDefinitionToReference(withUse[1], at, fakePlugin({ enablePopupEditor: false }, doc), doc),
         ).toBe(true);
-        expect(doc.moves).toEqual([{ line: 3, ch: mixed[3].length }]);
+        expect(doc.moves).toEqual([{ line: 3, ch: "use[^1]".length }]);
     });
 });

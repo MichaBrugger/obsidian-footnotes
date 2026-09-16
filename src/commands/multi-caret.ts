@@ -84,8 +84,11 @@ function caretArtifact(
         };
     }
     if (emptyReferenceStart(masked, pos.ch) !== null) return { kind: "empty" };
+    // a lazy label's own "[^x]" counts as a reference (the definition-start
+    // flag says which labels are real), so a caret inside it is inside a
+    // reference, not on plain text (Kimi sweep 2026-09-13)
     const occurrence = occurrenceAtCursor(
-        referenceOccurrences(lineText, masked),
+        referenceOccurrences(lineText, masked, ctx.definitionStarts()[pos.line]),
         pos.ch,
     );
     if (occurrence !== null) return { kind: "ref", name: occurrence.name };

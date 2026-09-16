@@ -41,7 +41,7 @@ function fakePlugin(doc: FakeEditor): FootnotePlugin {
 }
 
 describe("a multi-caret press with one caret inside a lazy label line's live reference", () => {
-    it.fails("refuses with the multi-caret notice instead of nesting the new reference inside it", async () => {
+    it("refuses with the multi-caret notice instead of nesting the new reference inside it", async () => {
         const lines = ["prose", "[^1]: lazy body", "", "[^1]: real body"];
         const doc = sharedFakeEditor(lines, {
             carets: [

@@ -46,7 +46,7 @@ function fakeCell(text: string, anchor: number, head: number) {
 }
 
 describe("a cell selection over a label-shaped cell text's live reference", () => {
-    it.fails("refuses with the nested-footnote notice instead of converting", () => {
+    it("refuses with the nested-footnote notice instead of converting", () => {
         const lines = ["| H |", "| --- |", "| [^1]: x |", "", "[^1]: body"];
         const doc = fakeEditor(lines, {
             cursor: { line: 2, ch: 2 },

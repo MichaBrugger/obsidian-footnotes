@@ -231,7 +231,9 @@ export function selectionPressHandled(
         }
         // Nested footnotes are refused inside table cells too, under the
         // same plugin-wide ruling (2026-08-24).
-        if (spanTouchesFootnote(cellText, maskedCell, from, to)) {
+        // a definition cannot live in a cell, so a label-shaped "[^x]:"
+        // there is a reference (labelIsDefinition false)
+        if (spanTouchesFootnote(cellText, maskedCell, from, to, false)) {
             showNotice(NestedFootnoteNotice, 8000);
             return true;
         }
@@ -515,8 +517,13 @@ function spanTouchesFootnote(
     masked: string,
     from: number,
     to: number,
+    // whether a label-shaped start of the line is a definition's label
+    // (definitionStartLines decides); a LAZY label's "[^x]" is a live
+    // reference, and a selection over it nests that reference into the new
+    // footnote (Kimi and Claude sweeps 2026-09-13)
+    labelIsDefinition = true,
 ): boolean {
-    for (const occurrence of referenceOccurrences(lineText, masked)) {
+    for (const occurrence of referenceOccurrences(lineText, masked, labelIsDefinition)) {
         if (occurrence.start < to && occurrence.end > from) return true;
     }
     for (
@@ -582,7 +589,7 @@ function selectionTouchesFootnote(
         const lineText = ctx.lines[line] ?? "";
         const start = line === from.line ? from.ch : 0;
         const end = line === to.line ? to.ch : lineText.length;
-        if (spanTouchesFootnote(lineText, ctx.maskedLine(line), start, end)) {
+        if (spanTouchesFootnote(lineText, ctx.maskedLine(line), start, end, ctx.definitionStarts()[line])) {
             return true;
         }
     }

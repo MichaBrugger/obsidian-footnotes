@@ -14,7 +14,7 @@ import { insertionLandsIntact, readInlineFootnoteFromClipboard } from "./inline-
 import { ProtectedCreationNotice, simulatedMaskedLine } from "../editor/insertion-liveness";
 import { shouldJumpFromDefinitionToReference, shouldJumpFromReferenceToDefinition } from "./navigation";
 import { propertiesWidgetOwnsFocus, readingViewActive, viewEditor } from "../editor/obsidian-internals";
-import { caretGuardsHandled, warnProtectedCaretIfInside } from "./press-guards";
+import { caretGuardsHandled, warnDefinitionCaretIfInside, warnProtectedCaretIfInside } from "./press-guards";
 import { selectionPressHandled, submitActiveNameModal } from "./selection-footnote";
 import { multiCaretPastePressHandled, multiCaretPressHandled } from "./multi-caret";
 import { activeTableCellEditor, resolvedCaret, runOutsideTableCell, TableCellEditor } from "../editor/table-cursor";
@@ -305,6 +305,12 @@ export async function insertInlineFootnote(plugin: FootnotePlugin) {
         ) {
             return;
         }
+        // the blank line between two of a definition's continuation lines
+        // is inside the definition too, but carries no definition-shaped
+        // text for the jump step to see: refuse there like the numbered and
+        // named keys do, instead of planting a nested "^[]" (GLM sweep
+        // 2026-09-13)
+        if (warnDefinitionCaretIfInside(doc, cell, cursorPosition, ctx)) return;
         // inside a real reference, navigate instead of nesting "^[]"
         if (navigateReferenceIfInside(plugin, doc, cell, ctx)) return;
         // creating a footnote inside protected text (code, math, comments,
@@ -348,6 +354,8 @@ export async function pasteInlineFootnote(plugin: FootnotePlugin) {
         ) {
             return;
         }
+        // the same definition-interior guard as the inline key above
+        if (warnDefinitionCaretIfInside(doc, pasteCell, pastePosition, pasteCtx)) return;
         if (navigateReferenceIfInside(plugin, doc, pasteCell, pasteCtx)) return;
         // creating a footnote inside protected text (code, math, comments,
         // frontmatter) is blocked outright. Before the clipboard await, so a

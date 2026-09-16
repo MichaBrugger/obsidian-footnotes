@@ -102,13 +102,13 @@ describe("a press on the blank line inside a definition block", () => {
         expect(noticed(NestedFootnoteNotice)).toBe(true);
     });
 
-    it.fails("the inline key must not plant ^[] in the gap", async () => {
+    it("the inline key must not plant ^[] in the gap", async () => {
         const doc = fakeEditor(GAP_LINES, { line: 4, ch: 0 });
         await insertInlineFootnote(fakePlugin(doc));
         expect(doc.lines).toEqual(GAP_LINES);
     });
 
-    it.fails("the paste key must not plant the clipboard in the gap", async () => {
+    it("the paste key must not plant the clipboard in the gap", async () => {
         vi.stubGlobal("navigator", {
             clipboard: { readText: () => Promise.resolve("clip") },
         });
@@ -119,7 +119,7 @@ describe("a press on the blank line inside a definition block", () => {
 });
 
 describe("the same gap in a CONVERTED multi-paragraph definition", () => {
-    it.fails("the inline key must not plant ^[] on the four-space separator", async () => {
+    it("the inline key must not plant ^[] on the four-space separator", async () => {
         const doc = fakeEditor(CONVERTED_LINES, { line: 3, ch: 2 });
         await insertInlineFootnote(fakePlugin(doc));
         expect(doc.lines).toEqual(CONVERTED_LINES);

@@ -92,7 +92,7 @@ describe("the caret inside a column-0 lazy label's own reference", () => {
         expect(referenceOccurrenceAtCursor(mixed[1], { line: 1, ch: 3 }, doc)?.target.name).toBe("1");
     });
 
-    it.fails("and the press does not write a new reference inside the old one's brackets", async () => {
+    it("and the press does not write a new reference inside the old one's brackets", async () => {
         const doc = fakeEditor(mixed, { cursor: { line: 1, ch: 3 }, edits: true, wholeDoc: true });
         await insertAutonumFootnote(pressPlugin(doc));
         expect(doc.lines[1]).toBe("[^1]: lazy body");

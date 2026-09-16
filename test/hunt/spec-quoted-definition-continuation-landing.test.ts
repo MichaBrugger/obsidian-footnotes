@@ -74,7 +74,7 @@ describe("a quoted definition with a continuation line", () => {
         expect(doc.moves).toEqual([{ line: 4, ch: multi[4].length }]);
     });
 
-    it.fails("(c) under reading two, a press on that continuation line jumps back to the reference", () => {
+    it("(c) under reading two, a press on that continuation line jumps back to the reference", () => {
         const doc = fakeEditor(multi, { wholeDoc: true });
         const handled = shouldJumpFromDefinitionToReference(
             multi[4],

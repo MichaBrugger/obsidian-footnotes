@@ -92,7 +92,7 @@ describe("a press on a quoted definition's continuation line", () => {
         });
     });
 
-    it.fails("does not write a footnote into the definition's body", () => {
+    it("does not write a footnote into the definition's body", () => {
         const doc = fakeEditor(callout, {
             cursor: { line: 4, ch: callout[4].length },
             edits: true,

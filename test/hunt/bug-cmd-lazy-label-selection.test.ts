@@ -41,7 +41,7 @@ function fakePlugin(doc: FakeEditor): FootnotePlugin {
 }
 
 describe("a selection covering a lazy label line's live reference", () => {
-    it.fails("refuses with the nested-footnote notice instead of converting", async () => {
+    it("refuses with the nested-footnote notice instead of converting", async () => {
         const lines = ["prose", "[^1]: lazy body", "", "[^1]: real body"];
         const doc = sharedFakeEditor(lines, {
             cursor: { line: 1, ch: 0 },
@@ -58,7 +58,7 @@ describe("a selection covering a lazy label line's live reference", () => {
         expect(doc.lines.join("\n")).toBe(lines.join("\n"));
     });
 
-    it.fails("refuses when the selection covers only part of the lazy reference", async () => {
+    it("refuses when the selection covers only part of the lazy reference", async () => {
         const lines = ["prose", "[^1]: lazy body", "", "[^1]: real body"];
         const doc = sharedFakeEditor(lines, {
             cursor: { line: 1, ch: 1 },
