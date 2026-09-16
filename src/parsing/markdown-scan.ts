@@ -487,23 +487,53 @@ class ReferenceShapeIndex {
  */
 export function maskLineRegions(
     line: string,
-    // A named object rather than two true/false arguments in a row, so a
-    // call like `maskLineRegions(line, { math: true })` says out loud which
+    // A named object rather than a row of positional arguments, so a call
+    // like `maskLineRegions(line, { math: true })` says out loud which
     // region is continuing.
-    startsIn: { comment?: boolean; math?: boolean } = {},
-): { masked: string; endsInComment: boolean; endsInMath: boolean } {
+    startsIn: {
+        comment?: boolean;
+        math?: boolean;
+        /**
+         * The length of the backtick run of a code span that opened on an
+         * earlier line and is still open at the start of this one (0 or
+         * missing: none). Everything up to the first run of exactly that
+         * length is code; a line with no such run is code in full.
+         */
+        code?: number;
+        /**
+         * The position of a backtick run on THIS line that opens a code
+         * span closed on a later line, which scanDocument has established
+         * by looking ahead. Everything from that run to the end of the
+         * line is code. Without it, a run with no closer on its line is
+         * literal backticks, as it always was.
+         */
+        codeOpenerAt?: number;
+    } = {},
+): {
+    masked: string;
+    endsInComment: boolean;
+    endsInMath: boolean;
+    /** The run length of a code span still open at the end of this line (0: none). */
+    endsInCode: number;
+    /** The backtick runs on this line that nothing on the line closes, in order: candidates for a span that closes on a later line. */
+    unmatchedRuns: { at: number; length: number }[];
+} {
     const startInComment = startsIn.comment ?? false;
     const startInMath = startsIn.math ?? false;
+    const startInCode = startsIn.code ?? 0;
+    const codeOpenerAt = startsIn.codeOpenerAt ?? -1;
+    const unmatchedRuns: { at: number; length: number }[] = [];
     // The quick way out: nothing on this line could open or close any of
-    // the three constructs, so there is nothing to mask.
+    // the constructs, so there is nothing to mask.
     if (
         !startInComment &&
         !startInMath &&
+        startInCode === 0 &&
         !line.includes("`") &&
         !line.includes("<!--") &&
         !line.includes("$")
     ) {
-        return { masked: line, endsInComment: false, endsInMath: false };
+        return { masked: line, endsInComment: false, endsInMath: false, endsInCode: 0, unmatchedRuns };
     }
 
     const chars = line.split("");
@@ -525,8 +555,42 @@ export function maskLineRegions(
         deadDollarFrom = -1;
     };
     let i = 0;
+    // The next run of exactly `length` backticks at or after `from` that
+    // is not inside a reference shape, or -1. Inside a code span a
+    // backslash is an ordinary character, so this never skips escapes;
+    // only an OPENING run has to be unescaped, and that is checked where
+    // the run is found.
+    const closingRun = (from: number, length: number): number => {
+        for (let j = from; j < line.length; ) {
+            if (line[j] !== "`") {
+                j++;
+                continue;
+            }
+            const candidate = j;
+            while (line[j] === "`") j++;
+            if (j - candidate === length && !insideReferenceShape(candidate)) return candidate;
+        }
+        return -1;
+    };
 
-    if (startInComment) {
+    if (startInCode > 0) {
+        // A code span that opened on an earlier line: everything up to the
+        // run that closes it is code, and a line with no such run is code
+        // in full (Reading view renders the whole stretch as one code
+        // span; Jason's check 2026-09-16, B30).
+        const close = closingRun(0, startInCode);
+        if (close === -1) {
+            return {
+                masked: "\0".repeat(line.length),
+                endsInComment: false,
+                endsInMath: false,
+                endsInCode: startInCode,
+                unmatchedRuns,
+            };
+        }
+        blot(0, close + startInCode);
+        i = close + startInCode;
+    } else if (startInComment) {
         // text inside a comment is literal, so the first "-->" closes it,
         // no exceptions
         const close = line.indexOf("-->");
@@ -535,6 +599,8 @@ export function maskLineRegions(
                 masked: "\0".repeat(line.length),
                 endsInComment: true,
                 endsInMath: false,
+                endsInCode: 0,
+                unmatchedRuns,
             };
         }
         blot(0, close + 3);
@@ -548,6 +614,8 @@ export function maskLineRegions(
                 masked: "\0".repeat(line.length),
                 endsInComment: false,
                 endsInMath: true,
+                endsInCode: 0,
+                unmatchedRuns,
             };
         }
         blot(0, close + 2);
@@ -570,26 +638,29 @@ export function maskLineRegions(
             const runStart = i;
             while (line[i] === "`") i++;
             const runLength = i - runStart;
-            // Look for the next run of backticks of exactly this length.
-            // Inside a code span a backslash is an ordinary character, so
-            // this search must NOT skip over escapes. Only the opening run
-            // had to be unescaped.
-            let close = -1;
-            for (let j = i; j < line.length; ) {
-                if (line[j] !== "`") {
-                    j++;
-                    continue;
+            // Look for the next run of backticks of exactly this length; a
+            // run inside "[^…]" can't close the span either, for the same
+            // reason as the opener check above.
+            const close = closingRun(i, runLength);
+            if (close === -1) {
+                // Nothing on this line closes it. When the scan has found
+                // the closer on a later line of the paragraph, the span
+                // runs from here to the end of the line; otherwise these
+                // are literal backticks, and the run is reported so the
+                // scan can look ahead.
+                if (runStart === codeOpenerAt) {
+                    blot(runStart, line.length);
+                    return {
+                        masked: chars.join(""),
+                        endsInComment: false,
+                        endsInMath: false,
+                        endsInCode: runLength,
+                        unmatchedRuns,
+                    };
                 }
-                const candidate = j;
-                while (line[j] === "`") j++;
-                // a run inside "[^…]" can't close the span either, for the
-                // same reason as the opener check above
-                if (j - candidate === runLength && !insideReferenceShape(candidate)) {
-                    close = candidate;
-                    break;
-                }
+                unmatchedRuns.push({ at: runStart, length: runLength });
+                continue;
             }
-            if (close === -1) continue; // nothing closes it: literal backticks
             blot(runStart, close + runLength);
             i = close + runLength;
             continue;
@@ -623,6 +694,8 @@ export function maskLineRegions(
                     masked: chars.join(""),
                     endsInComment: true,
                     endsInMath: false,
+                    endsInCode: 0,
+                    unmatchedRuns,
                 };
             }
             blot(i, close + 3);
@@ -645,6 +718,8 @@ export function maskLineRegions(
                         masked: chars.join(""),
                         endsInComment: false,
                         endsInMath: true,
+                        endsInCode: 0,
+                        unmatchedRuns,
                     };
                 }
                 blot(i, close + 2);
@@ -690,7 +765,7 @@ export function maskLineRegions(
         }
         i++;
     }
-    return { masked: chars.join(""), endsInComment: false, endsInMath: false };
+    return { masked: chars.join(""), endsInComment: false, endsInMath: false, endsInCode: 0, unmatchedRuns };
 }
 
 /** The per-line facts the whole-document walk produces. */
@@ -708,6 +783,21 @@ export interface DocumentScan {
     startsInComment: boolean[];
     /** Line `i` begins inside a multi-line $$ math block (a closer or interior line). */
     startsInMath: boolean[];
+    /**
+     * Line `i` begins inside an inline code span that opened on an earlier
+     * line: the length of its backtick run, or 0. CommonMark lets a code
+     * span run across the lines of one paragraph, and Obsidian's Reading
+     * view renders it as one span, so a "[^7]" inside it is dead text
+     * (Jason's check 2026-09-16, B30). A line inside such a span with no
+     * closer on it is protected in full.
+     */
+    startsInCode: number[];
+    /**
+     * The position of the backtick run on line `i` that opens a code span
+     * closed on a later line, or -1. The masked twin blots the line from
+     * there to its end.
+     */
+    codeOpenerAt: number[];
     /**
      * Line `i` begins inside an open fenced code block: an interior or a
      * closer line, at any blockquote depth. The selection edge-cut checks
@@ -841,6 +931,8 @@ export function scanDocument(lines: string[]): DocumentScan {
     const isProtected = new Array<boolean>(lines.length).fill(false);
     const startsInComment = new Array<boolean>(lines.length).fill(false);
     const startsInMath = new Array<boolean>(lines.length).fill(false);
+    const startsInCode = new Array<number>(lines.length).fill(0);
+    const codeOpenerAt = new Array<number>(lines.length).fill(-1);
     const startsInFence = new Array<boolean>(lines.length).fill(false);
     const inCommentBlock = new Array<boolean>(lines.length).fill(false);
     const commentBlockCloseAt = new Array<number>(lines.length).fill(-1);
@@ -887,6 +979,45 @@ export function scanDocument(lines: string[]): DocumentScan {
     // drops below it ends the quote, and the region with it.
     let inComment = false;
     let inMath = false;
+    // the backtick run length of a code span open across lines, 0 for none
+    let codeRun = 0;
+    // Whether a run of `length` backticks that nothing on line `from - 1`
+    // closes is closed on a later line of the same paragraph. The search
+    // stops at a blank line and at a line that starts a block of its own
+    // (a fence, a heading, a rule), because a code span lives inside one
+    // paragraph.
+    const closesAhead = (from: number, length: number): boolean => {
+        for (let k = from; k < src.length; k++) {
+            const text = src[k];
+            if (text.trim() === "") return false;
+            if (
+                /^ {0,3}(`{3,}|~{3,})/.test(text) ||
+                /^ {0,3}#{1,6}(?: |$)/.test(text) ||
+                /^ {0,3}([-*_])( *\1){2,} *$/.test(text)
+            ) {
+                return false;
+            }
+            if (maskLineRegions(text, { code: length }).endsInCode === 0) return true;
+        }
+        return false;
+    };
+    // The masking of an ordinary line's tail, with cross-line code spans
+    // settled: the first backtick run nothing on the line closes that IS
+    // closed further down the paragraph opens a span, and the line is
+    // masked again with that known. Returns the masking to read the other
+    // region facts from.
+    const maskWithCodeSpans = (i: number, startsIn: { comment?: boolean; math?: boolean; code?: number }) => {
+        let masked = maskLineRegions(src[i], startsIn);
+        for (const run of masked.unmatchedRuns) {
+            if (closesAhead(i + 1, run.length)) {
+                masked = maskLineRegions(src[i], { ...startsIn, codeOpenerAt: run.at });
+                codeOpenerAt[i] = run.at;
+                break;
+            }
+        }
+        codeRun = masked.endsInCode;
+        return masked;
+    };
     let regionDepth = 0;
     // An HTML comment that OPENS at the start of a line is an HTML block
     // (CommonMark type 2): the block runs through the line that holds the
@@ -1021,6 +1152,24 @@ export function scanDocument(lines: string[]): DocumentScan {
             // text and gets the full treatment below.
             inComment = false;
             inMath = false;
+        }
+        if (codeRun > 0) {
+            // A code span that opened on an earlier line runs on into this
+            // one. An interior line is code in full; the closer line keeps
+            // whatever live text follows the closing run, and that text can
+            // open code, a comment, or math of its own.
+            startsInCode[i] = codeRun;
+            inIndentedCode = false;
+            blockBoundary = false;
+            const closed = maskWithCodeSpans(i, { code: codeRun });
+            if (closed.endsInCode > 0 && codeOpenerAt[i] === -1) {
+                isProtected[i] = true;
+                continue;
+            }
+            inComment = closed.endsInComment;
+            inMath = closed.endsInMath;
+            if (inComment || inMath) regionDepth = depth;
+            continue;
         }
         if (inComment) {
             startsInComment[i] = true;
@@ -1478,8 +1627,8 @@ export function scanDocument(lines: string[]): DocumentScan {
             }
             continue;
         }
-        if (src[i].includes("<!--") || src[i].includes("$$")) {
-            const opened = maskLineRegions(src[i]);
+        if (src[i].includes("<!--") || src[i].includes("$$") || src[i].includes("`")) {
+            const opened = maskWithCodeSpans(i, {});
             inComment = opened.endsInComment;
             inMath = opened.endsInMath;
             if (inComment || inMath) regionDepth = depth;
@@ -1490,6 +1639,8 @@ export function scanDocument(lines: string[]): DocumentScan {
         isProtected,
         startsInComment,
         startsInMath,
+        startsInCode,
+        codeOpenerAt,
         startsInFence,
         endsProtected: endsProtectedNow(),
         endsProtectedAt,
@@ -1539,6 +1690,8 @@ export function maskProtectedLines(
             : maskLineRegions(line, {
                   comment: scan.startsInComment[i],
                   math: scan.startsInMath[i],
+                  code: scan.startsInCode[i],
+                  codeOpenerAt: scan.codeOpenerAt[i],
               })
                   .masked,
     );
@@ -1566,7 +1719,7 @@ export function maskedLineAt(lines: string[], i: number): string {
  */
 export function maskLineWithScan(
     lines: string[],
-    scan: Pick<DocumentScan, "isProtected" | "startsInComment" | "startsInMath">,
+    scan: Pick<DocumentScan, "isProtected" | "startsInComment" | "startsInMath" | "startsInCode" | "codeOpenerAt">,
     i: number,
 ): string {
     if (i < 0 || i >= lines.length) return "";
@@ -1576,6 +1729,8 @@ export function maskLineWithScan(
         : maskLineRegions(line, {
               comment: scan.startsInComment[i],
               math: scan.startsInMath[i],
+              code: scan.startsInCode[i],
+              codeOpenerAt: scan.codeOpenerAt[i],
           }).masked;
 }
 
@@ -1671,7 +1826,7 @@ export function definitionStartLines(
     lines: string[],
     scan: Pick<
         DocumentScan,
-        "isProtected" | "startsInComment" | "startsInMath" | "startsInFence" | "inCommentBlock" | "commentBlockCloseAt"
+        "isProtected" | "startsInComment" | "startsInMath" | "startsInCode" | "codeOpenerAt" | "startsInFence" | "inCommentBlock" | "commentBlockCloseAt"
     >,
     maskedAt: (i: number) => string,
 ): boolean[] {
@@ -1845,7 +2000,7 @@ export function findDefinitionBlocks(
     lines: string[],
     scan: Pick<
         DocumentScan,
-        "isProtected" | "startsInComment" | "startsInMath" | "startsInFence" | "inCommentBlock" | "commentBlockCloseAt"
+        "isProtected" | "startsInComment" | "startsInMath" | "startsInCode" | "codeOpenerAt" | "startsInFence" | "inCommentBlock" | "commentBlockCloseAt"
     > = scanDocument(lines),
     maskedLines?: string[],
     starts?: boolean[],

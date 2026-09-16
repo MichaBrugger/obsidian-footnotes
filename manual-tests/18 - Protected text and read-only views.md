@@ -117,3 +117,16 @@ An HTML comment line is a block, uniform[^h1] here:
 - [ ] Hotkey inside the hidden `[^n2]` (Source mode or Live Preview): navigates to its definition (or opens the popup), exactly like a visible reference
 - [ ] **Lint footnotes** (defaults): the missing-definition alert names `o1` (its only definition is commented out); `[^p9]:` becomes a definition (a blank line above it, then gathered to the bottom with the others; `tango[^p9]` renders after that); `[^h1]:` gathers too (it was a definition all along); nothing is inserted or moved inside either `%%` block, and the commented `[^o1]:` line is untouched; the hidden `[^n2]`, `[^n3]`, `[^2]` references are left where they are and nothing renumbers (the hidden `[^2]` holds its number)
 - [ ] Undo, turn `Delete orphaned definitions` ON, lint again: the `n2`, `n3`, and `2` definitions SURVIVE (referenced from inside comments); undo and turn it back OFF
+
+## A code span that wraps across lines (2026-09-16, B30)
+
+Settings: defaults. Reading view renders a backtick run that opens on one line and closes on the next as ONE code span, so the reference inside it is dead text; Live Preview shows two half spans and a live-looking reference, and the plugin follows Reading view. Build this paragraph:
+
+```
+Use of a `code
+span[^7] that wraps` onto the next line.
+```
+
+- [ ] Caret at the end of the paragraph, press the numbered key: the new footnote is `[^1]`, not `[^8]` (the `[^7]` inside the span reserves no number)
+- [ ] Lint footnotes: no alert names `[^7]` as a reference with no definition
+- [ ] Add a blank line between the two lines: now `[^7]` is a live reference again, the next number is `[^8]`, and the lint alert names it
