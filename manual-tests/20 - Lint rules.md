@@ -204,3 +204,20 @@ Tail prose keeps the definitions from being at the bottom already.
 ## H. Everything off (all four rules, Reindex, and the three Orphans-and-duplicates toggles)
 
 - [ ] The note is untouched and the toast says "All lint rules are turned off in the plugin settings, so there is nothing to lint." (2026-08-10)
+
+## I. Move-to-bottom and an indented code chunk under the heading (2026-09-16)
+
+Settings: `Move definitions to the bottom` ON, section heading `# Footnotes` ON. Build this note:
+
+```
+[^1]: sees [^1]
+
+# Footnotes
+
+	code-shaped[^89]
+```
+
+The last line starts with a tab, so it is an indented code block, and the `[^89]` inside it is dead text.
+
+- [ ] Lint: the definition is parked BELOW the code chunk, not above it (`# Footnotes`, blank, the tab line, blank, `[^1]: sees [^1]`), and in Reading view the tab line still renders as code with `[^89]` shown literally
+- [ ] Lint again: nothing changes

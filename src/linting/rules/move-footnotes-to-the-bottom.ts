@@ -113,8 +113,8 @@ export function moveFootnoteDefinitionsToBottom(
         // which code fences pair with which, so the protected regions come
         // out the same.
         let anchorEnd = -1;
+        const bodyScan = scanDocument(body);
         if (sectionHeading) {
-            const bodyScan = scanDocument(body);
             anchorEnd = findLineRunEnd(
                 body,
                 bodyScan.isProtected,
@@ -139,14 +139,50 @@ export function moveFootnoteDefinitionsToBottom(
                 }
                 out.push(body[i]);
             }
+            const rest = body.slice(anchorEnd + 1);
+            while (rest.length > 0 && rest[0] === "") rest.shift();
+            // An indented code chunk right under the heading stays where it
+            // is, and the definitions go BELOW it. Parked above it, the
+            // last definition would swallow the chunk: an indented line
+            // after a definition's blank line continues the definition, so
+            // the code stopped being code and a reference-shaped string
+            // inside it woke up as a live reference (found by the
+            // conservation property 2026-09-11; Jason's ruling 2026-09-16,
+            // below the chunk, as for any block). The chunk runs while its
+            // lines are indented code, blank lines between them included.
+            let chunkEnd = 0;
+            // rest[k] is body[offset + k], which is how its scan facts are read
+            const offset = body.length - rest.length;
+            const indentedCode = (k: number) =>
+                k < rest.length && bodyScan.isProtected[offset + k] && /^(\t| {4})/.test(rest[k]);
+            if (indentedCode(0)) {
+                while (chunkEnd < rest.length) {
+                    const line = rest[chunkEnd];
+                    if (line === "") {
+                        let next = chunkEnd + 1;
+                        while (next < rest.length && rest[next] === "") next++;
+                        if (indentedCode(next)) {
+                            chunkEnd = next;
+                            continue;
+                        }
+                        break;
+                    }
+                    if (indentedCode(chunkEnd)) {
+                        chunkEnd++;
+                        continue;
+                    }
+                    break;
+                }
+            }
+            if (chunkEnd > 0) out.push("", ...rest.slice(0, chunkEnd));
             out.push("", ...definitions.split("\n"));
             // The rest of the note goes below the gathered definitions,
             // with a blank line between. Without it, the first line of that
             // text would be read as more of the last definition
             // (buildDefinitionAppend follows the same rule).
-            const rest = body.slice(anchorEnd + 1);
-            while (rest.length > 0 && rest[0] === "") rest.shift();
-            if (rest.length > 0) out.push("", ...rest);
+            const remainder = rest.slice(chunkEnd);
+            while (remainder.length > 0 && remainder[0] === "") remainder.shift();
+            if (remainder.length > 0) out.push("", ...remainder);
             const anchored = preserveLeadingThematicBreak(
                 isProtected[0],
                 out.join("\n") + "\n".repeat(trailingNewlines),

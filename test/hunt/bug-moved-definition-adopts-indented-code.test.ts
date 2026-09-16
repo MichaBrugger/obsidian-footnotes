@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { computeNextFootnoteNumber } from "../../src/parsing/footnote-grammar";
 import { lintFootnotes } from "../../src/linting/linter";
 import { findDefinitionBlocks, scanDocument } from "../../src/parsing/markdown-scan";
 
@@ -13,26 +14,45 @@ import { findDefinitionBlocks, scanDocument } from "../../src/parsing/markdown-s
 //
 //     <tab>code-shaped[^89]
 //
-// Move-to-bottom gathers the definition under the heading, which puts the
+// Move-to-bottom gathered the definition under the heading, which put the
 // code chunk directly after the definition's blank line. An indented line
 // after a definition's blank gap CONTINUES that definition, so the code
-// chunk stops being code and becomes footnote body - and the "[^89]" inside
-// it, dead as code, wakes up as a live reference. The rule moved a
+// chunk stopped being code and became footnote body, and the "[^89]"
+// inside it, dead as code, woke up as a live reference. The rule moved a
 // definition onto a chunk it then swallowed.
 //
-// The fix is the move rule's: when the slot under the heading is followed
-// by an indented chunk, keep a separating line that cannot continue the
-// definition (or refuse the move), so the chunk stays code.
+// Jason's ruling (2026-09-16): the definitions are parked BELOW the code
+// chunk, the way they go below any block, so the chunk stays code.
 
-describe("move-to-bottom must not park a definition where indented code continues it", () => {
+describe("move-to-bottom parks a definition below an indented code chunk, never above it", () => {
     const doc = "[^1]: sees [^1]\n\n# Footnotes\n\n\tcode-shaped[^89]";
     const options = { fixPunctuation: false, fixLazyDefinitions: false, reindex: false, sectionHeading: "# Footnotes" };
 
-    it.fails("the code chunk stays standalone code after the move", () => {
+    it("the definition lands under the chunk and the chunk stays standalone code", () => {
         const out = lintFootnotes(doc, options);
+        expect(out).toBe("# Footnotes\n\n\tcode-shaped[^89]\n\n[^1]: sees [^1]");
         const lines = out.split("\n");
         const scan = scanDocument(lines);
-        expect(scan.isProtected[lines.length - 1]).toBe(true);
-        expect(findDefinitionBlocks(lines, scan).map((b) => b.end)).toEqual([2]);
+        expect(scan.isProtected[2]).toBe(true);
+        expect(findDefinitionBlocks(lines, scan)).toEqual([{ name: "1", start: 4, end: 4 }]);
+        // the reference-shaped string inside the code stays dead
+        expect(computeNextFootnoteNumber(out)).toBe(2);
+    });
+
+    it("a second lint changes nothing", () => {
+        const once = lintFootnotes(doc, options);
+        expect(lintFootnotes(once, options)).toBe(once);
+    });
+
+    it("a chunk of several indented lines with a blank line inside stays whole", () => {
+        const wide = "[^1]: sees [^1]\n\n# Footnotes\n\n\tone\n\n\ttwo\n\nTail prose.";
+        expect(lintFootnotes(wide, options)).toBe(
+            "# Footnotes\n\n\tone\n\n\ttwo\n\n[^1]: sees [^1]\n\nTail prose.",
+        );
+    });
+
+    it("control: prose under the heading still goes below the definitions", () => {
+        const prose = "[^1]: sees [^1]\n\n# Footnotes\n\nTail prose.";
+        expect(lintFootnotes(prose, options)).toBe("# Footnotes\n\n[^1]: sees [^1]\n\nTail prose.");
     });
 });
