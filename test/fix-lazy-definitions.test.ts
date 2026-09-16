@@ -13,6 +13,7 @@ import { lazyDefinitionLabelNames } from "../src/linting/rules/remove-orphaned-r
 import { footnoteRules } from "../src/linting/rules";
 import {
     definitionStartLines,
+    lazyDefinitionLabelLines,
     maskProtectedLines,
     scanDocument,
 } from "../src/parsing/markdown-scan";
@@ -84,10 +85,36 @@ describe("fixLazyDefinitions inserts the blank line a hidden definition needs", 
 
     it("never leaves a lazy label behind, and only ever inserts blank or bare-quote lines", () => {
         const isInsertable = (line: string) => /^ {0,3}(?:>[ \t]?)*$/.test(line) && line.trimEnd() === line;
+        // the protected lines of a note, as a sorted list of their text: the
+        // swallow guard's own measure of "the blank line would change how
+        // Obsidian reads the note"
+        const protectedTexts = (text: string): string => {
+            const lines = text.split(/\r?\n/);
+            const scan = scanDocument(lines);
+            return lines.filter((_, i) => scan.isProtected[i]).sort().join("\u0000");
+        };
         fc.assert(
             fc.property(docArb, (doc) => {
                 const fixed = fixLazyDefinitions(doc);
-                expect(lazyIn(fixed)).toEqual([]);
+                // A lazy label may only be left behind when the blank line
+                // it needs would make the definition swallow protected text
+                // below it (the swallow guard, 2026-09-15): for every label
+                // still lazy, inserting its blank line must change the set
+                // of protected lines.
+                const fixedLines = fixed.split(/\r?\n/);
+                const fixedScan = scanDocument(fixedLines);
+                const fixedMasked = maskProtectedLines(fixedLines, fixedScan);
+                const leftover = lazyDefinitionLabelLines(
+                    fixedLines,
+                    fixedScan,
+                    fixedMasked,
+                    definitionStartLines(fixedLines, fixedScan, (i) => fixedMasked[i]),
+                );
+                for (const at of leftover) {
+                    const markers = (/^((?: {0,3}>[ \t]?)*)/.exec(fixedLines[at])?.[1] ?? "").trimEnd();
+                    const trial = [...fixedLines.slice(0, at), markers, ...fixedLines.slice(at)].join("\n");
+                    expect(protectedTexts(trial)).not.toBe(protectedTexts(fixed));
+                }
                 // every input line survives, in order; the extra lines are insertable
                 const input = doc.split(/\r?\n/);
                 const output = fixed.split(/\r?\n/);

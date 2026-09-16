@@ -1197,7 +1197,12 @@ export function scanDocument(lines: string[]): DocumentScan {
     // <![CDATA[ is raw HTML and defines nothing, while <!DOCTYPE html>
     // ends at its own ">" and the label under it is a definition (probed
     // 2026-09-16, Kimi hunt cycle 1). Document level only.
-    let htmlBlock: { closer: RegExp | null } | null = null;
+    // `depth` is the blockquote depth the block opened at and `column` the
+    // content column of the list item it opened in (0 outside a list): an
+    // HTML block inside a quote or a list item is dead text too, and ends
+    // when its container does (Kimi hunt cycle 2, probed in Reading view
+    // 2026-09-16: a label under "> <div>" or "- <div>" defines nothing).
+    let htmlBlock: { closer: RegExp | null; depth: number; column: number } | null = null;
     const htmlBlockOpener = (text: string, paragraphOpen: boolean): { closer: RegExp | null } | null => {
         if (/^ {0,3}<(?:script|pre|style|textarea)(?:\s|>|$)/i.test(text)) {
             return { closer: /<\/(?:script|pre|style|textarea)>/i };
@@ -1292,8 +1297,18 @@ export function scanDocument(lines: string[]): DocumentScan {
         // line (dead too), or until the blank line that ends a type-6
         // block (the blank line itself is ordinary, and handled below).
         if (htmlBlock) {
-            if (htmlBlock.closer === null) {
-                if (src[i].trim() === "") {
+            // still inside the block's container: the same quote depth,
+            // and, inside a list item, indented to the item's content
+            // column (a blank line is judged below)
+            const inContainer =
+                depth >= htmlBlock.depth &&
+                (htmlBlock.column === 0 || rest.trim() === "" || leadingIndentWidth(rest) >= htmlBlock.column);
+            if (!inContainer) {
+                htmlBlock = null;
+                blockBoundary = true;
+                prevParagraph = false;
+            } else if (htmlBlock.closer === null) {
+                if (rest.trim() === "") {
                     htmlBlock = null;
                     blockBoundary = true;
                     prevParagraph = false;
@@ -1870,15 +1885,31 @@ export function scanDocument(lines: string[]): DocumentScan {
         // The other HTML block kinds open here, at the document level. A
         // block whose closer sits on its own opening line ("<!DOCTYPE
         // html>", "<?php ... ?>") is one dead line and a block boundary.
-        if (depth === 0 && /^ {0,3}</.test(rest)) {
-            const opener = htmlBlockOpener(rest, paragraphOpenBefore);
+        // ... at any quote depth, and behind a list marker ("- <div>"),
+        // where the block lives inside the item and its lines sit at the
+        // item's content column
+        const listItemHtml = rest.match(/^( {0,3})([-+*]|\d{1,9}[.)])( +)(?=<)/);
+        const htmlText = listItemHtml ? rest.slice(listItemHtml[0].length) : rest;
+        if (/^ {0,3}</.test(htmlText)) {
+            const opener = htmlBlockOpener(htmlText, listItemHtml ? false : paragraphOpenBefore);
             if (opener) {
                 isProtected[i] = true;
                 prevParagraph = false;
+                let column = 0;
+                if (listItemHtml && depth === 0) {
+                    // the item opens like any other list item, so the lines
+                    // after the block still belong to it
+                    const gap = listItemHtml[3].length > 4 ? 1 : listItemHtml[3].length;
+                    column = listItemHtml[1].length + listItemHtml[2].length + gap;
+                    while (listStack.length > 0 && listItemHtml[1].length < listStack[listStack.length - 1]) {
+                        listStack.pop();
+                    }
+                    listStack.push(column);
+                }
                 if (opener.closer && opener.closer.test(src[i].slice(src[i].indexOf("<") + 1))) {
                     blockBoundary = true;
                 } else {
-                    htmlBlock = opener;
+                    htmlBlock = { ...opener, depth, column };
                 }
                 continue;
             }
