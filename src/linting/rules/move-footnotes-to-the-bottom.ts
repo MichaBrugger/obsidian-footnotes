@@ -1,6 +1,5 @@
 import {
     findLineRunEnd,
-    protectedLines,
     scanDocument,
     removeLineRanges,
 } from "../../parsing/markdown-scan";
@@ -115,10 +114,12 @@ export function moveFootnoteDefinitionsToBottom(
         // out the same.
         let anchorEnd = -1;
         if (sectionHeading) {
+            const bodyScan = scanDocument(body);
             anchorEnd = findLineRunEnd(
                 body,
-                protectedLines(body),
+                bodyScan.isProtected,
                 sectionHeading.split("\n"),
+                bodyScan.inCommentBlock,
             );
         }
 

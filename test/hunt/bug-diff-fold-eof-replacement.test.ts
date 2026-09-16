@@ -15,7 +15,7 @@ import { lineDiffChanges, mapFoldLines } from "../../src/editor/document-diff";
 // line before the removal" - these lines were REPLACED, not removed.
 
 describe("mapFoldLines when a lint rewrites the folded section's last line at EOF", () => {
-    it.fails("a wholesale replacement of the fold's last line keeps the fold over the same lines", () => {
+    it("a wholesale replacement of the fold's last line keeps the fold over the same lines", () => {
         const before = "# H\nfoo\nbar";
         const after = "# H\nfoo\nBAZ";
         // the section still has three lines; the fold should still cover them
@@ -32,7 +32,7 @@ describe("mapFoldLines when a lint rewrites the folded section's last line at EO
         ]);
     });
 
-    it.fails("two folded body lines rewritten into one at EOF shrink the fold to the surviving line, not to nothing", () => {
+    it("two folded body lines rewritten into one at EOF shrink the fold to the surviving line, not to nothing", () => {
         const before = "# H\na\nb";
         const after = "# H\nc";
         // the section still has a body line; the fold should cover it

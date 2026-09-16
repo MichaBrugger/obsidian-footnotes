@@ -14,7 +14,7 @@ import { insertionLandsIntact, readInlineFootnoteFromClipboard } from "./inline-
 import { ProtectedCreationNotice, simulatedMaskedLine } from "../editor/insertion-liveness";
 import { shouldJumpFromDefinitionToReference, shouldJumpFromReferenceToDefinition } from "./navigation";
 import { propertiesWidgetOwnsFocus, readingViewActive, viewEditor } from "../editor/obsidian-internals";
-import { caretGuardsHandled, warnDefinitionCaretIfInside, warnProtectedCaretIfInside } from "./press-guards";
+import { warnTableEdgeCaretIfOutside, caretGuardsHandled, warnDefinitionCaretIfInside, warnProtectedCaretIfInside } from "./press-guards";
 import { selectionPressHandled, submitActiveNameModal } from "./selection-footnote";
 import { multiCaretPastePressHandled, multiCaretPressHandled } from "./multi-caret";
 import { activeTableCellEditor, resolvedCaret, runOutsideTableCell, TableCellEditor } from "../editor/table-cursor";
@@ -250,6 +250,10 @@ function insertInlineText(
     }
     runOutsideTableCell(doc, (cursorPosition) => {
         const lineText = doc.getLine(cursorPosition.line);
+        // a caret on a table row but outside its cells, or on the row of
+        // dashes under the header, would break the table (the same guard
+        // the numbered and named keys run)
+        if (lineText.includes("|") && warnTableEdgeCaretIfOutside(null, cursorPosition, docContext(doc))) return;
         const at = adjustFootnotePosition(cursorPosition, doc, lineText, plugin);
         // born-dead check (see simulatedMaskedLine). "Born-dead" means an
         // insertion that would not be a live footnote the moment it lands.

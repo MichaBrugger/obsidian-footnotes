@@ -16,9 +16,15 @@ import {
     maskInlineRegions,
     maskedLineAt,
 } from "../parsing/markdown-scan";
-import { cellCaret, TableCellEditor } from "../editor/table-cursor";
+import {
+    cellCaret,
+    isTableDelimiterRow,
+    TableCellEditor,
+    tableRowCellSpans,
+    tableRowLines,
+} from "../editor/table-cursor";
 
-import { NestedFootnoteNotice, showNotice } from "../editor/notice";
+import { NestedFootnoteNotice, NoFootnoteCreated, showNotice } from "../editor/notice";
 // The press guards. A footnote key has been pressed: does anything OTHER
 // than creation own this press? An empty placeholder gets a warning, a
 // filled inline footnote hops the caret out of itself, and protected text,
@@ -150,6 +156,47 @@ export function warnDefinitionCaretIfInside(
     );
     if (!inside) return false;
     showNotice(NestedFootnoteNotice, 8000);
+    return true;
+}
+
+const TableEdgeNotice =
+    NoFootnoteCreated + "the caret is at the edge of a table row, outside its cells. Put it inside a cell.";
+const TableDelimiterNotice =
+    NoFootnoteCreated + "the caret is on the row of dashes under a table's header. Put it inside a cell.";
+
+/**
+ * When the caret sits on a table row but outside every cell, or anywhere on
+ * the row of dashes under the header: leave the caret alone, explain with a
+ * Notice, and report true.
+ *
+ * This is the main-editor path, which Source mode and a caret placed
+ * without entering a cell take; a caret inside a cell's own editor goes
+ * through the cell and never gets here. A reference written past the
+ * closing pipe is a cell beyond the header count, which Obsidian drops, so
+ * the footnote never renders and its definition is orphaned on arrival;
+ * one written before the opening pipe pushes the last cell out of the
+ * table; one written into the dashes ends the table. Selections doing
+ * the same are refused already (Jason's ruling 2026-09-04); the caret
+ * press had no such check (Kimi sweep 2026-09-13).
+ */
+export function warnTableEdgeCaretIfOutside(
+    cell: TableCellEditor | null,
+    cursorPosition: EditorPosition,
+    ctx: DocContext,
+): boolean {
+    if (cell) return false;
+    const lineText = ctx.lines[cursorPosition.line] ?? "";
+    // a table row always has a pipe, and reading the whole note's rows is
+    // not free, so a line without one is settled here
+    if (!lineText.includes("|")) return false;
+    if (!tableRowLines(ctx.lines, ctx.scan.isProtected)[cursorPosition.line]) return false;
+    if (isTableDelimiterRow(lineText)) {
+        showNotice(TableDelimiterNotice, 8000);
+        return true;
+    }
+    const ch = cursorPosition.ch;
+    if (tableRowCellSpans(lineText).some((span) => span.from <= ch && ch <= span.to)) return false;
+    showNotice(TableEdgeNotice, 8000);
     return true;
 }
 

@@ -46,7 +46,7 @@ function fakePlugin(doc: FakeEditor): FootnotePlugin {
 const TABLE = ["| H | I |", "| --- | --- |", "| a | b |"];
 
 describe("a caret press at a table row's outer edge (main-editor path)", () => {
-    it.fails("does not append the reference after the row's closing pipe", async () => {
+    it("does not append the reference after the row's closing pipe", async () => {
         const doc = sharedFakeEditor(TABLE, {
             cursor: { line: 2, ch: "| a | b |".length },
             edits: true,
@@ -59,7 +59,7 @@ describe("a caret press at a table row's outer edge (main-editor path)", () => {
         expect(doc.lines[2].endsWith("|[^1]")).toBe(false);
     });
 
-    it.fails("does not prepend the reference before the row's opening pipe", async () => {
+    it("does not prepend the reference before the row's opening pipe", async () => {
         const doc = sharedFakeEditor(TABLE, {
             cursor: { line: 2, ch: 0 },
             edits: true,
@@ -70,7 +70,7 @@ describe("a caret press at a table row's outer edge (main-editor path)", () => {
         expect(doc.lines[2].startsWith("[^1]")).toBe(false);
     });
 
-    it.fails("does not splice the reference into the delimiter row's dashes", async () => {
+    it("does not splice the reference into the delimiter row's dashes", async () => {
         const doc = sharedFakeEditor(TABLE, {
             cursor: { line: 1, ch: 3 },
             edits: true,

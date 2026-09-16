@@ -314,10 +314,19 @@ export function findLineRunEnd(
     lines: string[],
     isProtected: boolean[],
     runLines: string[],
+    // A "%%" block comment's lines are left unprotected so that references
+    // inside them still bind their definitions, so on its own the
+    // protected test lets a commented-out heading anchor the definitions:
+    // the append then wrote inside the comment, and move-to-bottom broke
+    // the comment apart to gather under it (Claude sweep 2026-09-13). A
+    // caller with a scan passes its inCommentBlock, and those lines never
+    // match.
+    inCommentBlock: boolean[] = [],
 ): number {
     for (let i = 0; i + runLines.length <= lines.length; i++) {
         const matches = runLines.every(
-            (runLine, k) => !isProtected[i + k] && lines[i + k] === runLine,
+            (runLine, k) =>
+                !isProtected[i + k] && !inCommentBlock[i + k] && lines[i + k] === runLine,
         );
         if (matches) return i + runLines.length - 1;
     }

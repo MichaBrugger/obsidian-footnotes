@@ -43,14 +43,14 @@ describe("bug: a commented-out section heading still anchors the definition appe
     // Only the sourced half is pinned here. Exactly which line the append
     // ought to pick is a design question nobody has ruled on; that it must
     // not pick a line inside the comment is the recorded rule.
-    it.fails("the first definition is not written inside the %% comment block", () => {
+    it("the first definition is not written inside the %% comment block", () => {
         const lines = ["alpha[^1].", "", "%%", "# Footnotes", "%%", "", "tail"];
         const doc = fakeEditor(lines, { wholeDoc: true });
         const { change } = buildDefinitionAppend(doc, "1", true, headingPlugin(), undefined);
         expect(scanDocument(lines).inCommentBlock[change.from.line]).toBe(false);
     });
 
-    it.fails("move-to-bottom leaves the commented-out heading in one piece", () => {
+    it("move-to-bottom leaves the commented-out heading in one piece", () => {
         const doc = "x[^1]\n\n[^1]: one\n\n%%\n# Footnotes\n%%\n\ntail";
         const out = moveFootnoteDefinitionsToBottom(doc, "# Footnotes");
         // the three lines the user commented out must come back untouched

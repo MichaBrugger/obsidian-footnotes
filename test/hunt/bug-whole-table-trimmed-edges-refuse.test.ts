@@ -96,14 +96,14 @@ describe("a whole table whose last row ends in trailing spaces", () => {
         ]);
     });
 
-    it.fails("converts when dragged to the true end of the last row", async () => {
+    it("converts when dragged to the true end of the last row", async () => {
         const doc = fakeEditor(lines, { line: 2, ch: 0 }, { line: 4, ch: lines[4].length });
         await insertAutonumFootnote(fakePlugin(doc));
         expect(noticed(TableSelectionNotice)).toBe(false);
         expect(doc.lines[2]).toBe("[^1]");
     });
 
-    it.fails("converts when dragged to the last visible character instead", async () => {
+    it("converts when dragged to the last visible character instead", async () => {
         const doc = fakeEditor(
             lines,
             { line: 2, ch: 0 },
@@ -132,7 +132,7 @@ describe("a whole table indented one space", () => {
         ).toEqual([true, true, true]);
     });
 
-    it.fails("converts when selected edge to edge", async () => {
+    it("converts when selected edge to edge", async () => {
         const doc = fakeEditor(lines, { line: 2, ch: 0 }, { line: 4, ch: lines[4].length });
         await insertAutonumFootnote(fakePlugin(doc));
         expect(noticed(TableSelectionNotice)).toBe(false);

@@ -163,61 +163,95 @@ export interface FoldRange {
  *
  * Obsidian drops a heading's fold on any edit inside it, even a single
  * character (probed live, 2026-09-11), so after a lint the plugin puts the
- * folds back itself, and this works out where each one now lives. Every
- * fold line is mapped by its start offset, the way an editor maps a
- * position through edits: text before an edit stays, text after it shifts,
- * whole lines inserted at a line's start push that line down. A fold whose
- * heading line the edits removed is dropped; a fold whose last line was
- * removed ends on the line before the removal.
+ * folds back itself, and this works out where each one now lives. The
+ * lines of the note before and after are lined up (alignLines), and each
+ * fold's first and last lines are read off that: a line the lint rewrote
+ * in place is still the same line, a line above an insertion or deletion
+ * stays, a line below one shifts. A fold whose heading line was removed is
+ * dropped; a fold whose last line was removed ends on the line before the
+ * removal; a fold whose last line was replaced by more or fewer lines
+ * grows or shrinks with them.
+ *
+ * It used to map each fold line by its character offset through the
+ * edits, which broke whenever one edit covered two neighbouring lines: the
+ * second line's start fell inside the edit and collapsed onto the first,
+ * so folds came back a line short or not at all (Kimi and Claude sweeps
+ * 2026-09-13, Jason's original fold complaint in a narrower form).
  */
 export function mapFoldLines(folds: FoldRange[], changes: OffsetChange[], before: string): FoldRange[] {
     if (changes.length === 0) return folds;
     const after = applyOffsetChanges(before, changes);
-    const starts = [0];
-    for (let i = 0; i < before.length; i++) if (before.charCodeAt(i) === 10) starts.push(i + 1);
-    const removed = (line: number) =>
-        changes.some(
-            (c) =>
-                c.from <= starts[line] &&
-                (line + 1 < starts.length ? c.to >= starts[line + 1] : c.to >= before.length) &&
-                c.to > c.from,
-        );
-    const mapOffset = (offset: number): number => {
-        let mapped = offset;
-        for (const c of changes) {
-            if (offset < c.from) break;
-            const shift = c.text.length - (c.to - c.from);
-            if (c.from === c.to) {
-                // whole lines inserted at this very offset push it down
-                mapped += shift;
-                continue;
-            }
-            if (offset >= c.to) {
-                mapped += shift;
-                continue;
-            }
-            // the edit starts at this offset or covers it: the position
-            // collapses to where the edit starts
-            mapped = mapped - offset + c.from;
-            break;
-        }
-        return mapped;
-    };
-    const lineAt = (offset: number) => {
-        let line = 0;
-        for (let i = 0; i < offset && i < after.length; i++) if (after.charCodeAt(i) === 10) line++;
-        return line;
-    };
+    const map = alignLines(before.split("\n"), after.split("\n"));
     const out: FoldRange[] = [];
     for (const fold of folds) {
-        if (fold.from >= starts.length || fold.to >= starts.length || removed(fold.from)) continue;
-        const from = lineAt(mapOffset(starts[fold.from]));
-        // a removed last line: the fold now ends where the removal begins,
-        // on the line before it
-        const to = removed(fold.to) ? lineAt(Math.max(0, mapOffset(starts[fold.to]) - 1)) : lineAt(mapOffset(starts[fold.to]));
+        if (fold.from >= map.length || fold.to >= map.length) continue;
+        const from = map[fold.from].from;
+        if (from === -1) continue;
+        const to = map[fold.to].to;
         if (to > from) out.push({ from, to });
     }
     return out;
+}
+
+/**
+ * For each line of `a`, where it lives in `b`: `from` is the line a fold
+ * may START on (-1 when the line is gone), `to` the line a fold may END
+ * on.
+ *
+ * Lines are matched with their footnote references stripped out, because
+ * that is what a lint changes: a renumbered line is the same line, and
+ * matching on the raw text paired up look-alike lines across each other
+ * instead. Inside a run of lines that do not match, old lines and new
+ * lines pair up by position; old lines left over past the new count are
+ * gone; a fold ending on the run's last old line ends on the run's last
+ * new line, so it grows or shrinks with the run; and a fold ending on a
+ * line that was deleted outright ends on the line before the deletion.
+ */
+function alignLines(a: string[], b: string[]): { from: number; to: number }[] {
+    const strip = (line: string) => line.replace(/\[\^[^\]]*\]/g, "");
+    const na = a.map(strip);
+    const nb = b.map(strip);
+    let head = 0;
+    while (head < na.length && head < nb.length && na[head] === nb[head]) head++;
+    let aTail = na.length;
+    let bTail = nb.length;
+    while (aTail > head && bTail > head && na[aTail - 1] === nb[bTail - 1]) {
+        aTail--;
+        bTail--;
+    }
+    const middleA = na.slice(head, aTail);
+    const middleB = nb.slice(head, bTail);
+    const hunks =
+        middleA.length * middleB.length <= MaxComparedPairs
+            ? unmatchedRuns(middleA, middleB)
+            : [{ aStart: 0, aEnd: middleA.length, bStart: 0, bEnd: middleB.length }];
+    const map: { from: number; to: number }[] = [];
+    let bi = 0;
+    const matchedUpTo = (aEnd: number) => {
+        while (map.length < aEnd) {
+            map.push({ from: bi, to: bi });
+            bi++;
+        }
+    };
+    for (const hunk of hunks) {
+        matchedUpTo(head + hunk.aStart);
+        const n = hunk.aEnd - hunk.aStart;
+        const m = hunk.bEnd - hunk.bStart;
+        const bStart = head + hunk.bStart;
+        for (let k = 0; k < n; k++) {
+            if (m === 0) {
+                map.push({ from: -1, to: bStart - 1 });
+            } else {
+                map.push({
+                    from: k < m ? bStart + k : -1,
+                    to: k === n - 1 ? bStart + m - 1 : Math.min(bStart + k, bStart + m - 1),
+                });
+            }
+        }
+        bi = bStart + m;
+    }
+    matchedUpTo(a.length);
+    return map;
 }
 
 /** `before` with `changes` (offsets into `before`, in order, non-overlapping) applied. */

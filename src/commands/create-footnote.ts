@@ -36,7 +36,7 @@ import {
 } from "../editor/insertion-liveness";
 import { lintAfterFootnoteCreation } from "../linting/linter";
 import { maskInlineRegions, maskedLineAt } from "../parsing/markdown-scan";
-import { warnDefinitionCaretIfInside, warnProtectedCaretIfInside } from "./press-guards";
+import { warnDefinitionCaretIfInside, warnTableEdgeCaretIfOutside, warnProtectedCaretIfInside } from "./press-guards";
 import { cellCaret, TableCellEditor } from "../editor/table-cursor";
 
 import { showNotice } from "../editor/notice";
@@ -426,6 +426,9 @@ export function createAutonumFootnote(
     // practice that means a continuation line, since a press on the label
     // line was already taken by the jump steps earlier in the cascade.
     if (warnDefinitionCaretIfInside(doc, cell, cursorPosition, ctx)) return true;
+    // And for a caret on a table row but outside its cells, or on the row
+    // of dashes under the header, where a reference would break the table.
+    if (warnTableEdgeCaretIfOutside(cell, cursorPosition, ctx)) return true;
 
     // Make the footnote's name from the next free number, carrying the
     // note's footnote-prefix property when it has one (#31). A prefix is a
@@ -692,6 +695,9 @@ export function createFootnoteReference(
     // The same goes for a caret inside another footnote's definition
     // (Jason's ruling 2026-08-13).
     if (warnDefinitionCaretIfInside(doc, null, cursorPosition, ctx)) return true;
+    // And for a caret on a table row but outside its cells, or on the row
+    // of dashes under the header, where a placeholder would break the table.
+    if (warnTableEdgeCaretIfOutside(null, cursorPosition, ctx)) return true;
 
     const prefix = resolvePrefix();
     if (prefix === null) return true;

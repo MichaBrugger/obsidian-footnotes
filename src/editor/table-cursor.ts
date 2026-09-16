@@ -260,6 +260,21 @@ const DelimiterCell = /^\s*:?-+:?\s*$/;
 const QuotePrefix = /^(\s*>)+\s?/;
 
 /**
+ * Whether the line is the "| --- |" row that separates a table's header
+ * from its body: every cell a run of dashes with optional alignment colons.
+ * Those dashes are not cell text; they are what makes the lines a table,
+ * so nothing may be written into them.
+ */
+export function isTableDelimiterRow(lineText: string): boolean {
+    const stripped = lineText.replace(QuotePrefix, "");
+    const spans = tableRowCellSpans(stripped);
+    return (
+        spans.length > 0 &&
+        spans.every((span) => DelimiterCell.test(stripped.slice(span.from, span.to)))
+    );
+}
+
+/**
  * Which lines belong to a table.
  *
  * The test: take every run of neighboring lines that are not protected text
@@ -276,14 +291,7 @@ export function tableRowLines(lines: string[], isProtected: boolean[]): boolean[
     const rows = new Array<boolean>(lines.length).fill(false);
     const isRowShaped = (i: number) =>
         !isProtected[i] && tableRowCellSpans(lines[i]).length > 0;
-    const isDelimiterRow = (i: number) => {
-        const stripped = lines[i].replace(QuotePrefix, "");
-        const spans = tableRowCellSpans(stripped);
-        return (
-            spans.length > 0 &&
-            spans.every((span) => DelimiterCell.test(stripped.slice(span.from, span.to)))
-        );
-    };
+    const isDelimiterRow = (i: number) => isTableDelimiterRow(lines[i]);
     let i = 0;
     while (i < lines.length) {
         if (!isRowShaped(i)) {

@@ -92,7 +92,13 @@ export function buildDefinitionAppend(
     // on the definition line itself.
     const needsSeparator = (insertLine: number) =>
         insertLine + 1 < lines.length && lines[insertLine + 1].trim() !== "";
-    if (blocks.length > 0) {
+    // After the last definition block, unless that block's last line sits
+    // inside a comment, math block, or fence that never closes: a block
+    // owns the region a continuation line of its opens, so it can end
+    // inside one, and a definition appended there would be born hidden.
+    // That case falls through to the walk above the unclosed region below
+    // (Claude sweep 2026-09-13).
+    if (blocks.length > 0 && !ctx.scan.endsProtectedAt[blocks[blocks.length - 1].end]) {
         const lastLine = blocks[blocks.length - 1].end;
         let text = `\n[^${footnoteId}]: `;
         const cursor = { line: lastLine + 1, ch: text.length - 1 };
@@ -120,7 +126,7 @@ export function buildDefinitionAppend(
         // on what counts as the existing heading, or running lint twice
         // would keep changing the note instead of settling.
         const headingLines = plugin.settings.footnoteSectionHeading.split("\n");
-        const anchorEnd = findLineRunEnd(lines, isProtected, headingLines);
+        const anchorEnd = findLineRunEnd(lines, isProtected, headingLines, ctx.scan.inCommentBlock);
         // A heading the selection overlaps is about to be converted away
         // along with the rest of the selection. A drag that stops at
         // character 0 of the heading's line leaves the heading intact.

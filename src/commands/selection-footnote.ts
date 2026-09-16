@@ -42,7 +42,13 @@ import {
     NoFootnoteCreated,
     showNotice,
 } from "../editor/notice";
-import { cellSelection, TableCellEditor, tableRowCellSpans, tableRowLines } from "../editor/table-cursor";
+import {
+    cellSelection,
+    isTableDelimiterRow,
+    TableCellEditor,
+    tableRowCellSpans,
+    tableRowLines,
+} from "../editor/table-cursor";
 
 // Conversion: turning selected text into a footnote (issue #35).
 //
@@ -327,7 +333,8 @@ export function selectionPressHandled(
     }
     const ctx = docContext(doc);
     const text = rangeText(ctx.lines, trimmed.from, trimmed.to);
-    if (selectionCutsTable(ctx, trimmed.from, trimmed.to)) {
+    const table = tableVerdict(ctx, trimmed.from, trimmed.to);
+    if (table === "cuts") {
         showNotice(TableSelectionNotice, 8000);
         return true;
     }
@@ -390,12 +397,22 @@ export function selectionPressHandled(
     // selection, so the run of whitespace before it is replaced along with
     // the selection itself (absorbLeadingSpace decides how much).
     const firstLine = doc.getLine(trimmed.from.line);
-    const replaceFrom = { line: trimmed.from.line, ch: absorbLeadingSpace(firstLine, trimmed.from.ch) };
+    const lastLine = doc.getLine(trimmed.to.line);
+    // A whole table goes from its first row's first character to its last
+    // row's end: the indent and the trailing spaces belonged to the table,
+    // so they leave with it instead of staying next to the reference
+    // (Claude sweep 2026-09-13).
+    const replaceFrom =
+        table === "whole"
+            ? { line: trimmed.from.line, ch: 0 }
+            : { line: trimmed.from.line, ch: absorbLeadingSpace(firstLine, trimmed.from.ch) };
+    const replaceTo = table === "whole" ? { line: trimmed.to.line, ch: lastLine.length } : trimmed.to;
     const selection: ConvertedSelection = {
         from: replaceFrom,
-        to: trimmed.to,
+        to: replaceTo,
         text,
         lead: firstLine.slice(replaceFrom.ch, trimmed.from.ch),
+        trail: lastLine.slice(trimmed.to.ch, replaceTo.ch),
     };
     if (command === "inline") {
         convertMainSelectionToInline(plugin, doc, selection, ctx);
@@ -417,8 +434,10 @@ export interface ConvertedSelection {
     from: EditorPosition;
     to: EditorPosition;
     text: string;
-    /** The whitespace swallowed in front of the selection by absorbLeadingSpace, or "" when there was none. The replacement still starts at `from`, and the checks for "did the note change under the modal" compare `lead + text`. */
+    /** The whitespace swallowed in front of the selection by absorbLeadingSpace, or "" when there was none. The replacement still starts at `from`, and the checks for "did the note change under the modal" compare `lead + text + trail`. */
     lead: string;
+    /** The whitespace swallowed after the selection, which only a whole table's trailing spaces produce; "" otherwise. */
+    trail?: string;
 }
 
 /** The same thing as ConvertedSelection, but for a table cell's own editor: the positions are offsets into the cell's text. */
@@ -544,39 +563,53 @@ function spanTouchesFootnote(
 }
 
 /**
- * Whether the selection takes only PART of a table.
+ * How the selection stands to any table: "none" when neither edge is on a
+ * table row, "whole" when it holds one table edge to edge, "cuts" when it
+ * takes only PART of a table.
  *
- * An edge landing on a table row is refused, unless both edges sit inside
- * the same cell of the same row, because text within one cell converts
- * fine. A table held whole passes: with both edges out in the prose
- * around it, or with the edges exactly on its first and last rows (Jason's
- * ruling, sheet 07, 2026-09-09; it used to be refused on the belief that
- * a table cannot begin on the label line, and Obsidian renders one that
- * does).
+ * An edge landing on a table row cuts, unless both edges sit inside the
+ * same cell of the same row, because text within one cell converts fine.
+ * A table held whole passes: with both edges out in the prose around it
+ * ("none"), or with the edges exactly on its first and last rows ("whole";
+ * Jason's ruling, sheet 07, 2026-09-09; it used to be refused on the
+ * belief that a table cannot begin on the label line, and Obsidian renders
+ * one that does).
  */
-function selectionCutsTable(
+function tableVerdict(
     ctx: DocContext,
     from: EditorPosition,
     to: EditorPosition,
-): boolean {
+): "none" | "whole" | "cuts" {
     const rows = tableRowLines(ctx.lines, ctx.scan.isProtected);
-    if (!rows[from.line] && !rows[to.line]) return false;
+    if (!rows[from.line] && !rows[to.line]) return "none";
     if (from.line !== to.line) {
         // A table held whole, edge to edge on its first and last rows,
-        // converts (Jason's ruling, sheet 07, 2026-09-09).
+        // converts (Jason's ruling, sheet 07, 2026-09-09). The edges are
+        // judged against the rows' text, not their raw length: the
+        // selection arrives trimmed, so a last row ending in trailing
+        // spaces, or a table indented a space or two, used to be refused
+        // with advice that could not be followed (Claude sweep
+        // 2026-09-13).
+        const first = ctx.lines[from.line];
+        const last = ctx.lines[to.line];
         const wholeTable =
             rows[from.line] &&
             rows[to.line] &&
-            from.ch === 0 &&
-            to.ch === ctx.lines[to.line].length &&
+            from.ch <= first.length - first.trimStart().length &&
+            to.ch >= last.trimEnd().length &&
             !rows[from.line - 1] &&
             !rows[to.line + 1] &&
             rows.slice(from.line, to.line + 1).every(Boolean);
-        return !wholeTable;
+        return wholeTable ? "whole" : "cuts";
     }
-    return !tableRowCellSpans(ctx.lines[from.line] ?? "").some(
+    // The row of dashes under the header is not cell text, whichever cell
+    // it sits in: converting it ends the table (Kimi sweep 2026-09-13).
+    if (isTableDelimiterRow(ctx.lines[from.line] ?? "")) return "cuts";
+    return tableRowCellSpans(ctx.lines[from.line] ?? "").some(
         (span) => span.from <= from.ch && to.ch <= span.to,
-    );
+    )
+        ? "none"
+        : "cuts";
 }
 
 /** Runs spanTouchesFootnote over every line of a trimmed selection, so a selection spanning lines is checked the same way a single-line one is. */
@@ -827,7 +860,8 @@ export function convertSelectionToNamed(
     if (problem !== null) return problem;
     if (
         selection.to.line >= doc.lineCount() ||
-        rangeText(ctx.lines, selection.from, selection.to) !== selection.lead + selection.text
+        rangeText(ctx.lines, selection.from, selection.to) !==
+            selection.lead + selection.text + (selection.trail ?? "")
     ) {
         showNotice(SelectionChangedNotice, 8000);
         return null;

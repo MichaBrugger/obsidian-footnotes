@@ -38,7 +38,7 @@ function fakePlugin(doc: FakeEditor): FootnotePlugin {
 }
 
 describe("a selection covering a delimiter row's dashes", () => {
-    it.fails("refuses instead of converting the table's spine into a footnote", async () => {
+    it("refuses instead of converting the table's spine into a footnote", async () => {
         const lines = ["| H |", "| --- |", "| a |"];
         const doc = sharedFakeEditor(lines, {
             cursor: { line: 1, ch: 2 },

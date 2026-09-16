@@ -29,7 +29,7 @@ import { lintFootnotes } from "../../src/linting/linter";
 // the line before the removal" — these lines were REPLACED, not removed.
 
 describe("mapFoldLines when one lint edit replaces several folded lines mid-document", () => {
-    it.fails("two folded body lines replaced by two lines keep the fold over both", () => {
+    it("two folded body lines replaced by two lines keep the fold over both", () => {
         const before = "# H\na\nb\ntail";
         const after = "# H\nx\ny\ntail";
         // the section still has a heading and two body lines; the fold
@@ -39,7 +39,7 @@ describe("mapFoldLines when one lint edit replaces several folded lines mid-docu
         ]);
     });
 
-    it.fails("a reindex of two adjacent definition lines under a folded heading keeps the fold over both", () => {
+    it("a reindex of two adjacent definition lines under a folded heading keeps the fold over both", () => {
         const before = "body[^2]\n\n## Footnotes\n[^2]: two\n[^1]: one";
         const after = "body[^1]\n\n## Footnotes\n[^1]: two\n[^2]: one";
         expect(mapFoldLines([{ from: 2, to: 4 }], lineDiffChanges(before, after), before)).toEqual([
@@ -47,7 +47,7 @@ describe("mapFoldLines when one lint edit replaces several folded lines mid-docu
         ]);
     });
 
-    it.fails("the real lint pipeline produces the same failure through the public write-back path", () => {
+    it("the real lint pipeline produces the same failure through the public write-back path", () => {
         const before = "body[^2]\n\n## Footnotes\n[^2]: two\n[^1]: one";
         const after = lintFootnotes(before);
         // the pipeline also separates the heading from the definitions with
@@ -58,7 +58,7 @@ describe("mapFoldLines when one lint edit replaces several folded lines mid-docu
         ]);
     });
 
-    it.fails("a fold ending on a covered non-last line of the hunk is dropped whole", () => {
+    it("a fold ending on a covered non-last line of the hunk is dropped whole", () => {
         // removed() flags line 1 (its next line's start lies inside the
         // hunk) but NOT line 2 (the hunk stops one char short of line 3):
         // an arbitrary asymmetry, since both lines were replaced alike.
@@ -84,7 +84,7 @@ describe("mapFoldLines when one lint edit replaces several folded lines mid-docu
     // establish that it SHRINKS with the section (2 -> 1 ends on the
     // surviving line), so the symmetric reading is that it grows too. The
     // collapse-to-edit-start in mapOffset can only ever keep the old end.
-    it.fails("one folded line replaced by two: the fold grows with the section", () => {
+    it("one folded line replaced by two: the fold grows with the section", () => {
         const before = "# H\na\ntail";
         const after = "# H\nx\ny\ntail";
         expect(mapFoldLines([{ from: 0, to: 1 }], lineDiffChanges(before, after), before)).toEqual([

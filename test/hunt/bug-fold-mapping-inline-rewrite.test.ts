@@ -66,7 +66,7 @@ const mapped = (before: string, after: string, folds: FoldRange[]): FoldRange[] 
     mapFoldLines(folds, lineDiffChanges(before, after), before);
 
 describe("a lint that only rewrites characters inside lines still moves folds", () => {
-    it.fails("a heading fold over the whole note ends one line early", () => {
+    it("a heading fold over the whole note ends one line early", () => {
         // reindex swaps two names, one on line 1 and one across lines 3 and
         // 4. Nothing is inserted or deleted, so the fold must come back
         // exactly as it went in. It comes back 0..3, which leaves the last
@@ -77,7 +77,7 @@ describe("a lint that only rewrites characters inside lines still moves folds", 
         expect(mapped(before, after, [{ from: 0, to: 4 }])).toEqual([{ from: 0, to: 4 }]);
     });
 
-    it.fails("a folded list whose last child is renumbered loses that child", () => {
+    it("a folded list whose last child is renumbered loses that child", () => {
         const before = "# H\n- parent\n    - child[^2]\n    - child[^1]\ntail\n\n[^2]: two\n[^1]: one";
         const after = lintFootnotes(before, {});
         expect(mapped(before, after, [{ from: 1, to: 3 }])).toEqual([{ from: 1, to: 3 }]);
@@ -85,7 +85,7 @@ describe("a lint that only rewrites characters inside lines still moves folds", 
 });
 
 describe("a surviving line inside one replacement is treated as deleted", () => {
-    it.fails("a fold whose last line sits inside the replacement is dropped altogether", () => {
+    it("a fold whose last line sits inside the replacement is dropped altogether", () => {
         // The lint renumbers "[^20]" to "[^1]" on lines 0, 1 and 2, which
         // becomes one edit swallowing lines 1 and 2 whole. The fold over
         // lines 0 to 1 disappears: the folded list is wide open again, with
@@ -96,7 +96,7 @@ describe("a surviving line inside one replacement is treated as deleted", () => 
         expect(mapped(before, after, [{ from: 0, to: 1 }])).toEqual([{ from: 0, to: 1 }]);
     });
 
-    it.fails("a second fold in the same note has its start pulled up a line", () => {
+    it("a second fold in the same note has its start pulled up a line", () => {
         // Two folds here: lines 0 to 1 and lines 1 to 2. The first is
         // dropped and the second comes back as 0..2, so it now hides a line
         // the user never folded.

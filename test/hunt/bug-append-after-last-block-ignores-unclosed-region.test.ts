@@ -59,7 +59,7 @@ describe("bug: the append after the last definition block ignores an unclosed re
             expect(scanDocument(noteEndingInsideAnOpener(opener)).endsProtected).toBe(true);
         });
 
-        it.fails("the new definition lands outside that region and is a real definition", () => {
+        it("the new definition lands outside that region and is a real definition", () => {
             const lines = noteEndingInsideAnOpener(opener);
             const doc = fakeEditor(lines, { edits: true });
             const { change } = buildDefinitionAppend(doc, "2", false, fakePlugin());
