@@ -1807,15 +1807,21 @@ async function main() {
         action(`(${EDITOR}).editor.replaceRange('\\n\\n[^q]: body', {line: 0, ch: 12});`);
         await sleep(900);
         action(`(${EDITOR}).editor.undo();`);
+        // This creation was not split by the plugin, so the notice states
+        // the fact and makes no "undo again" promise (Jason's report
+        // 2026-09-11; until 2026-09-16 the promise leaked in from the
+        // cell test above, whose name stayed registered for ever, B27).
+        // The cell test above covers the promise itself.
+        const stranded = 'the footnote reference "[^q]" is still in the note.';
         await pollUntil(
             "the orphaned-reference notice",
             `[...document.querySelectorAll('.notice')].map(n => n.textContent).join('|')`,
-            (v) => typeof v === "string" && v.includes("Undo again to remove the reference too."),
+            (v) => typeof v === "string" && v.includes(stranded) && !v.includes("Undo again"),
         );
         action(`(${EDITOR}).editor.undo();`);
         await pollUntil(
             "the notice dismissed itself",
-            `[...document.querySelectorAll('.notice')].every(n => !n.textContent.includes('Undo again to remove the reference too.'))`,
+            `[...document.querySelectorAll('.notice')].every(n => !n.textContent.includes(${jsLiteral(stranded)}))`,
             (v) => v === true,
             3000,
         );
