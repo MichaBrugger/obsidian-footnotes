@@ -26,7 +26,7 @@ import { removeOrphanedFootnoteReferences } from "../../src/linting/rules/remove
 describe("the bare-prefix placeholder alert folds case", () => {
     beforeEach(resetNotices);
 
-    it.fails("countEmptyFootnoteReferences counts a case-variant placeholder", () => {
+    it("countEmptyFootnoteReferences counts a case-variant placeholder", () => {
         expect(countEmptyFootnoteReferences("x [^P.] y", "p.")).toBe(1);
     });
 
@@ -40,7 +40,7 @@ describe("the bare-prefix placeholder alert folds case", () => {
         expect(removeOrphanedFootnoteReferences("x [^P.] y", "p.")).toBe("x [^P.] y");
     });
 
-    it.fails("the unnamed-reference alert speaks for the case-variant placeholder", () => {
+    it("the unnamed-reference alert speaks for the case-variant placeholder", () => {
         const plugin = fakePlugin({ enableFootnotePrefix: true });
         noticeLintAlerts(plugin, "---\nfootnote-prefix: p.\n---\n\nx [^P.] y");
         expect(messages().some((m) => m.includes("unnamed footnote reference"))).toBe(true);

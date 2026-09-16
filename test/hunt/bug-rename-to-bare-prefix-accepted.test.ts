@@ -47,14 +47,14 @@ function prefixedDoc(prefix: string, name: string): string[] {
 }
 
 describe("renaming to the bare prefix", () => {
-    it.fails("is refused as an invalid name", () => {
+    it("is refused as an invalid name", () => {
         const lines = prefixedDoc("3=", "3=1");
         expect(
             planFootnoteRename(doc(lines), "3=1", "3=", undefined, { sweepPrefix: "3=" }),
         ).toMatchObject({ kind: "invalid" });
     });
 
-    it.fails("leaves the reference and the definition alone", () => {
+    it("leaves the reference and the definition alone", () => {
         const lines = prefixedDoc("3=", "3=1");
         const plan = planFootnoteRename(doc(lines), "3=1", "3=", undefined, {
             sweepPrefix: "3=",

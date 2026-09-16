@@ -60,7 +60,7 @@ const pluginWithDeletionOn = () =>
     });
 
 describe("an orphaned reference the rule refused to delete is reported nowhere", () => {
-    it.fails("the refused reference is named in an alert", () => {
+    it("the refused reference is named in an alert", () => {
         const doc = "[^1]: alpha\n\n[^42]\n\n    indented code[^73]";
         const after = lintFootnotes(doc, { ...pipeline, removeOrphanedReferences: true });
         // the guard is right to keep it: deleting it would turn the
@@ -71,7 +71,7 @@ describe("an orphaned reference the rule refused to delete is reported nowhere",
         expect(messages().some((m) => m.includes("[^42]"))).toBe(true);
     });
 
-    it.fails("a second orphan the guard also held back is reported as well", () => {
+    it("a second orphan the guard also held back is reported as well", () => {
         // "[^99]" sits in ordinary prose and could have been deleted on its
         // own. The guard works on the whole note at once, so the refusal
         // over "[^42]" keeps "[^99]" too, and neither is mentioned.

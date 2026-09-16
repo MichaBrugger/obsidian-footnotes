@@ -31,7 +31,7 @@ describe("a refused orphan-reference deletion is still reported", () => {
         expect(removeOrphanedFootnoteReferences(REFUSED)).toBe(REFUSED);
     });
 
-    it.fails("alert speaks for the survivor after a no-move lint", () => {
+    it("alert speaks for the survivor after a no-move lint", () => {
         const plugin = fakePlugin({ lintDeleteOrphanedReferences: true });
         const after = lintFootnotes(REFUSED, {
             moveDefinitionsToBottom: false,
@@ -48,7 +48,7 @@ describe("a refused orphan-reference deletion is still reported", () => {
         ).toBe(true);
     });
 
-    it.fails("alert speaks for the survivor under default move-to-bottom (anchored heading)", () => {
+    it("alert speaks for the survivor under default move-to-bottom (anchored heading)", () => {
         const plugin = fakePlugin({ lintDeleteOrphanedReferences: true });
         const anchored = "## Footnotes\n\n[^1]: alpha\n\n[^42]\n\n    indented code[^73]";
         const after = lintFootnotes(anchored, {

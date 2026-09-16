@@ -24,6 +24,7 @@ import { orphanedFootnoteDefinitionNames } from "./rules/remove-orphaned-definit
 import {
     lazyDefinitionLabelNames,
     orphanedFootnoteReferenceNames,
+    removeOrphanedFootnoteReferences,
 } from "./rules/remove-orphaned-references";
 
 import { addReferenceOrDeleteDefinition, showNotice } from "../editor/notice";
@@ -58,17 +59,25 @@ export function countEmptyFootnoteReferences(
     // review, a speed fix). Anything calling this on its own leaves it out.
     masked?: string[],
 ): number {
-    const needles = prefix ? ["[^]", referenceText(prefix)] : ["[^]"];
+    // Obsidian matches footnote names without regard to case, and so does
+    // every other prefix comparison in the plugin, so "[^P.]" under the
+    // prefix "p." is the placeholder too. The search folds case whenever a
+    // prefix is in play (Kimi sweep 2026-09-13); "[^]" has no letters to
+    // fold.
+    const fold = (text: string) => (prefix ? text.toLowerCase() : text);
+    const needles = prefix ? ["[^]", fold(referenceText(prefix))] : ["[^]"];
     // Masking can only ever take these strings away, never add one, so if
     // the raw text does not contain them at all, neither will the masked
     // twin. This runs on every single lint and most notes have no "[^]" in
     // them, so bailing out here skips building the masked twin for the
     // whole note (speed fix F4).
-    if (!needles.some((needle) => markdown.includes(needle))) return 0;
+    const haystack = fold(markdown);
+    if (!needles.some((needle) => haystack.includes(needle))) return 0;
     let count = 0;
     const lines =
         masked ?? maskProtectedLines(normalizeEol(markdown).text.split("\n"));
-    for (const line of lines) {
+    for (const raw of lines) {
+        const line = fold(raw);
         for (const needle of needles) {
             for (
                 let i = 0;
@@ -158,15 +167,35 @@ function noticeLazyDefinitions(lines: string[], scan: DocumentScan, masked: stri
 // The alert half of "Delete orphaned references". While that toggle is off,
 // the lint reports orphaned references instead of deleting them: an orphan
 // is never passed over in silence.
+//
+// With the toggle ON, an orphan that is still in the note after the lint
+// is one the rule REFUSED to delete, because taking it out would change how
+// a line near it is read (the reclassification guard in
+// remove-orphaned-references.ts). The alert used to assume the toggle had
+// dealt with every orphan and said nothing, so the survivor was neither
+// deleted nor reported, on that save and every later one (Kimi and Claude
+// sweeps 2026-09-13; ADR 2, lint is never silent). Now it says the rule
+// left it, and why. A single-rule command such as Move definitions to
+// bottom also ends here, and an orphan a full lint WOULD delete is not
+// reported after one of those: the next lint takes it, as before.
 function noticeOrphanedReferences(
     plugin: FootnotePlugin,
     markdown: string,
     prefix: string,
     precomputed: { lines: string[]; masked: string[]; scan: DocumentScan; starts: boolean[] },
 ) {
-    if (plugin.settings.lintDeleteOrphanedReferences) return;
     const names = orphanedFootnoteReferenceNames(markdown, prefix, precomputed);
     if (names.length === 0) return;
+    if (plugin.settings.lintDeleteOrphanedReferences) {
+        if (removeOrphanedFootnoteReferences(markdown, prefix) !== markdown) return;
+        showNotice(
+            names.length === 1
+                ? `This note has a footnote reference with no definition (${referenceList(names)}) that the lint left in place: deleting it would change how the lines around it are read. Write its definition or delete the reference by hand.`
+                : `This note has ${names.length} footnote references with no definition (${referenceList(names)}) that the lint left in place: deleting them would change how the lines around them are read. Write their definitions or delete the references by hand.`,
+            8000,
+        );
+        return;
+    }
     showNotice(
         names.length === 1
             ? `This note has a footnote reference with no definition (${referenceList(names)}). Write its definition or delete the reference.`
@@ -245,6 +274,13 @@ export function invalidFootnoteNames(
     };
     for (let i = 0; i < lines.length; i++) {
         for (const { name } of referenceOccurrences(lines[i], masked[i], starts[i])) consider(name);
+        // the line's own definition label, at column 0 or behind a
+        // blockquote or callout marker: a quoted definition is as real as
+        // a column-0 one (the C22 ruling), and used to go unchecked here
+        // because only column-0 blocks were read (Kimi sweep 2026-09-13)
+        if (!starts[i]) continue;
+        const hit = definitionLabelWithName(lines[i], masked[i]);
+        if (hit) consider(hit.name);
     }
     for (const block of findDefinitionBlocks(lines, scan, masked, starts)) consider(block.name);
     return names;
@@ -279,6 +315,7 @@ export function nestedFootnoteDefinitionNames(
     lines: string[],
     scan: DocumentScan,
     masked: string[],
+    starts: boolean[] = definitionStartLines(lines, scan, (i) => masked[i]),
 ): string[] {
     const names: string[] = [];
     // One entry per NAME, ignoring case, the same way the duplicate and
@@ -286,11 +323,29 @@ export function nestedFootnoteDefinitionNames(
     // used to be reported twice, which made the notice's count too high
     // (bug hunt, 2026-08-25).
     const seen = new Set<string>();
-    for (const block of findDefinitionBlocks(lines, scan)) {
+    // Every definition's text: the column-0 blocks, and the quoted
+    // definitions, which never form blocks but are as real as the others
+    // (the C22 ruling) and used to be skipped here (Kimi sweep
+    // 2026-09-13). A quoted definition's text is the rest of its label
+    // line and the quoted lines that follow it at the same depth, up to a
+    // blank line or another label, the way Obsidian carries a quoted
+    // definition on (verified in Reading view, 2026-09-16).
+    const spans = findDefinitionBlocks(lines, scan, masked, starts).map((block) => ({
+        name: block.name,
+        start: block.start,
+        end: block.end,
+    }));
+    for (let i = 0; i < lines.length; i++) {
+        if (!starts[i]) continue;
+        const hit = definitionLabelWithName(lines[i], masked[i]);
+        if (!hit?.label.quoted) continue;
+        spans.push({ name: hit.name, start: i, end: quotedDefinitionEnd(lines, scan, starts, i) });
+    }
+    for (const span of spans) {
         let nested = false;
-        for (let i = block.start; i <= block.end && !nested; i++) {
+        for (let i = span.start; i <= span.end && !nested; i++) {
             const startAt =
-                i === block.start
+                i === span.start
                     ? definitionLabelIn(lines[i])?.labelEnd ?? 0
                     : 0;
             nested =
@@ -298,12 +353,34 @@ export function nestedFootnoteDefinitionNames(
                     (occurrence) => occurrence.start >= startAt,
                 ) || lineHasInlineFootnote(masked[i]);
         }
-        if (nested && !seen.has(block.name.toLowerCase())) {
-            seen.add(block.name.toLowerCase());
-            names.push(block.name);
+        if (nested && !seen.has(span.name.toLowerCase())) {
+            seen.add(span.name.toLowerCase());
+            names.push(span.name);
         }
     }
     return names;
+}
+
+/** How many ">" markers open the line: its blockquote depth. */
+function quoteDepth(text: string): number {
+    return (/^(?: {0,3}> ?)+/.exec(text)?.[0].match(/>/g) ?? []).length;
+}
+
+/**
+ * The last line of the quoted definition whose label sits on `start`: the
+ * label line itself, then each following non-blank quoted line at the same
+ * depth that is not protected and does not start a definition of its own.
+ */
+function quotedDefinitionEnd(lines: string[], scan: DocumentScan, starts: boolean[], start: number): number {
+    const depth = quoteDepth(lines[start]);
+    let end = start;
+    for (let j = start + 1; j < lines.length; j++) {
+        const text = lines[j];
+        if (scan.isProtected[j] || starts[j] || quoteDepth(text) !== depth) break;
+        if (text.replace(/^(?: {0,3}> ?)+/, "").trim() === "") break;
+        end = j;
+    }
+    return end;
 }
 
 /**
@@ -324,8 +401,9 @@ function noticeNestedFootnotes(
     lines: string[],
     scan: DocumentScan,
     masked: string[],
+    starts: boolean[],
 ) {
-    const names = nestedFootnoteDefinitionNames(lines, scan, masked);
+    const names = nestedFootnoteDefinitionNames(lines, scan, masked, starts);
     if (names.length === 0) return;
     showNotice(
         names.length === 1
@@ -442,6 +520,6 @@ export function noticeLintAlerts(plugin: FootnotePlugin, markdown: string) {
     noticeDefinitionsInsideTables(markdown);
     noticeOrphanedDefinitions(plugin, markdown, { lines, scan, masked, starts });
     noticeDuplicateDefinitions(plugin, markdown, { lines, scan });
-    noticeNestedFootnotes(lines, scan, masked);
+    noticeNestedFootnotes(lines, scan, masked, starts);
     noticeInvalidNames(lines, scan, masked, starts);
 }

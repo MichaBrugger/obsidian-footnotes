@@ -190,11 +190,27 @@ export function planFootnoteRename(
          * names stay legal and stay put.
          */
         sweepPrefix?: string;
+        /**
+         * The note's valid prefix whenever the prefix feature is on, armed
+         * or not. A new name that is exactly this prefix, in any casing,
+         * is refused: "[^p.]" is the bare-prefix placeholder the rest of
+         * the plugin treats as a footnote still being named, so writing it
+         * over every reference and the definition would turn the footnote
+         * into fragments (Kimi and Claude sweeps 2026-09-13).
+         */
+        placeholderPrefix?: string;
     },
 ): RenamePlan {
     if (newName === oldName || newName === "") return { kind: "noop" };
     const problem = footnoteNameProblem(newName);
     if (problem !== null) return { kind: "invalid", reason: problem };
+    const bare = options?.placeholderPrefix ?? options?.sweepPrefix;
+    if (bare && newName.toLowerCase() === bare.toLowerCase()) {
+        return {
+            kind: "invalid",
+            reason: `"[^${bare}]" is the note's prefix with nothing after it, so it isn't a name. Type a name after the prefix.`,
+        };
+    }
     const effective = effectiveRenameName(newName, options?.sweepPrefix);
     const prefixAdded = effective !== newName;
     newName = effective;
@@ -483,6 +499,7 @@ class RenameFootnoteModal extends ValidatedTextModal {
         // may have changed while the modal was open
         const plan = planFootnoteRename(this.doc, this.oldName, typed, undefined, {
             sweepPrefix,
+            placeholderPrefix: notePlaceholderPrefix(this.plugin, this.doc),
         });
         switch (plan.kind) {
             case "noop":
@@ -516,9 +533,13 @@ class RenameFootnoteModal extends ValidatedTextModal {
 
 /** The note's prefix, but only when the Apply-footnote-prefix rule is armed: the prefix feature is on, that lint rule is on, and the note's prefix is valid. Armed means a bare rename would be re-prefixed on the very next lint. An invalid prefix never arms, because lint refuses to run under one at all (lintBlockedByPrefix). */
 function armedSweepPrefix(plugin: FootnotePlugin, doc: Editor): string | undefined {
-    if (!plugin.settings.enableFootnotePrefix || !plugin.settings.lintApplyPrefix) {
-        return undefined;
-    }
+    if (!plugin.settings.lintApplyPrefix) return undefined;
+    return notePlaceholderPrefix(plugin, doc);
+}
+
+/** The note's prefix whenever the prefix feature is on and the prefix is valid, whether or not the apply-prefix rule is armed. A name that is just this prefix is the bare-prefix placeholder, never a real name. */
+function notePlaceholderPrefix(plugin: FootnotePlugin, doc: Editor): string | undefined {
+    if (!plugin.settings.enableFootnotePrefix) return undefined;
     const prefix = footnotePrefixFromEditor(doc);
     if (!prefix || footnotePrefixProblem(prefix) !== null) return undefined;
     return prefix;

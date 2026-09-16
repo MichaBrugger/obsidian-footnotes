@@ -32,7 +32,7 @@ const ctx = (markdown: string) => {
 };
 
 describe("the invalid-name alert covers quoted definitions", () => {
-    it.fails("a quoted definition with an invalid name is reported", () => {
+    it("a quoted definition with an invalid name is reported", () => {
         const { lines, scan, masked, starts } = ctx("> [^my note]: x");
         expect(invalidFootnoteNames(lines, scan, masked, starts)).toContain("my note");
     });
@@ -44,7 +44,7 @@ describe("the invalid-name alert covers quoted definitions", () => {
 });
 
 describe("the nested-footnote alert covers quoted definitions", () => {
-    it.fails("a footnote nested inside a quoted definition is reported", () => {
+    it("a footnote nested inside a quoted definition is reported", () => {
         const { lines, scan, masked } = ctx("> [^1]: see [^2]\n\nuse[^1] use2[^2]");
         expect(nestedFootnoteDefinitionNames(lines, scan, masked)).toContain("1");
     });

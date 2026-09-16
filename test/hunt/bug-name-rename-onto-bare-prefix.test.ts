@@ -31,7 +31,7 @@ function prefixedDoc(): ReturnType<typeof fakeEditor> {
 }
 
 describe("rename onto the bare prefix", () => {
-    it.fails("renaming to the bare prefix is refused, not applied", () => {
+    it("renaming to the bare prefix is refused, not applied", () => {
         const doc = prefixedDoc();
         const plan = planFootnoteRename(doc, "p.1", "p.", undefined, {
             sweepPrefix: "p.",
@@ -39,7 +39,7 @@ describe("rename onto the bare prefix", () => {
         expect(plan.kind).not.toBe("renamed");
     });
 
-    it.fails("renaming to the bare prefix in another casing is refused too", () => {
+    it("renaming to the bare prefix in another casing is refused too", () => {
         const doc = prefixedDoc();
         const plan = planFootnoteRename(doc, "p.1", "P.", undefined, {
             sweepPrefix: "p.",
