@@ -1821,6 +1821,25 @@ export function findDefinitionBlocks(
         let end = i;
         let j = i + 1;
         while (j < lines.length) {
+            // A line inside a region that a line already in the block
+            // opened belongs to the block, whatever it looks like: the
+            // interior and the closer of a comment, math block, or fence
+            // opened on a continuation line, or the lines of a "%%" block
+            // opened there. Obsidian carries such a region on to its closer
+            // across column-0 lines (verified in Reading view, 2026-09-16),
+            // so the definition owns all of it. The block used to stop at
+            // the end of the indented run, and every rule that moves or
+            // deletes whole blocks then took the opener away from its
+            // closer (Claude sweep 2026-09-13).
+            if (
+                scan.startsInComment[j] ||
+                scan.startsInMath[j] ||
+                scan.startsInFence[j] ||
+                (scan.inCommentBlock[j] && scan.inCommentBlock[end])
+            ) {
+                end = j++;
+                continue;
+            }
             if (isProtected[j]) {
                 if (absorbable(j)) {
                     end = j++;
@@ -1855,6 +1874,48 @@ export function findDefinitionBlocks(
         i = end;
     }
     return blocks;
+}
+
+/**
+ * The last line of the quoted definition whose label sits on `start`. A
+ * label inside a blockquote or callout never forms a block, but Obsidian
+ * gives it the same continuation a column-0 definition gets, inside the
+ * quote: each following non-blank quoted line at the same depth (a lazy
+ * continuation, or an indented one), and a run of empty quote lines when
+ * an indented quoted line follows it. A protected line, a line starting a
+ * definition of its own, and a change of quote depth end it (verified in
+ * Reading view 2026-09-16; Claude sweep 2026-09-13, where the orphan rule
+ * cut a quoted label away from its body).
+ */
+export function quotedDefinitionEnd(
+    lines: string[],
+    scan: Pick<DocumentScan, "isProtected">,
+    starts: boolean[],
+    start: number,
+): number {
+    const depthOf = (text: string): number =>
+        (text.match(BlockquotePrefix)?.[0].match(/>/g) ?? []).length;
+    const inner = (j: number): string => lines[j].replace(BlockquotePrefix, "");
+    const depth = depthOf(lines[start]);
+    const continues = (j: number): boolean =>
+        j < lines.length && !scan.isProtected[j] && !starts[j] && depthOf(lines[j]) === depth;
+    let end = start;
+    let j = start + 1;
+    while (continues(j)) {
+        if (inner(j).trim() !== "") {
+            end = j++;
+            continue;
+        }
+        let k = j;
+        while (continues(k) && inner(k).trim() === "") k++;
+        if (continues(k) && /^ {4}/.test(inner(k))) {
+            end = k;
+            j = k + 1;
+        } else {
+            break;
+        }
+    }
+    return end;
 }
 
 /**

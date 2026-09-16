@@ -8,6 +8,7 @@ import {
     findDefinitionBlocks,
     maskProtectedLines,
     normalizeEol,
+    quotedDefinitionEnd,
     scanDocument,
 } from "../parsing/markdown-scan";
 import {
@@ -327,9 +328,7 @@ export function nestedFootnoteDefinitionNames(
     // definitions, which never form blocks but are as real as the others
     // (the C22 ruling) and used to be skipped here (Kimi sweep
     // 2026-09-13). A quoted definition's text is the rest of its label
-    // line and the quoted lines that follow it at the same depth, up to a
-    // blank line or another label, the way Obsidian carries a quoted
-    // definition on (verified in Reading view, 2026-09-16).
+    // line and its continuation inside the quote (quotedDefinitionEnd).
     const spans = findDefinitionBlocks(lines, scan, masked, starts).map((block) => ({
         name: block.name,
         start: block.start,
@@ -361,27 +360,6 @@ export function nestedFootnoteDefinitionNames(
     return names;
 }
 
-/** How many ">" markers open the line: its blockquote depth. */
-function quoteDepth(text: string): number {
-    return (/^(?: {0,3}> ?)+/.exec(text)?.[0].match(/>/g) ?? []).length;
-}
-
-/**
- * The last line of the quoted definition whose label sits on `start`: the
- * label line itself, then each following non-blank quoted line at the same
- * depth that is not protected and does not start a definition of its own.
- */
-function quotedDefinitionEnd(lines: string[], scan: DocumentScan, starts: boolean[], start: number): number {
-    const depth = quoteDepth(lines[start]);
-    let end = start;
-    for (let j = start + 1; j < lines.length; j++) {
-        const text = lines[j];
-        if (scan.isProtected[j] || starts[j] || quoteDepth(text) !== depth) break;
-        if (text.replace(/^(?: {0,3}> ?)+/, "").trim() === "") break;
-        end = j;
-    }
-    return end;
-}
 
 /**
  * True when this masked line holds a live inline footnote, the self-

@@ -9,6 +9,7 @@ import {
     findDefinitionBlocks,
     maskProtectedLines,
     normalizeEol,
+    quotedDefinitionEnd,
     removeLineRanges,
     restoreEol,
     scanDocument,
@@ -61,8 +62,15 @@ function scanReferences(
 
     // Following through on C22 (parallel-review probe, 2026-08-10). A label
     // inside a blockquote or a callout, "> [^x]: ...", is a REAL
-    // definition. It is treated as a definition block one line long, since
-    // there is no such thing as a continuation line inside a blockquote.
+    // definition. It becomes a block here too, running to the end of its
+    // continuation inside the quote (quotedDefinitionEnd). It used to be a
+    // block one line long, on the belief that a quote has no continuation
+    // lines; Obsidian disagrees, and cutting the label alone left its body
+    // behind as quoted code, whose references died with it, so the next
+    // lint deleted a definition only that body had been citing (Claude
+    // sweep 2026-09-13). Now the body goes with its label, and a
+    // definition only that body cited dies in the same call, exactly as
+    // under a column-0 orphan.
     //
     // And no definition label, of either shape, ever counts as a reference.
     // A label defines a footnote; it does not point at one. Counting labels
@@ -81,7 +89,7 @@ function scanReferences(
             blocks.push({
                 name: hit.name,
                 start: i,
-                end: i,
+                end: quotedDefinitionEnd(lines, scan, starts, i),
             });
         }
     }

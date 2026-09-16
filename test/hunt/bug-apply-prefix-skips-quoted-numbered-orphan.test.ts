@@ -55,7 +55,7 @@ const noteWith = (label: string) =>
     ].join("\n");
 
 describe("apply-prefix and an orphaned numbered definition inside a blockquote", () => {
-    it.fails("the quoted orphan adopts the note's prefix like any other number", () => {
+    it("the quoted orphan adopts the note's prefix like any other number", () => {
         const after = lintFootnotes(
             noteWith("> [^5]: an orphan inside a quote"),
             prefixed,

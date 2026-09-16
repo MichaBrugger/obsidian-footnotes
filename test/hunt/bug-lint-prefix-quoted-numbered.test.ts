@@ -15,7 +15,7 @@ import { lintFootnotes } from "../../src/linting/linter";
 // note's prefix sees the quoted numbered one left behind on every lint.
 
 describe("apply-footnote-prefix and a quoted numbered definition", () => {
-    it.fails("renames a quoted numbered definition's label too", () => {
+    it("renames a quoted numbered definition's label too", () => {
         const doc = "x[^1]\n\n> [^2]: quoted orphan\n\n[^1]: a";
         const out = applyFootnotePrefix(doc, "p.");
         expect(out).toContain("[^p.2]:");

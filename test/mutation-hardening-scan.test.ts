@@ -1430,11 +1430,15 @@ describe("round 2", () => {
         // applies (the interior line has no leading whitespace) so it
         // breaks one line too early.
         it("absorbs a comment region's protected interior line via the comment-aware branch, not by falling through", () => {
+            // Since 2026-09-16 the block also owns the closer line, because
+            // the definition owns the whole region its continuation line
+            // opened (bug-definition-block-owns-region-opener), so the
+            // block runs to the end of the note here.
             const doc = "[^1]: a\n    <!--\nhidden\n-->";
             const lines = doc.split("\n");
             const scan = scanDocument(lines);
             expect(findDefinitionBlocks(lines, scan)).toEqual([
-                { name: "1", start: 0, end: 2 },
+                { name: "1", start: 0, end: 3 },
             ]);
         });
     });

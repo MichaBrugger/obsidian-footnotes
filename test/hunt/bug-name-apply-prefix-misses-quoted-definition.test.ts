@@ -18,7 +18,7 @@ import { applyFootnotePrefix } from "../../src/linting/rules/apply-footnote-pref
 // exists only as a quoted definition is invisible to it.
 
 describe("apply-prefix collision guard vs quoted definitions", () => {
-    it.fails("does not rename a reference onto a name a blockquoted definition already owns", () => {
+    it("does not rename a reference onto a name a blockquoted definition already owns", () => {
         const input = "text[^note] here\n\n> [^p.note]: quoted definition";
         const out = applyFootnotePrefix(input, "p.");
         // "p.note" is taken by the quoted definition, so "note" must be
@@ -33,7 +33,7 @@ describe("apply-prefix collision guard vs quoted definitions", () => {
         expect(out).toBe(input);
     });
 
-    it.fails("two quoted definitions of different names stay different", () => {
+    it("two quoted definitions of different names stay different", () => {
         const input = "> [^note]: one\n\n> [^p.note]: two";
         const out = applyFootnotePrefix(input, "p.");
         expect(out).toBe(input);

@@ -37,12 +37,12 @@ describe("bug: a definition block carries a comment opener away from its closer"
     // from the opener down to the closer, come back exactly as they were
     // typed and still next to each other.
 
-    it.fails("move-to-bottom keeps a %% opener in a continuation line with its closer", () => {
+    it("move-to-bottom keeps a %% opener in a continuation line with its closer", () => {
         const doc = "x[^1] y[^2]\n\n[^1]: one\n    %%\nhidden[^2] text\n%%\n\ntail";
         expect(moveFootnoteDefinitionsToBottom(doc)).toContain("    %%\nhidden[^2] text\n%%");
     });
 
-    it.fails("move-to-bottom keeps an HTML opener in a continuation line with its closer", () => {
+    it("move-to-bottom keeps an HTML opener in a continuation line with its closer", () => {
         // the same shape with "<!--" and "-->", where the commented lines
         // are protected text: the definition still drags the opener off and
         // leaves the bare "-->" behind
@@ -50,30 +50,30 @@ describe("bug: a definition block carries a comment opener away from its closer"
         expect(moveFootnoteDefinitionsToBottom(doc)).toContain("    <!--\nhidden[^2] text\n-->");
     });
 
-    it.fails("reindex's reordering keeps a %% opener with its closer", () => {
+    it("reindex's reordering keeps a %% opener with its closer", () => {
         const doc = "b[^2] a[^1]\n\n[^1]: one\n    %%\nhidden\n%%\n[^2]: two";
         expect(reindexFootnotes(doc)).toContain("    %%\nhidden\n%%");
     });
 
-    it.fails("reindex's reordering keeps an HTML opener with its closer", () => {
+    it("reindex's reordering keeps an HTML opener with its closer", () => {
         const doc = "b[^2] a[^1]\n\n[^1]: one\n    <!--\nhidden\n-->\n[^2]: two";
         expect(reindexFootnotes(doc)).toContain("    <!--\nhidden\n-->");
     });
 
-    it.fails("deleting an orphaned definition leaves the %% lines it was hiding alone", () => {
-        // "[^9]" has no reference, so the orphan rule deletes its block.
-        // The block wrongly includes the comment opener, so the deletion
-        // takes the opener away and the commented-out definition below it
-        // comes back to life.
+    // The deletion half (rewritten to the fix, 2026-09-16). The orphan's
+    // block owns the comment its continuation line opened, from the opener
+    // down to the closer, so deleting the orphan takes the hidden lines
+    // with it as part of its body, the way it takes any other continuation
+    // line. What must never happen is the half-way state the bug produced:
+    // the opener gone and the closer left behind, hiding or revealing text
+    // the user never touched.
+    it("deleting an orphaned definition takes the %% lines its body was hiding with it", () => {
         const doc = "a[^1]\n\n[^9]: orphan\n    %%\n[^1]: one\n%%";
-        expect(removeOrphanedFootnoteDefinitions(doc)).toContain("    %%\n[^1]: one\n%%");
+        expect(removeOrphanedFootnoteDefinitions(doc)).toBe("a[^1]");
     });
 
-    it.fails("deleting an orphaned definition leaves the HTML lines it was hiding alone", () => {
-        // The worst of the six: here the commented-out "[^1]: one" line is
-        // inside the deleted block, so it is not revealed but destroyed.
-        // The note comes back as "a[^1]", a blank line, and a lone "-->".
+    it("deleting an orphaned definition takes the HTML lines its body was hiding with it", () => {
         const doc = "a[^1]\n\n[^9]: orphan\n    <!--\n[^1]: one\n-->";
-        expect(removeOrphanedFootnoteDefinitions(doc)).toContain("    <!--\n[^1]: one\n-->");
+        expect(removeOrphanedFootnoteDefinitions(doc)).toBe("a[^1]");
     });
 });

@@ -1,5 +1,6 @@
 import { footnotePrefixProblem } from "../../parsing/footnote-prefix";
 import { computeNextFootnoteNumber, referenceOccurrences } from "../../parsing/footnote-grammar";
+import { definitionLabelWithName } from "../../parsing/markdown-scan";
 
 import { rewriteDocument } from "../rewrite-document";
 import { rewriteFootnoteNames } from "../rewrite-footnote-names";
@@ -80,8 +81,22 @@ export function applyFootnotePrefix(markdown: string, prefix: string): string {
                 record(name);
             }
         }
-        for (const block of blocks) {
-            record(block.name);
+        // then the definitions, in the order they appear: the column-0
+        // blocks and the quoted labels alike. A label inside a blockquote
+        // or callout forms no block, but it is a definition all the same
+        // (the C22 ruling), and skipping it here let a rename land on a
+        // name a quoted definition already owned, merging two footnotes,
+        // and left a quoted numbered orphan outside the prefix's namespace
+        // (Kimi and Claude sweeps 2026-09-13).
+        const labels = blocks.map((block) => ({ line: block.start, name: block.name }));
+        for (let i = 0; i < lines.length; i++) {
+            if (isProtected[i] || !definitionStarts[i]) continue;
+            const hit = definitionLabelWithName(lines[i], maskedLines[i]);
+            if (hit?.label.quoted) labels.push({ line: i, name: hit.name });
+        }
+        labels.sort((a, b) => a.line - b.line);
+        for (const { name } of labels) {
+            record(name);
         }
 
         // Plain numbers carry on from after the highest-numbered footnote
