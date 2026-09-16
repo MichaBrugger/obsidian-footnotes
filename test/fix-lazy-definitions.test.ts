@@ -130,9 +130,9 @@ describe("the lint pipeline with the toggle", () => {
 
     it("runs before the orphan and duplicate rules, which then judge the promoted definition", () => {
         // a hidden definition nothing references is an orphaned definition once
-        // fixed (the trailing blank line is orphan deletion's own residue: a
-        // real "prose\n\n[^9]: nobody" comes out the same way)
-        expect(lintFootnotes("prose\n[^9]: nobody", { removeOrphanedDefinitions: true })).toBe("prose\n");
+        // fixed; deleting the note's last block takes its separator blank
+        // line with it (2026-09-16), so nothing dangles at the end
+        expect(lintFootnotes("prose\n[^9]: nobody", { removeOrphanedDefinitions: true })).toBe("prose");
         expect(lintFootnotes("prose\n[^9]: nobody", { removeOrphanedDefinitions: false, reindex: false })).toBe(
             "prose\n\n[^9]: nobody",
         );

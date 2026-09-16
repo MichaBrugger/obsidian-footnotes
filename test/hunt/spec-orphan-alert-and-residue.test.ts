@@ -90,12 +90,12 @@ describe("the orphaned-definition alert and the chain it stands in for", () => {
     });
 
     it("turning the toggle on really does delete both", () => {
-        expect(removeOrphanedFootnoteDefinitions(CHAIN)).toBe("text\n");
+        expect(removeOrphanedFootnoteDefinitions(CHAIN)).toBe("text");
     });
 });
 
 describe("deleting the last definition block of a note", () => {
-    it.fails("leaves the end of the note where it was", () => {
+    it("leaves the end of the note where it was", () => {
         // today it comes back as "a[^1]\n\n[^1]: one\n", one line longer at
         // the bottom than it went in
         const doc = "a[^1]\n\n[^1]: one\n\n[^orphan]: stray";

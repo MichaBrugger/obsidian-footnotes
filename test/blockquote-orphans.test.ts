@@ -26,7 +26,7 @@ describe("blockquoted orphan definitions vs the new orphan rules", () => {
     });
 
     it("A2: delete toggle removes a blockquoted orphan definition", () => {
-        expect(removeOrphanedFootnoteDefinitions("para.\n\n> [^9]: stray")).toBe("para.\n");
+        expect(removeOrphanedFootnoteDefinitions("para.\n\n> [^9]: stray")).toBe("para.");
     });
 
     it("B1: a blockquoted duplicate's label masquerades as a reference, keeping a column-0 orphan alive", () => {

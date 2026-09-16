@@ -252,7 +252,7 @@ describe("lintFootnotes composition", () => {
                 sectionHeading: "# Footnotes",
                 reindexOptions: { keepOrphanedDefinitions: false },
             }),
-        ).toBe("body text\n");
+        ).toBe("body text");
     });
 
     // L155 LogicalOperator/BooleanLiteral on `options.moveDefinitionsToBottom

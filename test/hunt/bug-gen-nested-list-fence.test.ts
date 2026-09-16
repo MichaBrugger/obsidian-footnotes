@@ -26,15 +26,15 @@ import { moveFootnoteDefinitionsToBottom } from "../../src/linting/rules/move-fo
 const DOC = "- - ```\n    fake[^99]\n    ```\nafter[^1]";
 
 describe("a fence inside a nested list item is protected", () => {
-    it.fails("code inside the nested fence reserves no number", () => {
+    it("code inside the nested fence reserves no number", () => {
         expect(computeNextFootnoteNumber(DOC)).toBe(2);
     });
 
-    it.fails("the fence lines are protected and the tail is live", () => {
+    it("the fence lines are protected and the tail is live", () => {
         expect(protectedLines(DOC.split("\n"))).toEqual([true, true, true, false]);
     });
 
-    it.fails("move-to-bottom works below the nested fence", () => {
+    it("move-to-bottom works below the nested fence", () => {
         const doc = "- - ```\n    fake[^99]\n    ```\npara[^1]\n\n[^1]: def\n\ntail";
         expect(moveFootnoteDefinitionsToBottom(doc)).toBe(
             "- - ```\n    fake[^99]\n    ```\npara[^1]\n\ntail\n\n[^1]: def",

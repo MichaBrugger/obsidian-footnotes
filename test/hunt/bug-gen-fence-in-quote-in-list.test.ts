@@ -22,15 +22,15 @@ import { reindexFootnotes } from "../../src/linting/rules/re-index-footnotes";
 describe("a fence inside a blockquote inside a list item is protected", () => {
     const doc = "- > ```\n  > code[^99]\n  > ```\nafter[^1]";
 
-    it.fails("code inside the nested fence reserves no number", () => {
+    it("code inside the nested fence reserves no number", () => {
         expect(computeNextFootnoteNumber(doc)).toBe(2);
     });
 
-    it.fails("the fence interior and closer are protected lines", () => {
+    it("the fence interior and closer are protected lines", () => {
         expect(protectedLines(doc.split("\n"))).toEqual([true, true, true, false]);
     });
 
-    it.fails("orphan deletion does not cut code text out of the nested fence", () => {
+    it("orphan deletion does not cut code text out of the nested fence", () => {
         // the missed fence leaves the quoted label-shaped code line looking
         // like a live (quoted, C22) definition; nothing references "9", so
         // reindex's drop-orphans deletes the code line

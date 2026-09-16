@@ -17,7 +17,7 @@ describe("fixed 2026-08-10: transitive-orphan chains outrun the 20-iteration rei
 
     it("a 21-deep chain is fully deleted in ONE call (transitive promise)", () => {
         const doc = `para.\n\n${chain(21)}`;
-        expect(reindexFootnotes(doc, dropOrphans)).toBe("para.\n");
+        expect(reindexFootnotes(doc, dropOrphans)).toBe("para.");
     });
 
     it("orphan deletion is idempotent on a 25-deep chain", () => {

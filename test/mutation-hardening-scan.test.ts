@@ -792,13 +792,15 @@ describe("scanDocument: fence opener detection on list-item lines", () => {
             false,
         ]);
     });
-    it("a list-item fence's closer one column past content+3 does not close", () => {
+    it("a list-item fence's closer one column past content+3 does not close, and the item's end kills the fence", () => {
+        // the over-indented closer is code; "swallowed" at column 0 then
+        // ends the item, and the fence with it (ruling A3, 2026-09-15)
         const doc = "- ```\n  code\n      ```\nswallowed";
         expect(protectedLines(doc.split("\n"))).toEqual([
             true,
             true,
             true,
-            true,
+            false,
         ]);
     });
 });

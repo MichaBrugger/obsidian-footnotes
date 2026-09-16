@@ -84,6 +84,6 @@ describe("the boundary: deletions that change nothing around them", () => {
     });
 
     it("a quoted orphaned definition with no body goes whole", () => {
-        expect(removeOrphanedFootnoteDefinitions("para.\n\n> [^9]: stray")).toBe("para.\n");
+        expect(removeOrphanedFootnoteDefinitions("para.\n\n> [^9]: stray")).toBe("para.");
     });
 });

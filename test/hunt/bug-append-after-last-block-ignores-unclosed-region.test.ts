@@ -52,6 +52,9 @@ describe("bug: the append after the last definition block ignores an unclosed re
     describe.each(openers)("with %s opened by the last definition's continuation line", (_name, opener) => {
         // Green control: the scanner already knows the note ends inside
         // something that was never closed. The append just never asks.
+        // (Obsidian runs a region opened by a definition's continuation
+        // on across unindented lines, verified 2026-09-16, so the
+        // list-item rule of ruling A3 does not apply here.)
         it("the scan reports that the note ends inside the unclosed region", () => {
             expect(scanDocument(noteEndingInsideAnOpener(opener)).endsProtected).toBe(true);
         });

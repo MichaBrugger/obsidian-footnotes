@@ -28,7 +28,7 @@ import { reindexFootnotes } from "../../src/linting/rules/re-index-footnotes";
 // behavior without any ground-truth note. A fix needs to re-ligate that pin.
 
 describe("an unclosed fence inside a list item dies with the item", () => {
-    it.fails("the text after an unclosed list fence is live, not code", () => {
+    it("the text after an unclosed list fence is live, not code", () => {
         expect(protectedLines("- ```\n  code\nplain[^1]".split("\n"))).toEqual([
             true,
             true,
@@ -36,15 +36,15 @@ describe("an unclosed fence inside a list item dies with the item", () => {
         ]);
     });
 
-    it.fails("a reference after the dead fence counts in autonumbering", () => {
+    it("a reference after the dead fence counts in autonumbering", () => {
         expect(computeNextFootnoteNumber("- ```\n  code[^99]\nplain[^1]")).toBe(2);
     });
 
-    it.fails("the next list item ends the fence", () => {
+    it("the next list item ends the fence", () => {
         expect(computeNextFootnoteNumber("- ```\n  code[^99]\n- item[^1]")).toBe(2);
     });
 
-    it.fails("an ordered item's fence dies the same way", () => {
+    it("an ordered item's fence dies the same way", () => {
         expect(protectedLines("1. ```\n   code\nplain[^1]".split("\n"))).toEqual([
             true,
             true,
@@ -52,7 +52,7 @@ describe("an unclosed fence inside a list item dies with the item", () => {
         ]);
     });
 
-    it.fails("a nested bullet's fence dies at document level too", () => {
+    it("a nested bullet's fence dies at document level too", () => {
         // the pinned closed shape is "- outer\n  - ```\n    fake[^1]\n    ```";
         // unclosed, the fence must die where the nested item ends
         expect(
@@ -60,7 +60,7 @@ describe("an unclosed fence inside a list item dies with the item", () => {
         ).toEqual([false, true, true, false]);
     });
 
-    it.fails("the pinned EOF-swallow shape itself (re-litigation)", () => {
+    it("the pinned EOF-swallow shape itself (re-litigation)", () => {
         // the existing pin expects [true,true,true,true] + endsProtected;
         // micromark reads "swallowed" as a live paragraph
         const scan = scanDocument("10. ```\n    code\n\nswallowed".split("\n"));
@@ -68,7 +68,7 @@ describe("an unclosed fence inside a list item dies with the item", () => {
         expect(scan.endsProtected).toBe(false);
     });
 
-    it.fails("a bare fence line after a list fence opens a NEW fence instead of closing", () => {
+    it("a bare fence line after a list fence opens a NEW fence instead of closing", () => {
         // micromark: the list fence dies with its item, so the bare "```"
         // OPENS a new unclosed fence at the document level and "real[^1]"
         // is code. The plugin lets the bare line close the list fence
@@ -84,14 +84,14 @@ describe("an unclosed fence inside a list item dies with the item", () => {
         ]);
     });
 
-    it.fails("move-to-bottom is not refused below a dead list fence", () => {
+    it("move-to-bottom is not refused below a dead list fence", () => {
         const doc = "- ```\n  code\npara[^1]\n\n[^1]: def\n\ntail";
         expect(moveFootnoteDefinitionsToBottom(doc)).toBe(
             "- ```\n  code\npara[^1]\n\ntail\n\n[^1]: def",
         );
     });
 
-    it.fails("drop-orphans deletes a real orphan below a dead list fence", () => {
+    it("drop-orphans deletes a real orphan below a dead list fence", () => {
         const doc = "- ```\n  code\nreal[^1]\n\n[^1]: def\n\n[^9]: stray";
         expect(reindexFootnotes(doc, { keepOrphanedDefinitions: false })).toBe(
             "- ```\n  code\nreal[^1]\n\n[^1]: def",

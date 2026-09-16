@@ -239,7 +239,7 @@ export const removeOrphanedDefinitionsRule: FootnoteRule = {
         {
             description: "A definition only an orphan's body references dies with it",
             before: "text\n\n[^a]: uses[^b]\n[^b]: chained",
-            after: "text\n",
+            after: "text",
         },
     ],
     apply: (text) => removeOrphanedFootnoteDefinitions(text),

@@ -631,10 +631,10 @@ export interface DocumentScan {
     /**
      * A line appended at the end of the note would itself be protected,
      * because an unclosed comment, math block, or DOCUMENT-LEVEL fence runs
-     * all the way to the end. A fence inside a blockquote does not count:
-     * the appended line ends the quote, and the fence dies with it. This
-     * replaced move-to-bottom's habit of re-scanning with a probe line
-     * (performance item F6).
+     * all the way to the end. A fence inside a blockquote or a list item
+     * does not count: the appended line ends the quote or the item, and
+     * the fence dies with it. This replaced move-to-bottom's habit of
+     * re-scanning with a probe line (performance item F6).
      */
     endsProtected: boolean;
     /**
@@ -775,11 +775,15 @@ export function scanDocument(lines: string[]): DocumentScan {
     // (Sol bug #1: the old test measured 0 to 3 spaces from the document
     // margin, so "    ```" could never close a "10. ```" fence, and that
     // fence then swallowed the rest of the note.)
+    // listColumn is the content column of the innermost LIST ITEM the
+    // fence opened in (null outside any item): the fence dies with that
+    // item, at the first non-blank line indented less than the column.
     let fence: {
         char: string;
         length: number;
         depth: number;
         contentIndent: number;
+        listColumn: number | null;
     } | null = null;
     // Comment and math regions live in the CONTAINER that opened them, just
     // as fences do (Sol bug #4, verified against metadataCache).
@@ -815,9 +819,13 @@ export function scanDocument(lines: string[]): DocumentScan {
     // An unclosed region inside a blockquote can't reach a line appended at
     // the end of the note: that appended line ends the quote, exactly as it
     // does for a fence inside a blockquote.
+    // ...and a fence inside a LIST ITEM can't reach it either: the
+    // appended line, at column 0, ends the item and the fence with it
+    // (Jason's ruling A3, 2026-09-15). A comment or math block opened in
+    // an item does run on, since Obsidian reads it so.
     const endsProtectedNow = (): boolean =>
         ((inComment || inMath) && regionDepth === 0) ||
-        (fence !== null && fence.depth === 0) ||
+        (fence !== null && fence.depth === 0 && fence.listColumn === null) ||
         (commentBlock !== null && commentBlock.depth === 0);
     const endsProtectedAt = new Array<boolean>(lines.length).fill(false);
     // The indented-code state (case C21). `blockBoundary` marks a place
@@ -838,6 +846,18 @@ export function scanDocument(lines: string[]): DocumentScan {
     // past the item's own content indent, not at column 4 of the document.
     // Document level only; a quoted list rides its quote's existing rules.
     const listStack: number[] = [];
+    // the content column of the innermost open list item, for a region
+    // that opens inside it; only document-level lists are tracked
+    const innermostListColumn = (depth: number): number | null =>
+        depth === 0 && listStack.length > 0 ? listStack[listStack.length - 1] : null;
+    // A construct that cannot be a lazy paragraph continuation (a fence, a
+    // comment or math opener) at an indent shallower than an open item's
+    // content column ENDS that item, blank line or no blank line.
+    const closeItemsShallowerThan = (indentWidth: number): void => {
+        while (listStack.length > 0 && indentWidth < listStack[listStack.length - 1]) {
+            listStack.pop();
+        }
+    };
     // Indented code measured against the quote it sits in (2026-08-11
     // review bug #4, ground-truthed in the live reading view). Quote
     // content indented 4 or more columns past the innermost ">" marker is
@@ -860,6 +880,25 @@ export function scanDocument(lines: string[]): DocumentScan {
         // count in. Fences and comment or math regions live in the
         // container that opened them.
         const { depth, rest } = blockquoteDepth(src[i]);
+        // A FENCE opened inside a LIST ITEM ends where the item ends: at
+        // the first non-blank line indented less than the item's content
+        // column (blank lines stay inside the item). Obsidian reads it so
+        // (Jason's ruling A3, 2026-09-15, verified in Reading view), exactly
+        // as a fence inside a blockquote dies with its quote. The line that
+        // ended it is ordinary text and gets the full treatment below. A
+        // comment or math block opened in an item is different: Obsidian
+        // runs it on to its closer or the end of the note (verified
+        // 2026-09-16), so those stay as they were.
+        if (
+            fence &&
+            fence.listColumn !== null &&
+            src[i].trim() !== "" &&
+            leadingIndentWidth(src[i]) < fence.listColumn
+        ) {
+            fence = null;
+            // the item is over, so the list state below may close it
+            blockBoundary = true;
+        }
         // An open "%%" block comment claims whole lines until its closer,
         // which is the first "%%" anywhere on a later line. Escapes and
         // backticks do not shield that closer, just as they do not shield
@@ -1129,7 +1168,22 @@ export function scanDocument(lines: string[]): DocumentScan {
                         item[3].length === 0 || item[3].length > 4
                             ? 1
                             : item[3].length;
-                    listStack.push(item[1].length + item[2].length + gap);
+                    let column = item[1].length + item[2].length + gap;
+                    listStack.push(column);
+                    // "- - text": each further marker on the line opens a
+                    // nested item at its own content column (the fence
+                    // hidden behind such a run was invisible to the
+                    // scanner, Kimi sweep 2026-09-13)
+                    for (;;) {
+                        const nested = src[i].slice(column).match(/^( {0,3})([-+*]|\d{1,9}[.)])( +|$)/);
+                        if (!nested) break;
+                        const nestedGap =
+                            nested[3].length === 0 || nested[3].length > 4
+                                ? 1
+                                : nested[3].length;
+                        column += nested[1].length + nested[2].length + nestedGap;
+                        listStack.push(column);
+                    }
                 }
             }
         }
@@ -1150,14 +1204,43 @@ export function scanDocument(lines: string[]): DocumentScan {
         // (bug-list-item-fence).
         let fenceLine = rest;
         let open = fenceLine.match(/^( {0,3})(`{3,}|~{3,})/);
-        if (!open) {
-            const afterListMarker = rest.replace(
-                /^ {0,3}(?:[-+*]|\d{1,9}[.)]) +/,
-                "",
-            );
-            if (afterListMarker !== rest) {
-                fenceLine = afterListMarker;
-                open = fenceLine.match(/^( {0,3})(`{3,}|~{3,})/);
+        // How many blockquote markers sit BEHIND the list markers on this
+        // line ("- > ```"): the fence then lives at that deeper depth, and
+        // its closer arrives as "  > ```", which blockquoteDepth reads at
+        // that same depth.
+        let markersDepth = 0;
+        if (!open && depth === 0) {
+            // Peel the line's container markers one by one: list markers
+            // and blockquote markers in any order ("- > ```", "- - ```",
+            // "1. > - ```"). Each list marker opened an item above; each
+            // ">" opens a quote the fence will live in. The scanner used to
+            // strip ONE list marker and stop, so a fence behind a second
+            // marker went unseen and its closer opened a phantom fence
+            // that swallowed the rest of the note (Kimi sweep 2026-09-13).
+            let peeled = rest;
+            let peeledAny = false;
+            for (;;) {
+                const marker = peeled.match(/^ {0,3}(?:[-+*]|\d{1,9}[.)]) +/);
+                if (marker) {
+                    peeled = peeled.slice(marker[0].length);
+                    peeledAny = true;
+                    continue;
+                }
+                const quoted = blockquoteDepth(peeled);
+                if (quoted.depth > 0) {
+                    markersDepth += quoted.depth;
+                    peeled = quoted.rest;
+                    peeledAny = true;
+                    continue;
+                }
+                break;
+            }
+            if (peeledAny) {
+                const behind = peeled.match(/^( {0,3})(`{3,}|~{3,})/);
+                if (behind) {
+                    fenceLine = peeled;
+                    open = behind;
+                }
             }
         }
         // Inside a list item, a fence's indent is measured from the ITEM's
@@ -1189,13 +1272,38 @@ export function scanDocument(lines: string[]): DocumentScan {
                 fenceLine = rest;
                 open = wide;
                 listFenceContentIndent = 4;
+            } else {
+                // ...or a quoted fence on such a line ("    > ```"): the
+                // fence lives inside a quote inside the definition (Kimi
+                // sweep 2026-09-13). Its interior and closer lines carry
+                // the same four-space indent plus the ">" marker, which
+                // blockquoteDepth cannot read at four spaces, so they are
+                // interior lines until the quote ends at the first blank
+                // or unindented line.
+                const quotedIndent = rest.match(/^ {4,7}/);
+                if (quotedIndent) {
+                    const quoted = blockquoteDepth(rest.slice(quotedIndent[0].length));
+                    const behind = quoted.depth > 0 ? quoted.rest.match(/^( {0,3})(`{3,}|~{3,})/) : null;
+                    if (behind) {
+                        fenceLine = quoted.rest;
+                        open = behind;
+                        markersDepth = quoted.depth;
+                        listFenceContentIndent = 4;
+                    }
+                }
             }
         }
         if (open && isFenceOpener(fenceLine, open[2])) {
+            // a fence at an indent shallower than an open item's content
+            // column is not inside that item (it cannot continue a
+            // paragraph lazily), so the item is over
+            if (depth === 0 && listFenceContentIndent === null && fenceLine === rest) {
+                closeItemsShallowerThan(indentWidth);
+            }
             fence = {
                 char: open[2][0],
                 length: open[2].length,
-                depth,
+                depth: depth + markersDepth,
                 // When the fence opened on a list item line, the column where
                 // the item's text starts (the list marker's width plus the
                 // opener's own indent) is the column the closing fence has to
@@ -1206,7 +1314,17 @@ export function scanDocument(lines: string[]): DocumentScan {
                 // the opener did, and Obsidian agrees (Claude sweep
                 // 2026-09-13, verified in Reading view: " ```" is not
                 // closed by "    ```").
-                contentIndent: listFenceContentIndent ?? rest.length - fenceLine.length,
+                // Behind a ">" the closer's indent is measured after the
+                // quote marker, so the container column is 0 there.
+                contentIndent:
+                    markersDepth > 0 ? 0 : (listFenceContentIndent ?? rest.length - fenceLine.length),
+                // Only a fence inside a LIST ITEM dies with its container;
+                // one inside a definition's continuation runs on, as
+                // Obsidian reads it (verified 2026-09-16).
+                listColumn:
+                    listFenceContentIndent === 4 && listStack.length === 0
+                        ? null
+                        : innermostListColumn(depth),
             };
             isProtected[i] = true;
             prevParagraph = false;
@@ -1367,6 +1485,10 @@ export function removeLineRanges(
     const rangeAtLine = new Map(ranges.map((range) => [range.start, range]));
     const out: string[] = [];
     let mergeBlanks = false;
+    // whether a cut reaches the last line: the blank line that separated
+    // that last block from the text above it would otherwise be left
+    // dangling at the end of the note (Kimi and Claude sweeps 2026-09-13)
+    const cutReachesEnd = ranges.some((range) => range.end >= lines.length - 1);
     for (let i = 0; i < lines.length; i++) {
         const range = rangeAtLine.get(i);
         if (range) {
@@ -1407,6 +1529,9 @@ export function removeLineRanges(
         }
         mergeBlanks = false;
         out.push(lines[i]);
+    }
+    if (cutReachesEnd) {
+        while (out.length > 0 && out[out.length - 1] === "") out.pop();
     }
     return out;
 }

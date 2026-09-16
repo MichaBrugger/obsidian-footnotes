@@ -139,7 +139,7 @@ describe("removeOrphanedFootnoteDefinitions", () => {
             i === 24 ? "[^25]: end" : `[^${i + 1}]: uses[^${i + 2}]`,
         ).join("\n");
         const out = removeOrphanedFootnoteDefinitions(`para.\n\n${chain}`);
-        expect(out).toBe("para.\n");
+        expect(out).toBe("para.");
         expect(removeOrphanedFootnoteDefinitions(out)).toBe(out);
     });
 
