@@ -67,24 +67,24 @@ const pressSettings = {
 };
 
 describe("the walk never stops between a mark and a word character", () => {
-    it.fails("a straight-apostrophe contraction", () => {
+    it("a straight-apostrophe contraction", () => {
         const line = "don't worry";
         expect(landsBetweenMarkAndWord(line, endOfWordOffset(line, 1))).toBe(false);
     });
 
-    it.fails("a curly-apostrophe contraction", () => {
+    it("a curly-apostrophe contraction", () => {
         const line = "don\u2019t worry";
         expect(landsBetweenMarkAndWord(line, endOfWordOffset(line, 1))).toBe(false);
     });
 
-    it.fails("an abbreviation", () => {
+    it("an abbreviation", () => {
         const line = "the U.S. said";
         expect(
             landsBetweenMarkAndWord(line, endOfWordOffset(line, line.indexOf("U"))),
         ).toBe(false);
     });
 
-    it.fails("a bare domain name", () => {
+    it("a bare domain name", () => {
         const line = "visit example.com today";
         expect(
             landsBetweenMarkAndWord(
@@ -111,7 +111,7 @@ describe("the walk never stops between a mark and a word character", () => {
 });
 
 describe("the numbered press never splits a word", () => {
-    it.fails("a contraction stays whole", async () => {
+    it("a contraction stays whole", async () => {
         const doc = fakeEditor(["I don't worry"], {
             cursor: { line: 0, ch: 3 },
             edits: true,
@@ -124,11 +124,11 @@ describe("the numbered press never splits a word", () => {
 });
 
 describe("the punctuation lint rule never splits a word", () => {
-    it.fails("a possessive keeps its apostrophe and its s together", () => {
+    it("a possessive keeps its apostrophe and its s together", () => {
         expect(footnoteAfterPunctuation("Marx[^1]'s theory")).not.toContain("'[^1]s");
     });
 
-    it.fails("an abbreviation is not cut open", () => {
+    it("an abbreviation is not cut open", () => {
         expect(footnoteAfterPunctuation("the U[^1].S. said")).not.toContain(".[^1]S");
     });
 

@@ -22,22 +22,22 @@ import { footnoteAfterPunctuation } from "../../src/linting/rules/footnote-after
 // something after it.
 
 describe("footnote-after-punctuation never moves a reference into a phrase it stands before", () => {
-    it.fails("a reference before an emphasis OPENER stays put", () => {
+    it("a reference before an emphasis OPENER stays put", () => {
         const doc = "see the note[^1]*important* today\n\n[^1]: x";
         expect(footnoteAfterPunctuation(doc)).toBe(doc);
     });
 
-    it.fails("a reference before a strong-emphasis OPENER stays put", () => {
+    it("a reference before a strong-emphasis OPENER stays put", () => {
         const doc = "see the note[^1]**important** today\n\n[^1]: x";
         expect(footnoteAfterPunctuation(doc)).toBe(doc);
     });
 
-    it.fails("a reference before a highlight OPENER stays put", () => {
+    it("a reference before a highlight OPENER stays put", () => {
         const doc = "see the note[^1]==marked== today\n\n[^1]: x";
         expect(footnoteAfterPunctuation(doc)).toBe(doc);
     });
 
-    it.fails("a reference before a quote OPENER stays put", () => {
+    it("a reference before a quote OPENER stays put", () => {
         const doc = 'see the note[^1]"quoted" today\n\n[^1]: x';
         expect(footnoteAfterPunctuation(doc)).toBe(doc);
     });

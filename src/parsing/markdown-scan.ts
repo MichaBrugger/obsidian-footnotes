@@ -24,7 +24,7 @@ const DefinitionStart = /^ {0,3}\[\^([^[\]]+)\]:/;
  * lint rule, already sit above this leaf module. The import cycle that
  * first forced it here is gone, but no better shared home turned up.
  */
-export const TrailingPunctuationChars = ".,;:!?。，、；：！？";
+export const TrailingPunctuationChars = ".,;:!?\u2026。，、；：！？";
 
 /**
  * The closing marks a footnote reference also steps past: closing quotes
@@ -57,14 +57,77 @@ export function referenceLandingAfter(text: string, end: number): number {
         if (at >= text.length) return at;
         const c = text[at];
         if (c === "]" && text[at + 1] === "(") {
-            const close = text.indexOf(")", at + 2);
+            // a link's "(url)" tail, with any round brackets INSIDE the
+            // address balanced, as in a Wikipedia disambiguation link
+            // (Claude sweep 2026-09-13); an unclosed tail ends the walk
+            const close = balancedParenEnd(text, at + 1);
             if (close === -1) return at + 1;
             at = close + 1;
             continue;
         }
         if (!ClosingMarkChars.includes(c) && !TrailingPunctuationChars.includes(c)) return at;
-        at++;
+        // A mark or punctuation character glued to a word character on its
+        // far side is not a closer: an emphasis OPENER ("[^1]*important*"),
+        // an opening quote, or punctuation inside a word ("Marx's",
+        // "U.S."). Walking past it would put the reference inside the next
+        // word or break the emphasis (Kimi and Claude sweeps 2026-09-13;
+        // Jason's landing rulings 2026-09-15). Emphasis markers come in
+        // runs ("**"), so the run is judged as one.
+        let runEnd = at + 1;
+        if ("*_~=".includes(c)) {
+            while (runEnd < text.length && text[runEnd] === c) runEnd++;
+        }
+        if (isWordCharAt(text, runEnd)) return at;
+        at = runEnd;
     }
+}
+
+/** Whether the code point at `i` is a letter, digit, or mark. */
+function isWordCharAt(text: string, i: number): boolean {
+    const cp = text.codePointAt(i);
+    return cp !== undefined && /[\p{L}\p{N}\p{M}]/u.test(String.fromCodePoint(cp));
+}
+
+/** The index of the ")" that closes the "(" at `open`, counting nested round brackets, or -1. */
+function balancedParenEnd(text: string, open: number): number {
+    let depth = 0;
+    for (let i = open; i < text.length; i++) {
+        if (text[i] === "(") depth++;
+        else if (text[i] === ")") {
+            depth--;
+            if (depth === 0) return i;
+        }
+    }
+    return -1;
+}
+
+/**
+ * The end of the link-like construct that contains `offset`, or -1 when it
+ * sits in none: a markdown link "[text](url)" with its address balanced, a
+ * wikilink "[[note|alias]]", a bare URL, or an autolink "<scheme://...>"
+ * (the closing ">" included). A reference belongs after the whole
+ * construct, never inside it (Jason's landing rulings, 2026-09-15).
+ */
+export function linkLikeEndAt(text: string, offset: number): number {
+    const link = /\[[^\]\n]*\]\(/g;
+    for (let m = link.exec(text); m; m = link.exec(text)) {
+        const close = balancedParenEnd(text, m.index + m[0].length - 1);
+        if (close === -1) continue;
+        if (offset >= m.index && offset < close + 1) return close + 1;
+    }
+    const wikilink = /\[\[[^\]\n]*\]\]/g;
+    for (let m = wikilink.exec(text); m; m = wikilink.exec(text)) {
+        if (offset >= m.index && offset < m.index + m[0].length) return m.index + m[0].length;
+    }
+    const url = /[A-Za-z][A-Za-z0-9+.-]*:\/\/[^\s<>]+/g;
+    for (let m = url.exec(text); m; m = url.exec(text)) {
+        let end = m.index + m[0].length;
+        if (offset < m.index || offset >= end) continue;
+        // an autolink's ">" belongs to it
+        if (text[m.index - 1] === "<" && text[end] === ">") end++;
+        return end;
+    }
+    return -1;
 }
 // An indented line is a continuation line: it belongs to the definition
 // above it. The exception is a line that is itself a label indented one to

@@ -53,14 +53,14 @@ const LINK_LINE =
     "see [bravo](https://en.wikipedia.org/wiki/Ba_(disambiguation)#hist) now";
 
 describe("a link address holding its own round brackets", () => {
-    it.fails("the walk steps over the whole address, not to its first ')'", () => {
+    it("the walk steps over the whole address, not to its first ')'", () => {
         const endOfLinkText = LINK_LINE.indexOf("]");
         expect(referenceLandingAfter(LINK_LINE, endOfLinkText)).toBe(
             LINK_LINE.indexOf("#hist)") + "#hist)".length,
         );
     });
 
-    it.fails("the numbered press keeps the link whole", async () => {
+    it("the numbered press keeps the link whole", async () => {
         const doc = fakeEditor([LINK_LINE], {
             cursor: { line: 0, ch: LINK_LINE.indexOf("bravo") + 2 },
             edits: true,
@@ -73,7 +73,7 @@ describe("a link address holding its own round brackets", () => {
         );
     });
 
-    it.fails("the punctuation lint rule moves the reference past the whole link", () => {
+    it("the punctuation lint rule moves the reference past the whole link", () => {
         expect(
             footnoteAfterPunctuation(
                 "[linked[^k]](https://en.wikipedia.org/wiki/Ba_(disambiguation)#h).",

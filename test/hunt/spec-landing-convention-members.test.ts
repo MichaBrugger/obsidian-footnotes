@@ -63,11 +63,11 @@ const pressSettings = {
 };
 
 describe("question 1: the one-character ellipsis", () => {
-    it.fails("the insert hops it the way it hops three dots", () => {
+    it("the insert hops it the way it hops three dots", () => {
         expect(endOfWordOffset("wait\u2026 what", 2)).toBe(5);
     });
 
-    it.fails("the lint rule moves a reference past it the way it does three dots", () => {
+    it("the lint rule moves a reference past it the way it does three dots", () => {
         expect(footnoteAfterPunctuation("so[^1]\u2026")).toBe("so\u2026[^1]");
     });
 
@@ -78,12 +78,12 @@ describe("question 1: the one-character ellipsis", () => {
 });
 
 describe("question 2: an aliased wikilink", () => {
-    it.fails("the walk steps over the whole aliased link", () => {
+    it("the walk steps over the whole aliased link", () => {
         const line = "A wikilink: [[some bravo|alias]].";
         expect(endOfWordOffset(line, line.indexOf("bravo") + 2)).toBe(line.length);
     });
 
-    it.fails("the numbered press does not write into the link target", async () => {
+    it("the numbered press does not write into the link target", async () => {
         const line = "A wikilink: [[some bravo|alias]] end";
         const doc = fakeEditor([line], {
             cursor: { line: 0, ch: line.indexOf("bravo") + 2 },

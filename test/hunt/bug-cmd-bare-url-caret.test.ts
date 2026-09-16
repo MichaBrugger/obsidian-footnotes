@@ -44,7 +44,7 @@ function fakePlugin(doc: FakeEditor): FootnotePlugin {
 }
 
 describe("caret inside a bare URL or autolink (end-of-word walk)", () => {
-    it.fails("lands after the whole bare URL, not between domain segments", async () => {
+    it("lands after the whole bare URL, not between domain segments", async () => {
         const doc = fakeEditor(
             ["see https://example.com end"],
             "see https://exa".length,
@@ -53,7 +53,7 @@ describe("caret inside a bare URL or autolink (end-of-word walk)", () => {
         expect(doc.lines[0]).toBe("see https://example.com[^1] end");
     });
 
-    it.fails("lands after the whole autolink, not inside the scheme", async () => {
+    it("lands after the whole autolink, not inside the scheme", async () => {
         const doc = fakeEditor(["see <https://x.co> end"], "see <ht".length);
         await insertAutonumFootnote(fakePlugin(doc));
         expect(doc.lines[0]).toBe("see <https://x.co>[^1] end");

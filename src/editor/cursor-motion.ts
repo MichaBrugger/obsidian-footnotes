@@ -2,7 +2,7 @@ import { Editor, EditorChange, EditorPosition } from "obsidian";
 
 import type FootnotePlugin from "../main";
 import { safeInsertionCh } from "./insertion-liveness";
-import { referenceLandingAfter } from "../parsing/markdown-scan";
+import { linkLikeEndAt, referenceLandingAfter, TrailingPunctuationChars } from "../parsing/markdown-scan";
 import {
     EditorWithCm,
     VaultWithConfig,
@@ -108,11 +108,32 @@ export function comparePositions(a: EditorPosition, b: EditorPosition): number {
  * main editor's `wordAt` cannot see the cell editor's text.
  */
 export function endOfWordOffset(text: string, offset: number): number {
+    // Inside a link, a wikilink, or a URL the "word" is the whole
+    // construct: a reference written inside "[text](url)" or between the
+    // segments of "example.com" breaks the link (Jason's landing rulings,
+    // 2026-09-15).
+    const linkEnd = linkLikeEndAt(text, offset);
+    if (linkEnd !== -1) return referenceLandingAfter(text, linkEnd);
+    const end = wordEndOffset(text, offset);
+    if (end === -1) return offset;
+    // then past the closing marks and punctuation that follow the word
+    // (the landing convention, referenceLandingAfter)
+    return referenceLandingAfter(text, end);
+}
+
+/**
+ * The end of the word `offset` sits in or just after, or -1 when it sits
+ * on no word. An apostrophe (straight or curly) or a dot between two word
+ * characters belongs to the word ("don't", "Marx's", "U.S.",
+ * "example.com"), so the walk crosses it instead of stopping in front of
+ * it (Jason's landing rulings, 2026-09-15).
+ */
+function wordEndOffset(text: string, offset: number): number {
     if (
         !isWordCp(text.codePointAt(offset)) &&
         !isWordCp(cpBefore(text, offset))
     ) {
-        return offset;
+        return -1;
     }
     let end = offset;
     // a start offset landing in the middle of a two-unit code point (found
@@ -123,12 +144,36 @@ export function endOfWordOffset(text: string, offset: number): number {
     if (unitAtEnd >= 0xdc00 && unitAtEnd <= 0xdfff) end--;
     for (;;) {
         const cp = text.codePointAt(end);
-        if (!isWordCp(cp)) break;
+        if (!isWordCp(cp)) {
+            const c = text[end];
+            if (
+                (c === "'" || c === "\u2019" || c === ".") &&
+                isWordCp(cpBefore(text, end)) &&
+                isWordCp(text.codePointAt(end + 1))
+            ) {
+                end++;
+                continue;
+            }
+            break;
+        }
         end += (cp as number) > 0xffff ? 2 : 1;
     }
-    // then past the closing marks and punctuation that follow the word
-    // (the landing convention, referenceLandingAfter)
-    return referenceLandingAfter(text, end);
+    return end;
+}
+
+/**
+ * Where a SELECTION grows to at its end when it is expanded to whole words:
+ * the end of the word, plus at most one trailing punctuation mark, and no
+ * closing quote or emphasis marker. A selection is not an insertion: the
+ * closing mark belongs to the text around the new footnote, not inside it
+ * ("This is \"some bravo\". End" gives "some bravo" and leaves the quote;
+ * Claude sweep 2026-09-13, the README's "plus one trailing punctuation
+ * mark").
+ */
+export function endOfWordForSelection(text: string, offset: number): number {
+    const end = wordEndOffset(text, offset);
+    if (end === -1) return offset;
+    return end < text.length && TrailingPunctuationChars.includes(text[end]) ? end + 1 : end;
 }
 
 /**
@@ -172,16 +217,17 @@ export function adjustFootnotePosition(
     plugin: FootnotePlugin,
 ) {
     if (plugin.settings.insertAtEndOfWord) {
-        const endOfWordUnderCursor = doc.wordAt(cursorPosition)?.to;
-        if (endOfWordUnderCursor) {
-            // the insertion point is the end of the word, then past the
-            // closing marks and punctuation that follow it (the landing
-            // convention, referenceLandingAfter: a note on the last word of
-            // "some bravo". lands after the quote and the full stop)
-            cursorPosition = {
-                line: endOfWordUnderCursor.line,
-                ch: referenceLandingAfter(lineText, endOfWordUnderCursor.ch),
-            };
+        // The insertion point is the end of the word, then past the closing
+        // marks and punctuation that follow it (the landing convention,
+        // referenceLandingAfter: a note on the last word of "some bravo".
+        // lands after the quote and the full stop). The plugin's own word
+        // walk decides the word, rather than the editor's, because the
+        // editor's stops at an apostrophe or a dot inside a word and knows
+        // nothing of links (Jason's landing rulings, 2026-09-15). A caret
+        // on no word at all stays where it is.
+        const landing = endOfWordOffset(lineText, cursorPosition.ch);
+        if (landing !== cursorPosition.ch) {
+            cursorPosition = { line: cursorPosition.line, ch: landing };
         }
     }
     const ch = safeInsertionCh(lineText, cursorPosition.ch);

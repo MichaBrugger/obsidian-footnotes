@@ -10,7 +10,7 @@ import {
 } from "../parsing/footnote-grammar";
 import {
     comparePositions,
-    endOfWordOffset,
+    endOfWordForSelection,
     moveCursorAndSetJumpPoint,
     startOfWordOffset,
 } from "../editor/cursor-motion";
@@ -212,7 +212,7 @@ export function selectionPressHandled(
         // main-editor branch below does.
         if (plugin.settings.expandSelectionToWholeWords) {
             from = startOfWordOffset(cellText, from);
-            to = endOfWordOffset(cellText, to);
+            to = endOfWordForSelection(cellText, to);
         }
         // Refuse an edge that cuts into protected text here and now,
         // rather than leaving it to the simulation. The liveness checks
@@ -315,7 +315,7 @@ export function selectionPressHandled(
         };
         trimmed.to = {
             line: trimmed.to.line,
-            ch: endOfWordOffset(doc.getLine(trimmed.to.line), trimmed.to.ch),
+            ch: endOfWordForSelection(doc.getLine(trimmed.to.line), trimmed.to.ch),
         };
     }
     // The inline key works within a single line only. A selection that

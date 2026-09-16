@@ -47,7 +47,7 @@ function fakePlugin(doc: FakeEditor): FootnotePlugin {
 }
 
 describe("caret inside a link's (url) part", () => {
-    it.fails("autonum lands after the whole link, not inside the url", async () => {
+    it("autonum lands after the whole link, not inside the url", async () => {
         // caret between "ht" and "tp": the word is "http", whose end is
         // followed by ":", which the punctuation walk steps over, landing
         // between ":" and "//" deep inside the destination
@@ -56,13 +56,13 @@ describe("caret inside a link's (url) part", () => {
         expect(doc.lines[0]).toBe("[text](http://x)[^1]");
     });
 
-    it.fails("inline lands after the whole link, not inside the url", async () => {
+    it("inline lands after the whole link, not inside the url", async () => {
         const doc = fakeEditor(["[text](http://x)"], "[text](ht".length);
         await insertInlineFootnote(fakePlugin(doc));
         expect(doc.lines[0]).toBe("[text](http://x)^[]");
     });
 
-    it.fails("a nested-paren url: the walk must not stop at the inner ')'", async () => {
+    it("a nested-paren url: the walk must not stop at the inner ')'", async () => {
         // caret inside "v" of "[a](u_(v)_w)": the word walk ends before the
         // INNER ")", a closing mark the walk steps over - landing mid-url
         const line = "see [a](u_(v)_w) end";

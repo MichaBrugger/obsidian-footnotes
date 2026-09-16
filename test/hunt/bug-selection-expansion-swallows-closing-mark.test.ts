@@ -64,25 +64,25 @@ const QUOTED = 'This is "some bravo". End';
 const BOLD = "This is **some bravo** end";
 
 describe("a selection ending at a closing mark", () => {
-    it.fails("leaves the closing quote on the line", async () => {
+    it("leaves the closing quote on the line", async () => {
         const doc = selecting(QUOTED, QUOTED.indexOf("some"), QUOTED.indexOf('"', 9));
         await insertAutonumFootnote(fakePlugin(settings, doc));
         expect(doc.lines[0]).toBe('This is "[^1]". End');
     });
 
-    it.fails("keeps the closing quote out of the definition", async () => {
+    it("keeps the closing quote out of the definition", async () => {
         const doc = selecting(QUOTED, QUOTED.indexOf("some"), QUOTED.indexOf('"', 9));
         await insertAutonumFootnote(fakePlugin(settings, doc));
         expect(doc.lines.at(-1)).toBe("[^1]: some bravo");
     });
 
-    it.fails("leaves the closing bold markers on the line", async () => {
+    it("leaves the closing bold markers on the line", async () => {
         const doc = selecting(BOLD, BOLD.indexOf("some"), BOLD.indexOf("**", 9));
         await insertAutonumFootnote(fakePlugin(settings, doc));
         expect(doc.lines[0]).toBe("This is **[^1]** end");
     });
 
-    it.fails("keeps the closing bold markers out of the definition", async () => {
+    it("keeps the closing bold markers out of the definition", async () => {
         const doc = selecting(BOLD, BOLD.indexOf("some"), BOLD.indexOf("**", 9));
         await insertAutonumFootnote(fakePlugin(settings, doc));
         expect(doc.lines.at(-1)).toBe("[^1]: some bravo");
