@@ -10,7 +10,7 @@ import { PREFIXES } from "./helpers/prefixes";
 import { docArb } from "./arbitraries";
 import { inlineFootnoteSpanAt, sanitizeInlineFootnoteContent } from "../src/commands/inline-footnotes";
 import { endOfWordOffset } from "../src/editor/cursor-motion";
-import { footnoteReferenceMatches, referenceOccurrences } from "../src/parsing/footnote-grammar";
+import { definitionLabelWithName, footnoteReferenceMatches, referenceOccurrences } from "../src/parsing/footnote-grammar";
 import { lineDiffChanges, mapFoldLines } from "../src/editor/document-diff";
 import { lintFootnotes, LintOptions } from "../src/linting/linter";
 import { applyFootnotePrefix } from "../src/linting/rules/apply-footnote-prefix";
@@ -32,6 +32,7 @@ import {
     maskedLineAt,
     normalizeEol,
     protectedLines,
+    quotedDefinitionEnd,
     scanDocument,
 } from "../src/parsing/markdown-scan";
 
@@ -813,6 +814,92 @@ describe("interrupted-definition invariants over random documents", () => {
                         masked[i],
                         `%% block line ${i} fully blotted: ${JSON.stringify(lines[i])}`,
                     ).not.toBe("\0".repeat(lines[i].length));
+                }
+            }),
+        );
+    });
+});
+
+// ---------- region-body conservation over random documents ----------
+// The lint moves and renumbers whole definition blocks and never moves a
+// quoted one (manual sheet 25: quoted definitions stay put; the pinned
+// region-absorb fixes keep a block's regions and continuations whole).
+// These two properties encode that at the structural level: every line of
+// a definition's body that no rule may rewrite - reference-free,
+// non-blank - must survive the lint, in its block's own order. Label lines
+// are exempt (reindex and the prefix rule rename them); reference-bearing
+// lines are exempt (renumbering rewrites them); blank lines are exempt
+// (whole-block moves collapse runs of them).
+
+describe("definition-body conservation over random documents", () => {
+    soakIt("a column-0 definition's reference-free body lines stay in the note, in order", () => {
+        fc.assert(
+            fc.property(docArb, keepingOptionsArb, (doc, options) => {
+                const text = normalizeEol(doc).text;
+                const lines = text.split("\n");
+                const scan = scanDocument(lines);
+                const masked = maskProtectedLines(lines, scan);
+                const starts = definitionStartLines(lines, scan, (i) => masked[i]);
+                const blocks = findDefinitionBlocks(lines, scan, masked, starts);
+                const outLines = normalizeEol(lintFootnotes(text, options)).text.split("\n");
+                for (const block of blocks) {
+                    let cursor = 0;
+                    for (let j = block.start + 1; j <= block.end; j++) {
+                        const line = lines[j];
+                        if (line.trim() === "" || referenceOccurrences(line, masked[j]).length > 0) {
+                            continue;
+                        }
+                        let found = -1;
+                        for (let k = cursor; k < outLines.length; k++) {
+                            if (outLines[k] === line) {
+                                found = k;
+                                break;
+                            }
+                        }
+                        expect(
+                            found,
+                            `body line stranded: ${JSON.stringify(line)} of block ${JSON.stringify(block)}`,
+                        ).toBeGreaterThan(-1);
+                        cursor = found + 1;
+                    }
+                }
+            }),
+        );
+    });
+
+    soakIt("a quoted definition's reference-free lines stay in the note, in order", () => {
+        fc.assert(
+            fc.property(docArb, keepingOptionsArb, (doc, options) => {
+                const text = normalizeEol(doc).text;
+                const lines = text.split("\n");
+                const scan = scanDocument(lines);
+                const masked = maskProtectedLines(lines, scan);
+                const starts = definitionStartLines(lines, scan, (i) => masked[i]);
+                const outLines = normalizeEol(lintFootnotes(text, options)).text.split("\n");
+                for (let i = 0; i < lines.length; i++) {
+                    if (!starts[i]) continue;
+                    const hit = definitionLabelWithName(lines[i], masked[i]);
+                    if (!hit || !hit.label.quoted) continue;
+                    const end = quotedDefinitionEnd(lines, scan, starts, i);
+                    let cursor = 0;
+                    for (let j = i + 1; j <= end; j++) {
+                        const line = lines[j];
+                        if (line.trim() === "" || referenceOccurrences(line, masked[j]).length > 0) {
+                            continue;
+                        }
+                        let found = -1;
+                        for (let k = cursor; k < outLines.length; k++) {
+                            if (outLines[k] === line) {
+                                found = k;
+                                break;
+                            }
+                        }
+                        expect(
+                            found,
+                            `quoted body line stranded: ${JSON.stringify(line)} under label ${JSON.stringify(lines[i])}`,
+                        ).toBeGreaterThan(-1);
+                        cursor = found + 1;
+                    }
                 }
             }),
         );

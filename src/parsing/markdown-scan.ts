@@ -104,6 +104,13 @@ function escapedAt(line: string, index: number): boolean {
 function balancedParenEnd(text: string, open: number): number {
     let depth = 0;
     for (let i = open; i < text.length; i++) {
+        // an escaped bracket is a literal character of the destination,
+        // not a closer (GLM hunt cycle 4, 2026-09-16: the landing walk
+        // stopped at it and wrote the reference into the address)
+        if (text[i] === "\\") {
+            i++;
+            continue;
+        }
         if (text[i] === "(") depth++;
         else if (text[i] === ")") {
             depth--;
@@ -202,7 +209,13 @@ export function tableRowLinesOf(lines: string[]): boolean[] {
             const htmlBlock =
                 /^ {0,3}<(?:!--|\?|![A-Za-z]|!\[CDATA\[|\/?(?:script|pre|style|textarea|address|article|aside|blockquote|details|dialog|div|dl|figure|footer|form|h[1-6]|header|hr|main|nav|ol|p|section|summary|table|ul)(?:[ >/]|$))/i.test(text) ||
                 (!paragraphOpen && /^ {0,3}<\/?[A-Za-z][A-Za-z0-9-]*(?:\s+[^<>]*)?\/?>\s*$/.test(text));
-            return !percentBlock && !htmlBlock && !/^ {0,3}(?:#{1,6}(?: |$)|([-*_])( *\1){2,} *$|(?:=+|-+) *$|`{3,}|~{3,}|\[\^|\[![^\]]*\])/.test(text) && !hasUnescapedPipe(text);
+            // a label directly under plain text is lazy prose and counts
+            // as paragraph text itself (GLM hunt cycle 4, 2026-09-16); a
+            // label after a boundary is a block of its own
+            if (/^ {0,3}\[\^[^\]\s]+\]:/.test(text)) {
+                return j > 0 && blockquoteDepth(lines[j - 1]).depth === blockquoteDepth(line).depth && plainText(j - 1);
+            }
+            return !percentBlock && !htmlBlock && !/^ {0,3}(?:#{1,6}(?: |$)|([-*_])( *\1){2,} *$|(?:=+|-+) *$|`{3,}|~{3,}|\[![^\]]*\])/.test(text) && !hasUnescapedPipe(text);
         };
         if (blockquoteDepth(lines[i - 1]).depth !== depth || !plainText(i - 1)) return false;
         // the paragraph above is a definition's lazy continuation when the
@@ -1780,7 +1793,12 @@ export function scanDocument(lines: string[]): DocumentScan {
                 // a blank quote line is still its content, as Reading
                 // view renders it ("body cont chunk"; Kimi hunt cycle 5,
                 // probed 2026-09-16); a block of its own ends it
-                quote.inDefinition = definitionLabelIn(src[i]) !== null || (quote.inDefinition && !quote.boundary);
+                // a label directly under a quoted paragraph line is lazy
+                // prose (sheet 25) and opens nothing; the indented quoted
+                // chunk after the blank quote line is then quoted code
+                // (GLM hunt cycle 4, 2026-09-16)
+                const quotedLabel = definitionLabelIn(src[i]) !== null && !(prevParagraph && prevDepth === depth);
+                quote.inDefinition = quotedLabel || (quote.inDefinition && !quote.boundary);
             }
         }
         const indentWidth = leadingIndentWidth(src[i]);
@@ -2412,7 +2430,16 @@ export function definitionStartLines(
                     open = "definition";
                     continue;
                 }
-                open = line.slice(close).trim() === "" ? "none" : "paragraph";
+                // a bare closer ends the block; a definition the block sat
+                // inside stays open (its indented chunk after the closer is
+                // still its body, probed 2026-09-16), and live text after
+                // the closer starts a paragraph
+                open =
+                    line.slice(close).trim() === ""
+                        ? open === "definition" || open === "definition-gap"
+                            ? "definition"
+                            : "none"
+                        : "paragraph";
             }
             continue;
         }
@@ -2726,6 +2753,17 @@ export function findDefinitionBlocks(
                 end = j++;
                 continue;
             }
+            // A "%%" block comment that opens directly under a line of the
+            // block does not end the definition: the indented chunk after
+            // its closer is still the footnote's body (GLM hunt cycle 2,
+            // probed in Reading view 2026-09-16), so the block's lines are
+            // the definition's too, and the walker owns what the scan says
+            // the definition owns (GLM hunt cycle 4: the move used to
+            // strand the chunk behind the label, and it turned into code).
+            if (end === j - 1 && scan.inCommentBlock[j] && !isProtected[j]) {
+                while (j < lines.length && scan.inCommentBlock[j]) end = j++;
+                continue;
+            }
             // A plain line directly under a block line, no blank between,
             // is a lazy continuation of the definition's paragraph and
             // belongs to the block, as Reading view renders it ("[^1]:
@@ -2827,7 +2865,9 @@ export function quotedDefinitionEnd(
         }
         let k = j;
         while (continues(k) && inner(k).trim() === "") k++;
-        if (continues(k) && /^ {4}/.test(inner(k))) {
+        // four columns of indent, spaces or a tab, as the column-0 walker
+        // and the scan measure it (GLM hunt cycle 4, 2026-09-16)
+        if (continues(k) && leadingIndentWidth(inner(k)) >= 4) {
             end = k;
             j = k + 1;
         } else {

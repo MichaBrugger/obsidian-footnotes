@@ -1431,3 +1431,63 @@ describe("press invariants around interrupted definitions", () => {
         );
     });
 });
+
+// ---------- quoted-definition press invariants (hunt cycle 8) ----------
+// The pinned refusals (the multi-caret and selection claims, the
+// definition-interior guard) keep every creation press out of a quoted
+// definition: its label line and its continuation lines are the
+// footnote's own text, and a reference planted there nests inside the
+// definition (Jason's ruling 2026-08-13). This property sweeps the four
+// commands over quoted-definition documents at every caret position
+// inside the quoted extent, label line included, and holds the whole
+// document byte-still: a guard may spend the press, navigation may move
+// the caret, but no edit may land.
+//
+// The shapes here use SPACE-indented continuations on purpose; the
+// tab-indented twin is pinned separately in
+// test/hunt/bug-quoted-definition-tab-continuation.test.ts and would turn
+// this property red until that fix lands.
+
+const QUOTED_DEF_DOCS = [
+    "> [^1]: quoted body\n> continuation text here",
+    "> [^1]: quoted body\n>\n>     chunk text",
+    "> [^1]: quoted body\n> cont\n>\n>     chunk text",
+    "> prose\n\n> > [^1]: depth two body\n> >     chunk text",
+    "> [!note] title\n> [^1]: callout label\n> body text",
+];
+
+const quotedPressArb = fc
+    .tuple(
+        fc.constantFrom(...QUOTED_DEF_DOCS),
+        fc.nat(1000),
+        fc.constantFrom<CommandName>("autonum", "named", "inline", "paste"),
+        settingsArb,
+    )
+    .map(([doc, pick, command, settings]) => {
+        const lines = doc.split("\n");
+        const scan = scanDocument(lines);
+        const masked = maskProtectedLines(lines, scan);
+        const starts = definitionStartLines(lines, scan, (i) => masked[i]);
+        const inside: number[] = [];
+        for (let i = 0; i < lines.length; i++) {
+            if (!starts[i]) continue;
+            const hit = definitionLabelWithName(lines[i], masked[i]);
+            if (!hit || !hit.label.quoted) continue;
+            const end = quotedDefinitionEnd(lines, scan, starts, i);
+            for (let j = i; j <= end; j++) inside.push(j);
+        }
+        const line = inside[pick % inside.length];
+        const ch = pick % (lines[line].length + 1);
+        return { lines, cursor: { line, ch }, command, settings };
+    });
+
+describe("quoted-definition press invariants over random documents", () => {
+    soakIt("no creation press edits inside a quoted definition", async () => {
+        await fc.assert(
+            fc.asyncProperty(quotedPressArb, async ({ lines, cursor, command, settings }) => {
+                const doc = await press(lines, cursor, command, settings);
+                expect(doc.lines.join("\n")).toBe(lines.join("\n"));
+            }),
+        );
+    });
+});
