@@ -236,9 +236,54 @@ export function orphanedDefinitionBlocks(
 export function removeOrphanedFootnoteDefinitions(markdown: string): string {
     const { text, eol } = normalizeEol(markdown);
     const lines = text.split("\n");
-    const dead = orphanedDefinitionBlocks(lines, scanDocument(lines));
+    const scan = scanDocument(lines);
+    const dead = orphanedDefinitionBlocks(lines, scan);
     if (dead.length === 0) return markdown;
-    return restoreEol(removeLineRanges(lines, dead).join("\n"), eol);
+    const out = removeLineRanges(lines, dead);
+    // The same promise the orphan-reference rule makes: a deletion that
+    // changes how Obsidian reads a line it did not touch is refused
+    // outright, and the orphans stay for the user to sort out (the alert
+    // names them). Cutting a block can put the line below it under a
+    // setext underline or a blank line, which turns a lazy label there
+    // into a real definition that the NEXT lint then deletes as an orphan,
+    // so lint twice was not lint once (Kimi hunt cycle 2, 2026-09-16).
+    if (linesReadDifferently(lines, scan, dead, out)) return markdown;
+    return restoreEol(out.join("\n"), eol);
+}
+
+/**
+ * Whether any line the cut kept is read differently afterwards: protected
+ * where it was live, or a definition start where it was not (or the other
+ * way round). The kept lines are walked in step with the result; a blank
+ * line the cut collapsed is skipped over.
+ */
+function linesReadDifferently(
+    lines: string[],
+    scan: DocumentScan,
+    dead: DefinitionBlock[],
+    out: string[],
+): boolean {
+    const masked = maskProtectedLines(lines, scan);
+    const starts = definitionStartLines(lines, scan, (i) => masked[i]);
+    const scanAfter = scanDocument(out);
+    const maskedAfter = maskProtectedLines(out, scanAfter);
+    const startsAfter = definitionStartLines(out, scanAfter, (i) => maskedAfter[i]);
+    const cut = new Set<number>();
+    for (const block of dead) for (let i = block.start; i <= block.end; i++) cut.add(i);
+    let j = 0;
+    for (let i = 0; i < lines.length; i++) {
+        if (cut.has(i)) continue;
+        if (out[j] !== lines[i]) {
+            // a blank line the cut merged away, or dropped from the end of
+            // the note (removeLineRanges takes the separator blank with a
+            // block cut from the end)
+            if (lines[i].trim() === "") continue;
+            return true;
+        }
+        if (scan.isProtected[i] !== scanAfter.isProtected[j] || starts[i] !== startsAfter[j]) return true;
+        j++;
+    }
+    return false;
 }
 
 /** This rule's catalogue entry. */

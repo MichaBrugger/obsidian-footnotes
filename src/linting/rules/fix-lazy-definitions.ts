@@ -48,6 +48,22 @@ const QuoteMarkers = /^ {0,3}((?:>[ \t]?)*)/;
  * hidden definitions comes back byte for byte as it went in.
  */
 export function fixLazyDefinitions(markdown: string): string {
+    // A label the pass skipped (its blank line would have swallowed
+    // protected text) can become safe once a LATER insertion in the same
+    // pass changes the note, so one pass could leave a label that the next
+    // lint then fixed, and lint twice was not lint once (Kimi hunt cycle
+    // 2, 2026-09-16). So the pass repeats until it changes nothing; each
+    // pass inserts at least one line or stops, and the cap is a safety net.
+    let current = markdown;
+    for (let pass = 0; pass < 20; pass++) {
+        const next = fixLazyDefinitionsOnce(current);
+        if (next === current) return current;
+        current = next;
+    }
+    return current;
+}
+
+function fixLazyDefinitionsOnce(markdown: string): string {
     return rewriteDocument(markdown, (text, view) => {
         let lines = view.lines;
         let scan = view.scan;

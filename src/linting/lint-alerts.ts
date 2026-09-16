@@ -22,7 +22,10 @@ import {
 } from "../parsing/footnote-grammar";
 import { inlineFootnoteSpanAt } from "../commands/inline-footnotes";
 import { duplicateFootnoteDefinitionNames } from "./rules/merge-duplicate-definitions";
-import { orphanedFootnoteDefinitionNames } from "./rules/remove-orphaned-definitions";
+import {
+    orphanedFootnoteDefinitionNames,
+    removeOrphanedFootnoteDefinitions,
+} from "./rules/remove-orphaned-definitions";
 import {
     lazyDefinitionLabelNames,
     orphanedFootnoteReferenceNames,
@@ -219,9 +222,24 @@ function noticeOrphanedDefinitions(
     markdown: string,
     precomputed: { lines: string[]; scan: DocumentScan; masked: string[]; starts: boolean[] },
 ) {
-    if (plugin.settings.lintDeleteOrphanedDefinitions) return;
     const names = orphanedFootnoteDefinitionNames(markdown, precomputed);
     if (names.length === 0) return;
+    if (plugin.settings.lintDeleteOrphanedDefinitions) {
+        // With the toggle ON, an orphaned definition still in the note is
+        // one the rule refused to cut (the cut would change how a nearby
+        // line is read, or the line holds a comment's closer); say so
+        // rather than pass it over (ADR 2; Kimi hunt cycle 2, 2026-09-16).
+        // After a single-rule command an orphan a full lint WOULD delete
+        // goes unreported, as before.
+        if (removeOrphanedFootnoteDefinitions(markdown) !== markdown) return;
+        showNotice(
+            names.length === 1
+                ? `This note has a footnote definition nothing references (${referenceList(names)}) that the lint left in place: deleting it would change how the lines around it are read, or cut a comment's closer. Add its reference in the text, or delete the definition by hand.`
+                : `This note has ${names.length} footnote definitions nothing references (${referenceList(names)}) that the lint left in place: deleting them would change how the lines around them are read, or cut a comment's closer. Add their references in the text, or delete the definitions by hand.`,
+            8000,
+        );
+        return;
+    }
     showNotice(
         names.length === 1
             ? `This note has a footnote definition nothing references (${referenceList(names)}). ${addReferenceOrDeleteDefinition(names[0])}`
