@@ -233,14 +233,14 @@ describe("rename property", () => {
                         ).toBe(false);
                         const folded = target.toLowerCase();
                         const names = new Set<string>();
-                        // the same label rule the resolver applies: a label
-                        // that starts a definition is a label, a label inside
-                        // a %% block comment is a (dead) label, and only a
-                        // LAZY label's own "[^x]" is a live reference - the
-                        // oracle used to treat every label as a label, which
-                        // only passed because every other lazy shape carries
-                        // a real reference somewhere else (found by a 4000-run
-                        // soak, 2026-09-12: "%% c %%" over a lone lazy label)
+                        // the same label rule the resolver applies: only a
+                        // label that starts a definition is a label; a LAZY
+                        // label's own "[^x]" and a label's inside a %% block
+                        // comment are live references (ruling A1,
+                        // 2026-09-15). The oracle used to treat every label
+                        // as a label, which only passed because every other
+                        // lazy shape carries a real reference somewhere else
+                        // (found by a 4000-run soak, 2026-09-12)
                         const starts = definitionStartLines(lines, scan, (i) =>
                             maskedLineAt(lines, i),
                         );
@@ -249,7 +249,7 @@ describe("rename property", () => {
                             for (const occurrence of referenceOccurrences(
                                 lines[i],
                                 maskedLineAt(lines, i),
-                                starts[i] || scan.inCommentBlock[i],
+                                starts[i],
                             )) {
                                 names.add(occurrence.name.toLowerCase());
                             }

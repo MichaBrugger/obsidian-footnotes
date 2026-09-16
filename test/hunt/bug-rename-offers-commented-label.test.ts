@@ -26,17 +26,20 @@ const LINES = [
     "%%",
 ];
 
-describe("a label inside a %% block comment is no rename target", () => {
-    it("the caret rule says no anywhere on the commented label line", () => {
+// REVERSED 2026-09-15 (Jason's ruling A1): Obsidian counts a commented
+// label's own "[^93]" as a live reference (Reading view gives the real
+// definition a second back-arrow), so the label IS a rename target, the
+// way a lazy label is. The 2026-09-12 fix that called it dead is undone.
+describe("a label inside a %% block comment is a rename target, through its own reference", () => {
+    it("the caret rule offers the name inside the brackets, and nothing outside them", () => {
         const doc = fakeEditor(LINES, { wholeDoc: true });
+        expect(renameTargetAtCursor(doc, { line: 8, ch: 3 })).toBe("93");
         expect(renameTargetAtCursor(doc, { line: 8, ch: 24 })).toBeNull();
-        expect(renameTargetAtCursor(doc, { line: 8, ch: 3 })).toBeNull();
-        expect(renameTargetAtCursor(doc, { line: 8, ch: 0 })).toBeNull();
     });
 
-    it("the selection rule says no too", () => {
+    it("the selection rule offers it too", () => {
         const doc = fakeEditor(LINES, { wholeDoc: true });
-        expect(renameTargetInSelection(doc, { line: 8, ch: 0 }, { line: 8, ch: 6 })).toBeNull();
+        expect(renameTargetInSelection(doc, { line: 8, ch: 0 }, { line: 8, ch: 6 })).toBe("93");
     });
 
     it("a lazy label under a comment-only line is paragraph text, so its own [^x] is a live reference and a target", () => {

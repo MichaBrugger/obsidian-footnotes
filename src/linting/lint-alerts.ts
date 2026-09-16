@@ -2,6 +2,7 @@ import type FootnotePlugin from "../main";
 import { footnotePrefix, footnotePrefixProblem } from "../parsing/footnote-prefix";
 import {
     definitionLabelIn,
+    definitionLabelWithName,
     definitionStartLines,
     DocumentScan,
     findDefinitionBlocks,
@@ -337,6 +338,87 @@ function noticeNestedFootnotes(
 // Every way of starting a lint calls this with the text as it stands AFTER
 // the lint, so the alerts speak whether or not any rule changed anything.
 //
+/**
+ * The names of definitions written inside a "%%" block comment, in order,
+ * each once. Obsidian never shows a definition there (its reference half
+ * still counts, so the footnote may render from a real definition
+ * elsewhere, or not at all), and the user almost certainly meant it to be
+ * seen, so the lint names it (Jason's ruling A1, 2026-09-15).
+ */
+export function commentedDefinitionNames(markdown: string): string[] {
+    const lines = normalizeEol(markdown).text.split("\n");
+    const scan = scanDocument(lines);
+    const masked = maskProtectedLines(lines, scan);
+    const names: string[] = [];
+    const seen = new Set<string>();
+    for (let i = 0; i < lines.length; i++) {
+        if (!scan.inCommentBlock[i] || scan.isProtected[i]) continue;
+        // the closer line's text after "%%" is outside the comment
+        if (scan.commentBlockCloseAt[i] >= 0) continue;
+        const hit = definitionLabelWithName(lines[i], masked[i]);
+        if (!hit) continue;
+        const folded = hit.name.toLowerCase();
+        if (seen.has(folded)) continue;
+        seen.add(folded);
+        names.push(hit.name);
+    }
+    return names;
+}
+
+function noticeCommentedDefinitions(markdown: string) {
+    const names = commentedDefinitionNames(markdown);
+    if (names.length === 0) return;
+    showNotice(
+        names.length === 1
+            ? `This note has a footnote definition inside a %% comment (${labelList(names)}), where Obsidian never shows it. Move it out of the comment.`
+            : `This note has ${names.length} footnote definitions inside %% comments (${labelList(names)}), where Obsidian never shows them. Move them out of the comments.`,
+        8000,
+    );
+}
+
+// A pipe-delimited table row: a line that starts and ends with "|" after
+// up to three spaces of indent. Close enough for an alert; the scanner's
+// definition-start rule uses the same shape.
+const TableRow = /^ {0,3}\|.*\|\s*$/;
+
+/**
+ * The names of definitions that sit INSIDE a table: a table row directly
+ * above the label and another directly below it. Obsidian ends the table
+ * at the label and folds the rows after it into the footnote's text as a
+ * lazy continuation, so the table is broken either way. The plugin does
+ * not move the label; it tells the user (Jason's ruling A2, 2026-09-15).
+ */
+export function definitionsInsideTableNames(markdown: string): string[] {
+    const lines = normalizeEol(markdown).text.split("\n");
+    const scan = scanDocument(lines);
+    const masked = maskProtectedLines(lines, scan);
+    const starts = definitionStartLines(lines, scan, (i) => masked[i]);
+    const names: string[] = [];
+    const seen = new Set<string>();
+    for (let i = 1; i + 1 < lines.length; i++) {
+        if (!starts[i]) continue;
+        if (!TableRow.test(lines[i - 1]) || !TableRow.test(lines[i + 1])) continue;
+        const hit = definitionLabelWithName(lines[i], masked[i]);
+        if (!hit) continue;
+        const folded = hit.name.toLowerCase();
+        if (seen.has(folded)) continue;
+        seen.add(folded);
+        names.push(hit.name);
+    }
+    return names;
+}
+
+function noticeDefinitionsInsideTables(markdown: string) {
+    const names = definitionsInsideTableNames(markdown);
+    if (names.length === 0) return;
+    showNotice(
+        names.length === 1
+            ? `This note has a footnote definition inside a table (${labelList(names)}); the rows after it become part of the footnote's text. Move it below the table.`
+            : `This note has ${names.length} footnote definitions inside tables (${labelList(names)}); the rows after each become part of its text. Move them below the tables.`,
+        8000,
+    );
+}
+
 // The line-ending normalize, the scan, the masked twin and the
 // definition-start pass are all done once here and shared by every alert.
 // Each alert used to work them out again for itself, which came to about
@@ -356,6 +438,8 @@ export function noticeLintAlerts(plugin: FootnotePlugin, markdown: string) {
     noticeEmptyReferences(markdown, prefix, masked);
     noticeOrphanedReferences(plugin, markdown, prefix, { lines, masked, scan, starts });
     noticeLazyDefinitions(lines, scan, masked, starts);
+    noticeCommentedDefinitions(markdown);
+    noticeDefinitionsInsideTables(markdown);
     noticeOrphanedDefinitions(plugin, markdown, { lines, scan, masked, starts });
     noticeDuplicateDefinitions(plugin, markdown, { lines, scan });
     noticeNestedFootnotes(lines, scan, masked);
