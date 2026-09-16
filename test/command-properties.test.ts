@@ -1349,3 +1349,85 @@ describe("the selection word model over plain words", () => {
         );
     });
 });
+
+// ---------- press invariants around interrupted definitions (added 2026-09-16, hunt cycle 6) ----------
+// The press-side half of the interrupted-definition finding
+// (test/hunt/bug-interrupting-block-keeps-definition-open.test.ts): a
+// note holding an HTML comment, <div> block, or $$ math block directly
+// under a definition, with an indented code chunk under the block. Two
+// invariants hold there TODAY and must keep holding when the scan fix
+// lands: a press never edits protected text above the caret, and the
+// definition a press appends starts a real definition in the after-scan
+// (never born dead under the misread chunk).
+
+const interruptedPressArb = fc
+    .tuple(
+        fc.constantFrom(
+            ["use[^1] here", "", "[^1]: body", "<!-- c -->", "    chunk[^73]"],
+            ["read[^1] first", "", "[^1]: body", "<!-- c", "-->", "    chunk[^73]"],
+            ["note[^1].", "", "[^1]: body", "$$", "x", "$$", "    chunk[^73]"],
+            ["cite[^1] here", "", "[^1]: body", "<div>", "inside", "", "    chunk[^73]"],
+        ),
+        fc.constantFrom("autonum", "named", "inline", "paste"),
+    )
+    .map(([lines, command]) => ({
+        lines: [...lines] as string[],
+        cursor: { line: 0, ch: lines[0].length },
+        command,
+        settings: {
+            insertAtEndOfWord: false,
+            enableFootnoteSectionHeading: false,
+            enableRemoveBlankLastLines: false,
+        } satisfies PressSettings,
+    }));
+
+describe("press invariants around interrupted definitions", () => {
+    soakIt("a press never edits a protected line above the caret", async () => {
+        await fc.assert(
+            fc.asyncProperty(pressArb, async ({ lines, cursor, command, settings }) => {
+                // a definition appended above the caret shifts the lines
+                // under it, so the protected lines are compared as a
+                // multiset of their text, not by index (GLM's original
+                // compared by index and tripped on that shift)
+                const protectedBefore = scanDocument(lines).isProtected;
+                const doc = await press(lines, cursor, command, settings);
+                const counts = new Map<string, number>();
+                for (const line of doc.lines) counts.set(line, (counts.get(line) ?? 0) + 1);
+                for (let i = 0; i < cursor.line; i++) {
+                    if (!protectedBefore[i]) continue;
+                    const left = counts.get(lines[i]) ?? 0;
+                    expect(left, `protected line ${i} edited: ${JSON.stringify(lines[i])} is gone`).toBeGreaterThan(0);
+                    counts.set(lines[i], left - 1);
+                }
+            }),
+        );
+    });
+
+    soakIt("the definition a press appends starts a real definition in the after-scan", async () => {
+        await fc.assert(
+            fc.asyncProperty(interruptedPressArb, async ({ lines, cursor, command, settings }) => {
+                const doc = await press(lines, cursor, command, settings);
+                const before = new Set<string>(lines);
+                const appended: number[] = [];
+                for (let i = 0; i < doc.lines.length; i++) {
+                    // the press's own empty definition: "[^N]: " with the
+                    // trailing space, not present in the before-document
+                    if (/^\[\^\d+\]: $/.test(doc.lines[i]) && !before.has(doc.lines[i])) {
+                        appended.push(i);
+                    }
+                }
+                if (appended.length === 0) return; // the press refused or navigated
+                const scan = scanDocument(doc.lines);
+                const masked = maskProtectedLines(doc.lines, scan);
+                const starts = definitionStartLines(doc.lines, scan, (i) => masked[i]);
+                for (const i of appended) {
+                    expect(
+                        starts[i],
+                        `appended definition ${JSON.stringify(doc.lines[i])} is not a definition start`,
+                    ).toBe(true);
+                    expect(scan.isProtected[i]).toBe(false);
+                }
+            }),
+        );
+    });
+});

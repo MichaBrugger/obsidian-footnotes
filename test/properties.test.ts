@@ -707,3 +707,114 @@ describe("editor helper invariants", () => {
         );
     });
 });
+
+// ---------- interrupted-definition invariants (added 2026-09-16, hunt cycle 6) ----------
+// Documents where a block of its own (an HTML comment, a <div> block, a
+// "$$" math block) sits directly under a footnote definition, with an
+// indented code chunk under the block. The shared docArb deliberately
+// leaves these adjacencies out (see the note in arbitraries.ts): the scan
+// currently misreads the chunk as the definition's continuation, so the
+// conservation and oracle invariants would run red until that fix lands.
+// These properties pin what HOLDS there today, so the fix cannot regress
+// the settling behavior: whatever the lint does to such a note, running
+// it twice changes nothing the second time, and the interrupter's own
+// protected lines survive every lint.
+//
+// Source of truth: the micromark oracle (each interrupter leaves the
+// chunk as <pre><code>), sheet 25's "an HTML comment line is a block",
+// and the in-repo Reading view probes recorded at
+// src/parsing/markdown-scan.ts:2447 (a label under a $$ closer is a
+// definition, so the block ended what came before). The full finding is
+// pinned in test/hunt/bug-interrupting-block-keeps-definition-open.test.ts.
+
+const proseTailArb = fc.constantFrom(
+    "Tail prose keeps the note honest.",
+    "More tail with[^2] a reference.",
+);
+
+const interrupterArb = fc.constantFrom(
+    "<!-- c -->",
+    "<!-- c\n-->",
+    "<div>\ninside",
+    "$$\nx\n$$",
+    "> <!-- c -->",
+);
+
+const interruptedDocArb = fc
+    .tuple(
+        fc.constantFrom("use[^1] here", "read[^1] this first", "note[^1]."),
+        interrupterArb,
+        fc.boolean(),
+        fc.array(proseTailArb, { maxLength: 2 }),
+    )
+    .map(([prose, interrupter, blankBefore, tail]) => {
+        // a blank between the prose and the definition keeps the definition
+        // real (a label under prose is lazy text); the interrupter follows
+        // the definition DIRECTLY - that adjacency is the finding - and the
+        // indented chunk follows the interrupter, its reference dead in
+        // Reading view
+        const body = [
+            prose,
+            "",
+            "[^1]: body",
+            ...(blankBefore ? [""] : []),
+            interrupter,
+            "    chunk[^73]",
+            ...tail,
+        ];
+        return body.join("\n");
+    });
+
+describe("interrupted-definition invariants over random documents", () => {
+    soakIt("lint is idempotent over interrupted-definition documents", () => {
+        fc.assert(
+            fc.property(interruptedDocArb, optionsArb, (doc, options) => {
+                const once = lintFootnotes(doc, options);
+                expect(lintFootnotes(once, options)).toBe(once);
+            }),
+        );
+    });
+
+    soakIt("the interrupter's protected lines survive lint as a multiset", () => {
+        fc.assert(
+            fc.property(interruptedDocArb, definitionKeepingOptionsArb, (doc, options) => {
+                const out = lintFootnotes(doc, options);
+                const linesIn = normalizeEol(doc).text.split("\n");
+                const protectedIn = protectedLines(linesIn);
+                const counts = new Map<string, number>();
+                for (const line of normalizeEol(out).text.split("\n")) {
+                    counts.set(line, (counts.get(line) ?? 0) + 1);
+                }
+                for (let i = 0; i < linesIn.length; i++) {
+                    if (!protectedIn[i]) continue;
+                    const left = counts.get(linesIn[i]) ?? 0;
+                    expect(
+                        left,
+                        `protected line lost: ${JSON.stringify(linesIn[i])}`,
+                    ).toBeGreaterThan(0);
+                    counts.set(linesIn[i], left - 1);
+                }
+            }),
+        );
+    });
+
+    soakIt("a %% block comment's lines are never fully blotted in the masked twin", () => {
+        // sheet 18: references inside a %% block are LIVE (they bind their
+        // definitions and take numbers), so the block's lines stay out of
+        // the protected mask even though their text is hidden
+        fc.assert(
+            fc.property(docArb, (doc) => {
+                const lines = normalizeEol(doc).text.split("\n");
+                const scan = scanDocument(lines);
+                const masked = maskProtectedLines(lines, scan);
+                for (let i = 0; i < lines.length; i++) {
+                    if (!scan.inCommentBlock[i] || lines[i] === "") continue;
+                    expect(
+                        masked[i],
+                        `%% block line ${i} fully blotted: ${JSON.stringify(lines[i])}`,
+                    ).not.toBe("\0".repeat(lines[i].length));
+                }
+            }),
+        );
+    });
+});

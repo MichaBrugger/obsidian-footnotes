@@ -1751,7 +1751,16 @@ export function scanDocument(lines: string[]): DocumentScan {
                 // lazy continuation (GLM and Kimi sweeps 2026-09-13,
                 // verified in Reading view). Only a paragraph can be
                 // continued lazily.
-                quote.boundary = blockEnder(rest, prevParagraph && prevDepth === depth && oneLineParagraphAbove(i, depth));
+                // a quoted HTML comment, HTML block, or "$$" math block is a
+                // block of its own inside the quote and ends a quoted
+                // definition, so the indented quoted chunk after it is code
+                // (GLM hunt cycle 2, probed in Reading view 2026-09-16)
+                const quotedBlock =
+                    /^ {0,3}<!--/.test(rest) ||
+                    /^ {0,3}\$\$/.test(rest) ||
+                    htmlBlockOpener(rest, prevParagraph && prevDepth === depth) !== null;
+                quote.boundary =
+                    quotedBlock || blockEnder(rest, prevParagraph && prevDepth === depth && oneLineParagraphAbove(i, depth));
                 // a quoted definition stays open through its lazy
                 // continuation lines, so the indented quoted chunk after
                 // a blank quote line is still its content, as Reading
@@ -2058,9 +2067,15 @@ export function scanDocument(lines: string[]): DocumentScan {
         if (/^ {0,3}<!--/.test(rest) && !/^ {0,3}<!--->?>/.test(rest)) {
             // An HTML block (see commentIsBlock above). When it closes on
             // this same line, the whole line is dead; otherwise the block
-            // runs on, and the closer line will be dead in full too.
+            // runs on, and the closer line will be dead in full too. At the
+            // document level it is a block of its own and ends an open
+            // definition: the indented chunk under it is code (GLM hunt
+            // cycle 2, probed in Reading view 2026-09-16). A "%%" block
+            // does NOT end one (probed the same day: the chunk after it is
+            // still the footnote's body).
             isProtected[i] = true;
             prevParagraph = false;
+            if (depth === 0) inDefinition = false;
             if (src[i].indexOf("-->", src[i].indexOf("<!--") + 4) === -1) {
                 inComment = true;
                 commentIsBlock = true;
@@ -2083,6 +2098,9 @@ export function scanDocument(lines: string[]): DocumentScan {
             if (opener) {
                 isProtected[i] = true;
                 prevParagraph = false;
+                // a block of its own at the document level ends an open
+                // definition (GLM hunt cycle 2, 2026-09-16)
+                if (depth === 0 && !listItemHtml) inDefinition = false;
                 let column = 0;
                 if (listItemHtml && depth === 0) {
                     // the item opens like any other list item, so the lines
@@ -2106,6 +2124,11 @@ export function scanDocument(lines: string[]): DocumentScan {
             const opened = settleOpeners(i, {}, (o) => maskWithCodeSpans(i, o));
             inComment = opened.endsInComment;
             inMath = opened.endsInMath;
+            // block math opened at the start of a column-0 line is a block
+            // of its own and ends an open definition; one opened by an
+            // indented continuation line ("    $$") is the definition's
+            // (GLM hunt cycle 2, probed in Reading view 2026-09-16)
+            if (inMath && depth === 0 && /^ {0,3}\$\$/.test(rest)) inDefinition = false;
             if (inComment || inMath) regionDepth = depth;
         }
     }
