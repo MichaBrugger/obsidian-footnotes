@@ -740,9 +740,12 @@ describe("scanDocument: indented code vs. definition/list continuation", () => {
     // and a normal 1-space gap is NOT force-collapsed to something else.
     it("five or more spaces after the marker collapse the content indent to marker+1", () => {
         // "-     item" : marker "-" (1 char) + 5 spaces + "item" - content
-        // indent collapses to 1+1=2, so a 6-space line is code (2+4)
+        // indent collapses to 1+1=2, so a 6-space line is code (2+4); and
+        // the item's own text, four columns past that content indent, is
+        // code as well (GLM hunt cycle 10, probed in Reading view
+        // 2026-09-16: "-      item[^1]" renders a code block)
         const doc = "-     item\n\n      code";
-        expect(protectedLines(doc.split("\n"))).toEqual([false, false, true]);
+        expect(protectedLines(doc.split("\n"))).toEqual([true, false, true]);
     });
     it("a normal single-space gap uses its literal width, not the collapse rule", () => {
         // "- item": content indent 1+1=2; a 5-space continuation (< 2+4)

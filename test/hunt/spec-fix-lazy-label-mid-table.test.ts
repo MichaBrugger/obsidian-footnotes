@@ -73,9 +73,17 @@ describe("a label under a table row that is not the last", () => {
         expect(fixLazyDefinitions(DELIMITER_ROW)).toBe(DELIMITER_ROW);
     });
 
-    it("the default lint leaves the rows together", () => {
-        expect(lintFootnotes(MIDDLE_ROW)).toContain("| c | d |");
-        expect(lintFootnotes(MIDDLE_ROW)).not.toContain("| c | d |\n\n");
+    it("the default lint keeps the row Obsidian folds into the footnote with it, so nothing renders differently", () => {
+        // Reading view ends the table at the label and reads "| e | f |"
+        // as the footnote's lazy text (the A2 alert says so, and a lone
+        // piped line under a label was probed as body text 2026-09-16),
+        // so the block walker owns that row and the move carries it away
+        // with the footnote (GLM hunt cycle 10): the table keeps the two
+        // rows it rendered before, and the footnote keeps its text. The
+        // in-table alert still names the label so the user can decide.
+        expect(lintFootnotes(MIDDLE_ROW)).toBe(
+            ["| a | b |", "| - | - |", "| c | d |", "", "ref[^1]", "", "[^1]: x", "| e | f |"].join("\n"),
+        );
     });
 
     it("the lint is stable: a second lint changes nothing", () => {

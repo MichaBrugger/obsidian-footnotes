@@ -180,6 +180,15 @@ export function tableRowLinesOf(lines: string[]): boolean[] {
     // either.
     const rowShaped = (text: string): boolean =>
         leadingIndentWidth(text) < 4 && definitionLabelIn(text) === null && hasUnescapedPipe(text);
+    // The rows of one table agree on the leading pipe: "a | b" over
+    // "--- | ---" is a table and so is "| a | b |" over "| --- | --- |",
+    // but "a | b" over "| --- | --- |" and "| a | b |" over "--- | ---"
+    // are paragraph text, and a row written the other way ends the table
+    // ("c | d" under a piped table is prose after it). GLM hunt cycle 10,
+    // probed in Reading view 2026-09-16; GFM's "optional" outer pipes
+    // hold only row by row here.
+    const leadingPipe = (text: string): boolean =>
+        /^ {0,3}\|/.test((text.endsWith("\r") ? text.slice(0, -1) : text).replace(BlockquotePrefix, ""));
     // A table cannot interrupt a paragraph: "text" directly over "| a | b |"
     // and its delimiter row renders as one paragraph with literal pipes
     // (Kimi hunt cycle 3, probed in Reading view 2026-09-16). So a header
@@ -233,8 +242,9 @@ export function tableRowLinesOf(lines: string[]): boolean[] {
             i++;
             continue;
         }
+        const style = leadingPipe(lines[i]);
         let end = i;
-        while (end + 1 < lines.length && rowShaped(lines[end + 1])) end++;
+        while (end + 1 < lines.length && rowShaped(lines[end + 1]) && leadingPipe(lines[end + 1]) === style) end++;
         if (end > i && tableDelimiterRow(lines[i + 1])) {
             for (let k = i; k <= end; k++) rows[k] = true;
         }
@@ -706,12 +716,32 @@ export function maskLineRegions(
     // the image whose name held a "$", a backtick, or a "<!--" (GLM hunt
     // cycle 9, probed in Reading view 2026-09-16: "[^a$b]![i](u)$m$"
     // renders the footnote and the math).
-    for (const image of line.matchAll(/!\[([^[\]\n]*)\]\(/g)) {
-        if (escapedAt(line, image.index) || image[1].length === 0) continue;
-        const from = image.index + 2;
-        const to = from + image[1].length;
-        for (let k = from; k < to; k++) chars[k] = "\0";
-        shapes.blottedAhead(from, to);
+    // The alt may hold brackets of its own ("![alt[^1]](url)" renders an
+    // embed and no footnote, GLM hunt cycle 3; the bracketed form slipped
+    // past a bracket-free pattern until GLM hunt cycle 10, 2026-09-16), so
+    // the alt's closing "]" is the one that balances the opener.
+    for (let at = line.indexOf("!["); at !== -1; at = line.indexOf("![", at + 2)) {
+        if (escapedAt(line, at)) continue;
+        let depth = 0;
+        let close = -1;
+        for (let k = at + 1; k < line.length; k++) {
+            const c = line[k];
+            if (c === "\\") {
+                k++;
+            } else if (c === "[") {
+                depth++;
+            } else if (c === "]") {
+                depth--;
+                if (depth === 0) {
+                    close = k;
+                    break;
+                }
+            }
+        }
+        if (close === -1 || line[close + 1] !== "(" || close === at + 2) continue;
+        const from = at + 2;
+        for (let k = from; k < close; k++) chars[k] = "\0";
+        shapes.blottedAhead(from, close);
     }
     // The next run of exactly `length` backticks at or after `from` that
     // is not inside a reference shape, or -1. Inside a code span a
@@ -1964,6 +1994,27 @@ export function scanDocument(lines: string[]): DocumentScan {
                             : item[3].length;
                     let column = item[1].length + item[2].length + gap;
                     listStack.push(column);
+                    // A gap of five or more spaces puts the item's text
+                    // four columns past its content column, so it is
+                    // indented CODE inside the item, and the lines
+                    // indented to it are code too: "-      item[^1]"
+                    // renders a code block holding "item[^1]" (GLM hunt
+                    // cycle 10, probed in Reading view 2026-09-16), after
+                    // a blank line and under prose alike, since a bullet
+                    // or a "1." interrupts a paragraph; a "10." under
+                    // prose is paragraph text and stays live.
+                    if (
+                        item[3].length > 4 &&
+                        src[i].length > item[0].length &&
+                        (!(prevParagraph && prevDepth === 0) || /^[-+*]$/.test(item[2]) || /^1[.)]$/.test(item[2]))
+                    ) {
+                        isProtected[i] = true;
+                        inIndentedCode = true;
+                        blockBoundary = false;
+                        prevParagraph = false;
+                        prevDepth = depth;
+                        continue;
+                    }
                     // "- - text": each further marker on the line opens a
                     // nested item at its own content column (the fence
                     // hidden behind such a run was invisible to the
@@ -2806,6 +2857,10 @@ export function findDefinitionBlocks(
     // in full and belong to the footnote's body, as Reading view renders
     // it (Kimi hunt cycle 4, 2026-09-16: the move left them behind and the
     // dead reference inside the span woke up).
+    // the rows Reading view renders as a table: a row under a block line
+    // ends the block, while a pipe run that renders as text is lazy text
+    // (GLM hunt cycle 10, probed 2026-09-16)
+    const tableRows = tableRowLinesOf(lines);
     const absorbable = (j: number) =>
         isProtected[j] &&
         (scan.startsInComment[j] ||
@@ -2921,6 +2976,7 @@ export function findDefinitionBlocks(
                 end === j - 1 &&
                 lines[j].trim() !== "" &&
                 lazyContinuation(lines[j]) &&
+                !tableRows[j] &&
                 !(j + 1 < lines.length && !isProtected[j + 1] && /^ {0,3}(=+|-+) *$/.test(lines[j + 1]))
             ) {
                 end = j++;
@@ -2997,10 +3053,31 @@ export function quotedDefinitionEnd(
         !scan.isProtected[j + 1] &&
         depthOf(lines[j + 1]) === depth &&
         /^ {0,3}(=+|-+) *$/.test(inner(j + 1));
+    // a quoted table row ends the quoted definition the way a column-0
+    // table under a label does (probed 2026-09-16), read on demand
+    let rows: boolean[] | null = null;
+    const tableRow = (j: number): boolean => {
+        if (rows === null) rows = tableRowLinesOf(lines);
+        return rows[j];
+    };
     let end = start;
     let j = start + 1;
     while (continues(j) || regionLine(j)) {
         if (!regionLine(j) && inner(j).trim() !== "" && !/^ {4}/.test(inner(j)) && underlineNext(j)) break;
+        // a quoted heading, list item, rule, fence, HTML line, or table
+        // row is a block of its own inside the quote, not the footnote's
+        // body ("> [^2]: body" then "> # Heading" renders the heading
+        // outside the footnote; GLM hunt cycle 10, probed in Reading view
+        // 2026-09-16), the same stops the column-0 walker makes; "2.
+        // item" carries the footnote on there too
+        if (
+            !regionLine(j) &&
+            inner(j).trim() !== "" &&
+            leadingIndentWidth(inner(j)) < 4 &&
+            (!lazyContinuation(inner(j)) || tableRow(j))
+        ) {
+            break;
+        }
         if (regionLine(j) || inner(j).trim() !== "") {
             end = j++;
             continue;
@@ -3100,7 +3177,12 @@ function lazyContinuation(line: string): boolean {
     // an inline "<span>" are text, only an HTML block opener of types 1
     // to 6 interrupts; a comment-only "%% c %%" line is text, a lone "%%"
     // opens a block; a link reference definition needs a destination.
-    return !/^ {0,3}(?:#{1,6}(?: |$)|([-*_])( *\1){2,} *$|(?:=+|-+) *$|>|[-*+] +\S|1[.)] +\S|~{3,}|`{3,}[^`]*$|<(?:!--|\?|![A-Za-z]|!\[CDATA\[|\/?(?:script|pre|style|textarea|address|article|aside|blockquote|details|dialog|div|dl|figure|footer|form|h[1-6]|header|hr|main|nav|ol|p|section|summary|table|ul)(?:[ >/]|$))|\|.*\|\s*$|%%\s*$|\[(?!\^)[^\]]+\]:\s+\S)/i.test(line);
+    // A line of pipes is not judged here: only a rendered table row ends
+    // the paragraph, and a pipe run that renders as text ("a | b" over a
+    // delimiter row, or "| --- | --- |" under such a line) is lazy text
+    // like any other (GLM hunt cycle 10, probed in Reading view
+    // 2026-09-16); the callers ask tableRowLinesOf about rows.
+    return !/^ {0,3}(?:#{1,6}(?: |$)|([-*_])( *\1){2,} *$|(?:=+|-+) *$|>|[-*+] +\S|1[.)] +\S|~{3,}|`{3,}[^`]*$|<(?:!--|\?|![A-Za-z]|!\[CDATA\[|\/?(?:script|pre|style|textarea|address|article|aside|blockquote|details|dialog|div|dl|figure|footer|form|h[1-6]|header|hr|main|nav|ol|p|section|summary|table|ul)(?:[ >/]|$))|%%\s*$|\[(?!\^)[^\]]+\]:\s+\S)/i.test(line);
 }
 
 /**
