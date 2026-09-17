@@ -1246,17 +1246,38 @@ export function scanDocument(lines: string[]): DocumentScan {
     // directly under prose is lazy text and counts as a paragraph line).
     const oneLineParagraphAbove = (i: number, depth: number): boolean => {
         let count = 0;
+        // whether every line counted so far is indented four or more
+        // columns: a definition's own continuation lines, not a paragraph
+        let allIndented = true;
         for (let j = i - 1; j >= 0; j--) {
             const { depth: d, rest: t } = blockquoteDepth(src[j]);
             if (isProtected[j] || d !== depth || t.trim() === "") break;
             if (/^ {0,3}(?:#{1,6}(?: |$)|([-*_])( *\1){2,} *$|`{3,}|~{3,}|<|\|)/.test(t)) break;
+            // a link reference definition and a "%%" block comment's lines
+            // (its bare closer included) are blocks of their own, so the
+            // paragraph above the underline starts under them: "[ref]:
+            // /url", "para", "===" is a link, a heading, and the indented
+            // chunk after the underline is code (GLM hunt cycle 8, probed
+            // in Reading view 2026-09-16)
+            if (LinkReferenceDefinition.test(t) || inCommentBlock[j]) break;
             if (DefinitionStart.test(t)) {
                 // a label that starts after a boundary is a block of its
                 // own and not part of the paragraph; one directly under
                 // prose is lazy text and counts
                 const above = j > 0 ? blockquoteDepth(src[j - 1]) : null;
-                if (above === null || above.depth !== depth || above.rest.trim() === "" || isProtected[j - 1]) break;
+                if (above === null || above.depth !== depth || above.rest.trim() === "" || isProtected[j - 1]) {
+                    // an underline under the definition's INDENTED
+                    // continuation is the footnote's body text, not a
+                    // heading: "[^1]: x", "    y", "===" renders one
+                    // footnote "x y ===", and an indented chunk after the
+                    // underline is still its body (GLM hunt cycle 8,
+                    // probed in Reading view 2026-09-16); only a lazy,
+                    // unindented line is pulled out as a heading
+                    if (count > 0 && allIndented) return false;
+                    break;
+                }
             }
+            if (leadingIndentWidth(t) < 4) allIndented = false;
             count++;
         }
         return count === 1;
@@ -2486,16 +2507,22 @@ export function definitionStartLines(
         if (lrdDestinationNext) {
             lrdDestinationNext = false;
             open = "none";
-            lrdAbove = true;
+            // a title may still follow on the next line, unless this
+            // destination line already carries one
+            lrdAbove = /^\s*\S+\s*$/.test(bare);
             lrdDepth = depth;
             continue;
         }
+        // The destination line may carry the title as well ("/url
+        // \"title\""): Reading view renders the link with its title and
+        // the label under the pair as a definition (GLM hunt cycle 8,
+        // probed 2026-09-16).
         if (
             open !== "paragraph" &&
             /^ {0,3}\[(?!\^)[^\]]+\]:\s*$/.test(bare) &&
             i + 1 < lines.length &&
             !scan.isProtected[i + 1] &&
-            /^\s*\S+\s*$/.test(lines[i + 1].replace(BlockquotePrefix, "")) &&
+            /^\s*\S+(?:\s+(?:"[^"]*"|'[^']*'|\([^)]*\)))?\s*$/.test(lines[i + 1].replace(BlockquotePrefix, "")) &&
             blockquoteDepth(lines[i + 1]).depth === depth
         ) {
             lrdDestinationNext = true;
@@ -2604,6 +2631,20 @@ export function definitionStartLines(
         // comment's closer (an inline "%% ... %%" pair, say) is not a
         // definition; only the branch above starts one after a closer
         const label = definitionLabelIn(line);
+        // A setext underline directly under a definition's own paragraph
+        // (GLM hunt cycle 8, probed in Reading view 2026-09-16): under the
+        // definition's LAZY line it pulls that line out as a heading, so
+        // the definition ended above and the label under the underline
+        // starts a new one; under an INDENTED continuation it is the
+        // footnote's body text ("x y ===" is one footnote), so the
+        // definition stays open and the label under it starts the next.
+        // The underline directly under the label line itself is handled
+        // at the label (the whole line becomes a heading).
+        if (open === "definition" && setextUnderline) {
+            const above = lines[i - 1].endsWith("\r") ? lines[i - 1].slice(0, -1) : lines[i - 1];
+            open = leadingIndentWidth(blockquoteDepth(above).rest) >= 4 ? "definition" : "none";
+            continue;
+        }
         // A plain line directly under a definition is the definition's own
         // lazy continuation, and a label under THAT line starts a new
         // definition: "[^1]: body", "more lazy", "[^2]: second" renders
@@ -2642,13 +2683,28 @@ export function definitionStartLines(
         return under.depth === depth && /^ {0,3}(=+|-+) *$/.test(under.rest);
     }
 
-    /** How many lines the open paragraph above line `i` holds: contiguous non-blank, unprotected lines at the same depth, stopping at a definition start. */
+    /** How many lines the open paragraph above line `i` holds: contiguous non-blank, unprotected lines at the same depth, stopping at a definition start or at a block of its own. */
     function paragraphLinesAbove(i: number, depth: number): number {
         let count = 0;
         for (let j = i - 1; j >= 0; j--) {
             const text = lines[j].endsWith("\r") ? lines[j].slice(0, -1) : lines[j];
             const above = blockquoteDepth(text);
             if (scan.isProtected[j] || above.depth !== depth || above.rest.trim() === "") break;
+            // a heading, a thematic break, a fence, an HTML block, a table
+            // row, a link reference definition, or a "%%" block comment's
+            // line is a block of its own, not paragraph text, so the
+            // paragraph above the underline starts under it: "# H",
+            // "para", "===" heads "para" alone and the label under the
+            // heading is a definition (GLM hunt cycle 8, probed in Reading
+            // view 2026-09-16; the scan's own walk already stopped there)
+            if (
+                /^ {0,3}(?:#{1,6}(?: |$)|([-*_])( *\1){2,} *$|`{3,}|~{3,}|<|\|)/.test(above.rest) ||
+                LinkReferenceDefinition.test(above.rest) ||
+                tableRows[j] ||
+                scan.inCommentBlock[j]
+            ) {
+                break;
+            }
             count++;
             if (starts[j]) break;
         }

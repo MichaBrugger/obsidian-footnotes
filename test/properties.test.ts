@@ -20,7 +20,10 @@ import { mergeDuplicateFootnoteDefinitions } from "../src/linting/rules/merge-du
 import { moveFootnoteDefinitionsToBottom } from "../src/linting/rules/move-footnotes-to-the-bottom";
 import { reindexFootnotes } from "../src/linting/rules/re-index-footnotes";
 import { removeOrphanedFootnoteDefinitions } from "../src/linting/rules/remove-orphaned-definitions";
+import { orphanedFootnoteDefinitionNames } from "../src/linting/rules/remove-orphaned-definitions";
+import { duplicateFootnoteDefinitionNames } from "../src/linting/rules/merge-duplicate-definitions";
 import {
+    underlinedDefinitionLabelNames,
     lazyDefinitionLabelNames,
     orphanedFootnoteReferenceNames,
     removeOrphanedFootnoteReferences,
@@ -899,6 +902,75 @@ describe("definition-body conservation over random documents", () => {
                             `quoted body line stranded: ${JSON.stringify(line)} under label ${JSON.stringify(lines[i])}`,
                         ).toBeGreaterThan(-1);
                         cursor = found + 1;
+                    }
+                }
+            }),
+        );
+    });
+});
+
+// ---------- scan and alert invariants (GLM hunt cycle 12 additions) ----------
+
+describe("scanner and alert invariants", () => {
+    soakIt("every column-0 definition start is a block's first line, and every block starts on a start", () => {
+        fc.assert(
+            fc.property(docArb, (doc) => {
+                const lines = normalizeEol(doc).text.split("\n");
+                const scan = scanDocument(lines);
+                const masked = maskProtectedLines(lines, scan);
+                const starts = definitionStartLines(lines, scan, (i) => masked[i]);
+                const blocks = findDefinitionBlocks(lines, scan, masked, starts);
+                const blockStarts = new Set(blocks.map((block) => block.start));
+                for (let i = 0; i < lines.length; i++) {
+                    if (!starts[i]) continue;
+                    // a start whose raw line is a column-0 label shape must
+                    // form a block; only quoted labels and after-closer
+                    // labels (neither DefinitionStart-shaped at column 0)
+                    // may form none
+                    expect(
+                        blockStarts.has(i),
+                        `start at line ${i} (${JSON.stringify(lines[i])}) is not a block start`,
+                    ).toBe(/^ {0,3}\[\^[^[\]\s]+\]:/.test(lines[i]));
+                }
+                for (const block of findDefinitionBlocks(lines, scan, masked, starts)) {
+                    expect(
+                        starts[block.start],
+                        `block starting at line ${block.start} is not a definition start`,
+                    ).toBe(true);
+                }
+            }),
+        );
+    });
+
+    soakIt("every alert names a footnote that really occurs in the note", () => {
+        fc.assert(
+            fc.property(docArb, (doc) => {
+                const text = normalizeEol(doc).text;
+                const lines = text.split("\n");
+                const scan = scanDocument(lines);
+                const masked = maskProtectedLines(lines, scan);
+                const starts = definitionStartLines(lines, scan, (i) => masked[i]);
+                const live = new Set<string>();
+                for (let i = 0; i < lines.length; i++) {
+                    for (const { name } of referenceOccurrences(lines[i], masked[i], starts[i])) {
+                        live.add(name.toLowerCase());
+                    }
+                    const hit = definitionLabelWithName(lines[i], masked[i]);
+                    if (hit) live.add(hit.name.toLowerCase());
+                }
+                const nameLists = [
+                    orphanedFootnoteReferenceNames(text),
+                    orphanedFootnoteDefinitionNames(text),
+                    duplicateFootnoteDefinitionNames(text),
+                    lazyDefinitionLabelNames(lines, scan, masked, starts),
+                    underlinedDefinitionLabelNames(lines, scan, masked, starts),
+                ];
+                for (const [kind, list] of nameLists.map((names, i) => [i, names] as const)) {
+                    for (const name of list) {
+                        expect(
+                            live.has(name.toLowerCase()),
+                            `alert ${kind} names ${JSON.stringify(name)}, which the note does not hold`,
+                        ).toBe(true);
                     }
                 }
             }),
