@@ -77,8 +77,10 @@ describe("blockquoteDepth (via scanDocument's container-depth reach)", () => {
         // no space between ">" and the fence delimiter: correct code takes
         // "```" as rest and opens a fence; consuming one extra char would
         // leave only "``" (two backticks), which is not a fence
-        const doc = [">```", "after"].join("\n");
-        expect(protectedLines(doc.split("\n"))).toEqual([true, false]);
+        // the blank line ends the quote's fence; a plain line directly
+        // under it would be swallowed (GLM hunt cycle 11, probed 2026-09-16)
+        const doc = [">```", "", "after"].join("\n");
+        expect(protectedLines(doc.split("\n"))).toEqual([true, false, false]);
     });
 
     it("a marker's single trailing space is swallowed by the marker, not left in rest", () => {
@@ -598,14 +600,16 @@ describe("scanDocument: fence container depth and closer indent", () => {
         const doc = [
             "> ```",
             "> code",
+            "",
             "[^1]: def",
             "    cont",
         ].join("\n");
         const scan = scanDocument(doc.split("\n"));
-        // the fence dies at line 2 (depth drops to 0); "[^1]: def" is a
-        // live definition and "    cont" is its live continuation, not
-        // orphaned indented code
-        expect(scan.isProtected).toEqual([true, true, false, false]);
+        // the fence dies at the blank line (a label directly under the
+        // fence's content would be swallowed, GLM hunt cycle 11, probed
+        // 2026-09-16); "[^1]: def" is a live definition and "    cont" is
+        // its live continuation, not orphaned indented code
+        expect(scan.isProtected).toEqual([true, true, false, false, false]);
     });
 
     // line 488/490: the closer's indent is measured against the fence's
@@ -796,10 +800,13 @@ describe("scanDocument: fence opener detection on list-item lines", () => {
         ]);
     });
     it("a list-item fence's closer one column past content+3 does not close, and the item's end kills the fence", () => {
-        // the over-indented closer is code; "swallowed" at column 0 then
-        // ends the item, and the fence with it (ruling A3, 2026-09-15)
-        const doc = "- ```\n  code\n      ```\nswallowed";
+        // the over-indented closer is code; after the blank line, "ended"
+        // at column 0 ends the item, and the fence with it (ruling A3,
+        // 2026-09-15; a plain line directly under the content would be
+        // swallowed, GLM hunt cycle 11, probed 2026-09-16)
+        const doc = "- ```\n  code\n      ```\n\nended";
         expect(protectedLines(doc.split("\n"))).toEqual([
+            true,
             true,
             true,
             true,

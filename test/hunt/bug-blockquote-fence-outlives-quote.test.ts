@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+// PROBED 2026-09-16 (GLM hunt cycle 11, Reading view): a PLAIN line directly under a quoted or list-item fence's content is swallowed by the fence (it renders inside the code block), while a blank line, an indented chunk, a heading, a list marker, or a bare fence ends the fence with its container. The fixtures below that put plain text directly under the fence gained the blank line Reading view needs; their purpose (the fence dies with its container) stands.
 
 import { computeNextFootnoteNumber } from "../../src/parsing/footnote-grammar";
 import { moveFootnoteDefinitionsToBottom } from "../../src/linting/rules/move-footnotes-to-the-bottom";
@@ -15,6 +16,7 @@ describe("fixed 2026-08-10: a blockquoted fence dies with its blockquote", () =>
         const markdown = [
             "> ```",
             "> sample[^99]",
+            "",
             "outside the quote[^7]",
         ].join("\n");
 
@@ -25,6 +27,7 @@ describe("fixed 2026-08-10: a blockquoted fence dies with its blockquote", () =>
         const input = [
             "> ```",
             "> sample[^99]",
+            "",
             "body[^1]",
             "",
             "[^1]: one",

@@ -195,6 +195,8 @@ export function tableRowLinesOf(lines: string[]): boolean[] {
     // row needs something other than plain paragraph text above it: a
     // blank line, a heading, a rule, a fence line, a label, a quote at
     // another depth, or the start of the note.
+    // the two lines of a link reference definition written over two lines
+    const lrdLines = twoLineLinkReferenceLines(lines);
     const paragraphTextAbove = (i: number): boolean => {
         if (i === 0) return false;
         const depth = blockquoteDepth(lines[i]).depth;
@@ -202,6 +204,18 @@ export function tableRowLinesOf(lines: string[]): boolean[] {
             const line = lines[j];
             const text = (line.endsWith("\r") ? line.slice(0, -1) : line).replace(BlockquotePrefix, "");
             if (text.trim() === "" || leadingIndentWidth(text) >= 4) return false;
+            // a link reference definition's lines are a block of their own:
+            // both lines of the two-line form, and a title on its own line
+            // under either form ('  "title"'); GLM hunt cycle 11's
+            // adjacency sweep, 2026-09-16
+            if (lrdLines[j]) return false;
+            if (
+                j > 0 &&
+                /^ {0,3}(?:"[^"]*"|'[^']*'|\([^)]*\))\s*$/.test(text) &&
+                (LinkReferenceDefinition.test(lines[j - 1].replace(BlockquotePrefix, "")) || lrdLines[j - 1])
+            ) {
+                return false;
+            }
             // a comment-only line ("%% c %%") is paragraph text like any
             // other (sheet 18; a table under one is no table, Kimi hunt
             // cycle 4, probed 2026-09-16); only a lone "%%" opens a block
@@ -224,7 +238,22 @@ export function tableRowLinesOf(lines: string[]): boolean[] {
             if (/^ {0,3}\[\^[^\]\s]+\]:/.test(text)) {
                 return j > 0 && blockquoteDepth(lines[j - 1]).depth === blockquoteDepth(line).depth && plainText(j - 1);
             }
-            return !percentBlock && !htmlBlock && !/^ {0,3}(?:#{1,6}(?: |$)|([-*_])( *\1){2,} *$|(?:=+|-+) *$|`{3,}|~{3,}|\[![^\]]*\])/.test(text) && !hasUnescapedPipe(text);
+            // an HTML comment's "-->" closer line, a "$$" math closer, a
+            // list marker whose wide gap makes its text code, and a link
+            // reference definition are blocks of their own, so a label
+            // directly under them is a definition and a table under it is
+            // a table (GLM hunt cycle 11, probed in Reading view 2026-09-16)
+            const blockLine =
+                /^\s*-->\s*$/.test(text) ||
+                /^\s*\$\$\s*$/.test(text) ||
+                // a "%%" closer followed by a label is a definition line
+                // (Jason's verification 2026-09-15), so the label under it
+                // is a definition and a table under that is a table (GLM
+                // hunt cycle 11's adjacency sweep, 2026-09-16)
+                /^ {0,3}%%\s*\[\^[^\]\s]+\]:/.test(text) ||
+                /^ {0,3}(?:[-+*]|\d{1,9}[.)]) {5,}\S/.test(text) ||
+                LinkReferenceDefinition.test(text);
+            return !percentBlock && !htmlBlock && !blockLine && !/^ {0,3}(?:#{1,6}(?: |$)|([-*_])( *\1){2,} *$|(?:=+|-+) *$|`{3,}|~{3,}|\[![^\]]*\])/.test(text) && !hasUnescapedPipe(text);
         };
         if (blockquoteDepth(lines[i - 1]).depth !== depth || !plainText(i - 1)) return false;
         // the paragraph above is a definition's lazy continuation when the
@@ -234,7 +263,11 @@ export function tableRowLinesOf(lines: string[]): boolean[] {
         let top = i - 1;
         while (top > 0 && blockquoteDepth(lines[top - 1]).depth === depth && plainText(top - 1)) top--;
         const aboveRun = top > 0 ? lines[top - 1].replace(BlockquotePrefix, "") : "";
-        return !(blockquoteDepth(lines[top - 1] ?? "").depth === depth && /^ {0,3}\[\^[^\]\s]+\]:/.test(aboveRun));
+        // ... and the same holds when the run is a QUOTED definition's
+        // column-0 lazy tail ("> [^1]: qbody", "tail": one footnote), so a
+        // label directly above the run at a deeper quote depth counts too
+        // (GLM hunt cycle 11's adjacency sweep, 2026-09-16)
+        return !(blockquoteDepth(lines[top - 1] ?? "").depth >= depth && /^ {0,3}\[\^[^\]\s]+\]:/.test(aboveRun));
     };
     let i = 0;
     while (i < lines.length) {
@@ -1049,6 +1082,8 @@ export interface DocumentScan {
      * (bug-comment-boundary-lines).
      */
     isProtected: boolean[];
+    /** Line `i` is CommonMark indented code (four columns past its container, outside any definition), as opposed to a protected line a definition's content owns. */
+    indentedCode: boolean[];
     /** Line `i` begins inside a multi-line HTML comment, so it is a closer or an interior line. */
     startsInComment: boolean[];
     /** Line `i` begins inside a multi-line $$ math block (a closer or interior line). */
@@ -1185,6 +1220,25 @@ function blockEnder(rest: string, paragraphOpen: boolean): boolean {
     );
 }
 
+/** The two lines of every link reference definition written as a label line over a destination line ("[foo]:" then "/url", a title allowed on the destination line), at the same quote depth. */
+function twoLineLinkReferenceLines(lines: string[]): boolean[] {
+    const out = new Array<boolean>(lines.length).fill(false);
+    for (let i = 0; i + 1 < lines.length; i++) {
+        const label = blockquoteDepth(lines[i]);
+        const destination = blockquoteDepth(lines[i + 1]);
+        if (
+            label.depth === destination.depth &&
+            /^ {0,3}\[(?!\^)[^\]]+\]:\s*$/.test(label.rest) &&
+            /^\s*\S+(?:\s+(?:"[^"]*"|'[^']*'|\([^)]*\)))?\s*$/.test(destination.rest)
+        ) {
+            out[i] = true;
+            out[i + 1] = true;
+            i++;
+        }
+    }
+    return out;
+}
+
 /** A link reference definition line, "[foo]: /url"; a footnote label "[^x]:" is not one. */
 // "[foo]:" alone is paragraph text, not a definition (GLM hunt cycle 5,
 // probed in Reading view 2026-09-16); the destination has to follow
@@ -1227,6 +1281,7 @@ export function scanDocument(lines: string[]): DocumentScan {
     const codeOpenerAt = new Array<number>(lines.length).fill(-1);
     const startsInFence = new Array<boolean>(lines.length).fill(false);
     const inCommentBlock = new Array<boolean>(lines.length).fill(false);
+    const indentedCode = new Array<boolean>(lines.length).fill(false);
     const commentBlockCloseAt = new Array<number>(lines.length).fill(-1);
     let i = 0;
 
@@ -1303,6 +1358,11 @@ export function scanDocument(lines: string[]): DocumentScan {
         // whether every line counted so far is indented four or more
         // columns: a definition's own continuation lines, not a paragraph
         let allIndented = true;
+        // how many unindented lines sit directly above the underline
+        // before the first indented one: under a definition, "    cont",
+        // "para", "===" pulls "para" out alone as a heading (GLM hunt
+        // cycle 11, probed in Reading view 2026-09-16)
+        let lazyRun = -1;
         for (let j = i - 1; j >= 0; j--) {
             const { depth: d, rest: t } = blockquoteDepth(src[j]);
             if (isProtected[j] || d !== depth || t.trim() === "") break;
@@ -1328,10 +1388,12 @@ export function scanDocument(lines: string[]): DocumentScan {
                     // probed in Reading view 2026-09-16); only a lazy,
                     // unindented line is pulled out as a heading
                     if (count > 0 && allIndented) return false;
+                    if (lazyRun >= 0) return lazyRun === 1;
                     break;
                 }
             }
             if (leadingIndentWidth(t) < 4) allIndented = false;
+            else if (!allIndented && lazyRun < 0) lazyRun = count;
             count++;
         }
         return count === 1;
@@ -1459,6 +1521,12 @@ export function scanDocument(lines: string[]): DocumentScan {
     // code, as after the quote line itself (GLM hunt cycle 9, probed in
     // Reading view 2026-09-16)
     let prevLazyOfQuote = false;
+    // the line before was indented code: a code block is a block of its
+    // own, so a label directly under it opens a definition whose chunk
+    // after the blank gap is its live body (GLM hunt cycle 11, probed in
+    // Reading view 2026-09-16); the list stack must not see a boundary
+    // there, so this is kept apart from blockBoundary
+    let prevIndentedCode = false;
     // Which lines are GFM table rows, read without any protection facts
     // (a fence or comment handles its own lines before this is consulted):
     // a run of lines carrying an unescaped pipe whose second line is the
@@ -1466,6 +1534,11 @@ export function scanDocument(lines: string[]): DocumentScan {
     // its last row, so an indented chunk there is code (Kimi hunt cycle 2,
     // probed in Reading view 2026-09-16).
     const tableRows = tableRowLinesOf(src);
+    // the two lines of a link reference definition written as "[foo]:"
+    // over "/url" are a block of their own, so a label directly under
+    // them opens a definition whose chunk after the blank gap is its
+    // live body (GLM hunt cycle 11, probed in Reading view 2026-09-16)
+    const lrdTwoLine = twoLineLinkReferenceLines(src);
     // An open Obsidian "%%" block comment, and the blockquote depth it
     // opened at, since it lives in its container like every other region.
     // Its lines are not protected, because the references inside them are
@@ -1618,11 +1691,17 @@ export function scanDocument(lines: string[]): DocumentScan {
         // comment or math block opened in an item is different: Obsidian
         // runs it on to its closer or the end of the note (verified
         // 2026-09-16), so those stay as they were.
+        // ... except that a plain line directly under the fence's content
+        // is swallowed by it, as under a quoted fence ("- ```", "  code",
+        // then "[^1]: body" at column 0 renders inside the code block; GLM
+        // hunt cycle 11, probed in Reading view 2026-09-16); after a blank
+        // line, or for a line that starts a block, the item is over
         if (
             fence &&
             fence.listColumn !== null &&
             src[i].trim() !== "" &&
-            leadingIndentWidth(src[i]) < fence.listColumn
+            leadingIndentWidth(src[i]) < fence.listColumn &&
+            (!lazyLineShape(src[i]) || (i > 0 && src[i - 1].trim() === ""))
         ) {
             fence = null;
             // the item is over, so the list state below may close it
@@ -1776,7 +1855,20 @@ export function scanDocument(lines: string[]): DocumentScan {
             // (bug-blockquote-fence-outlives-quote). This line is ordinary
             // text and gets the full treatment below, so a bare "```" here
             // OPENS a new fence (bug-bare-fence-after-blockquote-fence).
-            fence = null;
+            // Only a PLAIN line directly under the fence's content is
+            // swallowed by it, the way Obsidian lets it lazily continue
+            // the quote: "> ```", "> code", then "lazy" or "[^1]: body" at
+            // column 0 renders inside the code block, while a blank line,
+            // an indented chunk, a heading, or a bare fence ends it (GLM
+            // hunt cycle 11, probed in Reading view 2026-09-16).
+            if (
+                src[i].trim() === "" ||
+                leadingIndentWidth(src[i]) >= 4 ||
+                !lazyLineShape(src[i]) ||
+                (i > 0 && src[i - 1].trim() === "")
+            ) {
+                fence = null;
+            }
         }
         if (fence) {
             inIndentedCode = false;
@@ -1925,8 +2017,10 @@ export function scanDocument(lines: string[]): DocumentScan {
         const indented = indentWidth >= codeIndent;
         if (indented && inIndentedCode) {
             isProtected[i] = true;
+            indentedCode[i] = true;
             blockBoundary = false;
             prevParagraph = false;
+            prevIndentedCode = true;
             continue;
         }
         if (indented && !inDefinition && (blockBoundary || indentEndsAbove)) {
@@ -1936,8 +2030,10 @@ export function scanDocument(lines: string[]): DocumentScan {
             // must neither count it nor rewrite it.
             inIndentedCode = true;
             isProtected[i] = true;
+            indentedCode[i] = true;
             blockBoundary = false;
             prevParagraph = false;
+            prevIndentedCode = true;
             continue;
         }
         // A line indented that far which reaches this point is a definition
@@ -1969,7 +2065,7 @@ export function scanDocument(lines: string[]): DocumentScan {
                 // a definition; anything at a boundary that is not a label
                 // ends one.
                 inDefinition = DefinitionStart.test(src[i])
-                    ? blockBoundary || inDefinition
+                    ? blockBoundary || prevIndentedCode || inDefinition
                     : inDefinition && !blockBoundary && !thematicBreak && depth === 0;
             }
             // A list-item marker OPENS a container. Its content indent is
@@ -2043,7 +2139,9 @@ export function scanDocument(lines: string[]): DocumentScan {
         // for the scan's own state, 2026-09-16)
         const paragraphOpenBefore = prevParagraph;
         blockBoundary =
-            blockEnder(rest, prevParagraph && prevDepth === depth && oneLineParagraphAbove(i, depth)) || tableRows[i];
+            blockEnder(rest, prevParagraph && prevDepth === depth && oneLineParagraphAbove(i, depth)) ||
+            tableRows[i] ||
+            lrdTwoLine[i];
         // a block of its own (a heading, a rule, a link reference
         // definition, a setext heading, a table row) ends an open
         // definition too, so the indented chunk after it is code, as
@@ -2056,6 +2154,7 @@ export function scanDocument(lines: string[]): DocumentScan {
             (depth < prevDepth || (prevLazyOfQuote && depth === prevDepth));
         prevParagraph = !blockBoundary && !DefinitionStart.test(src[i]);
         prevDepth = depth;
+        prevIndentedCode = false;
 
         // A fence can also open on a LIST ITEM line ("- ```", "1. ~~~").
         // The list marker is a container prefix, just like the blockquote
@@ -2293,6 +2392,7 @@ export function scanDocument(lines: string[]): DocumentScan {
     if (src.length > 0) endsProtectedAt[src.length - 1] = endsProtectedNow();
     return {
         isProtected,
+        indentedCode,
         startsInComment,
         startsInMath,
         startsInCode,
@@ -2484,7 +2584,7 @@ export function definitionStartLines(
     lines: string[],
     scan: Pick<
         DocumentScan,
-        "isProtected" | "startsInComment" | "startsInMath" | "startsInCode" | "codeOpenerAt" | "literalOpeners" | "startsInFence" | "inCommentBlock" | "commentBlockCloseAt"
+        "isProtected" | "startsInComment" | "startsInMath" | "startsInCode" | "codeOpenerAt" | "literalOpeners" | "startsInFence" | "inCommentBlock" | "commentBlockCloseAt" | "indentedCode"
     >,
     maskedAt: (i: number) => string,
 ): boolean[] {
@@ -2532,7 +2632,7 @@ export function definitionStartLines(
             const inDefinition = open === "definition" || open === "definition-gap";
             open =
                 inDefinition &&
-                (/^ {4}/.test(line) ||
+                ((/^ {4}/.test(line) && !scan.indentedCode[i]) ||
                     scan.startsInComment[i] ||
                     scan.startsInMath[i] ||
                     scan.startsInFence[i])
@@ -2707,7 +2807,12 @@ export function definitionStartLines(
             thematicBreak ||
             (open === "paragraph" && setextUnderline && paragraphLinesAbove(i, depth) === 1) ||
             (depth > 0 && /^\[![^\]]*\][+-]?/.test(bare)) ||
-            tableRows[i]
+            tableRows[i] ||
+            // an EMPTY list item ("-" or "1." alone) holds no paragraph to
+            // continue, so the label under it is a definition (GLM hunt
+            // cycle 11, probed in Reading view 2026-09-16); a lone "-" under
+            // a paragraph is a setext underline and was judged above
+            /^ {0,3}(?:[-+*]|\d{1,9}[.)])\s*$/.test(bare)
         ) {
             open = "none";
             continue;
@@ -2827,7 +2932,7 @@ export function findDefinitionBlocks(
     lines: string[],
     scan: Pick<
         DocumentScan,
-        "isProtected" | "startsInComment" | "startsInMath" | "startsInCode" | "codeOpenerAt" | "literalOpeners" | "startsInFence" | "inCommentBlock" | "commentBlockCloseAt"
+        "isProtected" | "startsInComment" | "startsInMath" | "startsInCode" | "codeOpenerAt" | "literalOpeners" | "startsInFence" | "inCommentBlock" | "commentBlockCloseAt" | "indentedCode"
     > = scanDocument(lines),
     maskedLines?: string[],
     starts?: boolean[],
@@ -2861,13 +2966,16 @@ export function findDefinitionBlocks(
     // ends the block, while a pipe run that renders as text is lazy text
     // (GLM hunt cycle 10, probed 2026-09-16)
     const tableRows = tableRowLinesOf(lines);
+    // ... but never CommonMark indented code: a chunk the scan reads as
+    // code (after a quoted definition's lines, say) is not the block's,
+    // and moving it would wake it up (GLM hunt cycle 11, 2026-09-16)
     const absorbable = (j: number) =>
         isProtected[j] &&
         (scan.startsInComment[j] ||
             scan.startsInMath[j] ||
             scan.startsInFence[j] ||
             scan.startsInCode[j] > 0 ||
-            /^ {4}/.test(lines[j]));
+            (/^ {4}/.test(lines[j]) && !scan.indentedCode[j]));
     const blocks: DefinitionBlock[] = [];
     for (let i = 0; i < lines.length; i++) {
         if (!startsAt[i]) continue;
@@ -3170,6 +3278,11 @@ export function quotedDefinitionLabelAbove(
 /** Whether a non-blank, unindented line can lazily continue a definition's paragraph: it is not a label and starts no block of its own. */
 function lazyContinuation(line: string): boolean {
     if (DefinitionStart.test(line)) return false;
+    return lazyLineShape(line);
+}
+
+/** Whether a line has the shape of plain paragraph text rather than the start of a block of its own; a footnote label counts as plain here (a quoted fence swallows one, GLM hunt cycle 11). */
+function lazyLineShape(line: string): boolean {
     // The same block starts the paragraph walk (paragraphGoesOn) knows,
     // probed in Reading view (GLM hunt cycle 5, 2026-09-16): an ordered
     // item numbered 1 interrupts, "2. item text" carries the footnote on;

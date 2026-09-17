@@ -304,6 +304,12 @@ function linesReadDifferently(
     let j = 0;
     for (let i = 0; i < lines.length; i++) {
         if (cut.has(i)) continue;
+        // a blank line removeLineRanges put in (in front of a "---" the cut
+        // would have promoted to the note's first line, or between a kept
+        // paragraph and a setext underline) keeps the kept line reading as
+        // it did, so it is stepped over (GLM hunt cycle 11, 2026-09-16:
+        // the guard's own blank made the rule refuse a clean cut)
+        while (j < out.length && out[j] === "" && lines[i] !== "") j++;
         if (out[j] !== lines[i]) {
             // a blank line the cut merged away, or dropped from the end of
             // the note (removeLineRanges takes the separator blank with a

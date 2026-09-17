@@ -1050,3 +1050,167 @@ describe("scanner and alert invariants", () => {
         );
     });
 });
+
+// ---------- adjacency sweep (GLM hunt cycle 11 additions) ----------
+// The shared docArb joins its blocks with blank lines and keeps several
+// adjacencies out (see the note in arbitraries.ts). This sweep is the
+// complement: EVERY ordered pair of the plugin's attack-surface blocks,
+// joined by a bare newline as well as a blank one, run through the lint's
+// core contracts. Deterministic (the pair space is small), so one `it`
+// covers all of it.
+//
+// Four pairs are excluded because they trip the live findings pinned in
+// test/hunt (bug-label-gap-chunk-protected, bug-table-under-label-after-
+// block-line, bug-orphan-cut-rule-residue-deferred-deletion); re-include
+// them when those land. The exclusion is by (blockA, blockB) identity.
+
+const sweepBlocks: string[][] = [
+    ["prose[^1] line"],
+    ["[^1]: body"],
+    ["[^1]: body", "    cont"],
+    ["[^1]: body", "lazy tail"],
+    ["[^1]: body", "", "    chunk[^9]"],
+    ["# Heading"],
+    ["---"],
+    ["para", "==="],
+    ["```", "code[^9]", "```"],
+    ["```", "code"],
+    ["<!--", "c", "-->"],
+    ["x <!--", "--> tail"],
+    ["<!-- c -->"],
+    ["$$", "m", "$$"],
+    ["x $$", "$$ tail"],
+    ["%%", "hidden[^9]", "%%"],
+    ["%%", "hidden", "%% [^7]: def"],
+    ["%% c %%"],
+    ["> quoted para"],
+    ["> [^1]: qbody"],
+    ["> [^1]: qbody", "> cont"],
+    ["> [^1]: qbody", "tail"],
+    ["> ```", "> code", "> ```"],
+    ["> %%", "> hidden", "> %%"],
+    ["| a | b |", "| --- | --- |", "| c | d |"],
+    ["[^1]: body", "| a | b |", "| --- | --- |"],
+    ["[^1]: | a | b |", "| --- | --- |"],
+    ["a | b", "--- | ---"],
+    ["[foo]: /url"],
+    ["[foo]: /url", '  "title"'],
+    ["[foo]:", "/url"],
+    ["- item"],
+    ["- item", "  cont"],
+    ["-      item"],
+    ["-"],
+    ["1. item"],
+    ["2. item"],
+    ["<div>", "inside"],
+    ["<span>x</span>"],
+    ["    code[^9]"],
+    ["\tcode[^9]"],
+    [""],
+    ["---", "title: t", "---"],
+    ["> [!note] Title", "> body"],
+    ["> | a | b |", "> | --- | --- |"],
+    ["see [text](url) end"],
+    ["see [[note|alias]] end"],
+    ["see ![alt](url) end"],
+    ["^[body] here"],
+    ["see https://e.com/x end"],
+    ["see <https://e.com> end"],
+    ["[^1]"],
+    ["[^]"],
+    ["\\[^1] literal"],
+    ["`code [^9]`"],
+    ["~~gone[^9]~~"],
+    ["==mark[^9]=="],
+    [">", "> [^1]: x"],
+    ["> > deep[^9]"],
+    ["> > deep[^9]", "> [^9]: x"],
+    ["$x[^9]$"],
+    ["x <!-- c --> y"],
+    ["# H[^9]"],
+    ["para", "[^9]: lazy", "==="],
+    ["[foo[^9]]: /url"],
+    ["<?php x ?>"],
+    ["<![CDATA[x]]>"],
+    ["<!DOCTYPE html>"],
+];
+
+// block pairs that trip pinned live findings, as [indexA, indexB] of
+// sweepBlocks: the chunk block (4) under an above-line that leaves the
+// scan's block state open (bug-label-gap-chunk-protected), the table-under-
+// label block (25) under an above-line the table reader misjudges
+// (bug-table-under-label-after-block-line), and a definition block before a
+// trailing "---" (bug-orphan-cut-rule-residue-deferred-deletion). Excluded
+// by index until the pins land.
+// no pair is excluded: the three findings of GLM hunt cycle 11 that the
+// sweep first tripped over landed the same day (2026-09-16)
+const excludedPairs = new Set<string>();
+
+describe("adjacency sweep over every pair of surface blocks", () => {
+    const defaults: LintOptions = {
+        fixPunctuation: true,
+        fixLazyDefinitions: true,
+        moveDefinitionsToBottom: true,
+        reindex: true,
+        removeOrphanedReferences: false,
+        removeOrphanedDefinitions: false,
+        mergeDuplicateDefinitions: false,
+    };
+
+    it("lint is idempotent, NUL-free, and conserves live text over every adjacent pair", { timeout: 120_000 }, () => {
+        const counts: string[] = [];
+        let cases = 0;
+        for (let a = 0; a < sweepBlocks.length; a++) {
+            for (let b = 0; b < sweepBlocks.length; b++) {
+                for (const sep of ["\n", "\n\n"]) {
+                    if (excludedPairs.has(`${a}+${b}`)) continue;
+                    cases++;
+                    const doc = [...sweepBlocks[a], ...sweepBlocks[b]].join(sep);
+                    const once = lintFootnotes(doc, defaults);
+                    expect(once, `NUL in lint of ${JSON.stringify(doc)}`).not.toContain("\0");
+                    expect(lintFootnotes(once, defaults), `not idempotent: ${JSON.stringify(doc)}`).toBe(once);
+                    counts.push(doc);
+                }
+            }
+        }
+        expect(cases).toBeGreaterThan(3000);
+        // conservation over the same corpus: references and definitions are
+        // never minted or lost, protected lines survive (deletions off)
+        const referenceCountOf = (text: string): number => {
+            const lines = normalizeEol(text).text.split("\n");
+            const scan = scanDocument(lines);
+            const masked = maskProtectedLines(lines, scan);
+            const starts = definitionStartLines(lines, scan, (i) => masked[i]);
+            return lines.reduce(
+                (sum, line, i) => sum + referenceOccurrences(line, masked[i], starts[i]).length,
+                0,
+            );
+        };
+        const definitionCountOf = (text: string): number =>
+            findDefinitionBlocks(normalizeEol(text).text.split("\n")).length;
+        for (const doc of counts) {
+            const out = lintFootnotes(doc, defaults);
+            const baseline = fixLazyDefinitions(doc);
+            expect(
+                referenceCountOf(out),
+                `references changed: ${JSON.stringify(doc)} -> ${JSON.stringify(out)}`,
+            ).toBe(referenceCountOf(baseline));
+            expect(
+                definitionCountOf(out),
+                `definitions changed: ${JSON.stringify(doc)} -> ${JSON.stringify(out)}`,
+            ).toBe(definitionCountOf(baseline));
+            const linesIn = normalizeEol(doc).text.split("\n");
+            const protectedIn = protectedLines(linesIn);
+            const countsOut = new Map<string, number>();
+            for (const line of normalizeEol(out).text.split("\n")) {
+                countsOut.set(line, (countsOut.get(line) ?? 0) + 1);
+            }
+            for (let i = 0; i < linesIn.length; i++) {
+                if (!protectedIn[i]) continue;
+                const left = countsOut.get(linesIn[i]) ?? 0;
+                expect(left, `protected line lost: ${JSON.stringify(linesIn[i])}`).toBeGreaterThan(0);
+                countsOut.set(linesIn[i], left - 1);
+            }
+        }
+    });
+});

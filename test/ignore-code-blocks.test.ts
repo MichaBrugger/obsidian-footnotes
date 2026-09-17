@@ -161,8 +161,11 @@ describe("fence delimiters respect their container", () => {
         expect(computeNextFootnoteNumber("```\ncode\n> ```\nstill code[^9]")).toBe(1);
     });
 
-    it("a blockquoted fence ends when its quote ends", () => {
-        expect(computeNextFootnoteNumber("> ```\n> code[^9]\nlive[^7]")).toBe(8);
+    it("a plain line directly under a quoted fence's content is swallowed by the fence", () => {
+        // Reading view renders "live[^7]" inside the code block (GLM hunt
+        // cycle 11, probed 2026-09-16); the blank line in the next test is
+        // what ends the quote and its fence
+        expect(computeNextFootnoteNumber("> ```\n> code[^9]\nlive[^7]")).toBe(1);
     });
 
     it("a blank line ends the quote - and its fence", () => {
