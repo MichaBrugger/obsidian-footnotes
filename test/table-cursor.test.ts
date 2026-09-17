@@ -60,8 +60,11 @@ describe("tableRowLines", () => {
     const none = (lines: string[]) => new Array<boolean>(lines.length).fill(false);
 
     it("marks the header, delimiter, and body rows, not the prose around them", () => {
-        const lines = ["before", "| a | b |", "| --- | --- |", "| 1 | 2 |", "", "after"];
-        expect(tableRowLines(lines, none(lines))).toEqual([false, true, true, true, false, false]);
+        // a blank line before the header: a table cannot interrupt a
+        // paragraph in Reading view (Kimi hunt cycle 3), and since GLM hunt
+        // cycle 7 the editor's reader follows the scanner's on that
+        const lines = ["before", "", "| a | b |", "| --- | --- |", "| 1 | 2 |", "", "after"];
+        expect(tableRowLines(lines, none(lines))).toEqual([false, false, true, true, true, false, false]);
     });
 
     it("a header with its delimiter row and no body is still a table", () => {
@@ -92,8 +95,10 @@ describe("tableRowLines", () => {
     });
 
     it("quoted tables count, quote marks stripped for the delimiter test", () => {
-        const lines = ["> intro", "> | a | b |", "> | --- | --- |", "> | 1 | 2 |"];
-        expect(tableRowLines(lines, none(lines))).toEqual([false, true, true, true]);
+        // the blank quote line for the same reason (probed 2026-09-16: a
+        // quoted table directly under quoted prose is literal pipes)
+        const lines = ["> intro", ">", "> | a | b |", "> | --- | --- |", "> | 1 | 2 |"];
+        expect(tableRowLines(lines, none(lines))).toEqual([false, false, true, true, true]);
     });
 
     it("a delimiter row needs at least one dash cell", () => {

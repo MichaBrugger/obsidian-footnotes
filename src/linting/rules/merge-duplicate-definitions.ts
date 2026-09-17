@@ -124,6 +124,26 @@ export function mergeDuplicateFootnoteDefinitions(markdown: string): string {
         const doomed: { start: number; end: number }[] = [];
         for (const group of groups.values()) {
             if (group.length < 2) continue;
+            // A copy whose table starts on its label line ("[^1]: | a | b |"
+            // with the delimiter row under it) cannot be folded into
+            // indented continuation lines: the header would become body
+            // text and the rows a paragraph of literal pipes, so the table
+            // Reading view shows inside the footnote would be gone (GLM
+            // hunt cycle 7, 2026-09-16). Such a duplicate stays as written
+            // and the duplicate alert names it.
+            const holdsTable = (block: (typeof blocks)[number]): boolean => {
+                const label = definitionLabelIn(lines[block.start]);
+                const next = lines[block.start + 1] ?? "";
+                return (
+                    label !== null &&
+                    lines[block.start].slice(label.labelEnd).includes("|") &&
+                    block.end > block.start &&
+                    /^ {0,3}\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)*\|?\s*$/.test(next)
+                );
+            };
+            // (a table copy that comes FIRST stays the survivor and takes the
+            // others' prose under its rows, as before)
+            if (group.slice(1).some(holdsTable)) continue;
             const base = group[0];
             const appended = appendAfter.get(base.end) ?? [];
             for (const duplicate of group.slice(1)) {

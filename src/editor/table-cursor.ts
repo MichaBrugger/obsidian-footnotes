@@ -1,6 +1,7 @@
 import { Editor, EditorPosition } from "obsidian";
 
 import { EditorWithCm } from "./obsidian-internals";
+import { tableRowLinesOf } from "../parsing/markdown-scan";
 
 // While you edit a table cell, Obsidian runs a separate little editor
 // inside that cell. The main editor's getCursor() does NOT follow your
@@ -294,8 +295,15 @@ export function isTableDelimiterRow(lineText: string): boolean {
  */
 export function tableRowLines(lines: string[], isProtected: boolean[]): boolean[] {
     const rows = new Array<boolean>(lines.length).fill(false);
+    // the scanner's reader knows which pipe runs Reading view renders as
+    // tables (a run directly under paragraph text is none, Kimi hunt
+    // cycle 3); this reader adds the protection facts the editor has and
+    // never calls a row what the scanner does not (GLM hunt cycle 7,
+    // 2026-09-16: the caret guards refused presses on a paragraph of
+    // literal pipes as if it were a table)
+    const rendered = tableRowLinesOf(lines);
     const isRowShaped = (i: number) =>
-        !isProtected[i] && tableRowCellSpans(lines[i]).length > 0;
+        !isProtected[i] && rendered[i] && tableRowCellSpans(lines[i]).length > 0;
     const isDelimiterRow = (i: number) => isTableDelimiterRow(lines[i]);
     let i = 0;
     while (i < lines.length) {

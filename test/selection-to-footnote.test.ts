@@ -1577,9 +1577,11 @@ describe("partial-table selections refuse (Jason's ruling 2026-09-04)", () => {
     it("a quoted table refuses too", () =>
         refused(
             { line: 0, ch: 0 },
-            { line: 1, ch: 11 },
+            { line: 2, ch: 11 },
             insertAutonumFootnote,
-            ["> intro", "> | a | b |", "> | --- | --- |", "> | 1 | 2 |"],
+            // the blank quote line keeps the rows a table (a table cannot
+            // interrupt a paragraph, quoted or not; probed 2026-09-16)
+            ["> intro", ">", "> | a | b |", "> | --- | --- |", "> | 1 | 2 |"],
         ));
 
     it("text inside ONE cell still converts in source mode", async () => {

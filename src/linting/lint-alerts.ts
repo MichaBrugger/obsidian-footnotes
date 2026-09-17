@@ -312,8 +312,8 @@ function noticeDuplicateDefinitions(
         if (mergeDuplicateFootnoteDefinitions(markdown) !== markdown) return;
         showNotice(
             names.length === 1
-                ? `This note defines ${referenceList(names)} more than once, and the lint could not merge them: one copy sits on the line of a "%%" comment's closer. Obsidian renders only the last definition. Merge them by hand.`
-                : `This note defines ${names.length} footnotes more than once (${referenceList(names)}), and the lint could not merge them: a copy sits on the line of a "%%" comment's closer. Obsidian renders only each one's last definition. Merge them by hand.`,
+                ? `This note defines ${referenceList(names)} more than once, and the lint could not merge them: a copy sits on the line of a "%%" comment's closer, or holds a table. Obsidian renders only the last definition. Merge them by hand.`
+                : `This note defines ${names.length} footnotes more than once (${referenceList(names)}), and the lint could not merge them: a copy sits on the line of a "%%" comment's closer, or holds a table. Obsidian renders only each one's last definition. Merge them by hand.`,
             8000,
         );
         return;

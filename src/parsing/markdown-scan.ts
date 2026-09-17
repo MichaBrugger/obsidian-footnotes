@@ -1575,7 +1575,16 @@ export function scanDocument(lines: string[]): DocumentScan {
             // A closer with nothing after it ends a BLOCK: a label directly
             // under it is a definition, and an indented chunk may open on
             // the very next line.
-            if (src[i].slice(close + 2).trim() === "") blockBoundary = true;
+            if (src[i].slice(close + 2).trim() === "") {
+                blockBoundary = true;
+                // a quoted block's bare closer ends the quote's block too,
+                // so the indented quoted chunk after it is code (GLM hunt
+                // cycle 7, probed in Reading view 2026-09-16)
+                if (quote && quote.depth === depth) {
+                    quote.boundary = true;
+                    quote.inDefinition = false;
+                }
+            }
             continue;
         }
         if ((inComment || inMath) && depth < regionDepth) {
@@ -1722,8 +1731,14 @@ export function scanDocument(lines: string[]): DocumentScan {
                 ) {
                     fence = null;
                     // a closed fence ends its block, so an indented chunk
-                    // may open on the very next line (Sol bug #5)
+                    // may open on the very next line (Sol bug #5); inside
+                    // a quote the same holds for the quote's own chunk
+                    // (GLM hunt cycle 7, probed in Reading view 2026-09-16)
                     blockBoundary = true;
+                    if (quote && quote.depth === fenceDepth) {
+                        quote.boundary = true;
+                        quote.inDefinition = false;
+                    }
                 }
             }
             continue;
@@ -2379,6 +2394,10 @@ export function definitionStartLines(
     // the line above was a link reference definition, whose title may
     // follow on this line
     let lrdAbove = false;
+    // ... and the quote depth that definition sat at: a title line inside
+    // a quote under a column-0 definition is the quote's own paragraph,
+    // and the label under it is lazy (GLM hunt cycle 7, probed 2026-09-16)
+    let lrdDepth = 0;
     // the line above was a link reference label alone ("[foo]:") whose
     // destination follows on this line
     let lrdDestinationNext = false;
@@ -2453,7 +2472,7 @@ export function definitionStartLines(
         // it ('  "title"', CommonMark 4.7), so the block runs two lines
         // and the label under the title still starts a definition (Kimi
         // hunt cycle 5, probed in Reading view 2026-09-16).
-        const lrdTitle = lrdAbove && /^ {0,3}(?:"[^"]*"|'[^']*'|\([^)]*\))\s*$/.test(bare);
+        const lrdTitle = lrdAbove && depth === lrdDepth && /^ {0,3}(?:"[^"]*"|'[^']*'|\([^)]*\))\s*$/.test(bare);
         lrdAbove = false;
         if (lrdTitle) {
             open = "none";
@@ -2468,6 +2487,7 @@ export function definitionStartLines(
             lrdDestinationNext = false;
             open = "none";
             lrdAbove = true;
+            lrdDepth = depth;
             continue;
         }
         if (
@@ -2534,6 +2554,7 @@ export function definitionStartLines(
         if (open !== "paragraph" && LinkReferenceDefinition.test(bare)) {
             open = "none";
             lrdAbove = true;
+            lrdDepth = depth;
             continue;
         }
         // A "$$" closer ends the math block the same way, so a label right

@@ -416,6 +416,22 @@ describe("creation-command invariants over random documents", () => {
                     }
 
                     typeText(doc, name);
+                    // A name that completes an autolink around the
+                    // placeholder ("<[^a@b]ftp:x>" holds an "@", so the
+                    // angle brackets become an email autolink) is dead
+                    // text the moment it is typed, and the press rightly
+                    // creates nothing for it; the flow is not judged there.
+                    {
+                        const at = doc.getCursor().line;
+                        const typedMasked = maskProtectedLines(doc.lines, scanDocument(doc.lines))[at];
+                        if (
+                            !referenceOccurrences(doc.getLine(at), typedMasked).some(
+                                (o) => o.name.toLowerCase() === name.toLowerCase(),
+                            )
+                        ) {
+                            return;
+                        }
+                    }
                     const definitionsBefore = definitionNamesFolded(doc.lines);
                     // A placeholder planted on the blank line right under a
                     // definition and then named turns that line into the
