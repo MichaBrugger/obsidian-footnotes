@@ -512,7 +512,11 @@ function isFenceOpener(bareLine: string, delim: string): boolean {
  * the scan head, and every question is asked at or ahead of it. So the one
  * thing masking can change for a question is whether a NUL now sits between
  * the candidate and its nearest bracket behind, which the index answers
- * from the highest position blotted so far.
+ * from the highest position blotted so far. The one blot made AHEAD of the
+ * head, an image's alt text, is kept apart and only counts for a question
+ * asked past its start (GLM hunt cycle 9, 2026-09-16: counting it early
+ * hid every reference written before the image whose name held a "$", a
+ * backtick, or a "<!--").
  */
 class ReferenceShapeIndex {
     /** Index of the nearest "[", "]", or raw NUL behind j, or -1. */
@@ -522,6 +526,8 @@ class ReferenceShapeIndex {
     /** 1 when a "]" comes before any "[", raw NUL, or the end, walking forward from j + 1. */
     private readonly closesAhead: Uint8Array;
     private lastBlotted = -1;
+    /** Blots made before the scan head reached them (an image's alt text), as start and end pairs. */
+    private readonly ahead: number[] = [];
 
     constructor(line: string) {
         const n = line.length;
@@ -561,14 +567,24 @@ class ReferenceShapeIndex {
         if (to - 1 > this.lastBlotted) this.lastBlotted = to - 1;
     }
 
+    /** Records a blot made ahead of the scan head, from `from` up to (not including) `to`. It counts only for questions asked past `from`. */
+    blottedAhead(from: number, to: number): void {
+        this.ahead.push(from, to);
+    }
+
     inside(i: number): boolean {
         const bracket = this.bracketBehind[i];
         if (bracket === -1 || this.openerBehind[i] === 0) return false;
         // A NUL between the opener and i, or on the opener itself, or on
         // its "^", ends the walk backwards. Every blot so far lies behind
         // i, so asking that is exactly the same as asking whether the
-        // highest blotted position has reached the opener.
-        if (this.lastBlotted >= bracket) return false;
+        // highest blotted position has reached the opener. A blot made
+        // ahead of the head joins in once i has passed its start.
+        let last = this.lastBlotted;
+        for (let k = 0; k < this.ahead.length; k += 2) {
+            if (this.ahead[k] < i && this.ahead[k + 1] - 1 > last) last = this.ahead[k + 1] - 1;
+        }
+        if (last >= bracket) return false;
         return this.closesAhead[i] === 1;
     }
 }
@@ -685,9 +701,17 @@ export function maskLineRegions(
     // which renders. The alt is blotted up front; the "![", "](" and the
     // destination keep their shape for the landing walk, and the
     // destination itself is blotted by the link branch below.
+    // This blot lands AHEAD of the scan head, so it is not reported the
+    // way the others are: reported early, it hid every reference before
+    // the image whose name held a "$", a backtick, or a "<!--" (GLM hunt
+    // cycle 9, probed in Reading view 2026-09-16: "[^a$b]![i](u)$m$"
+    // renders the footnote and the math).
     for (const image of line.matchAll(/!\[([^[\]\n]*)\]\(/g)) {
         if (escapedAt(line, image.index) || image[1].length === 0) continue;
-        blot(image.index + 2, image.index + 2 + image[1].length);
+        const from = image.index + 2;
+        const to = from + image[1].length;
+        for (let k = from; k < to; k++) chars[k] = "\0";
+        shapes.blottedAhead(from, to);
     }
     // The next run of exactly `length` backticks at or after `from` that
     // is not inside a reference shape, or -1. Inside a code span a
@@ -1399,6 +1423,12 @@ export function scanDocument(lines: string[]): DocumentScan {
     // 2026-09-13, verified in Reading view).
     let prevParagraph = false;
     let prevDepth = 0;
+    // the line before was a column-0 lazy continuation of a QUOTED
+    // paragraph ("> para" then "lazy"): Obsidian still lets no indented
+    // line continue the quote's paragraph there, so the chunk after it is
+    // code, as after the quote line itself (GLM hunt cycle 9, probed in
+    // Reading view 2026-09-16)
+    let prevLazyOfQuote = false;
     // Which lines are GFM table rows, read without any protection facts
     // (a fence or comment handles its own lines before this is consulted):
     // a run of lines carrying an unescaped pipe whose second line is the
@@ -1774,6 +1804,7 @@ export function scanDocument(lines: string[]): DocumentScan {
             blockBoundary = true;
             quote = null; // a blank line ends every open blockquote
             prevParagraph = false;
+            prevLazyOfQuote = false;
             continue; // nothing on a blank line can open a fence or a comment
         }
         if (depth === 0) {
@@ -1846,7 +1877,8 @@ export function scanDocument(lines: string[]): DocumentScan {
         // table's last row renders as a code block (Kimi hunt cycle 2,
         // probed in Reading view 2026-09-16). CommonMark would call the
         // first a lazy continuation; Reading view wins.
-        const indentEndsAbove = depth === 0 && (prevDepth > 0 || (i > 0 && tableRows[i - 1] && !tableRows[i]));
+        const indentEndsAbove =
+            depth === 0 && (prevDepth > 0 || prevLazyOfQuote || (i > 0 && tableRows[i - 1] && !tableRows[i]));
         // A non-blank line at a block boundary closes every list item it is
         // not indented far enough to sit inside. A lazy continuation, which
         // has no blank line above it, keeps its item open.
@@ -1966,6 +1998,11 @@ export function scanDocument(lines: string[]): DocumentScan {
         // definition too, so the indented chunk after it is code, as
         // Reading view renders it (Kimi hunt cycle 5, probed 2026-09-16)
         if (blockBoundary && depth === 0) inDefinition = false;
+        prevLazyOfQuote =
+            paragraphOpenBefore &&
+            !blockBoundary &&
+            !DefinitionStart.test(src[i]) &&
+            (depth < prevDepth || (prevLazyOfQuote && depth === prevDepth));
         prevParagraph = !blockBoundary && !DefinitionStart.test(src[i]);
         prevDepth = depth;
 
@@ -2979,6 +3016,31 @@ export function quotedDefinitionEnd(
             break;
         }
     }
+    // A plain line at a SHALLOWER depth directly under the definition's
+    // last line lazily continues it out of the quote: "> [^1]: quoted
+    // def" then "plain column-0 line" renders one footnote "quoted def
+    // plain column-0 line", and so on through further plain lines, while
+    // a label under them starts a new definition, a heading ends the run,
+    // and an indented chunk after such a line is code (GLM hunt cycle 9,
+    // probed in Reading view 2026-09-16). Cutting the label without the
+    // tail used to strand the footnote's body as prose.
+    let tailDepth = depth;
+    for (let k = end + 1; k < lines.length; k++) {
+        if (scan.isProtected[k] || starts[k]) break;
+        const d = depthOf(lines[k]);
+        const text = inner(k);
+        if (d >= tailDepth || text.trim() === "" || leadingIndentWidth(text) >= 4 || !lazyContinuation(text)) break;
+        if (
+            k + 1 < lines.length &&
+            !scan.isProtected[k + 1] &&
+            depthOf(lines[k + 1]) === d &&
+            /^ {0,3}(=+|-+) *$/.test(inner(k + 1))
+        ) {
+            break;
+        }
+        tailDepth = d + 1;
+        end = k;
+    }
     return end;
 }
 
@@ -3001,9 +3063,24 @@ export function quotedDefinitionLabelAbove(
 ): number {
     const depthOf = (text: string): number =>
         (text.match(BlockquotePrefix)?.[0].match(/>/g) ?? []).length;
-    const depth = depthOf(lines[line]);
+    // a plain shallower line directly under quoted lines may be the quoted
+    // definition's lazy tail (see quotedDefinitionEnd), so the walk first
+    // climbs such lines to the quoted run above them
+    let from = line;
+    while (
+        from >= 0 &&
+        depthOf(lines[from]) < depthOf(lines[line]) + 1 &&
+        depthOf(lines[from]) === 0 &&
+        lines[from].trim() !== "" &&
+        !scan.isProtected[from] &&
+        !starts[from]
+    ) {
+        from--;
+    }
+    if (from < 0) return -1;
+    const depth = depthOf(lines[from]);
     if (depth === 0) return -1;
-    for (let j = line; j >= 0; j--) {
+    for (let j = from; j >= 0; j--) {
         if (depthOf(lines[j]) !== depth) return -1;
         const hit = definitionLabelWithName(lines[j], maskedAt(j));
         if (!hit) continue;

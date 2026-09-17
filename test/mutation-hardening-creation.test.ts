@@ -220,18 +220,23 @@ describe("createAutonumFootnote", () => {
     // top-level block, so the note has definitions while the append still
     // takes the no-blocks path - the one place isFirstFootnote is visible.
     it("counts a blockquote definition as an existing footnote", () => {
-        const doc = fakeEditor(["> [^q]: quoted def", "prose"], { line: 1, ch: 5 });
-        createAutonumFootnote("prose", { line: 1, ch: 5 }, fakePlugin(doc), doc);
+        // the blank line keeps "prose" outside the quoted footnote: a plain
+        // line directly under a quoted definition is its lazy body in
+        // Reading view, where the press refuses to nest (GLM hunt cycle 9,
+        // probed 2026-09-16)
+        const doc = fakeEditor(["> [^q]: quoted def", "", "prose"], { line: 2, ch: 5 });
+        createAutonumFootnote("prose", { line: 2, ch: 5 }, fakePlugin(doc), doc);
         // NOT the note's first footnote (no heading slot), but the label
         // still gets its blank separator: directly under the prose line it
         // would be lazy paragraph text to Obsidian (2026-09-09)
         expect(doc.lines).toEqual([
             "> [^q]: quoted def",
+            "",
             "prose[^1]",
             "",
             "[^1]: ",
         ]);
-        expect(doc.cursor).toEqual({ line: 3, ch: "[^1]: ".length });
+        expect(doc.cursor).toEqual({ line: 4, ch: "[^1]: ".length });
     });
 
     // The isFirstFootnote twin: with no definition anywhere the blank
@@ -417,18 +422,20 @@ describe("createMatchingFootnoteDefinition", () => {
     // definition trick as the autonum command - the note already has one, so
     // no blank separator is added.
     it("counts a blockquote definition when placing the matching definition", () => {
-        const doc = fakeEditor(["> [^q]: d", "see [^tag] x"], { line: 1, ch: 7 });
+        // the blank line keeps the prose outside the quoted footnote (GLM
+        // hunt cycle 9, probed 2026-09-16)
+        const doc = fakeEditor(["> [^q]: d", "", "see [^tag] x"], { line: 2, ch: 7 });
         expect(
             createMatchingFootnoteDefinition(
                 "see [^tag] x",
-                { line: 1, ch: 7 },
+                { line: 2, ch: 7 },
                 fakePlugin(doc),
                 doc,
             ),
         ).toBe(true);
         // the blank separator: under the prose line the label would be lazy
         // paragraph text to Obsidian (2026-09-09)
-        expect(doc.lines).toEqual(["> [^q]: d", "see [^tag] x", "", "[^tag]: "]);
+        expect(doc.lines).toEqual(["> [^q]: d", "", "see [^tag] x", "", "[^tag]: "]);
     });
 
     // L349 BooleanLiteral (`center` -> false) and L357/L359 BooleanLiterals
@@ -1016,12 +1023,14 @@ describe("the numbered selection conversion", () => {
     // L219 ConditionalExpression, `isFirstFootnote` -> true / false, and the
     // `!== 0` inversion: the blockquote definition counts.
     it("counts a blockquote definition as an existing footnote", () => {
-        const doc = fakeEditor(["> [^q]: d", "tail word"], { line: 1, ch: 5 }, {
-            anchor: { line: 1, ch: 5 },
-            head: { line: 1, ch: 9 },
+        // the blank line keeps the prose outside the quoted footnote (GLM
+        // hunt cycle 9, probed 2026-09-16)
+        const doc = fakeEditor(["> [^q]: d", "", "tail word"], { line: 2, ch: 5 }, {
+            anchor: { line: 2, ch: 5 },
+            head: { line: 2, ch: 9 },
         });
         selectionPressHandled(fakePlugin(doc), doc, null, "autonum");
-        expect(doc.lines).toEqual(["> [^q]: d", "tail[^1]", "", "[^1]: word"]);
+        expect(doc.lines).toEqual(["> [^q]: d", "", "tail[^1]", "", "[^1]: word"]);
     });
 
     // L267 BooleanLiteral, `center` -> false.

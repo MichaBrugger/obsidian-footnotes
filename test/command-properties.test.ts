@@ -1507,3 +1507,65 @@ describe("quoted-definition press invariants over random documents", () => {
         );
     });
 });
+
+// ---------- press definition-census invariants (added 2026-09-16, GLM hunt cycle 13) ----------
+// A press may add exactly ONE definition (its own) and may never DELETE
+// one. Reclassification is a text editor's reality, exactly like typing:
+// a wrapper planted on the blank line above a definition (or before a
+// quote marker, or on a setext underline line) makes that definition read
+// lazy or plain, the same way the user's own keystrokes would. So a
+// "dropped" name is legitimate only when its label line still exists with
+// the same text and merely reads non-definition; a press that cut the line
+// itself fails here.
+
+describe("press definition-census invariants over random documents", () => {
+    soakIt("a press adds at most one definition name, and a dropped one is reclassified, never deleted", async () => {
+        await fc.assert(
+            fc.asyncProperty(pressArb, async ({ lines, cursor, command, settings }) => {
+                const before = definitionNamesFolded(lines);
+                const doc = await press(lines, cursor, command, settings);
+                const after = definitionNamesFolded(doc.lines);
+                const added = [...after].filter((name) => !before.has(name));
+                expect(
+                    added.length,
+                    `press added more than one definition: before ${[...before].sort().join()} after ${[...after].sort().join()}`,
+                ).toBeLessThanOrEqual(1);
+                // a dropped name must survive as its own label-shaped line,
+                // read as non-definition text (lazy, heading, plain prose).
+                // Matched by line TEXT, not index: the press's own
+                // definition append can shift the lines under the caret.
+                // Names fold case, so the label lines are collected through
+                // the label reader, not string equality.
+                const afterScan = scanDocument(doc.lines);
+                const afterMasked = maskProtectedLines(doc.lines, afterScan);
+                const afterStarts = definitionStartLines(doc.lines, afterScan, (i) => afterMasked[i]);
+                for (const name of before) {
+                    if (after.has(name)) continue;
+                    const beforeScan = scanDocument(lines);
+                    const beforeMasked = maskProtectedLines(lines, beforeScan);
+                    const originalLabels = new Set(
+                        lines.filter(
+                            (line, i) =>
+                                line.includes("[^") &&
+                                definitionLabelWithName(line, beforeMasked[i])?.name.toLowerCase() ===
+                                    name.toLowerCase(),
+                        ),
+                    );
+                    let survives = false;
+                    for (let j = 0; j < doc.lines.length; j++) {
+                        if (!originalLabels.has(doc.lines[j])) continue;
+                        const hit = definitionLabelWithName(doc.lines[j], afterMasked[j]);
+                        if (hit && hit.name.toLowerCase() === name.toLowerCase() && !afterStarts[j]) {
+                            survives = true;
+                            break;
+                        }
+                    }
+                    expect(
+                        survives,
+                        `press deleted the definition line of ${name} outright`,
+                    ).toBe(true);
+                }
+            }),
+        );
+    });
+});

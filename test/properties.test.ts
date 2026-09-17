@@ -976,4 +976,77 @@ describe("scanner and alert invariants", () => {
             }),
         );
     });
+
+    // added 2026-09-16, GLM hunt cycle 13: every whole-document transform
+    // trims or appends blank lines at the note's ends. The scan's block
+    // state machine must be closed over that: blank lines at the END of a
+    // note change no fact about the lines before them. A state variable
+    // that leaked past the blank-line branch (as several have) would fail
+    // here the moment the generator leaves blanks at the end of a block.
+    soakIt("appending blank lines at the end changes no scan fact about the existing lines", () => {
+        fc.assert(
+            fc.property(docArb, fc.nat(3), (doc, extra) => {
+                const before = normalizeEol(doc).text.split("\n");
+                const after = [...before, ...Array.from({ length: extra }, () => "")];
+                const scanBefore = scanDocument(before);
+                const scanAfter = scanDocument(after);
+                const maskedBefore = maskProtectedLines(before, scanBefore);
+                const maskedAfter = maskProtectedLines(after, scanAfter);
+                const startsBefore = definitionStartLines(before, scanBefore, (i) => maskedBefore[i]);
+                const startsAfter = definitionStartLines(after, scanAfter, (i) => maskedAfter[i]);
+                for (let i = 0; i < before.length; i++) {
+                    expect(
+                        scanAfter.isProtected[i],
+                        `line ${i} protection changed: ${JSON.stringify(before[i])}`,
+                    ).toBe(scanBefore.isProtected[i]);
+                    expect(startsAfter[i]).toBe(startsBefore[i]);
+                    expect(maskedAfter[i]).toBe(maskedBefore[i]);
+                }
+                const blocksBefore = findDefinitionBlocks(before, scanBefore, maskedBefore, startsBefore);
+                const blocksAfter = findDefinitionBlocks(after, scanAfter, maskedAfter, startsAfter);
+                expect(blocksAfter.map((b) => [b.start, b.end, b.name.toLowerCase()])).toEqual(
+                    blocksBefore.map((b) => [b.start, b.end, b.name.toLowerCase()]),
+                );
+            }),
+        );
+    });
+
+    // added 2026-09-16, GLM hunt cycle 13: with named footnotes left alone
+    // and no prefix, reindex's whole job is handing plain numbers to the
+    // numbered footnotes. So the set of non-numeric names must survive
+    // untouched, and every numeric name afterwards must be one of the
+    // plain 1..k slots the pass hands out - a rename that reached a named
+    // footnote, or a numbered name minted past the slot count, breaks a
+    // footnote's pairing with its definition.
+    soakIt("reindex conserves the non-numeric names and numbers the rest within 1..k", () => {
+        const nameSets = (text: string): { named: Set<string>; numbered: Set<string> } => {
+            const lines = normalizeEol(text).text.split("\n");
+            const scan = scanDocument(lines);
+            const masked = maskProtectedLines(lines, scan);
+            const starts = definitionStartLines(lines, scan, (i) => masked[i]);
+            const named = new Set<string>();
+            const numbered = new Set<string>();
+            for (let i = 0; i < lines.length; i++) {
+                for (const { name } of referenceOccurrences(lines[i], masked[i], starts[i])) {
+                    (/^\d+$/.test(name) ? numbered : named).add(name.toLowerCase());
+                }
+                if (starts[i]) {
+                    const hit = definitionLabelWithName(lines[i], masked[i]);
+                    if (hit) (/^\d+$/.test(hit.name) ? numbered : named).add(hit.name.toLowerCase());
+                }
+            }
+            return { named, numbered };
+        };
+        fc.assert(
+            fc.property(docArb, (doc) => {
+                const before = nameSets(doc);
+                const after = nameSets(reindexFootnotes(doc, { renumberNamedFootnotes: false }));
+                expect([...after.named].sort()).toEqual([...before.named].sort());
+                for (const name of after.numbered) {
+                    expect(Number(name)).toBeGreaterThanOrEqual(1);
+                    expect(Number(name)).toBeLessThanOrEqual(before.numbered.size);
+                }
+            }),
+        );
+    });
 });

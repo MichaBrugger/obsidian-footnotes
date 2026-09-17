@@ -28,7 +28,11 @@ import { FootnoteRule } from "../rule";
 // another definition's body dies when that one dies, however long the chain
 // gets, and it all happens in ONE call, so the repeat limit in reindex never
 // comes into it. Definitions that reference each other in a ring count as
-// referenced and survive, exactly as they do under reindex.
+// referenced and survive, exactly as they do under reindex. A definition
+// that is never cut (its line holds a "%%" closer) keeps every reference
+// in its body alive: Reading view still shows the footnote such a body
+// cites, so cutting it would orphan a live reference (GLM hunt cycle 9,
+// probed 2026-09-16).
 
 interface ReferenceScan {
     blocks: DefinitionBlock[];
@@ -158,6 +162,8 @@ function orphanedBlocks(referenceScan: ReferenceScan): DefinitionBlock[] {
         changed = false;
         for (const i of [...alive]) {
             if ((refCount.get(blocks[i].name.toLowerCase()) ?? 0) > 0) continue;
+            // a block the rule never cuts stays, references and all
+            if (blocks[i].holdsCloser) continue;
             alive.delete(i);
             for (const name of blockRefs[i]) {
                 refCount.set(name, (refCount.get(name) ?? 0) - 1);
