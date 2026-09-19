@@ -17,7 +17,7 @@ Create, navigate, and edit Obsidian footnotes all from the keyboard:
 
 ## Support the plugin
 
-If this plugin has made your writing a little smoother, you can buy me a coffee. Tips go toward the hours I spend on bug-hunting, feature requests, and keeping up with Obsidian releases.
+If this plugin has made your writing a little smoother, you can [buy me a coffee](https://ko-fi.com/comprehensivejason). Tips go toward the hours I spend on bug-hunting, feature requests, and keeping up with Obsidian releases.
 
 [![Support me on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/comprehensivejason)
 
