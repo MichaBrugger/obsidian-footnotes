@@ -29,7 +29,7 @@ import { scanDocument } from "../../src/parsing/markdown-scan";
 // Hunt: 2026-09-13. Lens: selection conversion, table edges.
 //
 // Source of truth:
-//  - manual sheet 07's ruling (2026-09-09): "Select the table ALONE, edge
+//  - manual sheet 05's ruling (2026-09-09): "Select the table ALONE, edge
 //    to edge ... both convert", pinned in test/selection-to-footnote.test.ts.
 //  - GFM 4.10 (tables): trailing whitespace on a row, and up to three
 //    spaces of leading indent, leave the table exactly the table it was.

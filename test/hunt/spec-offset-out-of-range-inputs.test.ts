@@ -11,7 +11,7 @@ import { simulateChanges } from "../../src/editor/insertion-liveness";
 // Reading one, total: a helper that takes an offset or a range should cope
 // with one that does not fit the text, because the offsets it is handed come
 // from a live editor. A caret can be reported past the end of the text it
-// belongs to: that is exactly why cellCaret exists to clamp one (sheet 08,
+// belongs to: that is exactly why cellCaret exists to clamp one (sheet 06,
 // 2026-09-11), and the #39 null-deref class says a stale caret must not
 // crash the press that reads it. On this reading endOfWordOffset should give
 // the offset back untouched, the way its twin startOfWordOffset already

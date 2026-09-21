@@ -13,7 +13,7 @@
 //   >     chunk[^73]
 //
 // What the user would see in Reading view: the label line is paragraph
-// text (manual sheet 25's callout fixture proves a quoted label under a
+// text (manual sheet 14's callout fixture proves a quoted label under a
 // quoted body line renders as plain "[^1]: ..." prose, not a definition),
 // so this is "after a plain quoted paragraph" - the chunk renders as
 // quoted CODE with the literal string "chunk[^73]". The plugin's own
@@ -36,7 +36,7 @@
 // alert names it, and with "Delete orphaned references" on, the lint cuts
 // it out of the code text (ADR-0002: lint never touches code).
 //
-// Source of truth: manual sheet 25 (a quoted label directly under a quote
+// Source of truth: manual sheet 14 (a quoted label directly under a quote
 // or callout body line is lazy prose) + the pinned quoted-paragraph
 // control in bug-quoted-definition-chunk-after-gap.test.ts.
 //

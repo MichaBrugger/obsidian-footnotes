@@ -160,7 +160,7 @@ const specialBlockArb = fc.constantFrom(
     // test/hunt/bug-lazy-label-in-inline-comment.test.ts
     "%% [^98]: inline comment label %%",
     // a label after a real %% block's closer on the same line: a live
-    // definition (Jason's verification 2026-09-15, sheet 18)
+    // definition (Jason's verification 2026-09-15, sheet 11)
     "%%\nhidden\n%% [^99]: after the closer",
     // a small GFM table, with a label right under it (Jason's ruling A2:
     // a label directly under a table row is a definition)
@@ -171,7 +171,7 @@ const specialBlockArb = fc.constantFrom(
     // label under a link reference definition (a block, not a paragraph),
     // setext underlines of both kinds, a callout title with its label, a
     // quoted definition at depth two, an ordered-paren list item with a
-    // label, and a code span that wraps across lines (sheet 18's B30)
+    // label, and a code span that wraps across lines (sheet 11's B30)
     "x <!-- a\n--> tail\n[^101]: after comment tail",
     "[foo]: /url\n[^102]: after lrd",
     "setext para\n===\n[^103]: after setext h1",

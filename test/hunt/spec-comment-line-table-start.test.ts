@@ -8,7 +8,7 @@ import { tableRowLinesOf, definitionStartLines, maskProtectedLines, scanDocument
 // comment-only line ("%% c %%")?
 //
 // The plugin disagrees with ITSELF here. definitionStartLines treats a
-// comment-only line as a paragraph line, per sheet 18's recorded Reading
+// comment-only line as a paragraph line, per sheet 11's recorded Reading
 // view check ("a comment-only line is still a paragraph line"): a label
 // under one is lazy. tableRowLinesOf treats the same line as a BLOCK
 // boundary: its paragraphTextAbove check excludes lines starting with
@@ -30,7 +30,7 @@ import { tableRowLinesOf, definitionStartLines, maskProtectedLines, scanDocument
 // lazy.
 //
 // Source of truth: GFM's "a table cannot interrupt a paragraph" plus
-// sheet 18's recorded ruling that a comment-only line is a paragraph
+// sheet 11's recorded ruling that a comment-only line is a paragraph
 // line. The two plugin readers cannot both be right.
 
 describe("spec question: a table header directly under a %% comment-only line", () => {

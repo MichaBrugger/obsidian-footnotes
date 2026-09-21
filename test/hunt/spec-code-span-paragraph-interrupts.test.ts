@@ -33,7 +33,7 @@ import { maskProtectedLines } from "../../src/parsing/markdown-scan";
 // Reading view shows as live.
 //
 // The catch: B30 (2026-09-16) ruled that for code spans across lines the
-// oracle is Reading view, not Live Preview and not micromark, and sheet 18
+// oracle is Reading view, not Live Preview and not micromark, and sheet 11
 // records only the plain-paragraph case ("a run of the same length closes
 // it further down ... within the paragraph"). Whether Reading view also
 // ends the span's paragraph at these constructs is NOT recorded anywhere.
@@ -82,7 +82,7 @@ describe("spec question: does a code span cross a paragraph-ending block start?"
     });
 
     it("control: within one plain paragraph the span still crosses lines (B30)", () => {
-        // sheet 18: a run that closes on the next line of the SAME
+        // sheet 11: a run that closes on the next line of the SAME
         // paragraph is one code span, and the reference inside is dead
         expect(
             firstLineReferences("Use of a `code\nspan[^7] that wraps` onto the next line."),

@@ -11,7 +11,7 @@ import {
 } from "../../src/parsing/markdown-scan";
 
 // A code span lives inside ONE paragraph: CommonMark lets it wrap across
-// the lines of a paragraph, and the plugin matches (sheet 18's B30,
+// the lines of a paragraph, and the plugin matches (sheet 11's B30,
 // 2026-09-16). A HEADING is not a paragraph - it is a leaf block whose
 // inline content ends with the line. A backtick run opened in a heading
 // has no later line to close on; it is a literal backtick.
@@ -36,7 +36,7 @@ import {
 //
 // Source of truth: CommonMark's code-span rule (a span wraps only within
 // one paragraph; a heading is a leaf block) via micromark as run for
-// this hunt + sheet 18's B30 (the paragraph case the plugin matches).
+// this hunt + sheet 11's B30 (the paragraph case the plugin matches).
 //
 // Settings involved: `Delete orphaned definitions` (the destructive
 // half), the default reindex and alerts for the rest.
@@ -73,7 +73,7 @@ describe("a backtick run opened inside a HEADING", () => {
         expect(computeNextFootnoteNumber("# `code[^1]\nspan` tail")).toBe(2);
     });
 
-    it("control: the same span inside a PARAGRAPH still wraps (sheet 18's B30)", () => {
+    it("control: the same span inside a PARAGRAPH still wraps (sheet 11's B30)", () => {
         expect(liveReferenceLines("a `code[^1]\nspan` tail")).toEqual([]);
     });
 });

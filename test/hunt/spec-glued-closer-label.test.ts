@@ -14,7 +14,7 @@ import {
 // closer ("%%[^1]: def", no space) a definition in Reading view, or is it
 // still inside the comment?
 //
-// The probed ground truth (Jason's verification 2026-09-15, sheet 18 and
+// The probed ground truth (Jason's verification 2026-09-15, sheet 11 and
 // the afterCloser comments) covers the SPACED form: "%% [^3]: def" renders
 // as a definition. For the glued form nothing is recorded.
 //

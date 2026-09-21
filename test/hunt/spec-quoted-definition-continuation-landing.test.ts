@@ -29,7 +29,7 @@ import {
 // Reading two, "a quoted definition is a definition block like any other":
 // CONTEXT.md defines a definition block as a label line plus its continuation
 // lines, "the unit that moves, merges, and is jumped to as one thing", with
-// no exception for quoting. Manual sheet 05 then says a multi-line definition
+// no exception for quoting. Manual sheet 03 then says a multi-line definition
 // lands the caret at the end of its LAST continuation line, and that a caret
 // parked at the end of a definition jumps back to the reference on the next
 // press. On this reading both (b) and (c) should change.

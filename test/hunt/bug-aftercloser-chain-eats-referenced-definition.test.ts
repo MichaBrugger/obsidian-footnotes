@@ -38,7 +38,7 @@ import { reindexFootnotes } from "../../src/linting/rules/re-index-footnotes";
 // Source of truth: linter.ts's conservation promise + ADR-0002 +
 // the recorded Reading-view ground truth that a label after a "%%" closer
 // is a live definition whose body text is live (Jason's verification
-// 2026-09-15, sheet 18).
+// 2026-09-15, sheet 11).
 //
 // Settings involved: `Delete orphaned definitions` ON; the same shared
 // walk also runs under Reindex with `Keep orphaned definitions` off.

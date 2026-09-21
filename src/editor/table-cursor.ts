@@ -106,7 +106,7 @@ export function runOutsideTableCell(
  * LONGER text the cell had before. A caret past the end of the text made
  * every slice built from it land nowhere, so the born-dead check refused
  * an inline footnote with the protected-text toast, now and then, in the
- * last cell of a table (Jason's report, sheet 08, 2026-09-11; never caught
+ * last cell of a table (Jason's report, sheet 06, 2026-09-11; never caught
  * in the act, so this closes the one door the symptoms point at). Every
  * cell path reads its caret through here.
  */

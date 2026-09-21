@@ -32,7 +32,7 @@ import { removeOrphanedFootnoteDefinitions } from "../../src/linting/rules/remov
 // - quotedDefinitionEnd stops the quoted definition at its own label line
 //   ("each following non-blank quoted line at the same depth ... a change
 //   of quote depth end it"), so the column-0 line is NOT part of the
-//   quoted definition. Under sheet 25's prose-label rule, a label directly
+//   quoted definition. Under sheet 14's prose-label rule, a label directly
 //   under a plain paragraph line is then LAZY text.
 //
 // If Obsidian reads the column-0 line as a new paragraph outside the quote
@@ -51,7 +51,7 @@ import { removeOrphanedFootnoteDefinitions } from "../../src/linting/rules/remov
 // entry (lazy), or folded into footnote 1's body (lazy continuation of the
 // quote's definition)?
 //
-// Source of truth: manual sheet 25 (the prose-label rule) + the
+// Source of truth: manual sheet 14 (the prose-label rule) + the
 // quotedDefinitionEnd contract recorded as verified in Reading view
 // 2026-09-16; Obsidian unprobed for this exact adjacency.
 //

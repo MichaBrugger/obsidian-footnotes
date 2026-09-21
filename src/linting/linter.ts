@@ -349,7 +349,11 @@ export function lintRulesAllDisabled(plugin: FootnotePlugin): boolean {
  * number, so reindex would fold the whole chapter namespace back into the
  * ordinary numbers. The lint refuses to run until the property is fixed.
  */
-export function lintBlockedByPrefix(markdown: string): string | null {
+export function lintBlockedByPrefix(markdown: string, prefixFeatureOn = true): string | null {
+    // with the per-note prefix feature off, the property is ignored like
+    // any other frontmatter, so it blocks nothing (Jason's ruling
+    // 2026-09-20, from the pruned sheet on invalid prefix properties)
+    if (!prefixFeatureOn) return null;
     const prefix = footnotePrefix(markdown);
     if (!prefix) return null;
     const problem = footnotePrefixProblem(prefix);
@@ -440,7 +444,7 @@ function lintActiveNoteIfSafe(plugin: FootnotePlugin) {
         return;
     }
     const before = doc.getValue();
-    const blocked = lintBlockedByPrefix(before) ?? lintBlockedBySectionHeading(plugin);
+    const blocked = lintBlockedByPrefix(before, plugin.settings.enableFootnotePrefix) ?? lintBlockedBySectionHeading(plugin);
     if (blocked) {
         showNotice(blocked, 8000);
         return;
@@ -670,7 +674,7 @@ export function lintAfterFootnoteCreation(
     const before = doc.getValue();
     // Say nothing when a bad prefix blocks the lint. The insert that just
     // happened has already told the user about it.
-    if (lintBlockedByPrefix(before) ?? lintBlockedBySectionHeading(plugin)) return null;
+    if (lintBlockedByPrefix(before, plugin.settings.enableFootnotePrefix) ?? lintBlockedBySectionHeading(plugin)) return null;
     const after = lintFootnotes(
         before,
         lintOptionsFromSettings(plugin, configuredSectionHeading(plugin), before),
@@ -726,7 +730,7 @@ export async function runFootnoteTransformCommand(
         // An invalid footnote-prefix cancels the lint outright. Left to
         // run, reindex would treat the prefixed references as plain
         // numbers and renumber them.
-        const blocked = lintBlockedByPrefix(before) ?? lintBlockedBySectionHeading(plugin);
+        const blocked = lintBlockedByPrefix(before, plugin.settings.enableFootnotePrefix) ?? lintBlockedBySectionHeading(plugin);
         if (blocked) {
             showNotice(blocked, 8000);
             return;

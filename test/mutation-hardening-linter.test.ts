@@ -414,7 +414,10 @@ describe("lintAfterFootnoteCreation guards", () => {
     // cancels the run, silently (the insert path already explained it).
     it("is silently inert on a note whose prefix is invalid", () => {
         const blocked = '---\nfootnote-prefix: "3"\n---\nAlpha[^1], bravo\n\n[^1]: one';
-        const doc = creationLint(blocked);
+        // an invalid property blocks the lint only while the prefix
+        // feature is on (Jason's ruling 2026-09-20); with it off, the
+        // property is ordinary frontmatter and the lint runs
+        const doc = creationLint(blocked, { enableFootnotePrefix: true });
         expect(doc.value).toBe(blocked);
         expect(noticeCalls).toEqual([]);
     });

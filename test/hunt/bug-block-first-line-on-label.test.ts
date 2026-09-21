@@ -12,9 +12,9 @@ import { lintFootnotes } from "../../src/linting/linter";
 import { orphanedFootnoteReferenceNames } from "../../src/linting/rules/remove-orphaned-references";
 import { findDefinitionBlocks, scanDocument } from "../../src/parsing/markdown-scan";
 
-// Jason's manual pass, sheets 06 and 07 (2026-09-09).
+// Jason's manual pass, sheets 04 and 05 (2026-09-09).
 //
-// Sheet 06: selecting a fenced code block on its own and converting it put
+// Sheet 04: selecting a fenced code block on its own and converting it put
 // the fence's opening "```" on the definition's label line: "[^6]: ```".
 // To Obsidian that is the literal text "```", so the fence's CLOSER on the
 // indented line below opened a fence of its own that ran to the end of the
@@ -22,7 +22,7 @@ import { findDefinitionBlocks, scanDocument } from "../../src/parsing/markdown-s
 // became an orphan, the popup waited for an index that never came, and the
 // caret landed on the wrong footnote.
 //
-// Sheet 07: a table selected exactly (or with the blank lines around it)
+// Sheet 05: a table selected exactly (or with the blank lines around it)
 // was refused, on the belief that a table cannot begin on the label line.
 // Jason's ruling: it should convert, since a bare table inside a footnote
 // definition renders fine - and Obsidian renders "[^1]: | a | b |" with

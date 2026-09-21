@@ -24,7 +24,7 @@ import { lintAfterFootnoteCreation } from "../../src/linting/linter";
 // they create still pops lint warnings about their note.
 //
 // Source of truth: the lintRulesAllDisabled contract comment in
-// src/linting/linter.ts + the two triggers that honor it (sheet 22's
+// src/linting/linter.ts + the two triggers that honor it (sheet 12's
 // "nothing to lint" check).
 //
 // Settings involved: every lint rule OFF, `Lint on footnote creation` ON.

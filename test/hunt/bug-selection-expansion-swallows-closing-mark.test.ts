@@ -27,7 +27,7 @@ import { insertAutonumFootnote } from "../../src/commands/insert-or-navigate-foo
 //    whole words first, plus one trailing punctuation mark".
 //  - selection-footnote.ts's own comment on the expansion, same wording:
 //    "The end moves to the end of its word plus one punctuation mark".
-//  - manual sheet 06, line ~20: only the period is taken.
+//  - manual sheet 04, line ~20: only the period is taken.
 //  - commit 5ec4b66 (2026-09-09), which grew the walk into the full run of
 //    closing marks, names only the reference-PLACEMENT consumers. It sets
 //    no rule for selections.

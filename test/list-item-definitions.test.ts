@@ -63,7 +63,7 @@ describe("definitions inside list items: the reader", () => {
     });
 
     it("control: a column-0 label directly under an item line is lazy prose, not an in-item definition", () => {
-        // sheet 25's rule: a label directly under a line of prose (a list
+        // sheet 14's rule: a label directly under a line of prose (a list
         // item line included) is paragraph text
         expect(labelsIn(["- item", "[^x]: under the item"])).toEqual([]);
     });

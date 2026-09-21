@@ -32,7 +32,7 @@ import { protectedLines, scanDocument } from "../../src/parsing/markdown-scan";
 //
 // Hunt: 2026-09-13. Lens: contexts.
 //
-// Source of truth: manual sheet 25, which rules that a label under a prose
+// Source of truth: manual sheet 14, which rules that a label under a prose
 // line is paragraph text (ruling 2026-09-09); CommonMark 0.31.2 sections 4.4
 // and 4.5, where a delimiter indented four columns after a paragraph line is
 // lazy continuation of that paragraph and not a fence at all. Checked

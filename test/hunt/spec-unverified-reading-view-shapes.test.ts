@@ -27,7 +27,7 @@ import { moveFootnoteDefinitionsToBottom } from "../../src/linting/rules/move-fo
 // treats it as dead - reindex skips it, the orphan alert never names it,
 // and with Delete orphaned references ON nothing happens (masking hides it
 // from every rule). If instead Obsidian is laxer than CommonMark (it has
-// been before: sheet 25's footnote-interruption ruling), the code is right
+// been before: sheet 14's footnote-interruption ruling), the code is right
 // and this pin should be deleted.
 //
 // NEEDS A LIVE CHECK: does "[^1]" inside "<a://b[^1]>" render as a footnote
@@ -111,7 +111,7 @@ describe("spec: a bare <span> line opens a type-7 HTML block", () => {
 // quoted definition across non-blank quoted lines at the same depth ("a
 // lazy continuation, or an indented one" - quotedDefinitionEnd, verified in
 // Reading view 2026-09-16), which suggests the column-0 definition gets the
-// same continuation. But sheet 25's ten probed shapes are about what a
+// same continuation. But sheet 14's ten probed shapes are about what a
 // DEFINITION may follow, not what a definition's continuation is, and no
 // sheet records the column-0 lazy body line.
 //

@@ -24,7 +24,7 @@ import { resolveTableCellCursor, type TableCellEditor } from "../../src/editor/t
 // no column of the cell editor, and at cell offset 0 no backslash has been
 // used yet, so the caret belongs at the first column of the cell's content;
 // and cellCaret's own docstring, "Every cell path reads its caret through
-// here" (Jason's report, sheet 08, 2026-09-11), which resolveTableCellCursor
+// here" (Jason's report, sheet 06, 2026-09-11), which resolveTableCellCursor
 // does not honour because it reads cellView.state.selection.main.head raw.
 
 // The fake DOM the resolver walks: one table with a header row and one body

@@ -10,7 +10,7 @@ import { referenceOccurrences } from "../../src/parsing/footnote-grammar";
 // inside it: "para `code [^1]" over "``` `x`" is one paragraph holding
 // one code span "code [^1]\n``` " followed by literal "x`" (verified
 // with the micromark oracle). Reading view renders cross-line code spans
-// as one span the same way (sheet 18, B30).
+// as one span the same way (sheet 11, B30).
 //
 // The scanner's paragraphGoesOn walk, which decides whether a code span
 // may close on a later line, stops at any line matching
@@ -27,7 +27,7 @@ import { referenceOccurrences } from "../../src/parsing/footnote-grammar";
 // has no definition.
 //
 // Source of truth: CommonMark 4.5 (backtick fence info strings) +
-// micromark oracle output below + sheet 18's B30 (Reading view renders
+// micromark oracle output below + sheet 11's B30 (Reading view renders
 // the cross-line span as one).
 //
 // Settings involved: none for the scan; the orphan alert/deletion

@@ -277,7 +277,7 @@ export async function openFootnotePopup(
         // footnote out of the way, so the new footnote took its number -
         // the stale cache resolved the subpath at once, to the OLD
         // definition's position, and the popup showed a slice of the note
-        // from there (Jason's report, sheet 04, 2026-09-09: ".)", a blank
+        // from there (Jason's report, sheet 02, 2026-09-09: ".)", a blank
         // line, then both definitions). So: listen for this file's cache
         // change before saving, then wait for it, with a cap in case the
         // cache has nothing new to report.
@@ -659,7 +659,7 @@ export async function openFootnotePopup(
         // route with no hotkey for the scope above to catch) acts on
         // Obsidian's active editor, which is the popup's own embed - so the
         // popup flipped into Reading view and the note did not (Jason's
-        // report, sheet 04, 2026-09-11). The embed keeps a rendered view in
+        // report, sheet 02, 2026-09-11). The embed keeps a rendered view in
         // its DOM the whole time, so that is no signal; its EDITOR being
         // taken out of the DOM is (probed live 2026-09-11). When that
         // happens while the popup is open: close the popup and hand the

@@ -473,7 +473,7 @@ export function createAutonumFootnote(
         // moved with it. The context built before the press still holds
         // the old row, so the append was landing four characters short of
         // the row's new end - inside the reference - and the table widget
-        // then normalised the mess away (Jason's report, sheet 07,
+        // then normalised the mess away (Jason's report, sheet 05,
         // 2026-09-09: "only [^ is inserted and the last pipe disappears").
         // So the note is read again here.
         const definition = buildDefinitionAppend(doc, footnoteId, isFirstFootnote, plugin, docContext(doc));

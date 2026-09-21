@@ -39,7 +39,7 @@ import { moveFootnoteDefinitionsToBottom } from "../../src/linting/rules/move-fo
 // - the table's home changed with one lint. The next lint judges the moved
 // note differently (the table now starts under a label with a blank line
 // above the label), pulls the table back out below the definition, and the
-// note still is not settled: lint twice is not lint once (manual sheet 20's
+// note still is not settled: lint twice is not lint once (manual former sheet 20's
 // contract: the second lint must say "No linting needed.").
 //
 // Source of truth: the plugin's own pinned readings - a label under a

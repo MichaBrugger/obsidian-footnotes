@@ -30,7 +30,7 @@ import { maskProtectedLines } from "../../src/parsing/markdown-scan";
 // without a recorded probe (bug-blockquote-region-outlives-quote's last
 // test). The plugin's reading also has one thing going for it: Live
 // Preview's highlighter paints an unclosed comment to the end of the
-// note (sheet 18's `<!-->` note) - but Live Preview is not the oracle,
+// note (sheet 11's `<!-->` note) - but Live Preview is not the oracle,
 // Reading view is.
 //
 // NEEDS A LIVE CHECK: in Reading view, with a note reading "x <!--",

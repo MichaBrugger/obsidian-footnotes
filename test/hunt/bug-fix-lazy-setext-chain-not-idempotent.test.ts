@@ -47,7 +47,7 @@ import {
 // loop count is only a safety net, not what actually stops it.");
 // src/linting/linter.ts's statement that the rule order is chosen so "one
 // lint settles the note; the other order would need a second pass"; manual
-// sheet 25 line 74 ("Lint again without undoing: 'No linting needed.'");
+// sheet 14 line 74 ("Lint again without undoing: 'No linting needed.'");
 // the attack-surface reference's fix-lazy row, which names this exact
 // attack ("a lazy label whose 'fix' changes what the line above means
 // (setext heading, table, list)").
@@ -103,7 +103,7 @@ describe("fixing a lazy label above a setext underline makes the next label lazy
 });
 
 describe("the lint does not settle in one run on this shape", () => {
-    it("a second lint says 'No linting needed' (sheet 25)", () => {
+    it("a second lint says 'No linting needed' (sheet 14)", () => {
         const once = lintFootnotes(SETEXT);
         expect(lintFootnotes(once)).toBe(once);
     });
@@ -123,7 +123,7 @@ describe("the lint does not settle in one run on this shape", () => {
         expect(lintFootnotes(once)).toBe(once);
     });
 
-    it("lint on save does not rewrite the note on the second save (sheet 21)", () => {
+    it("lint on save does not rewrite the note on the second save (former sheet 21)", () => {
         const saves = [SETEXT];
         for (let i = 0; i < 3; i++) saves.push(lintFootnotes(saves[saves.length - 1]));
         // it takes three lints to reach a note the fourth leaves alone

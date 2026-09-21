@@ -20,7 +20,7 @@ import { protectedLines, scanDocument } from "../../src/parsing/markdown-scan";
 // The paragraph walk that the SAME scan uses for cross-line code spans and
 // regions (paragraphGoesOn, and oneLineParagraphAbove's own regex list)
 // stops at both: a link reference definition is a block of its own (pinned
-// in cycle 5), and a bare "%%" closer ends its block (sheet 18: a label
+// in cycle 5), and a bare "%%" closer ends its block (sheet 11: a label
 // directly under a bare closer is a definition, so the closer is a block
 // boundary and not paragraph text). So the two walks in one file disagree,
 // and the indented chunk after the setext heading reads LIVE when Reading
@@ -31,14 +31,14 @@ import { protectedLines, scanDocument } from "../../src/parsing/markdown-scan";
 // the plugin counts it live, so reindex hands its number out to it, the
 // punctuation rule moves it, orphan handling judges it, and move-to-bottom
 // can gather definitions around it - protected text rewritten, the promise
-// the linter makes broken (docs/adr/0002's conservation spirit, sheet 20
+// the linter makes broken (docs/adr/0002's conservation spirit, former sheet 20
 // section I records the indented-chunk-under-a-heading shape).
 //
 // Source of truth: CommonMark 4.3 (a setext underline heads the directly
 // preceding paragraph, and "[ref]: /url" is a block of its own, so that
 // paragraph is the single line between) + micromark/mdast (definition,
 // heading) + the cycle-5 Reading-view pin that an indented chunk after a
-// setext heading is code + sheet 18's %% block facts (a bare closer ends
+// setext heading is code + sheet 11's %% block facts (a bare closer ends
 // the block). Control in the same file: the label-line variant
 // ("[^1]: body", "para", "===") where the recorded Reading-view fact
 // (the lazy line is pulled out as a heading) already makes the chunk code,

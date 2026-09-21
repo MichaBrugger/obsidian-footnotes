@@ -33,7 +33,7 @@ import {
 // has its two definitions read as "definition + reference" by the plugin
 // and "duplicate definitions" by Obsidian.
 //
-// The catch: sheet 25's list of what a definition may follow ("a blank
+// The catch: sheet 14's list of what a definition may follow ("a blank
 // line, the note start, a heading, a closed fence, a callout's title
 // line, or another definition") was ground-truthed in Reading view on
 // ten shapes, and a link reference definition was not one of them. Sheet
@@ -65,11 +65,11 @@ describe("spec question: a definition label directly under a link reference defi
         expect(startsOf("[foo]: /url\n[^1]: x")[1]).toBe(true);
     });
 
-    it("control: the same label under ordinary prose stays lazy (sheet 25)", () => {
+    it("control: the same label under ordinary prose stays lazy (sheet 14)", () => {
         expect(startsOf("para line\n[^1]: x")[1]).toBe(false);
     });
 
-    it("control: the same label after a blank line is a definition (sheet 25)", () => {
+    it("control: the same label after a blank line is a definition (sheet 14)", () => {
         expect(startsOf("[foo]: /url\n\n[^1]: x")[2]).toBe(true);
     });
 });

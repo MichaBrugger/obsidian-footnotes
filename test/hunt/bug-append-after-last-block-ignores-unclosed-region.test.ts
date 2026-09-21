@@ -31,7 +31,7 @@ import { findDefinitionBlocks, scanDocument } from "../../src/parsing/markdown-s
 // definition added at the very end would be born inside it as dead text,
 // and the next lint would then delete its live reference as an orphan");
 // attack-surface "%% comments" row ("the definition append never lands
-// inside an unclosed block"); manual sheet 18 line ~118 ("nothing is
+// inside an unclosed block"); manual sheet 11 line ~118 ("nothing is
 // inserted or moved inside either %% block").
 
 const noteEndingInsideAnOpener = (opener: string) => [

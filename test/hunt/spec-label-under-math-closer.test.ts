@@ -18,7 +18,7 @@ import {
 //
 // Reading one, "yes, it is a block like any other": Obsidian documents "$$"
 // as a block, and the scanner already models it as one, the same way it
-// models a code fence and an HTML comment. Manual sheet 25 pins both of those
+// models a code fence and an HTML comment. Manual sheet 14 pins both of those
 // closers as paragraph enders (a label under a closed fence is a definition,
 // control c3; a label under the "-->" that closes a comment is a definition,
 // ground truth 2026-09-09). A "$$" block should behave the same, so the label

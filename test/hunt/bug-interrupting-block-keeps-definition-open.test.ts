@@ -12,7 +12,7 @@
 //       code chunk [^73]
 //
 // What the user sees in Reading view: the comment renders as nothing (a
-// block, per manual sheet 25: "an HTML comment line is a block ... a label
+// block, per manual sheet 14: "an HTML comment line is a block ... a label
 // under it is a definition", so the block ended the definition), and the
 // indented line renders as a code block with the literal text
 // "code chunk [^73]". The micromark oracle agrees for every flavor below:
@@ -24,7 +24,7 @@
 // "a chunk indented by four spaces or a tab that opens at a block
 // boundary outside any definition" is code), and the recorded Reading
 // view probes agree for every flavor: a label under an HTML comment line
-// is a definition (sheet 25), a label under a "$$" closer is a definition
+// is a definition (sheet 14), a label under a "$$" closer is a definition
 // (markdown-scan.ts:2447, Claude sweep verified in Reading view), and a
 // label under a <div> block defines nothing (Kimi cycle 1 probe) - in
 // each case the interrupting block ended whatever came before.
@@ -54,7 +54,7 @@
 // pinned cycle-5 enders were caught by.
 //
 // Settings involved: the scan facts themselves; "Move definitions to the
-// bottom" OFF (a supported combo, manual sheet 20 sections B and C) with
+// bottom" OFF (a supported combo, manual former sheet 20 sections B and C) with
 // Reindex or "Delete orphaned references" ON for the consequence tests.
 
 import { describe, expect, it } from "vitest";
@@ -159,7 +159,7 @@ describe("an interrupting block ends the definition, so the chunk under it is co
         await insertAutonumFootnote(
             fakePlugin({ insertAtEndOfWord: false, enablePopupEditor: false, lintOnFootnoteCreation: false }, doc),
         );
-        // sheet 18: dead reference-shaped text reserves no number, so the
+        // sheet 11: dead reference-shaped text reserves no number, so the
         // press must mint [^2]; the misread chunk makes it mint [^74]
         expect(doc.lines[0]).toBe("use[^1] here[^2]");
     });

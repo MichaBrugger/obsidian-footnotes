@@ -35,7 +35,7 @@ import { moveFootnoteDefinitionsToBottom } from "../../src/linting/rules/move-fo
 // is a conservation bug); if no, the walker is right.
 //
 // Source of truth: Reading view (unprobed); the indented twin is pinned
-// by sheet 07. Settings involved: `Move definitions to the bottom`
+// by sheet 05. Settings involved: `Move definitions to the bottom`
 // (default ON).
 
 describe("spec: a table's column-0 rows under a definition label that starts it", () => {

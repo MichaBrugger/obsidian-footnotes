@@ -31,7 +31,7 @@ import { resetNotices } from "../helpers/notices";
     // what CodeMirror does with an out-of-range position. Filed as
     // spec-cell-selection-shrinking-row-append.)
 //
-// Source of truth: the pinned createAutonumFootnote fix (sheet 08's
+// Source of truth: the pinned createAutonumFootnote fix (sheet 06's
 // family; the note must be re-read after the cell's write-back) + Jason's
 // ruling 2026-09-04 that footnote writes never break a table.
 //

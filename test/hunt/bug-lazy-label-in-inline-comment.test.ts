@@ -22,7 +22,7 @@ import { lintFootnotes } from "../../src/linting/linter";
 // What the user sees: a note containing `%% [^1]: x %%` grows one stray
 // blank line at the top per lint/save, and the alert never clears.
 //
-// Source of truth: manual sheet 18 ("a mid-line `%%` pairs only within its
+// Source of truth: manual sheet 11 ("a mid-line `%%` pairs only within its
 // own line"; references inside an inline pair are live, a definition
 // inside one is dead - the `%% [^1]: x %%` line is an inline pair, not a
 // block opener, because it has two `%%`), plus the lazy-label code's own
@@ -30,7 +30,7 @@ import { lintFootnotes } from "../../src/linting/linter";
 // comment is dead text, not a definition one blank line short of working,
 // so there is nothing to report and nothing to fix" - the block case is
 // skipped, the inline-pair case is not), plus the lint idempotence
-// contract of sheets 20 and 21 ("run lint AGAIN - it must say 'No linting
+// contract of former sheets 20 and 21 ("run lint AGAIN - it must say 'No linting
 // needed.'").
 //
 // Settings involved: `Fix definitions hidden by a missing blank line`
@@ -69,7 +69,7 @@ describe("a definition label inside an inline %% comment pair", () => {
         expect(fixLazyDefinitions("para\n[^1]: x")).toBe("para\n\n[^1]: x");
     });
 
-    it("control: a label after a real block closer IS a definition (Jason's verification, sheet 18)", () => {
+    it("control: a label after a real block closer IS a definition (Jason's verification, sheet 11)", () => {
         const doc = "%%\nhidden\n%% [^1]: x";
         expect(fixLazyDefinitions(doc)).toBe(doc);
     });

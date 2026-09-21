@@ -21,7 +21,7 @@ import { lintFootnotes } from "../../src/linting/linter";
 //   - the C22 ruling (Jason, 2026-08-10) recorded in
 //     test/blockquote-definitions.test.ts: a "> [^1]: def" label is a live
 //     definition, not decoration.
-//   - README around line 158, and manual-test sheet 15: every plain
+//   - README around line 158, and manual-test sheet 09: every plain
 //     footnote adopts the prefix and the whole namespace renumbers.
 //   - the rule's own contract: plain numbered footnotes are converted "in
 //     the order they first appear: references first, then any orphaned

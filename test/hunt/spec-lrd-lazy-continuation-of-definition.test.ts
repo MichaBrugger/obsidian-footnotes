@@ -23,7 +23,7 @@ import { moveFootnoteDefinitionsToBottom } from "../../src/linting/rules/move-fo
 //
 // Why this is a spec question and not a bug pin: Reading view's answer is
 // unprobed, and Obsidian has diverged from micromark exactly in this
-// neighborhood before (sheet 25: a footnote definition may not interrupt
+// neighborhood before (sheet 14: a footnote definition may not interrupt
 // a paragraph; "  [^1]: x" directly under another definition starts a
 // NEW footnote, where micromark reads it as a continuation). The pinned
 // lazy-continuation shapes nearby (cycle 9, probed) cover "2. item text",

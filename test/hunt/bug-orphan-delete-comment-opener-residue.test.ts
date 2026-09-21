@@ -9,9 +9,9 @@ import { lintFootnotes } from "../../src/linting/linter";
 // reads a line it did not touch.
 //
 // "para" over "[^9]%%" is two paragraph lines (a "%%" mid-line never opens
-// anything, sheet 18). Delete the orphaned "[^9]" and the line is a lone
+// anything, sheet 11). Delete the orphaned "[^9]" and the line is a lone
 // "%%" at the start of a line - the opener of an Obsidian "%%" block
-// comment, which hides every line up to the next "%%" (sheet 18, ground
+// comment, which hides every line up to the next "%%" (sheet 11, ground
 // truth 2026-09-09). The rest of the note disappears from Reading view.
 //
 // The guard misses it on every axis it checks: a "%%" block's lines are
@@ -25,7 +25,7 @@ import { lintFootnotes } from "../../src/linting/linter";
 // stray reference hides the rest of their note inside a comment block
 // Obsidian renders as blank space. No alert fires.
 //
-// Source of truth: the rule's refusal contract + manual sheet 18 ("a %%
+// Source of truth: the rule's refusal contract + manual sheet 11 ("a %%
 // at the start of a line with no second %% on that line opens a block
 // comment through the next %% anywhere"; Obsidian hides the block).
 //

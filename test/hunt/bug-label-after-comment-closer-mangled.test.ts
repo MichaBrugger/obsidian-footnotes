@@ -32,7 +32,7 @@ import { removeOrphanedFootnoteReferences } from "../../src/linting/rules/remove
 // One thing the HTML shapes do NOT show: under section 4.6 the closer line
 // is literal HTML, so nothing in those notes defines footnote 1 and the
 // top "x[^1]" really is an orphaned reference. Deleting it is exactly what
-// the opt-in setting authorises (sheet 18, the oscar[^o1] rule), so these
+// the opt-in setting authorises (sheet 11, the oscar[^o1] rule), so these
 // tests only ask that the closer line itself comes through untouched.
 //
 // How a person reaches this: pressing Backspace at the start of a label

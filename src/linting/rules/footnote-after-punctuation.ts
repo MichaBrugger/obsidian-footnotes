@@ -125,7 +125,7 @@ export function footnoteAfterPunctuation(markdown: string): string {
         // a definition inside a list item ("- [^la]: text") has a label the
         // margin reader does not see; the swap used to hop that label's
         // reference over its own colon and destroy the definition (found
-        // by the sheet 23 tests, 2026-09-20; Jason's ruling 1 keeps such
+        // by the former sheet 23 tests, 2026-09-20; Jason's ruling 1 keeps such
         // definitions as they are)
         const inItemLabelEnds = new Map(
             inItemDefinitionLabels(lines, scan, maskedLines, definitionStarts).map((hit) => [hit.line, hit.labelEnd]),

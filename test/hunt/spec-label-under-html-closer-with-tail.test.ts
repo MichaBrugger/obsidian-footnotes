@@ -19,8 +19,8 @@ import {
 //
 // Reading two, the prose reading: the text after "-->" is live, so the
 // closer line reads as a paragraph line, and a label directly under a
-// paragraph line is paragraph text too (the prose-label rule, sheet 25).
-// Sheet 18 is the closest ground truth, and it only records that a reference
+// paragraph line is paragraph text too (the prose-label rule, sheet 14).
+// Sheet 11 is the closest ground truth, and it only records that a reference
 // placed after a mid-line "-->" is live. That is a fact about inline
 // liveness, not about block structure, so it does not settle this. The "%%"
 // closer sitting right beside this one in definitionStartLines already makes
@@ -37,7 +37,7 @@ import {
 // Hunt: 2026-09-13. Lens: contexts.
 //
 // Source of truth: CommonMark 0.31.2 section 4.6, HTML block type 2, and
-// micromark's parse of the same three lines; manual sheets 18 and 25.
+// micromark's parse of the same three lines; manual sheets 11 and 14.
 
 const starts = (lines: string[]) => {
     const scan = scanDocument(lines);

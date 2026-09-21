@@ -35,12 +35,12 @@
 // Why a spec question and not a bug pin: no manual sheet or recorded
 // probe pins what Reading view does with an indented chunk directly under
 // a closed %% block comment that follows a definition. The pinned facts
-// nearby (sheet 18: the block comment's lines are hidden but its
+// nearby (sheet 11: the block comment's lines are hidden but its
 // references are live; Jason's 2026-09-15 verification: a label after the
 // bare closer renders as a definition) all point at "the block ended the
 // definition", but the chunk itself was never probed. The sibling HTML
 // block flavors are pinned as bugs in
-// bug-indented-chunk-after-html-block.test.ts, where sheet 25 grounds the
+// bug-indented-chunk-after-html-block.test.ts, where sheet 14 grounds the
 // block reading.
 //
 // NEEDS A LIVE CHECK: in Reading view, does the note above render the

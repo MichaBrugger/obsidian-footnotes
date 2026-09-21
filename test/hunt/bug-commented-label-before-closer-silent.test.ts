@@ -24,7 +24,7 @@ import { noticeLintAlerts, commentedDefinitionNames } from "../../src/linting/li
 // definition or delete the reference") - the wrong advice, since they
 // already wrote the definition; it is just hidden.
 //
-// Source of truth: manual sheet 18 ("a definition inside a `%%` block
+// Source of truth: manual sheet 11 ("a definition inside a `%%` block
 // comment is dead"; a block runs "through the next `%%` anywhere"), the
 // commented-definition alert's own contract (lint-alerts.ts: definitions
 // "written inside a `%%` block comment... the lint names it", Jason's

@@ -24,7 +24,7 @@ import { simulateChanges } from "../../src/editor/insertion-liveness";
 //  - CONTEXT.md, "Placeholder": an empty reference ("[^]", or bare-prefix
 //    "[^2.]") mid-naming is "an in-progress footnote owned by the user's
 //    typing", not a footnote.
-//  - manual sheet 14: a press inside an untouched "[^P-]" refuses with
+//  - manual sheet 08: a press inside an untouched "[^P-]" refuses with
 //    "This footnote reference has only the prefix. Type a name after it."
 //  - the press guards, the lint alerts, and remove-orphaned-references all
 //    special-case the bare prefix, so every other part of the plugin

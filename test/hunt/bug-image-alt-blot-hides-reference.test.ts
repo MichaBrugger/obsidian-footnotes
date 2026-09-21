@@ -25,7 +25,7 @@ import {
 // Obsidian reads the bracket construct first, so a "$" inside a reference
 // is name text that never opens math (Jason verified live 2026-08-10; the
 // scanner's own documented rule), a backtick inside a name is footnote-id
-// text (sheet 23: "[^aa`a] [^bb#b] [^cc`c]" renders three footnotes), and
+// text (former sheet 23: "[^aa`a] [^bb#b] [^cc`c]" renders three footnotes), and
 // "[^a<!--b]" renders as a live footnote (Kimi sweep 2026-09-13, verified
 // in Reading view). An image's alt text is dead, but only the ALT is
 // (cycle 8): the reference after the image must stay live.

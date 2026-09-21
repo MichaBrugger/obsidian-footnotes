@@ -10,12 +10,12 @@ import {
 // The scanner's paragraphGoesOn ends a paragraph's line-run at any line
 // matching /^ {0,3}%%/ - meant for a "%%" BLOCK opener (a lone "%%"). But
 // the same regex matches an INLINE comment pair line ("%% c %%"), which
-// sheet 18 (2026-09-09) rules is an ordinary paragraph line: "a
+// sheet 11 (2026-09-09) rules is an ordinary paragraph line: "a
 // comment-only line is still a paragraph line". So every cross-line
 // lookahead that goes through paragraphGoesOn stops one line early:
 //
 // 1. A code span opened on one line and closing on a later line of the
-//    same paragraph (Reading view renders it as ONE span, sheet 18 B30,
+//    same paragraph (Reading view renders it as ONE span, sheet 11 B30,
 //    2026-09-16) stops at the inline-comment line. The reference the span
 //    covers stays LIVE to the plugin where Reading view shows it as dead
 //    code text.
@@ -34,7 +34,7 @@ import {
 // bottom refuses to run at all (endsProtected), so their definitions are
 // never gathered.
 //
-// Source of truth: manual sheet 18 ("a comment-only line is still a
+// Source of truth: manual sheet 11 ("a comment-only line is still a
 // paragraph line", and B30: a wrapped code span is one span to Reading
 // view) + the literalOpeners ruling's own condition (the search runs
 // through "a later line of the SAME paragraph" - and an inline-comment

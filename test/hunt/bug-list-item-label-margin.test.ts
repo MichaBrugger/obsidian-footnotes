@@ -32,7 +32,7 @@ import {
 //
 // Source of truth: micromark + mdast-util-gfm-footnote (the repo's
 // designated oracle; no manual sheet records Reading view disagreeing on
-// list-item labels - sheet 25's rule is about paragraphs, and the
+// list-item labels - sheet 14's rule is about paragraphs, and the
 // definition's up-to-3-spaces indent is CommonMark's own allowance). GFM
 // footnote definitions inside list items indent from the item's content
 // column like any other block.

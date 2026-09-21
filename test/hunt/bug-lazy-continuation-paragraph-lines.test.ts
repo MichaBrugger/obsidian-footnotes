@@ -29,7 +29,7 @@ import { messages, resetNotices } from "../helpers/notices";
 //   probed, for the table twin). lazyContinuation's `<` arm matches any
 //   line starting with "<".
 // - "%% c %%"  - an inline "%% ... %%" pair is an ordinary paragraph line
-//   (sheet 18). paragraphGoesOn got that refinement in cycle 4 (a lone %%
+//   (sheet 11). paragraphGoesOn got that refinement in cycle 4 (a lone %%
 //   block opener only); lazyContinuation's bare `%%` arm did not.
 //
 // What the user sees: with Move definitions to the bottom on (the

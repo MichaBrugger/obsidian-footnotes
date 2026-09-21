@@ -10,7 +10,7 @@ import {
     shouldJumpFromReferenceToDefinition,
 } from "../../src/commands/navigation";
 
-// Jason's manual pass, sheet 05 (2026-09-09): with the popup on, pressing
+// Jason's manual pass, sheet 03 (2026-09-09): with the popup on, pressing
 // the hotkey inside "[^dup]" opened the popup on the FIRST "[^dup]:"
 // definition, while Obsidian renders the LAST one (and the jump, with the
 // popup off, goes to the last one). The popup's embed is resolved by

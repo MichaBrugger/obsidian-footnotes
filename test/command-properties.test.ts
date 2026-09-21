@@ -1,3 +1,5 @@
+import { underlinedDefinitionLabelNames } from "../src/linting/rules/remove-orphaned-references";
+import { lazyDefinitionLabelNames } from "../src/linting/rules/remove-orphaned-references";
 import { Editor, EditorChange, EditorPosition } from "obsidian";
 import fc from "fast-check";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -256,6 +258,19 @@ function definitionNamesFolded(lines: string[]): Set<string> {
         findDefinitionBlocks(lines, scan).map((block) =>
             block.name.toLowerCase(),
         ),
+    );
+}
+
+/** The names on label-shaped lines that are lazy prose today (or heading text under an underline): a press that fills the blank line above such a label can lawfully turn it into a definition, exactly as typing there would. */
+function promotableLabelNamesFolded(lines: string[]): Set<string> {
+    const scan = scanDocument(lines);
+    const masked = maskProtectedLines(lines, scan);
+    const starts = definitionStartLines(lines, scan, (i) => masked[i]);
+    return new Set(
+        [
+            ...lazyDefinitionLabelNames(lines, scan, masked, starts),
+            ...underlinedDefinitionLabelNames(lines, scan, masked, starts),
+        ].map((name) => name.toLowerCase()),
     );
 }
 
@@ -635,7 +650,7 @@ describe("creation-command invariants over random documents", () => {
         );
 
     // ---- an INDEPENDENT reading of the conversion rules ----
-    // Written from the README and sheet 06, not from the production
+    // Written from the README and sheet 04, not from the production
     // functions, so the oracle cannot agree with a bug in trimSelectionEdges,
     // absorbLeadingSpace, or indentDefinitionBody by construction (review
     // D6, 2026-09-09: the property used to call all three).
@@ -969,8 +984,10 @@ describe("creation-command invariants over random documents", () => {
                 // definition (a label under a definition's lazy line is a
                 // definition), and that promoted name is not the minted one
                 // (found by the 5000-run soak, 2026-09-20)
-                const rawBefore = rawNamesFolded(lines);
-                const minted = [...defsAfter].find((name) => !defsBefore.has(name) && !rawBefore.has(name));
+                // (a shape that only sat in dead text before, "fake[^1]" in
+                // a fence, reserves nothing and CAN be the minted name)
+                const promotable = promotableLabelNamesFolded(lines);
+                const minted = [...defsAfter].find((name) => !defsBefore.has(name) && !promotable.has(name));
                 // the minted name is the next free number over the masked
                 // twin: dead text reserves nothing (the #41 rule)
                 expect(minted).toBe(String(computeNextFootnoteNumber(lines.join("\n"))));
@@ -1536,8 +1553,8 @@ describe("press definition-census invariants over random documents", () => {
                 // as a definition was promoted by the press's edit (a lazy
                 // label under a filled-in blank line), exactly like typing
                 // would do it; only a name new to the note counts as added
-                const rawBefore = rawNamesFolded(lines);
-                const added = [...after].filter((name) => !before.has(name) && !rawBefore.has(name));
+                const promotable = promotableLabelNamesFolded(lines);
+                const added = [...after].filter((name) => !before.has(name) && !promotable.has(name));
                 expect(
                     added.length,
                     `press added more than one definition: before ${[...before].sort().join()} after ${[...after].sort().join()}`,

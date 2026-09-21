@@ -20,17 +20,17 @@ import {
 // this same "[^1]" as a live reference when it decides what the caret is on.
 // So the press should land on the real definition.
 //
-// Reading two, "insert": manual sheet 25's hotkey bullet says, of the lazy
+// Reading two, "insert": manual sheet 14's hotkey bullet says, of the lazy
 // label line, "Hotkey on the [^p1]: line: a plain insert as well". Taken at
 // face value that settles it, and inserting is what the plugin does today.
 //
-// Why the bullet does not settle it: in sheet 25's own fixtures the name on
+// Why the bullet does not settle it: in sheet 14's own fixtures the name on
 // the lazy label line has no definition anywhere in the note, so both
 // readings produce the same visible result there and the sheet never had to
 // choose. The bullet also omits the qualifier the sheet's rename clause
 // spells out, that the caret is INSIDE the brackets, which is the only
 // position this question is about. And adopting the navigate reading would
-// change sheet 25's own fixtures: a press inside the label's brackets there
+// change sheet 14's own fixtures: a press inside the label's brackets there
 // would stop inserting at the caret and start appending a definition for an
 // as-yet-undefined name.
 //

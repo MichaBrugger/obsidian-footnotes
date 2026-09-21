@@ -7,7 +7,7 @@ import { insertInTableCell } from "../../src/commands/create-footnote";
 import { ProtectedCreationNotice } from "../../src/editor/insertion-liveness";
 import { TableCellEditor } from "../../src/editor/table-cursor";
 
-// Jason's retest, sheet 08 (2026-09-11): in the bottom-right cell of a bare
+// Jason's retest, sheet 06 (2026-09-11): in the bottom-right cell of a bare
 // table in Live Preview, the inline and paste keys SOMETIMES toasted the
 // protected-text refusal while the numbered and named keys never did. Six
 // scripted rounds could not reproduce it with a fresh cell, and the pure

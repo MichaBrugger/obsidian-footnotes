@@ -7,7 +7,7 @@ import { adjustFootnotePosition, endOfWordOffset } from "../../src/editor/cursor
 import { footnoteAfterPunctuation } from "../../src/linting/rules/footnote-after-punctuation";
 import { referenceLandingAfter } from "../../src/parsing/markdown-scan";
 
-// Jason's manual pass, sheet 01 (2026-09-09): with "insert at end of word"
+// Jason's manual pass, former sheet 01 (2026-09-09): with "insert at end of word"
 // on, a footnote placed on the last word of a quoted, bracketed, or
 // emphasized phrase landed INSIDE the closing marks:
 //   This is "some bravo[^1]".      wanted   This is "some bravo".[^1]

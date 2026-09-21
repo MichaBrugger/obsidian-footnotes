@@ -17,7 +17,7 @@ import {
 // the tail, pinned 2026-09-16). Move-to-bottom gathers the blocks by
 // joining them with a single "\n", so a block ending in such a tail lands
 // DIRECTLY above the next definition's label: "lazy tail\n[^2]: two".
-// Sheet 25's own rule then reads the second label as lazy paragraph text
+// Sheet 14's own rule then reads the second label as lazy paragraph text
 // (a label directly under a paragraph line is no definition), so the
 // second footnote stops rendering. The pipeline even fights itself over
 // it: fix-lazy inserts the blank back, and move-to-bottom re-glues the
@@ -32,8 +32,8 @@ import {
 // conservation property with the cycle-3 generator shapes (a pipe-less
 // GFM table whose label's lazy tail is "c | d").
 //
-// Source of truth: sheet 25 (the label-under-prose rule the move's
-// OUTPUT now violates) + the conservation promise of sheets 20/21 (lint
+// Source of truth: sheet 14 (the label-under-prose rule the move's
+// OUTPUT now violates) + the conservation promise of former sheets 20/21 (lint
 // never changes what renders, with deletions off) + the pinned
 // lazy-continuation ruling (the tail belongs to the first block, so the
 // only place left to be wrong is the join).

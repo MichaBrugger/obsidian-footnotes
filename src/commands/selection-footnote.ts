@@ -581,7 +581,7 @@ function spanTouchesFootnote(
  * same cell of the same row, because text within one cell converts fine.
  * A table held whole passes: with both edges out in the prose around it
  * ("none"), or with the edges exactly on its first and last rows ("whole";
- * Jason's ruling, sheet 07, 2026-09-09; it used to be refused on the
+ * Jason's ruling, sheet 05, 2026-09-09; it used to be refused on the
  * belief that a table cannot begin on the label line, and Obsidian renders
  * one that does).
  */
@@ -594,7 +594,7 @@ function tableVerdict(
     if (!rows[from.line] && !rows[to.line]) return "none";
     if (from.line !== to.line) {
         // A table held whole, edge to edge on its first and last rows,
-        // converts (Jason's ruling, sheet 07, 2026-09-09). The edges are
+        // converts (Jason's ruling, sheet 05, 2026-09-09). The edges are
         // judged against the rows' text, not their raw length: the
         // selection arrives trimmed, so a last row ending in trailing
         // spaces, or a table indented a space or two, used to be refused
@@ -800,7 +800,7 @@ function indentDefinitionBody(text: string): string {
     // sits after a label, while it does read the indented closer as an
     // opener - so to the scanner such a note has an unclosed fence from
     // that line on, and every definition below it turns into code (Jason's
-    // report, sheet 06, 2026-09-09: the orphaned reference, the waiting
+    // report, sheet 04, 2026-09-09: the orphaned reference, the waiting
     // notice, the caret on the wrong footnote). A fence therefore starts
     // on the line after the label, indented like the rest, where Obsidian
     // and the scanner read it the same way. Every other block construct -
@@ -1108,7 +1108,7 @@ function convertCellSelection(
     // with it: the context built above still holds the old row, and the
     // append landed inside the new one, splitting the reference and the
     // row (Kimi hunt cycle 3, 2026-09-16; the numbered cell press had the
-    // same bug, sheet 07). So the note is read again here.
+    // same bug, sheet 05). So the note is read again here.
     const definition = seedDefinitionBody(
         buildDefinitionAppend(doc, footnoteId, isFirstFootnote, plugin, docContext(doc)),
         footnoteId,

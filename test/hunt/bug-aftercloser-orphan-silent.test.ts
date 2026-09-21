@@ -24,7 +24,7 @@ import { orphanedFootnoteDefinitionNames } from "../../src/linting/rules/remove-
 // content-destroying fix is OFF by default and surfaced as a lint alert
 // instead - lint never eats user text the user didn't explicitly opt
 // into losing" - and what it won't fix, it names) + Jason's verification
-// that the label is a real definition (sheet 18).
+// that the label is a real definition (sheet 11).
 //
 // Settings involved: `Delete orphaned definitions` OFF (the alert side).
 

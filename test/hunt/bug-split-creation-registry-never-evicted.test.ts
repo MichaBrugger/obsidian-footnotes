@@ -20,7 +20,7 @@ import { noteSplitCreation, undoOrphanMessage } from "../../src/editor/undo-orph
 //
 // Hunt: 2026-09-13. Lens: the undo notice.
 //
-// Source of truth: manual sheet 02 line ~11 and sheet 08 line ~15 - the
+// Source of truth: manual sheet 01 line ~11 and sheet 06 line ~15 - the
 // sentence is reserved for creations the plugin itself split into two undo
 // steps (2026-09-11); and the module's own stated intent above the set,
 // "Only for those is 'undo again to remove the reference too' a promise the

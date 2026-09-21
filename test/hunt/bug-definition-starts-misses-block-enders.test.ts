@@ -75,7 +75,7 @@ const lazyNames = (doc: string) => {
 
 describe("a setext underline of dashes ends the paragraph", () => {
     it("the spellings the start rule already knows all work", () => {
-        // the "=" spelling, as manual sheet 25 pinned it
+        // the "=" spelling, as manual sheet 14 pinned it
         expect(blocksOf("t[^1]\n\nH\n===\n[^1]: real")).toEqual(["1@4"]);
         expect(blocksOf("t[^1]\n\nH\n=\n[^1]: real")).toEqual(["1@4"]);
         // three dashes, by way of the thematic-break test

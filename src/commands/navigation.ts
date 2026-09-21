@@ -259,7 +259,7 @@ export function shouldJumpFromReferenceToDefinition(
     // A footnote defined more than once: Obsidian renders the LAST
     // definition, and the jump below goes there, but the popup's embed is
     // resolved by Obsidian's own subpath lookup, which finds the FIRST one
-    // (Jason's report, sheet 05, 2026-09-09). Rather than open the popup on
+    // (Jason's report, sheet 03, 2026-09-09). Rather than open the popup on
     // the definition that does not render, the press jumps; the duplicate
     // lint alert already says how to fix the note.
     if (popupRouteFor(plugin, definitions, footnoteName)) {

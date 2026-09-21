@@ -13,7 +13,7 @@
 //   [^2]: under
 //
 // What the user would see in Reading view: "[^1]: lazy" sits directly
-// under a prose line, so it is paragraph text (manual sheet 25: a label
+// under a prose line, so it is paragraph text (manual sheet 14: a label
 // under prose renders as plain "[^1]: ..." with no footnote). A table
 // cannot interrupt a paragraph - the very rule pinned in
 // test/hunt/bug-setext-underline-makes-heading.test.ts ("a header row
@@ -39,7 +39,7 @@
 // deletion on, the phantom definition is also renumbered and reordered
 // like a real one.
 //
-// Source of truth: manual sheet 25 (a label directly under prose is lazy;
+// Source of truth: manual sheet 14 (a label directly under prose is lazy;
 // its quote and callout fixtures cover the quoted shapes) + the probed
 // table-cannot-interrupt-a-paragraph rule pinned in
 // bug-setext-underline-makes-heading.test.ts. Ruling A2 (a label under a

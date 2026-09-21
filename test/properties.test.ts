@@ -726,7 +726,7 @@ describe("editor helper invariants", () => {
 // protected lines survive every lint.
 //
 // Source of truth: the micromark oracle (each interrupter leaves the
-// chunk as <pre><code>), sheet 25's "an HTML comment line is a block",
+// chunk as <pre><code>), sheet 14's "an HTML comment line is a block",
 // and the in-repo Reading view probes recorded at
 // src/parsing/markdown-scan.ts:2447 (a label under a $$ closer is a
 // definition, so the block ended what came before). The full finding is
@@ -804,7 +804,7 @@ describe("interrupted-definition invariants over random documents", () => {
     });
 
     soakIt("a %% block comment's lines are never fully blotted in the masked twin", () => {
-        // sheet 18: references inside a %% block are LIVE (they bind their
+        // sheet 11: references inside a %% block are LIVE (they bind their
         // definitions and take numbers), so the block's lines stay out of
         // the protected mask even though their text is hidden
         fc.assert(
@@ -826,7 +826,7 @@ describe("interrupted-definition invariants over random documents", () => {
 
 // ---------- region-body conservation over random documents ----------
 // The lint moves and renumbers whole definition blocks and never moves a
-// quoted one (manual sheet 25: quoted definitions stay put; the pinned
+// quoted one (manual sheet 14: quoted definitions stay put; the pinned
 // region-absorb fixes keep a block's regions and continuations whole).
 // These two properties encode that at the structural level: every line of
 // a definition's body that no rule may rewrite - reference-free,

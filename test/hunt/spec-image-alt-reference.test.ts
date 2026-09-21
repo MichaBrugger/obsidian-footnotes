@@ -29,7 +29,7 @@ import { maskProtectedLines, scanDocument } from "../../src/parsing/markdown-sca
 // references` on, an alt-text reference keeps a definition alive that
 // Obsidian shows as orphaned. If Obsidian instead renders alt-text
 // references live (its renderer has diverged from micromark before, e.g.
-// sheet 25's footnote-interruption ruling and the one-line setext rule),
+// sheet 14's footnote-interruption ruling and the one-line setext rule),
 // the code is right and this pin should be deleted.
 //
 // NEEDS A LIVE CHECK: does "![^1](url)" with "[^1]: one" in the note show

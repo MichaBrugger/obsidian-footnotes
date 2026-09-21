@@ -55,7 +55,7 @@ import { referenceOccurrences } from "../../src/parsing/footnote-grammar";
 // the mixed run can say which.
 //
 // Source of truth: the two recorded probes above (cycle 12 vs cycle 5,
-// manual sheets 25/21) + the plugin's own two readers, quoted. Filed as a
+// manual sheets 14/21) + the plugin's own two readers, quoted. Filed as a
 // spec question per the hunt rules: where Reading view cannot be consulted,
 // the disagreement is recorded, not judged.
 //

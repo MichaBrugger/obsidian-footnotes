@@ -222,7 +222,13 @@ function noticeOrphanedReferences(
     prefix: string,
     precomputed: { lines: string[]; masked: string[]; scan: DocumentScan; starts: boolean[] },
 ) {
-    let names = orphanedFootnoteReferenceNames(markdown, prefix, precomputed);
+    // a reference whose name is invalid (a "#", a backtick) is the
+    // invalid-name alert's to report; naming it here as well would ask
+    // the user to write a definition that could never bind (Jason's
+    // ruling 2026-09-20, from the pruned lint-alerts sheet)
+    let names = orphanedFootnoteReferenceNames(markdown, prefix, precomputed).filter(
+        (name) => footnoteNameProblem(name) === null,
+    );
     if (names.length === 0) return;
     if (plugin.settings.lintDeleteOrphanedReferences) {
         // Each orphan is judged on its own by the rule now (Kimi hunt

@@ -28,7 +28,7 @@ import { scanDocument } from "../../src/parsing/markdown-scan";
 // which is the green control at the bottom of this file.
 //
 // Hunt: 2026-09-13. Lens: comments.
-// Source of truth: manual sheet 18 line ~118 ("nothing is inserted or moved
+// Source of truth: manual sheet 11 line ~118 ("nothing is inserted or moved
 // inside either %% block"); attack-surface "%% comments" row ("nothing
 // inside a block comment is moved, renamed, or fixed; the definition append
 // never lands inside an unclosed block").

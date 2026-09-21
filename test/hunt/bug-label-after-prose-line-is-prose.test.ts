@@ -15,7 +15,7 @@ import { findDefinitionBlocks, scanDocument } from "../../src/parsing/markdown-s
 // footnote definition interrupt a paragraph: a "[^x]:" line directly under
 // a prose line (paragraph text, a list item, a quote line, a table row) is
 // lazy paragraph text and renders as plain "[^x]: ..." with no footnote.
-// Ground truth in Reading view, 2026-09-09 (manual sheet 25): ten shapes,
+// Ground truth in Reading view, 2026-09-09 (manual sheet 14): ten shapes,
 // definitions only after a blank line, the note start, a heading, a closed
 // fence, or another definition. The plugin read a label as a definition
 // wherever it sat, so it listed and navigated to "definitions" Obsidian

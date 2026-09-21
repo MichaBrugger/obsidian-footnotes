@@ -8,7 +8,7 @@ import { insertAutonumFootnote } from "../../src/commands/insert-or-navigate-foo
 import { ProtectedCreationNotice } from "../../src/editor/insertion-liveness";
 import { maskLineRegions } from "../../src/parsing/markdown-scan";
 
-// Jason's manual pass, sheet 18 (2026-09-11): with the caret at "$5 or |$6",
+// Jason's manual pass, sheet 11 (2026-09-11): with the caret at "$5 or |$6",
 // the numbered key refused with the protected-text toast, claiming the
 // reference would complete a math pair. Obsidian disagrees. Ground truth in
 // Reading view (2026-09-11): a closing "$" that is immediately followed by

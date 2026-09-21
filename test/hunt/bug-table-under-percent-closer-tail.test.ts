@@ -10,7 +10,7 @@ import {
 import { lazyDefinitionLabelNames } from "../../src/linting/rules/remove-orphaned-references";
 
 // The visible tail after an Obsidian "%%" BLOCK comment's closer is live
-// paragraph text (sheet 18: "%% [^3]: def" renders as a definition, and
+// paragraph text (sheet 11: "%% [^3]: def" renders as a definition, and
 // the scan's own definitionStartLines reads a closer line with a tail as
 // `open = "paragraph"`). A GFM table cannot start directly under a line
 // of paragraph text (pinned in Reading view, cycle 3: "a table header
@@ -30,14 +30,14 @@ import { lazyDefinitionLabelNames } from "../../src/linting/rules/remove-orphane
 // the whole run - pipes and label alike - as one paragraph, so with the
 // gather rule off the user's "[^1]: def" sits there as plain text and no
 // alert ever names it: a silent miss of exactly the shape the
-// lazy-definition alert exists for (sheet 23), against the never-silent
+// lazy-definition alert exists for (former sheet 23), against the never-silent
 // policy (ADR 0002).
 //
 // What the user sees: they typed a definition one blank line short below
 // a comment block's "%% tail" line; the lint neither fixes nor reports
 // it, and reindex numbers a "definition" Obsidian shows as prose.
 //
-// Source of truth: sheet 18 (the tail after a closer is live) + the
+// Source of truth: sheet 11 (the tail after a closer is live) + the
 // cycle-3 Reading-view probe (no table under a paragraph line) + the
 // scan's own paragraph reading of the tail line.
 //

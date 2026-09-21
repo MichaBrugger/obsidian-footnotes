@@ -16,7 +16,7 @@ import {
 // comment closer still counts").
 //
 // So a "[^1]:" label directly under such a closer line sits directly under
-// a PROSE line, and manual sheet 25's rule (Obsidian's, matched by the
+// a PROSE line, and manual sheet 14's rule (Obsidian's, matched by the
 // plugin since 2026-09-09) says it is lazy paragraph text: "A label starts
 // a definition only after a blank line, the note start, a heading, a
 // closed fence, a callout's title line, or another definition." A prose
@@ -36,7 +36,7 @@ import {
 // The missing-definition alert stays silent too, because as far as the
 // plugin is concerned the definition exists.
 //
-// Source of truth: manual sheet 25's stated rule (a label directly under a
+// Source of truth: manual sheet 14's stated rule (a label directly under a
 // prose line is lazy) + the plugin's own math-branch precedent (verified
 // in Reading view per the code comment).
 //
@@ -61,7 +61,7 @@ const lazyNames = (markdown: string): string[] => {
 };
 
 describe("a definition label directly under an inline comment's closer line with tail text", () => {
-    it("is a LAZY label, not a definition start (sheet 25's rule)", () => {
+    it("is a LAZY label, not a definition start (sheet 14's rule)", () => {
         expect(startsOf(doc)[3]).toBe(false);
     });
 

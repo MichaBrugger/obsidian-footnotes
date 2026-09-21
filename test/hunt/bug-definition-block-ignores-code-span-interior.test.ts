@@ -12,7 +12,7 @@ import {
 
 // A code span that opens on a definition's label line and closes several
 // lines later keeps every line in between dead (Reading view renders the
-// whole stretch as one span, manual sheet 18 B30 2026-09-16; the scanner
+// whole stretch as one span, manual sheet 11 B30 2026-09-16; the scanner
 // protects the no-backtick lines in full through startsInCode). The
 // definition block owns all of it, the way it owns a comment, math, or
 // fence region one of its lines opens: the footnote's body reads "a `code
@@ -33,7 +33,7 @@ import {
 // with `Delete orphaned references` ON a later lint deletes it - user text
 // destroyed across two lints. Conservation (no live text lost) is broken.
 //
-// Source of truth: manual sheet 18's B30 ruling (a wrapped code span is
+// Source of truth: manual sheet 11's B30 ruling (a wrapped code span is
 // ONE span to Reading view; the reference inside it is dead) + the block
 // walker's own absorb rule for regions a definition's lines open (Sol bug
 // #3, hunt 2026-08-25), which startsInCode lines belong to.

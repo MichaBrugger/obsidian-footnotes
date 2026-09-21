@@ -28,11 +28,11 @@ import { TableSelectionNotice } from "../../src/commands/selection-footnote";
 // exists to stop a table being shredded, and nothing here is shredded, so
 // a run of whole tables (and the blank lines between them) should convert
 // the way one whole table does.
-// Reading B: the ruling in sheet 07 is about ONE table, and a selection
+// Reading B: the ruling in sheet 05 is about ONE table, and a selection
 // over several is out of scope by design. Then the bug is only in the
 // toast, which is giving advice that cannot be followed.
 //
-// Source of truth: manual sheet 07's ruling (2026-09-09), "a whole table
+// Source of truth: manual sheet 05's ruling (2026-09-09), "a whole table
 // selected edge to edge (with or without the text around it) converts; a
 // partial table refuses"; the rule is silent on more than one table.
 //

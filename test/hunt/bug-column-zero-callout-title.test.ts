@@ -36,7 +36,7 @@ import {
 //
 // Source of truth: Obsidian's callout syntax, where a callout is a blockquote
 // whose first line is "[!type]"; there is no such thing as a column-0
-// callout. Manual sheet 25's control c4 is the real shape, "> [!note]" then
+// callout. Manual sheet 14's control c4 is the real shape, "> [!note]" then
 // "> [^c4]:".
 
 const startsOf = (doc: string) => {
@@ -54,7 +54,7 @@ const lazyNames = (doc: string) => {
 };
 
 describe("a callout title only exists inside a blockquote", () => {
-    it("the real thing still works (sheet 25, control c4)", () => {
+    it("the real thing still works (sheet 14, control c4)", () => {
         expect(lastLineStarts("a[^1]\n\n> [!note]\n> [^1]: mid")).toBe(true);
         expect(lastLineStarts("a[^1]\n\n> [!note]- Folded\n> [^1]: mid")).toBe(true);
         // and a callout's BODY line is prose, so a label under that one is lazy

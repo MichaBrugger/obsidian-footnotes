@@ -23,7 +23,7 @@ import { moveFootnoteDefinitionsToBottom } from "../../src/linting/rules/move-fo
 //
 // Why this is a spec question and not a bug pin: Reading view's answer is
 // unprobed, and Obsidian has diverged from micromark precisely in this
-// neighborhood before (sheet 25: footnote definitions may not interrupt a
+// neighborhood before (sheet 14: footnote definitions may not interrupt a
 // paragraph, where micromark says they may). The pinned shapes nearby all
 // cover the OTHER direction - "setext para\n===\n[^103]: after setext h1"
 // (a label under a paragraph's setext underline is a definition; the

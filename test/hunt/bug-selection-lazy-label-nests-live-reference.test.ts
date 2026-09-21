@@ -43,8 +43,8 @@ import { TableCellEditor } from "../../src/editor/table-cursor";
 //  - docs/adr/0001-no-nested-footnotes.md: "A selection that contains or
 //    cuts through any live reference, placeholder, or inline footnote
 //    refuses to convert, with a toast."
-//  - manual sheet 25: a lazy label's own "[^p1]" is a live reference.
-//  - manual sheet 06: the selection refusal list.
+//  - manual sheet 14: a lazy label's own "[^p1]" is a live reference.
+//  - manual sheet 04: the selection refusal list.
 //  - for the cell: GFM says a table row holds inline content only, so no
 //    cell text can be a definition.
 //

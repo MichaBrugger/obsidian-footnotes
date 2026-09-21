@@ -51,7 +51,7 @@ export const ClosingMarkChars = "\"'’”)]}」』）】〕》〉*_~=";
  *     This is **some bravo**. ->   This is **some bravo**.[^1]
  *
  * That is the Chicago Manual of Style's rule, the one every major style
- * guide shares (Jason's ask, sheet 01, 2026-09-09). A markdown link's
+ * guide shares (Jason's ask, former sheet 01, 2026-09-09). A markdown link's
  * "(url)" tail right after a "]" is stepped over whole, so the reference
  * never splits "[text](url)". A space, a letter, or an opening bracket
  * (the start of a following reference) ends the walk.
@@ -217,7 +217,7 @@ export function tableRowLinesOf(lines: string[]): boolean[] {
                 return false;
             }
             // a comment-only line ("%% c %%") is paragraph text like any
-            // other (sheet 18; a table under one is no table, Kimi hunt
+            // other (sheet 11; a table under one is no table, Kimi hunt
             // cycle 4, probed 2026-09-16); only a lone "%%" opens a block
             // ... and a "%%" with text after it is a closer's live tail,
             // paragraph text that a table cannot interrupt either (GLM
@@ -975,7 +975,7 @@ export function maskLineRegions(
                 }
                 // a "$" directly followed by a digit cannot close math
                 // ("pay $5 or [^1]$6" is prose with a live reference;
-                // ground truth in Reading view 2026-09-11, Jason's sheet 18
+                // ground truth in Reading view 2026-09-11, Jason's sheet 11
                 // report: the press guard was refusing that spot)
                 if (line[j] === "$" && !insideReferenceShape(j) && !/\d/.test(line[j + 1] ?? "")) {
                     close = j;
@@ -1418,7 +1418,7 @@ export function scanDocument(lines: string[]): DocumentScan {
             /^ {0,3}[-*+] +\S/.test(text) ||
             /^ {0,3}1[.)] +\S/.test(text) ||
             // a "%%" BLOCK opener: the only "%%" on its line. An inline
-            // pair ("%% c %%") is an ordinary paragraph line, sheet 18;
+            // pair ("%% c %%") is an ordinary paragraph line, sheet 11;
             // Kimi hunt cycle 4 caught the walk stopping there (2026-09-16)
             (/^ {0,3}%%/.test(text) && (text.match(/%%/g) ?? []).length === 1) ||
             /^ {0,3}<(?:!--|\?|![A-Za-z]|!\[CDATA\[|\/?(?:script|pre|style|textarea|address|article|aside|blockquote|details|dialog|div|dl|figure|footer|form|h[1-6]|header|hr|main|nav|ol|p|section|summary|table|ul)(?:[ >/]|$))/i.test(text)
@@ -1988,7 +1988,7 @@ export function scanDocument(lines: string[]): DocumentScan {
                 // view renders it ("body cont chunk"; Kimi hunt cycle 5,
                 // probed 2026-09-16); a block of its own ends it
                 // a label directly under a quoted paragraph line is lazy
-                // prose (sheet 25) and opens nothing; the indented quoted
+                // prose (sheet 14) and opens nothing; the indented quoted
                 // chunk after the blank quote line is then quoted code
                 // (GLM hunt cycle 4, 2026-09-16)
                 const quotedLabel = definitionLabelIn(src[i]) !== null && !(prevParagraph && prevDepth === depth);
@@ -2583,7 +2583,7 @@ export function removeLineRanges(
  * label directly under a line of prose (paragraph text, a list item, a
  * quote line, a table row, or a lazy continuation of any of those) is lazy
  * paragraph text: it renders as the plain characters "[^x]: ..." and makes
- * no footnote. Ground truth in Reading view 2026-09-09 (manual sheet 25),
+ * no footnote. Ground truth in Reading view 2026-09-09 (manual sheet 14),
  * and Jason's ruling the same day was to match Obsidian.
  *
  * A label may start after a blank line (a bare ">" inside a quote counts as

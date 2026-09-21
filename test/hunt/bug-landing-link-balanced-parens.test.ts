@@ -25,9 +25,9 @@ import { referenceLandingAfter } from "../../src/parsing/markdown-scan";
 // Source of truth:
 //  - CommonMark 0.31.2, section 6.3: a link destination may contain
 //    balanced parentheses, so "(...Ba_(disambiguation)#hist)" is ONE tail.
-//  - manual sheet 01, line ~30: "The link case lands after the whole
+//  - manual former sheet 01, line ~30: "The link case lands after the whole
 //    (url), never between ] and (".
-//  - manual sheet 20, line ~55: the same swap for the plain-link case in
+//  - manual former sheet 20, line ~55: the same swap for the plain-link case in
 //    the punctuation lint rule.
 //  - referenceLandingAfter's own doc comment: "A markdown link's '(url)'
 //    tail right after a ']' is stepped over whole, so the reference never

@@ -24,12 +24,12 @@ import {
 // the bottom (Obsidian then renders only the last, if it saw the first at
 // all).
 //
-// Why this is a spec question and not a bug pin: sheet 25's rule (the
+// Why this is a spec question and not a bug pin: sheet 14's rule (the
 // Obsidian-specific one) covers labels UNDER prose lines, and its
 // definition-start allowance list does not mention a list marker's line;
 // the marker-line shape is unprobed in Reading view. The after-blank
 // in-item twin (bug-list-item-label-margin) IS pinned as a bug because
-// sheet 25 explicitly allows a label after a blank line and the only
+// sheet 14 explicitly allows a label after a blank line and the only
 // thing in the way there is the indent margin.
 //
 // NEEDS A LIVE CHECK: in Reading view, does "- [^a]: def" render as a
@@ -54,7 +54,7 @@ describe("spec: a footnote label directly after a list marker", () => {
         expect(orphanedFootnoteReferenceNames("- [^a]: def\n\nuse[^a]")).toEqual([]);
     });
 
-    it("control: a label directly UNDER a list item is lazy (sheet 25, settled)", () => {
+    it("control: a label directly UNDER a list item is lazy (sheet 14, settled)", () => {
         const lines = "- item\n[^a]: def".split("\n");
         const scan = scanDocument(lines);
         const masked = maskProtectedLines(lines, scan);

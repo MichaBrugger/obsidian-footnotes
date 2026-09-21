@@ -33,7 +33,7 @@ import { fixLazyDefinitions } from "../../src/linting/rules/fix-lazy-definitions
 // Lens: the fix-lazy-definitions rule.
 //
 // Source of truth for the shape (not for the verdict, which is the
-// question): CommonMark 4.3, setext headings. Manual sheet 25 has no
+// question): CommonMark 4.3, setext headings. Manual sheet 14 has no
 // setext fixture, so nothing in the sheets settles this.
 //
 // The assertion below is written for reading one, so it is red today.

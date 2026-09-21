@@ -13,7 +13,7 @@ import {
 // Scenario: the SAME footnote name defined TWICE - once in a definition
 // whose label follows a "%%" block comment's closer on its line
 // ("%% [^d]: first body" - a real definition, Jason's verification
-// 2026-09-15, sheet 18), and once in an ordinary column-0 definition.
+// 2026-09-15, sheet 11), and once in an ordinary column-0 definition.
 //
 // What the user sees: Obsidian renders only the LAST definition of a name
 // (ground truth recorded in merge-duplicate-definitions.ts: "Every earlier
@@ -39,7 +39,7 @@ import {
 // Source of truth: ADR 0002 ("every content-destroying fix is surfaced as a
 // lint alert instead... duplicate definitions alert rather than merge") +
 // the recorded ground truth that a closer-line label defines its footnote
-// (bug-aftercloser-orphan-silent's own header) + sheet 23's duplicate
+// (bug-aftercloser-orphan-silent's own header) + former sheet 23's duplicate
 // section ("an alert says [^dup] is defined more than once"). The
 // documented carve-out for BLOCKQUOTED duplicates (C22: merging would need
 // quote-marker-aware continuations) does not cover the closer line, which

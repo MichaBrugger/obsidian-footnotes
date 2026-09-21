@@ -15,11 +15,11 @@ import { messages, resetNotices } from "../helpers/notices";
 // lazy", pinned 2026-09-16), or the visible tail after a comment block's
 // closer that a continuation line of the block opened ("[^1]: body <!-- c"
 // then "--> tail" - the tail after the closer is live paragraph text,
-// sheet 18). buildDefinitionAppend's "after the last definition block"
+// sheet 11). buildDefinitionAppend's "after the last definition block"
 // branch adds a separator only when the line BELOW the insertion point has
 // content; it never looks at the line the block ends on. So the new
 // "[^2]: " label lands directly under a paragraph line, and by the
-// plugin's own prose-label rule (sheet 25, pinned) such a label is lazy
+// plugin's own prose-label rule (sheet 14, pinned) such a label is lazy
 // paragraph text, not a definition.
 //
 // Two user-visible failures from one root cause:
@@ -42,10 +42,10 @@ import { messages, resetNotices } from "../helpers/notices";
 // block whose last line reads as paragraph text, and then both presses
 // behave as on any other note.
 //
-// Source of truth: sheet 25 (a label directly under a paragraph line is
+// Source of truth: sheet 14 (a label directly under a paragraph line is
 // plain text) + the pinned lazy-continuation ruling (the tail belongs to
 // the block, so the join after it is the only place a blank can go) +
-// sheet 18 (text after a comment block's closer is live paragraph text) +
+// sheet 11 (text after a comment block's closer is live paragraph text) +
 // ADR 0002 (never silent).
 //
 // Settings involved: defaults with `Lint on footnote creation` off (the

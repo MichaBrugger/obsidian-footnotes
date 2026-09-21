@@ -21,7 +21,7 @@ import { lazyDefinitionLabelNames } from "../../src/linting/rules/remove-orphane
 // treats the bare "-" as an open paragraph (its walk falls through to open =
 // "paragraph" for any non-blank, non-block line, and a lone "-" is neither a
 // heading, a rule, nor a setext underline without a paragraph above), so the
-// label under it lands in the prose-label rule (manual sheet 25: "a label
+// label under it lands in the prose-label rule (manual sheet 14: "a label
 // directly under a line of prose (paragraph text, a list item, a quote
 // line, ...) is lazy"). The scan's own block walker disagrees in spirit: it
 // opens a LIST ITEM container on the bare "-" (listStack gains the item's

@@ -90,7 +90,7 @@ describe("spec question: definition labels inside CommonMark HTML blocks", () =>
 
     it("control: the plugin already reads the type-2 comment block like micromark", () => {
         // a label UNDER a closed comment line is a definition in both
-        // readings (sheet 18)
+        // readings (sheet 11)
         expect(verdict("<!-- c -->\n[^1]: x").starts[1]).toBe(true);
     });
 

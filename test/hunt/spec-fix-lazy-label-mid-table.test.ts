@@ -41,7 +41,7 @@ import { fixLazyDefinitions } from "../../src/linting/rules/fix-lazy-definitions
 // move-to-bottom).
 //
 // Source of truth: the GFM spec, "Tables (extension)", for the break on a
-// blank line; manual sheet 25, whose only table fixture puts the label
+// blank line; manual sheet 14, whose only table fixture puts the label
 // under the LAST row of the table, where the inserted blank line falls
 // after the table and costs nothing. Nothing in the sheets covers a label
 // above a row.
@@ -92,7 +92,7 @@ describe("a label under a table row that is not the last", () => {
     });
 });
 
-describe("the boundary: sheet 25's fixture, the label under the LAST row", () => {
+describe("the boundary: sheet 14's fixture, the label under the LAST row", () => {
     const LAST_ROW = ["| a | b |", "| - | - |", "| c | d |", "[^1]: x", "", "ref[^1]"].join("\n");
 
     it("the label is a definition, so the fix rule leaves the note alone", () => {
