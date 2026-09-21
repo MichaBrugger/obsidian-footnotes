@@ -745,7 +745,7 @@
 <section data-layer="plumbing">
 <div class="prose">
 <h2><sup>5</sup>Plumbing: main.ts, settings, and the danger zone</h2>
-<p><code>main.ts</code> is the only file Obsidian loads. On load it registers the seven commands and six hand-drawn icons, installs the save hook and the vim hook, registers the undo-orphan extension, wires the right-click rename entry, and runs settings migrations. On unload it puts everything back.</p>
+<p><code>main.ts</code> is the only file Obsidian loads. On load it registers the eight commands and seven icons (six hand-drawn, one placeholder for the delete command until its own arrives), installs the save hook and the vim hook, registers the undo-orphan extension, wires the right-click rename and delete entries, and runs settings migrations. On unload it puts everything back.</p>
 <p><code>settings.ts</code> holds the settings interface, the defaults, and the settings tab, written against the declarative settings API in Obsidian 1.13. The migrations live in <code>main.ts</code>: version 1 renamed every <code>tidy*</code> key to <code>lint*</code> when the feature was renamed, and version 2 flipped the polarity of the orphan-definition toggle. Loading also type-checks every saved key against the defaults and drops mismatches, so a hand-edited <code>"no"</code> cannot be read as true.</p>
 <p><span class="dot l-editor"></span><code>editor/obsidian-internals.ts</code> is the deliberate quarantine for everything undocumented: the raw CodeMirror view behind the editor, the embed registry the popup hijacks, the property type manager, the hotkey manager (so the name modal can read your real key bindings), vim's internal state (so Escape in the popup can tell insert mode from normal mode), and the command executor. Every access is optional-chained so a future Obsidian release degrades a feature rather than crashing the plugin. Anything that touches this file is smoke-test territory, not unit-test territory, because a mocked test would only encode the plugin's own assumptions.</p>
 </div>
@@ -760,7 +760,7 @@
   <div class="layer t1"><span class="k">1</span><span class="t">Unit and property tests</span><span class="c">npm test · 397 files</span><span class="d">88 feature specs and spec rulings, 23 files pinning what the retired manual sheets used to ask for, and 286 bug pins under <span class="mono">test/hunt/</span>. Plus the properties: random documents are generated, linted, and checked for invariants like "no NUL leaks", "protected text is byte-identical", and a differential oracle that parses each document with an independent Markdown parser before and after and demands the same footnote structure. When a property finds a bug, the shrunk counterexample becomes a permanent pin in <span class="mono">test/hunt/</span>.</span></div>
   <div class="layer t2"><span class="k">2</span><span class="t">Static analysis</span><span class="c">npm run lint · npm run knip</span><span class="d">Type-aware ESLint with the official plugin guidelines, and knip for dead exports and unused dependencies, kept at zero findings.</span></div>
   <div class="layer t3"><span class="k">3</span><span class="t">Mutation testing</span><span class="c">npm run mutation</span><span class="d">Stryker makes small deliberate breakages in the pure modules (all of parsing and linting, the non-DOM parts of the rest) and checks that some test fails. A surviving mutant is a logic change nobody would notice. Local only, before a release; it needs its own slower vitest config because per-mutant bookkeeping breaks under shared workers.</span></div>
-  <div class="layer t4"><span class="k">4</span><span class="t">Smoke tests</span><span class="c">npm run test:smoke · 2,641-line script</span><span class="d">Drives the real plugin inside the real app through the Obsidian CLI: deploys the build, makes a scratch note, moves the caret, fires commands, reads the editor back. The only layer that can catch Obsidian changing under the plugin, so the popup and table cells live here.</span></div>
+  <div class="layer t4"><span class="k">4</span><span class="t">Smoke tests</span><span class="c">npm run test:smoke · 2,700-line script</span><span class="d">Drives the real plugin inside the real app through the Obsidian CLI: deploys the build, makes a scratch note, moves the caret, fires commands, reads the editor back. The only layer that can catch Obsidian changing under the plugin, so the popup and table cells live here.</span></div>
   <div class="layer t5"><span class="k">5</span><span class="t">Manual sheets</span><span class="c">manual-tests/ · 24 sheets</span><span class="d">Theme sheets run as live notes for rendering, popups, and feel; mirrored into the sandbox vault's "Footnote Tests" folder. Two more sheets in <span class="mono">compat-tests/</span> check coexistence with other footnote plugins.</span></div>
 </div>
 <div class="prose">
@@ -772,7 +772,7 @@
 <h3>Things that look like duplicates but are not</h3>
 <ul>
   <li><strong>One README.</strong> The 0.2.0 rewrite replaced the 0.1.3 <code>README.md</code> on 2026-09-11; every GIF and still in <code>README/</code> is recorded by <code>scripts/readme-gifs/record.mjs</code>.</li>
-  <li><strong>Three manifests.</strong> <code>manifest.json</code> is the shipped 0.1.3, <code>manifest-beta.json</code> is the in-flight beta (0.2.0-beta.16 as of 2026-09-11), and <code>versions.json</code> maps each release to the minimum Obsidian version, which Obsidian's installer requires.</li>
+  <li><strong>Three manifests.</strong> <code>manifest.json</code> is the shipped 0.2.0, <code>manifest-beta.json</code> is the in-flight beta (0.2.1-beta.1 as of 2026-09-21), and <code>versions.json</code> maps each release to the minimum Obsidian version, which Obsidian's installer requires.</li>
   <li><strong>Two vitest configs.</strong> The fast one shares workers; the Stryker one isolates per file because mutation coverage tracking needs it.</li>
 </ul>
 </div>
@@ -781,7 +781,7 @@
 <section>
 <div class="prose">
 <h2><sup>7</sup>Where the complexity actually comes from</h2>
-<p>It is fair to ask whether ten thousand lines is too many for footnotes. Here is an honest accounting of what the lines are paying for.</p>
+<p>It is fair to ask whether sixteen thousand lines is too many for footnotes. Here is an honest accounting of what the lines are paying for.</p>
 <ul>
   <li><strong>Obsidian's Markdown has terrain.</strong> Code, math, both kinds of comment, frontmatter, blockquotes, lists, tables, lazy labels, setext headings. Each one is a rule in the scanner, and each rule interacts with the others (a fence inside a blockquote closes when the quote ends). The parsing folder alone is a sixth of the plugin by lines, and every layer above it carries guards for the same terrain.</li>
   <li><strong>The plugin promises never to eat your text.</strong> That promise is why every insertion is rehearsed first, why lint refuses edits that would reclassify a line, why destructive rules are off and alert instead, and why selection conversion has more refusals than conversions.</li>
