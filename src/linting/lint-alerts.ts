@@ -189,7 +189,8 @@ function noticeLazyDefinitions(lines: string[], scan: DocumentScan, masked: stri
 // heading. Either way the blank line that helps is the one BETWEEN the
 // label and the underline, so these labels get their own alert and are
 // left out of the lazy one and its fix (Kimi hunt cycle 3, probed in
-// Reading view 2026-09-16). Never silent, like every alert.
+// Reading view 2026-09-16). Never silent, like every alert. Jason
+// approved the wording on 2026-09-20.
 function noticeUnderlinedDefinitions(lines: string[], scan: DocumentScan, masked: string[], starts: boolean[]) {
     const names = underlinedDefinitionLabelNames(lines, scan, masked, starts);
     if (names.length === 0) return;
