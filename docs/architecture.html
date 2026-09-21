@@ -484,31 +484,31 @@
   </div>
   <div class="gap"><span>loads</span></div>
   <div class="band l-plumbing">
-    <div><span class="name">plumbing</span><span class="count">main.ts + settings.ts · 2 files · 678 lines</span></div>
-    <div class="what">Registers the 7 commands and 6 icons, loads and migrates settings, installs the save hook and the vim hook, and puts it all back on unload.</div>
+    <div><span class="name">plumbing</span><span class="count">main.ts + settings.ts · 2 files · 714 lines</span></div>
+    <div class="what">Registers the 8 commands and 7 icons, loads and migrates settings, installs the save hook and the vim hook, and puts it all back on unload.</div>
     <div class="uses"><span class="lbl">leans on</span><span class="chip l-commands">commands</span><span class="chip l-linting">linting</span><span class="chip l-editor">editor</span><span class="chip l-parsing">parsing</span></div>
   </div>
   <div class="gap"><span>calls</span></div>
   <div class="band l-commands">
-    <div><span class="name">commands/</span><span class="count">13 files · 5,290 lines</span></div>
-    <div class="what">The press: claims, guards, jumps, create, the popup, rename, the prefix modal. Everything you can trigger from a key.</div>
+    <div><span class="name">commands/</span><span class="count">14 files · 5,998 lines</span></div>
+    <div class="what">The press: claims, guards, jumps, create, the popup, rename, delete, the prefix modal. Everything you can trigger from a key.</div>
     <div class="uses"><span class="lbl">leans on</span><span class="chip l-linting">linting</span><span class="chip l-editor">editor</span><span class="chip l-parsing">parsing</span></div>
   </div>
   <div class="gap"><span>calls (one function: lint right after creating a footnote)</span></div>
   <div class="band l-linting">
-    <div><span class="name">linting/</span><span class="count">14 files · 3,030 lines</span></div>
+    <div><span class="name">linting/</span><span class="count">14 files · 3,726 lines</span></div>
     <div class="what">The 8 rules, the pipeline that runs them in order, the shared rewrite engine (with its scan memo), the shared rename engine, and the alerts.</div>
     <div class="uses"><span class="lbl">leans on</span><span class="chip l-editor">editor</span><span class="chip l-parsing">parsing</span></div>
   </div>
   <div class="gap"><span>calls</span></div>
   <div class="band l-editor">
-    <div><span class="name">editor/</span><span class="count">8 files · 1,760 lines</span></div>
+    <div><span class="name">editor/</span><span class="count">9 files · 1,976 lines</span></div>
     <div class="what">Helpers between the note and the live editor: DocContext, caret motion, table cells, the insertion rehearsal, the line diff that writes a lint back, notices, and the quarantine for undocumented Obsidian internals.</div>
     <div class="uses"><span class="lbl">leans on</span><span class="chip l-parsing">parsing</span></div>
   </div>
   <div class="gap"><span>calls</span></div>
   <div class="band l-parsing">
-    <div><span class="name">parsing/</span><span class="count">3 files · 2,070 lines</span></div>
+    <div><span class="name">parsing/</span><span class="count">4 files · 4,077 lines</span></div>
     <div class="what">The scanner, the masked twin, the footnote grammar, the prefix reader. Pure text in, facts out. The scanner itself imports nothing.</div>
     <div class="uses"><span class="lbl">leans on</span><span class="chip l-obsidian">nothing</span></div>
   </div>
@@ -516,7 +516,7 @@
 <p class="figcaption"><b>Figure 1.</b> Each band lists the layers it imports from, taken from the real import statements. Reading top to bottom, every "leans on" chip points further down the stack. Small exceptions are noted below.</p>
 </div>
 <div class="prose">
-<p>The biggest file in the plugin, <code>parsing/markdown-scan.ts</code> at 1,579 lines, imports <strong>nothing at all</strong>. It is pure text logic: give it lines, get back facts about those lines. That is why it can be tested thousands of times per second without Obsidian running, and why the mutation tester can chew on it.</p>
+<p>The biggest file in the plugin, <code>parsing/markdown-scan.ts</code> at 3,405 lines, imports <strong>nothing at all</strong>. It is pure text logic: give it lines, get back facts about those lines. That is why it can be tested thousands of times per second without Obsidian running, and why the mutation tester can chew on it.</p>
 <p>A few imports do point the wrong way, and they are worth knowing about because they are where the layers leak. The prefix reader in parsing imports the notice helper and the plugin class. The linter imports the popup and navigation from commands, because lint on save has to close an open popup first. The lint alerts import the inline-footnote helper. None of these is a bug, but each one is a reason the "parsing is pure" claim is true of the scanner and grammar, not the whole folder.</p>
 </div>
 </section>
@@ -562,7 +562,7 @@
 <section data-layer="commands">
 <div class="prose">
 <h2><sup>3</sup>Commands: what happens when you press the key</h2>
-<p>Obsidian sees seven commands. Four of them share one piece of machinery, the <strong>cascade</strong>, and that machinery is most of the commands folder.</p>
+<p>Obsidian sees eight commands. Four of them share one piece of machinery, the <strong>cascade</strong>, and that machinery is most of the commands folder.</p>
 </div>
 <div class="table-wrap">
 <table>
@@ -572,6 +572,7 @@
   <tr><td>Insert inline footnote</td><td>Plants <code>^[ ]</code> with the caret inside. Pressing again inside a filled one hops out.</td><td><span class="dot l-commands"></span><span class="mono">inline-footnotes.ts</span></td></tr>
   <tr><td>Insert inline footnote from clipboard</td><td>Same, with the clipboard as the body. Every guard runs before the clipboard is read.</td><td><span class="dot l-commands"></span><span class="mono">inline-footnotes.ts</span></td></tr>
   <tr><td>Rename footnote</td><td>Dialog to rename the footnote under the caret everywhere at once. Also in the right-click menu on the desktop. On a phone, where Obsidian owns the long-press menu, long-press to select the name and then use the toolbar icon or the command palette.</td><td><span class="dot l-commands"></span><span class="mono">rename-footnote.ts</span></td></tr>
+  <tr><td>Delete footnote definition and all references</td><td>Removes the footnote under the caret everywhere: its definition and every reference to it, in one transaction. Obsidian's own right-click delete removes only the clicked reference. Also in the right-click menu and, on a phone, the toolbar icon.</td><td><span class="dot l-commands"></span><span class="mono">delete-footnote.ts</span></td></tr>
   <tr><td>Set footnote prefix</td><td>Modal that writes the <code>footnote-prefix</code> property. Works in Reading view too.</td><td><span class="dot l-commands"></span><span class="mono">set-footnote-prefix.ts</span></td></tr>
   <tr><td>Lint footnotes</td><td>Runs the whole cleanup pipeline (section 4).</td><td><span class="dot l-linting"></span><span class="mono">linting/linter.ts</span></td></tr>
 </table>
@@ -753,10 +754,10 @@
 <section data-layer="scaffold">
 <div class="prose">
 <h2><sup>6</sup>The scaffold: five ways of checking</h2>
-<p>This is where most of the file count lives, and why the repo feels much larger than a 10,000-line plugin. Each layer catches a different kind of mistake, and each is coloured here by the part of the plugin it mostly protects.</p>
+<p>This is where most of the file count lives, and why the repo feels much larger than a 16,000-line plugin. Each layer catches a different kind of mistake, and each is coloured here by the part of the plugin it mostly protects.</p>
 </div>
 <div class="layers">
-  <div class="layer t1"><span class="k">1</span><span class="t">Unit and property tests</span><span class="c">npm test · 172 files</span><span class="d">80 feature specs, 77 bug pins, 12 spec rulings, 2 timing pins. Plus the properties: random documents are generated, linted, and checked for invariants like "no NUL leaks", "protected text is byte-identical", and a differential oracle that parses each document with an independent Markdown parser before and after and demands the same footnote structure. When a property finds a bug, the shrunk counterexample becomes a permanent pin in <span class="mono">test/hunt/</span>.</span></div>
+  <div class="layer t1"><span class="k">1</span><span class="t">Unit and property tests</span><span class="c">npm test · 397 files</span><span class="d">88 feature specs and spec rulings, 23 files pinning what the retired manual sheets used to ask for, and 286 bug pins under <span class="mono">test/hunt/</span>. Plus the properties: random documents are generated, linted, and checked for invariants like "no NUL leaks", "protected text is byte-identical", and a differential oracle that parses each document with an independent Markdown parser before and after and demands the same footnote structure. When a property finds a bug, the shrunk counterexample becomes a permanent pin in <span class="mono">test/hunt/</span>.</span></div>
   <div class="layer t2"><span class="k">2</span><span class="t">Static analysis</span><span class="c">npm run lint · npm run knip</span><span class="d">Type-aware ESLint with the official plugin guidelines, and knip for dead exports and unused dependencies, kept at zero findings.</span></div>
   <div class="layer t3"><span class="k">3</span><span class="t">Mutation testing</span><span class="c">npm run mutation</span><span class="d">Stryker makes small deliberate breakages in the pure modules (all of parsing and linting, the non-DOM parts of the rest) and checks that some test fails. A surviving mutant is a logic change nobody would notice. Local only, before a release; it needs its own slower vitest config because per-mutant bookkeeping breaks under shared workers.</span></div>
   <div class="layer t4"><span class="k">4</span><span class="t">Smoke tests</span><span class="c">npm run test:smoke · 2,641-line script</span><span class="d">Drives the real plugin inside the real app through the Obsidian CLI: deploys the build, makes a scratch note, moves the caret, fires commands, reads the editor back. The only layer that can catch Obsidian changing under the plugin, so the popup and table cells live here.</span></div>
@@ -765,7 +766,7 @@
 <div class="prose">
 <p>Continuous integration on GitHub runs only layers 1 and 2 plus the build. The rest is a pre-release ritual you run by hand.</p>
 
-<h3>Why there are 77 bug files</h3>
+<h3>Why there are 286 bug files</h3>
 <p>The standing rule is that every bug found gets a failing test before it is fixed, and the test stays forever as a regression pin. That many pins means that many bugs were found and fixed that way, most of them by the adversarial hunts and the property suite. They are not clutter you need to read; they are a ratchet. Delete one and the bug it pins can come back unnoticed.</p>
 
 <h3>Things that look like duplicates but are not</h3>
@@ -806,7 +807,7 @@
   <tr><td>Lint changed something it should not have, or left something alone</td><td class="open"><span class="mono"><span class="dot l-linting"></span>linting/linter.ts</span> for order and triggers<span class="mono"><span class="dot l-linting"></span>linting/rules/&lt;the rule&gt;.ts</span><span class="mono"><span class="dot l-linting"></span>linting/lint-alerts.ts</span></td><td><span class="mono">test/rule-examples.test.ts</span> runs every rule's worked examples</td></tr>
   <tr><td>The popup will not open or behaves oddly</td><td class="open"><span class="mono"><span class="dot l-commands"></span>commands/footnote-popup.ts</span><span class="mono"><span class="dot l-commands"></span>commands/popup-retry.ts</span><span class="mono"><span class="dot l-editor"></span>editor/obsidian-internals.ts</span></td><td>Smoke tests only; unit tests cannot see this</td></tr>
   <tr><td>A lint unfolded a section or moved the caret</td><td class="open"><span class="mono"><span class="dot l-editor"></span>editor/document-diff.ts</span><span class="mono"><span class="dot l-linting"></span>linting/linter.ts</span> (the write-back)</td><td><span class="mono">test/document-diff.test.ts</span>, <span class="mono">test/fold-lines.test.ts</span>, then a live check: folds are Obsidian's</td></tr>
-  <tr><td>A dialog looks or behaves wrong, especially on the phone</td><td class="open"><span class="mono"><span class="dot l-commands"></span>commands/validated-text-modal.ts</span></td><td>Smoke tests; the phone by hand (sheet 24)</td></tr>
+  <tr><td>A dialog looks or behaves wrong, especially on the phone</td><td class="open"><span class="mono"><span class="dot l-commands"></span>commands/validated-text-modal.ts</span></td><td>Smoke tests; the phone by hand (sheet 13)</td></tr>
   <tr><td>Anything inside a table cell</td><td class="open"><span class="mono"><span class="dot l-editor"></span>editor/table-cursor.ts</span></td><td>Smoke tests</td></tr>
   <tr><td>A setting is missing, mis-migrated, or the tab looks wrong</td><td class="open"><span class="mono"><span class="dot l-plumbing"></span>settings.ts</span> for the tab<span class="mono"><span class="dot l-plumbing"></span>main.ts</span> for migrations</td><td>Unit tests for the migrations</td></tr>
   <tr><td>A word or a term is being used inconsistently</td><td class="open"><span class="mono"><span class="dot l-scaffold"></span>CONTEXT.md</span></td><td>It is the enforced vocabulary</td></tr>
@@ -835,16 +836,16 @@
     create-footnote.ts, definition-append.ts, navigation.ts, press-guards.ts
     selection-footnote.ts, multi-caret.ts, inline-footnotes.ts
     footnote-popup.ts, popup-retry.ts
-    rename-footnote.ts, set-footnote-prefix.ts, validated-text-modal.ts</span>
+    rename-footnote.ts, delete-footnote.ts, set-footnote-prefix.ts, validated-text-modal.ts</span>
 <span class="l-linting">  linting/                the cleanup
     linter.ts               order, triggers, the write-back
     rules/                  the eight rules
     lint-alerts.ts          the notices
     rewrite-document.ts     the shared rewrite engine and its scan memo
     rewrite-footnote-names.ts   the shared rename engine</span>
-<span class="l-scaffold">test/                     172 files: specs, hunt/ pins, properties, helpers
+<span class="l-scaffold">test/                     397 files: specs, hunt/ pins, properties, helpers
 scripts/smoke-test.mjs    drives the real app
-manual-tests/             24 sheets   ·   compat-tests/   2 sheets
+manual-tests/             15 sheets   ·   compat-tests/   2 sheets
 docs/adr/                 the two standing decisions
 CONTEXT.md                the vocabulary</span></code></pre>
 </div>
