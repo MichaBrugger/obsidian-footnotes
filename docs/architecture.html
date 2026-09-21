@@ -436,7 +436,7 @@
   <p class="eyebrow">Footnote Shortcut · plugin structure</p>
   <h1>What the plugin is made of, one layer at a time</h1>
   <p class="lede">Four layers of source code stacked so that each one only leans on the layer below it, wrapped in a testing scaffold that is bigger than the plugin itself. This page walks the stack from the bottom up.</p>
-  <p class="stamp">Claude: drafted 2026-09-09 from a read of the code and kept current through 2026-09-11 (version 0.2.0-beta.16, after the manual and phone passes). Terms follow CONTEXT.md: a <em>reference</em> is the <code>[^1]</code> in your text, a <em>definition</em> is the <code>[^1]: …</code> line that holds the note.</p>
+  <p class="stamp">Claude: drafted 2026-09-09 from a read of the code and kept current through 2026-09-21 (version 0.2.1-beta.1 plus the Delete footnote command; the counts are from the tree on that day). Terms follow CONTEXT.md: a <em>reference</em> is the <code>[^1]</code> in your text, a <em>definition</em> is the <code>[^1]: …</code> line that holds the note.</p>
   <div class="legend">
     <span>Colour key, used on every figure and heading:</span>
     <span class="chip l-parsing">parsing</span>
@@ -451,9 +451,9 @@
 </header>
 
 <div class="stats">
-  <div class="stat" style="--st: var(--commands)"><div class="n">40</div><div class="l">source files, 12,830 lines (about 40% of them comments)</div></div>
-  <div class="stat" style="--st: var(--scaffold)"><div class="n">172</div><div class="l">test files (77 of them are pinned bugs)</div></div>
-  <div class="stat" style="--st: var(--commands)"><div class="n">7</div><div class="l">commands you can bind to a key</div></div>
+  <div class="stat" style="--st: var(--commands)"><div class="n">43</div><div class="l">source files, 16,491 lines (about 40% of them comments)</div></div>
+  <div class="stat" style="--st: var(--scaffold)"><div class="n">397</div><div class="l">test files (286 of them are pinned bugs)</div></div>
+  <div class="stat" style="--st: var(--commands)"><div class="n">8</div><div class="l">commands you can bind to a key</div></div>
   <div class="stat" style="--st: var(--linting)"><div class="n">8</div><div class="l">lint rules, run in a fixed order</div></div>
 </div>
 
@@ -464,7 +464,7 @@
   <li class="f-parsing"><span><b>Parsing</b> reads your note once and tells everyone else what is real: which lines are protected (code, math, comments, frontmatter), which <code>[^x]:</code> lines are true definitions, and where each definition block starts and ends.</span></li>
   <li class="f-commands"><span><b>A press</b> of a hotkey falls down a fixed ladder of questions (is there a selection? several carets? is the caret already on a footnote?) and the first rung that applies handles it. Nothing is written until a rehearsal proves the new footnote would actually work.</span></li>
   <li class="f-linting"><span><b>Lint</b> is eight small text-in, text-out functions run in a fixed order inside one undo step. Anything lint refuses to fix on its own, it tells you about in a notice.</span></li>
-  <li class="f-scaffold"><span><b>Everything outside <code>src/</code></b> exists to prove those three sentences stay true after every change: unit tests, random-document properties, mutation testing, a script that drives the real app, and 24 manual sheets.</span></li>
+  <li class="f-scaffold"><span><b>Everything outside <code>src/</code></b> exists to prove those three sentences stay true after every change: unit tests, random-document properties, mutation testing, a script that drives the real app, and 15 manual sheets.</span></li>
 </ol>
 <p>If you remember only this list, you can find your way around. The rest of the page fills in each sentence.</p>
 </div>
