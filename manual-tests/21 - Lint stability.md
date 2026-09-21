@@ -1,14 +1,5 @@
-[^t1]: def
----
-text[^t1]
----
-prose after the second divider keeps the fixture honest.
-
 # 21: lint stability paranoia (2026-08-10)
 
-Settings: all lint rules ON; the second check needs `Lint on save` ON.
+Automated coverage: 2 former checks now live in test/sheet-21-lint-stability.test.ts and the smoke suite; run `npm test` and `npm run test:smoke` before this sheet.
 
-The fixture IS this note's top: the definition sits on the very first line with a `---` right below it, the exact shape that used to tempt the lint into minting frontmatter. Nothing to build by hand.
-
-- [ ] Lint moves the definition down WITHOUT turning the top of the note into frontmatter (no swallowed prose; a blank line appears above the first `---`)
-- [ ] With lint-on-save ON, saving twice in a row never rewrites the second time (no churn)
+Nothing on this sheet needs a human any more. Both checks were text outcomes of one lint on a five-line fixture and are pinned by `test/sheet-21-lint-stability.test.ts`, which also records one disagreement for you to rule on: since the setext ruling of 2026-09-16, a definition with a `---` right under it is a heading to Obsidian, so the lint now leaves it alone and the underlined-definition alert speaks instead of the definition being moved down.

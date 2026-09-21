@@ -15,10 +15,11 @@ import type { DocumentScan } from "./markdown-scan";
 // alone (reindex) or refuse (the rename command). Modelling these
 // definitions everywhere (option a) waits until more such cases turn up.
 
-/** A footnote label found inside a list item: the line it sits on and its name as written. */
+/** A footnote label found inside a list item: the line it sits on, its name as written, and where the label (through its colon) ends on that line. */
 export interface InItemLabel {
     line: number;
     name: string;
+    labelEnd: number;
 }
 
 // a list marker with its content after it: up to three spaces of indent,
@@ -71,14 +72,14 @@ export function inItemDefinitionLabels(
             // label at the start of what it is given, so the marker is
             // cut off the raw line and its masked twin alike
             const hit = definitionLabelWithName(line.slice(marker[0].length), masked[i].slice(marker[0].length));
-            if (hit && !starts[i]) out.push({ line: i, name: hit.name });
+            if (hit && !starts[i]) out.push({ line: i, name: hit.name, labelEnd: marker[0].length + hit.label.labelEnd });
             open.push(column);
             continue;
         }
         if (open.length === 0 || starts[i] || width < 4) continue;
         const lead = line.length - line.trimStart().length;
         const hit = definitionLabelWithName(line.slice(lead), masked[i].slice(lead));
-        if (hit) out.push({ line: i, name: hit.name });
+        if (hit) out.push({ line: i, name: hit.name, labelEnd: lead + hit.label.labelEnd });
     }
     return out;
 }

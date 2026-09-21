@@ -1,3 +1,4 @@
+import { inItemDefinitionLabels } from "../../parsing/list-item-definitions";
 import { referenceOccurrences } from "../../parsing/footnote-grammar";
 import { ClosingMarkChars, definitionLabelIn, referenceLandingAfter, TrailingPunctuationChars } from "../../parsing/markdown-scan";
 import { rewriteDocument } from "../rewrite-document";
@@ -120,7 +121,15 @@ export function footnoteAfterPunctuation(markdown: string): string {
     // a comment opens or closes, the part inside the comment is blanked
     // while the part outside it still gets the swap
     // (bug-comment-boundary-lines).
-    return rewriteDocument(markdown, (_text, { lines, scan, maskedLines }) => {
+    return rewriteDocument(markdown, (_text, { lines, scan, maskedLines, definitionStarts }) => {
+        // a definition inside a list item ("- [^la]: text") has a label the
+        // margin reader does not see; the swap used to hop that label's
+        // reference over its own colon and destroy the definition (found
+        // by the sheet 23 tests, 2026-09-20; Jason's ruling 1 keeps such
+        // definitions as they are)
+        const inItemLabelEnds = new Map(
+            inItemDefinitionLabels(lines, scan, maskedLines, definitionStarts).map((hit) => [hit.line, hit.labelEnd]),
+        );
 
         const result = lines.map((line, i) => {
             if (scan.isProtected[i]) return line;
@@ -134,7 +143,7 @@ export function footnoteAfterPunctuation(markdown: string): string {
             // the label reader sees, so it is stepped over first (the old
             // colon guard happened to cover it; spec-bom-before-line-zero-label)
             const bom = line.startsWith("\ufeff") ? 1 : 0;
-            const prefixLength = bom + (definitionLabelIn(line.slice(bom))?.labelEnd ?? 0);
+            const prefixLength = inItemLabelEnds.get(i) ?? bom + (definitionLabelIn(line.slice(bom))?.labelEnd ?? 0);
             return (
                 line.slice(0, prefixLength) +
                 swapInSegment(

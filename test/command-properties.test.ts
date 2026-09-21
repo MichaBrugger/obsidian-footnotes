@@ -963,7 +963,14 @@ describe("creation-command invariants over random documents", () => {
                 // only a fresh creation adds exactly a reference and its label
                 if (rawShapeCount(doc.lines) !== shapesBefore + 2) return;
                 const defsAfter = definitionNamesFolded(doc.lines);
-                const minted = [...defsAfter].find((name) => !defsBefore.has(name));
+                // the minted name is the one whose shape is NEW to the note:
+                // a press that fills the blank line under a definition can
+                // lawfully promote a lazy label further down into a
+                // definition (a label under a definition's lazy line is a
+                // definition), and that promoted name is not the minted one
+                // (found by the 5000-run soak, 2026-09-20)
+                const rawBefore = rawNamesFolded(lines);
+                const minted = [...defsAfter].find((name) => !defsBefore.has(name) && !rawBefore.has(name));
                 // the minted name is the next free number over the masked
                 // twin: dead text reserves nothing (the #41 rule)
                 expect(minted).toBe(String(computeNextFootnoteNumber(lines.join("\n"))));
@@ -1525,7 +1532,12 @@ describe("press definition-census invariants over random documents", () => {
                 const before = definitionNamesFolded(lines);
                 const doc = await press(lines, cursor, command, settings);
                 const after = definitionNamesFolded(doc.lines);
-                const added = [...after].filter((name) => !before.has(name));
+                // a name whose shape was already in the note and now reads
+                // as a definition was promoted by the press's edit (a lazy
+                // label under a filled-in blank line), exactly like typing
+                // would do it; only a name new to the note counts as added
+                const rawBefore = rawNamesFolded(lines);
+                const added = [...after].filter((name) => !before.has(name) && !rawBefore.has(name));
                 expect(
                     added.length,
                     `press added more than one definition: before ${[...before].sort().join()} after ${[...after].sort().join()}`,

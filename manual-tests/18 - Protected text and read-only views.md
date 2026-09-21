@@ -1,88 +1,20 @@
----
-decoy: this note's own frontmatter is the frontmatter fixture, mentions [^1], and must never be touched
----
 # 18: protected text and read-only views
+
+Automated coverage: 26 former checks now live in test/sheet-18-protected-text.test.ts and the smoke suite; run `npm test` and `npm run test:smoke` before this sheet.
 
 Settings: defaults; the lint half needs all lint rules ON. Undo between checks. Every fixture is already in this note.
 
-## Creation is blocked in protected text (rule 2026-08-12)
-
-Fixture for the two swallow-guard checks at the end (both are spots where the footnote IS inserted): pay $5 or $6 now, and a lone backslash \ right here.
-
-Always on, inline spans included. With the caret in each spot, EVERY insert hotkey (numbered, named, inline, paste) toasts "No footnote was created: footnotes can't go inside code, math, or other protected text." and changes nothing:
-
-- [ ] Inside the fenced code block below
-- [ ] Inside the `inline code span` on this line
-- [ ] Inside the `$$` math block below
-- [ ] Inside $x + y$ inline math
-- [ ] On this note's own frontmatter line at the top (source mode)
-- [ ] In LIVE PREVIEW, click into the `decoy` property's value field and press each insert hotkey: the same toast, and NO footnote appears at the spot you last clicked in the prose (the Properties widget sits outside the editor, so that stale caret used to get the footnote; fixed 2026-09-04)
-- [ ] From that same field, Rename footnote toasts "Place the cursor on a footnote reference or definition to rename it."
-- [ ] Just BEFORE the opening backtick of the span above, inserting works normally
-- [ ] Just AFTER its closing backtick, the same
-- [ ] Navigation is unaffected: the hotkey on the live reference swap me[^s1] further down still jumps
-- [ ] Caret between `$5 or ` and `$6` in the fixture line above: the reference is INSERTED, no toast (`$5 or [^n]$6` is not math: a closing dollar followed by a digit does not close math, ground truth 2026-09-11; the guard used to refuse this spot)
-- [ ] Caret right after the lone backslash in that same line: the footnote is inserted BEFORE the backslash
-
-```
-block me [^here]
-```
-
-$$
-E = mc^2
-$$
+Pinned by units and smoke, not repeated here: creation refused in code, math, comments and frontmatter by all four insert hotkeys; creation working again just outside a code span, at `$5 or [^n]$6`, and in front of a lone backslash; navigation unaffected by the guards; the Properties-widget refusal and its Rename message; the lint leaving every protected region byte-for-byte while the live references swap; the numbered command reserving nothing from a protected shape; the presses and the lint over the `%%` fixture below, orphan deletion included; the wrapped code span's numbering and alerts; and the refusals in front of a quote marker and on a setext underline.
 
 ## Reading view (fixed 2026-08-08)
 
 Switch this note to Reading view:
 
-- [ ] Pressing any footnote hotkey does nothing: no toast, and flipping back to editing view shows NO stray `[^]` or `^[]` anywhere (presses used to edit the hidden buffer invisibly)
 - [ ] The footnote commands are missing from the command palette while in Reading view; **Set footnote prefix** stays available (a frontmatter edit is fine there)
-
-## Lint and the numbered command leave protected regions alone
-
-Run **Lint footnotes** once, check, undo.
-
-Math inline $x[^9].$ stays, display too:
-
-$$
-[^8]: mathematical label
-y[^7]
-$$
-
-    indented code[^90] block, standalone
-
-Comment boundaries: live[^c1] <!-- hidden [^c2]
---> live again[^c3].
-
-(The short-form comment `<!-->` is deliberately NOT in this sheet: Reading view shows it as literal text and the plugin treats it as complete, both per CommonMark, but Live Preview's highlighter paints everything after it as one unclosed comment, which made this note display wrong, 2026-09-08. The short form is pinned by units instead.)
-
-> ```
-> quoted fence[^f1]
-
-- ```
-  listed fence[^f2]
-  ```
-
-Inline code fakes `[^88]` and `[^55]: nope`, an escaped literal \[^9], an inline footnote ^[^inline-content] here, and a quoted live ref:
-
-> quoted text[^q1] renumbers like any live text
-
-Real refs to lint: swap me[^s1].
-
-[^c1]: one
-[^c3]: three
-[^s1]: swap definition
-[^q1]: quoted-reference definition
-
-- [ ] Lint: everything inside the math, the indented block, the comment, BOTH fences, the inline-code fakes, the escape, the inline footnote, and this note's frontmatter decoy is byte-for-byte untouched; only `swap me[^s1].` swaps to `swap me.[^s1]`
-- [ ] The refs BEFORE the comment opener and AFTER its closer (`[^c1]`, `[^c3]`) are LIVE: they renumber/swap like normal text; the blockquoted `[^q1]` renumbers too
-- [ ] The quoted fence above ended when its blockquote did: this checklist text is live, not phantom code
-- [ ] The numbered command in the prose: none of `[^9]`, `[^8]`, `[^7]`, `[^90]`, `[^c2]`, `[^f1]`, `[^f2]`, `[^88]`, the escaped `[^9]`, or the inline `^[...]` content reserve numbers
 
 ## Obsidian `%%` comments (2026-09-09)
 
-Obsidian hides a `%%` comment but still parses it: a reference inside a comment is a real reference (it binds its definition and takes a number, though its own superscript is hidden), while a definition inside a `%%` block comment is dead. A `%%` at the start of a line with no second `%%` on that line opens a block comment through the next `%%` anywhere; a mid-line `%%` pairs only within its own line. The plugin matches this.
+Obsidian hides a `%%` comment but still parses it: a reference inside a comment is a real reference (it binds its definition and takes a number, though its own superscript is hidden), while a definition inside a `%%` block comment is dead. A `%%` at the start of a line with no second `%%` on that line opens a block comment through the next `%%` anywhere; a mid-line `%%` pairs only within its own line. The plugin matches this. This rendering is the ground truth the units are written against, so it is worth re-checking by eye.
 
 Hidden reference, live definition: november[^n1] here.
 %%
@@ -114,33 +46,3 @@ An HTML comment line is a block, uniform[^h1] here:
 [^3]: sierra
 
 - [ ] Reading view: `[^n1]`, `[^h1]`, `[^1]`, `[^3]` render as footnotes; the `n2`, `n3`, and `2` entries appear in the footnote list (each with a back-arrow) though no marker is visible for them; `sierra` shows as `[3]`, not `[2]`; `oscar[^o1]` renders as plain text; `tango[^p9]` renders as plain text and the `[^p9]:` line reads as prose
-- [ ] Hotkey inside the hidden `[^n2]` (Source mode or Live Preview): navigates to its definition (or opens the popup), exactly like a visible reference
-- [ ] **Lint footnotes** (defaults): the missing-definition alert names `o1` (its only definition is commented out); `[^p9]:` becomes a definition (a blank line above it, then gathered to the bottom with the others; `tango[^p9]` renders after that); `[^h1]:` gathers too (it was a definition all along); nothing is inserted or moved inside either `%%` block, and the commented `[^o1]:` line is untouched; the hidden `[^n2]`, `[^n3]`, `[^2]` references are left where they are and nothing renumbers (the hidden `[^2]` holds its number)
-- [ ] Undo, turn `Delete orphaned definitions` ON, lint again: the `n2`, `n3`, and `2` definitions SURVIVE (referenced from inside comments); undo and turn it back OFF
-
-## A code span that wraps across lines (2026-09-16, B30)
-
-Settings: defaults. Reading view renders a backtick run that opens on one line and closes on the next as ONE code span, so the reference inside it is dead text; Live Preview shows two half spans and a live-looking reference, and the plugin follows Reading view. Build this paragraph:
-
-```
-Use of a `code
-span[^7] that wraps` onto the next line.
-```
-
-- [ ] Caret at the end of the paragraph, press the numbered key: the new footnote is `[^1]`, not `[^8]` (the `[^7]` inside the span reserves no number)
-- [ ] Lint footnotes: no alert names `[^7]` as a reference with no definition
-- [ ] Add a blank line between the two lines: now `[^7]` is a live reference again, the next number is `[^8]`, and the lint alert names it
-
-## In front of a quote marker, and on a setext underline (rulings 4 and 5, 2026-09-20)
-
-Settings: defaults. Both spots refuse with the protected-text toast, the way the table delimiter row does: a reference written before a `>` would drop the line out of its quote, and one written into an underline would turn the heading above back into prose.
-
-> A quoted line.
-> Another quoted line.
-
-Setext heading
-==============
-
-- [ ] Caret at the very start of `Another quoted line` (before the `>`), numbered key: the toast, nothing inserted
-- [ ] Caret at the end of the `====` line, numbered key: the toast, nothing inserted
-- [ ] Caret after `> ` on the second quoted line: the footnote is inserted as usual and the line stays quoted

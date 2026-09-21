@@ -1,72 +1,26 @@
 # 05: navigation
 
-Settings: run once with `Edit footnotes in a popup` OFF (the classic jump) and once ON (the popup opens instead). Every fixture is already in this note.
+Automated coverage: 12 former checks now live in test/sheet-05-navigation.test.ts and the smoke suite; run `npm test` and `npm run test:smoke` before this sheet.
 
-Jump from this numbered reference[^1] and from this repeated one[^1]; jumping back from the definition lands on the FIRST use. Multi-digit[^12] works; so do a plain name[^plain], an uppercase name[^Chapter], a colon name[^arXiv:2026.0717], and a dotted name[^named-footnote.1].
+Settings: `Edit footnotes in a popup` OFF for the first check, ON for the second. Every fixture is already in this note. Undo between checks.
 
-- [ ] Popup OFF: inserting a footnote into this sentence jumps the caret to the new definition at the bottom
-- [ ] Reference to definition jump lands CENTERED, at the END of the definition text
-- [ ] Definition to reference jump returns to the FIRST use, centered
-- [ ] Caret in the body of the `[^1]:` definition at the bottom: the key JUMPS back to the reference (a jump, not a toast; the selection twin is sheet 06's nesting refusal)
-- [ ] The multi-line definition below lands the caret at the end of its LAST continuation line
-- [ ] Colon and uppercase names navigate to the right definition (popup ON: the popup is bound to it)
-- [ ] Callout: a press inside `[^cq]` below navigates to the definition INSIDE the callout, no duplicate minted at the bottom (2026-08-10); pressing on the callout's `[^cq]:` line jumps back
+Jump from this numbered reference[^1]; the filler below is what makes the scrolling matter.
 
-> [!note] A callout
-> body[^cq] here
->
-> [^cq]: callout definition
-
-## Orphan definitions (QOL 2026-08-07)
-
-Caret on the orphan definition at the very bottom, press any footnote hotkey:
-
-- [ ] "Nothing references this footnote" toast, caret stays, NOTHING inserted
-- [ ] Same on its indented continuation line
-
-## Duplicate definitions
-
-Obsidian renders only the LAST definition of a duplicated footnote (verified live 2026-08-12).
-
-- [ ] The hotkey on this reference dup here[^dup] jumps to the LAST `[^dup]:` definition, the one that renders
-- [ ] With `Edit footnotes in a popup` ON, the same press still JUMPS to the last definition instead of opening the popup (2026-09-09: Obsidian's own lookup hands the popup the FIRST definition, so a duplicated footnote skips the popup); turn the popup back OFF
-
-Filler so the jumps travel; scroll matters here.
+- [ ] Reference to definition: the jump lands the caret CENTERED in the window, not parked against the top or bottom edge (the other direction, definition back to reference, is already measured by the smoke suite)
 
 Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
 
 Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
 
 [^1]: the first numbered definition
-[^12]: multi-digit definition
-[^plain]: a plainly named definition
-[^Chapter]: uppercase names are stored lowercased internally; jumping and the popup both still work
-[^arXiv:2026.0717]: colons in names used to break jumping (issue #50)
-[^named-footnote.1]: dots are fine in names
-[^multiline]: this definition has continuation lines
-    the caret should land at the end
-    of this very last line, right here
-[^dup]: body
-[^dup]: another body
-
-A trailing use so the multi-line definition jumps: from me[^multiline].
-
-[^orphan]: no reference anywhere uses this definition, on purpose
-    its continuation line behaves the same way
 
 ## Definitions inside a list item (ruling 1, 2026-09-20)
 
-Settings: defaults. Reading view renders a footnote definition inside a list item, written right after the marker or indented to the item's margin. The plugin recognizes such definitions where ignoring them misfired (this hotkey, the orphan alert, the two renamers); it never moves them.
+Settings: defaults plus `Edit footnotes in a popup` ON. Reading view renders a footnote definition inside a list item; the plugin now navigates to one instead of appending a second definition, and Obsidian resolves the name for the popup itself, which is the half no test can watch.
 
 - [^la]: a definition written right after the list marker
 - item two
 
-- item three
+Uses: alpha[^la].
 
-    [^lb]: a definition indented to the item's margin (four spaces)
-
-Uses: alpha[^la] and bravo[^lb].
-
-- [ ] Caret in `alpha[^la]`, numbered key: the caret lands at the end of the marker line (with the popup on, the popup opens on that definition) and NO second definition is appended at the bottom
-- [ ] Caret in `bravo[^lb]`, numbered key: lands at the end of the indented line, nothing appended
-- [ ] Rename footnote with the caret on `alpha[^la]`: the modal refuses, saying the footnote is defined inside a list item
+- [ ] Caret in `alpha[^la]`, numbered key with the popup ON: the popup opens on THAT definition, showing its text, and nothing is appended at the bottom

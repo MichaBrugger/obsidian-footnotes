@@ -54,9 +54,11 @@ const labelsIn = (lines: string[]) => {
 
 describe("definitions inside list items: the reader", () => {
     it("finds a label right after the marker and one indented to the item's margin", () => {
+        // labelEnd is where the label's colon ends on its line: after
+        // "- [^la]:" and after "    [^lb]:"
         expect(labelsIn(NOTE)).toEqual([
-            { line: 0, name: "la" },
-            { line: 5, name: "lb" },
+            { line: 0, name: "la", labelEnd: 8 },
+            { line: 5, name: "lb", labelEnd: 10 },
         ]);
     });
 

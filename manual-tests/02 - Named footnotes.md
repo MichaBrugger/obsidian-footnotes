@@ -1,34 +1,11 @@
 # 02: named footnotes
 
+Automated coverage: 9 former checks now live in test/sheet-02-named-footnotes.test.ts and the smoke suite; run `npm test` and `npm run test:smoke` before this sheet.
+
 Settings: defaults, popup OFF. Undo between checks. Every fixture is already in this note.
 
 ## The two-step flow
 
-Insert into this sentence.
+Set the check up in this sentence: press the named hotkey, type `cite` between the brackets, then press the named hotkey again so the `[^cite]:` definition is created at the bottom.
 
-- [ ] Named hotkey inserts `[^]` with the caret inside the brackets
-- [ ] Type a name, press the hotkey again with the caret still inside: the `[^name]:` definition is created
-- [ ] Undo ONCE right after that: the definition goes and the typed reference stays, and the notice says the reference is still in the note WITHOUT promising that another undo removes it (2026-09-11; that sentence is reserved for table-cell creations, sheet 08, where the plugin itself split the creation into two undo steps)
-- [ ] Type a name, then press the NUMBERED hotkey by accident: it creates the definition exactly like the named key; nothing is nested into the brackets (parity fixed 2026-08-09)
-- [ ] Type a name with a space in it and press again: a toast warns that the name won't work as a footnote, no broken definition is created
-
-## Empty reference guard (QOL 2026-08-07)
-
-Fixture: an empty [^] reference sits in this sentence. Put the caret between its brackets.
-
-- [ ] The NAMED hotkey toasts "This footnote reference is empty. Type a name between the brackets." and the caret stays put
-- [ ] The NUMBERED, INLINE, and PASTE hotkeys show the same toast, nothing nests
-
-## Naming a selection (the name modal)
-
-Select `name me` in the next line and press the NAMED hotkey; the fixture footnote[^1] below is what the already-used check collides with.
-
-A sentence you can name me from, twice over.
-
-- [ ] In the modal, type `a[b`, then `a b`, then `a` + backtick + `b`, then `a#b`: each shows "Footnote names can't contain spaces, backticks, brackets, or "#"." inline and the modal stays open
-- [ ] Type `1` (already a footnote): ""[^1]" is already used by another footnote."
-- [ ] Named key on a selection, then edit the note behind the open modal and press Enter: "The note changed while naming the footnote. Reselect the text and try again."
-
-(An abandoned `[^]`'s lint alert is sheet 23's check.)
-
-[^1]: the fixture definition the modal collides with
+- [ ] Undo ONCE right after that: the definition goes and the typed reference stays, in ONE undo step (the notice's wording is pinned by a test; what needs your eyes is whether Obsidian's history really unwinds it this way)

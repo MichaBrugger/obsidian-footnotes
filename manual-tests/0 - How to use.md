@@ -2,6 +2,44 @@
 
 One sheet = one theme (2026-09-08 restructure: the 43 scenario sheets were too many and split single features across several files). Every sheet states the settings it needs, carries EVERY fixture it uses (no typing or pasting to set a check up), and expects an undo (Ctrl+Z) between checks. Default settings unless a sheet says otherwise.
 
+## 2026-09-20: the sheets hold only what needs a human
+
+Claude: the 304 checks of 2026-09-08 were pruned on 2026-09-20 to the 55 that need a person in the real app (how something looks, feels, or behaves in the live editor, or wording judged by taste). Everything else moved to the automated layers, with a `test/sheet-NN-*.test.ts` file per sheet pinning what the sheet used to ask for, or a scenario in `scripts/smoke-test.mjs`. Before a manual pass, run both layers and read their results as the first checks of every sheet:
+
+```
+npm test
+npm run test:smoke
+```
+
+The smoke suite drives the real plugin inside the running sandbox vault (Obsidian open, the hot-reload plugin on) and takes a few minutes. A sheet with no checkboxes left says so in two lines; keep it, so the numbering and the old-id map below stay valid.
+
+| Sheet | Human checks left |
+| --- | --- |
+| 01 | 0 |
+| 02 | 1 |
+| 03 | 0 |
+| 04 | 5 |
+| 05 | 2 |
+| 06 | 5 |
+| 07 | 13 |
+| 08 | 1 |
+| 09 | 0 |
+| 10 | 6 |
+| 11 | 0 |
+| 12 | 0 |
+| 13 | 0 |
+| 14 | 2 |
+| 15 | 1 |
+| 16 | 1 |
+| 17 | 0 |
+| 18 | 2 |
+| 20 | 0 |
+| 21 | 0 |
+| 22 | 5 |
+| 23 | 0 |
+| 24 | 9 |
+| 25 | 2 |
+
 | Sheet | Theme |
 | --- | --- |
 | 01 | Numbered footnotes: insertion basics, end-of-word on and off |

@@ -1,8 +1,10 @@
 # 25: definition labels directly after a prose line (2026-09-09)
 
-Settings: defaults (both Orphans toggles and `Merge duplicate definitions` OFF, `Fix definitions hidden by a missing blank line` ON), popup OFF. Every fixture is already in this note. The first three checks only read; undo after each lint.
+Automated coverage: 10 former checks now live in test/sheet-25-definition-labels-after-prose.test.ts and the smoke suite; run `npm test` and `npm run test:smoke` before this sheet.
 
-The rule (Obsidian's, matched by the plugin since 2026-09-09): a footnote definition cannot interrupt a paragraph. A `[^x]:` line directly under a prose line (paragraph text, a list item, a quote or callout body line, a table row) is lazy paragraph text and renders as plain `[^x]: ...` with no footnote. A label starts a definition only after a blank line (a bare `>` inside a quote counts), the note start, a heading, a closed fence, a callout's title line, or another definition. Ground truth: ten shapes in Reading view plus the callout/quote variants; micromark disagrees (its footnote definitions may interrupt a paragraph), so this is Obsidian's behavior on purpose.
+Settings: defaults. Nothing left on this sheet writes to the note, so there is nothing to undo; both checks only look at Reading view. Every fixture is already in this note.
+
+The rule (Obsidian's, matched by the plugin since 2026-09-09): a footnote definition cannot interrupt a paragraph. A `[^x]:` line directly under a prose line (paragraph text, a list item, a quote or callout body line, a table row) is lazy paragraph text and renders as plain `[^x]: ...` with no footnote. A label starts a definition only after a blank line (a bare `>` inside a quote counts), the note start, a heading, a closed fence, a callout's title line, or another definition. Ground truth: ten shapes in Reading view plus the callout/quote variants; micromark disagrees (its footnote definitions may interrupt a paragraph), so this is Obsidian's behavior on purpose. Everything the plugin does about it (the presses, the rename, the lint with the fix toggle on and off, and the seven-label alert) is pinned in the unit tests; what is left here is what Obsidian itself paints, because that is what the rule copies.
 
 ## Fixtures (label directly under prose, no blank line: prose to Obsidian)
 
@@ -64,22 +66,3 @@ Comment lines live on sheet 18: a comment-only `%% c %%` line is a paragraph lin
 
 - [ ] `[^p1]`, `[^p2]`, `[^l1]`, `[^q1]`, `[^cb]`, `[^d1]`, `[^d2]`: the reference renders as plain text (no superscript) and the label line reads as prose; NO entry at the bottom
 - [ ] The five controls render as real footnotes: superscript references, entries at the bottom
-
-## The plugin agrees
-
-- [ ] Hotkey inside `[^p1]` (and any of the seven prose fixtures): the reference has no definition, so the press APPENDS a real `[^p1]:` definition at the bottom (the note then holds the lazy label AND a real definition; undo it); it never jumps to the label line
-- [ ] Hotkey on the `[^p1]:` line: a plain insert as well; Rename footnote with the caret inside that line's `[^p1]`: it RENAMES (a lazy label's own `[^p1]` is a live reference), so the label line and the alpha reference change together; undo
-- [ ] Hotkey inside `[^c1]` through `[^c5]`: navigates to the definition (or opens the popup); on their label lines it jumps back to the reference
-- [ ] **Lint footnotes** (the fix toggle ON, its default): every one of the seven prose fixtures gets the line it was missing, six lines in all (a blank above `[^p1]:`, `[^p2]:`, `[^l1]:`, `[^q1]:`, `[^d2]:`; a bare `>` above `> [^cb]:` inside the callout; `[^d1]:` needs nothing once `[^d2]:` above it is a definition); the six column-0 ones then gather at the bottom together with the three column-0 controls, `[^cb]` stays inside its callout, `[^c4]` and `[^c5]` stay put (quoted definitions are never moved); NO lazy-definition alert; Reading view now renders all twelve as footnotes
-- [ ] Lint again without undoing: "No linting needed."
-- [ ] Undo, turn `Move definitions to existing footnote section heading, or to bottom` OFF, lint: the seven labels stay where they are, each one line further down; undo and turn it back ON
-
-## With the fix toggle OFF (the alert)
-
-Turn `Fix definitions hidden by a missing blank line` OFF for this section and back ON at the end.
-
-- [ ] **Lint footnotes**: the seven prose fixtures stay exactly where they are; ONE alert names all seven labels: `This note has 7 footnote definitions that Obsidian reads as plain text because there is no blank line above them ("[^p1]:", "[^p2]:", "[^l1]:", "[^q1]:", "[^cb]:", "[^d2]:", "[^d1]:"). Add a blank line above each.` (label order = first appearance; the message sits in a code span here so the lint cannot rewrite its quoted labels, as on sheet 19); the missing-definition alert does NOT list them; the three column-0 controls gather at the bottom as usual, while `[^c4]` and `[^c5]` stay inside their callout and quote (quoted definitions are never moved)
-- [ ] Undo, turn `Delete orphaned references` ON, lint again: the seven references SURVIVE (a reference pointing at a lazy label is not an orphan; the same alert repeats), the label lines stay untouched, the controls are unaffected; turn it back OFF
-- [ ] Add a blank line above `[^p1]: after a paragraph` by hand and lint: `p1` leaves the alert, its definition gathers at the bottom, and the reference renders
-- [ ] Undo. Put the caret at the end of `> callout body` above and press the numbered hotkey: the new definition lands at the bottom under a blank line (never glued to the line above it), and Reading view shows it as a footnote
-- [ ] Turn `Fix definitions hidden by a missing blank line` back ON

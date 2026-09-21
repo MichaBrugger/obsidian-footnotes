@@ -1,8 +1,10 @@
 # 07: selection conversion across every block type (2026-08-19)
 
+Automated coverage: 6 former checks now live in test/sheet-07-*.test.ts and the smoke suite; run `npm test` and `npm run test:smoke` before this sheet.
+
 Settings: defaults, popup OFF for the text checks (turn it ON for the popup pass at the end). Work in source mode for the table fixture: live preview's table widget fights multi-line drags. Every fixture is already in this note (the wikilinked image lives in the vault's Attachments folder).
 
-Every fixture: select from the prose line ABOVE the block through the prose line BELOW it (the block travels WHOLE), press the key, then check the text AND how the footnote renders (Reading view or the popup). Undo between checks. The text shapes are pinned by units (`selection-to-footnote`, "the block zoo converts"); the RENDERING is what only eyes can verify.
+Every fixture: select from the prose line ABOVE the block through the prose line BELOW it (the block travels WHOLE), press the numbered key, then look at how the footnote RENDERS (Reading view or the popup). Undo between checks. That the text comes out right is pinned by units (`selection-to-footnote`, "the block zoo converts"), so do not re-check it here: this sheet is only about what the finished footnote looks like.
 
 ## Numbered key: each block becomes a multi-paragraph definition
 
@@ -18,7 +20,7 @@ before the list
 
 after the list
 
-- [ ] Converts; the footnote renders the list with its nesting
+- [ ] The footnote renders the list with its nesting
 
 Numbered list and a task item:
 
@@ -30,7 +32,7 @@ before numbers
 
 after numbers
 
-- [ ] Converts; the footnote renders the ordered list and the checkbox
+- [ ] The footnote renders the ordered list and the checkbox
 
 Blockquote:
 
@@ -41,7 +43,7 @@ before the quote
 
 after the quote
 
-- [ ] Converts; the footnote renders a quote block
+- [ ] The footnote renders a quote block
 
 Callout:
 
@@ -52,7 +54,7 @@ before the callout
 
 after the callout
 
-- [ ] Converts; the footnote (and the popup) renders the callout box
+- [ ] The footnote (and the popup) renders the callout box
 
 Horizontal rule:
 
@@ -62,7 +64,7 @@ before the rule
 
 after the rule
 
-- [ ] Converts; the footnote shows a divider (not a stray `---` or a setext effect)
+- [ ] The footnote shows a divider (not a stray `---` or a setext effect)
 
 Heading:
 
@@ -72,7 +74,7 @@ before the heading
 
 after the heading
 
-- [ ] Converts; the footnote shows the heading text (styled or plain is fine; note which)
+- [ ] The footnote shows the heading text (styled or plain is fine; note which)
 
 Image links, both flavors:
 
@@ -81,7 +83,7 @@ before the images
 ![[some vault image.png]]
 after the images
 
-- [ ] Converts; the embeds render inside the footnote / popup
+- [ ] The embeds render inside the footnote / popup
 
 Table (source mode; the cell-level cases are sheet 08's):
 
@@ -93,11 +95,9 @@ before the table
 
 after the table
 
-- [ ] Converts; the footnote renders the table
-- [ ] The indented table inside the definition doesn't confuse later lints (run Lint: nothing rewrites it)
-- [ ] Undo. Select the table ALONE, edge to edge (first pipe to last pipe), and again with only the blank lines around it: both convert, the table's header row on the `[^n]:` label line and the other rows indented under it, and it renders inside the footnote (Jason's ruling 2026-09-09; a partial table still refuses)
+- [ ] The footnote renders the table
 
-Fenced code and `$$` math (text shape pinned by units; rendering check only):
+Fenced code and `$$` math:
 
 before the fence
 ```
@@ -109,24 +109,15 @@ $$
 inline math before $1+1\neq3$ and after
 after the fence
 
-- [ ] Converts; the footnote renders the code block AND the math block
-- [ ] Select from INSIDE the `$$` block to below it: the cuts-through-protected-text toast, nothing changes
+- [ ] The footnote renders the code block AND the math block
 
-## Named key: the same zoo through the modal
+## Inline key
 
-- [ ] Pick any two fixtures above, use the NAMED hotkey: the modal opens, Enter converts identically under `[^yourname]`; one undo reverts everything
-
-## Inline key: multi-line selections REFUSE (ruling 2026-08-20)
-
-Inline footnotes are single-line; flattening a multi-line selection was tried and reverted. A line-spanning selection toasts and redirects to the numbered/named keys.
-
-- [ ] Any multi-line fixture above + INLINE hotkey: the "Inline footnotes are single-line" toast, nothing changes
-- [ ] A SINGLE image link selected on its own line + INLINE hotkey: converts, brackets stay unescaped, the embed still renders inline
-- [ ] A full-line drag that ends at ch 0 of the next line still converts (it normalizes to one line)
+- [ ] A SINGLE image link selected on its own line + INLINE hotkey: the embed still renders inside the inline footnote
 
 ## Popup pass
 
 Turn the popup setting ON and redo ONE list, the callout, and the table fixture with the numbered key:
 
 - [ ] The popup opens showing the whole multi-paragraph body, editable, no Properties-widget bleed (the 2026-08-13 embed hazard)
-- [ ] Escape closes it; the caret jump target is the end of the LAST body line
+- [ ] Escape closes the popup and the caret comes back to the end of the LAST body line

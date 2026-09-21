@@ -1,41 +1,24 @@
----
-footnote-prefix: p.
----
 # 10: rename footnote (2026-08-12)
 
-Settings: defaults (the frontmatter prefix stays inert until the last check turns the prefix feature on). Undo between checks. Every fixture is already in this note: two footnotes[^alpha] and[^Beta], a prefixed one[^p.1], a right-click fixture here[^menu], plus a fenced decoy.
+Automated coverage: 11 former checks now live in test/sheet-10-rename-footnote.test.ts and the smoke suite; run `npm test` and `npm run test:smoke` before this sheet.
 
-```
-fake [^alpha] inside code, decoy [^menu] too
-```
+Settings: defaults. Undo between checks. Every fixture is already in this note: a footnote[^alpha] to rename, and a right-click fixture here[^menu].
 
 ## The command
 
 Run **Rename footnote** from the command palette with the caret in each spot:
 
-- [ ] Caret inside `[^alpha]` above: the modal opens prefilled with `alpha`; rename to `gamma` renames the reference AND the definition, and the toast counts the places
-- [ ] The fenced `[^alpha]` decoy is untouched
-- [ ] One undo reverts the whole rename at once
-- [ ] Caret on the `[^Beta]:` definition label at the bottom also opens the modal
-- [ ] Renaming `alpha` to `Beta` (the second live footnote): the modal stays open with ""[^Beta]" is already used by another footnote."
-- [ ] Renaming `Beta` to `beta` (case only) works; same footnote to Obsidian
-- [ ] Renaming to `bad name`, `a#b`, or `a[b` keeps the modal open with "Footnote names can't contain spaces, backticks, brackets, or "#"." inline
-- [ ] Caret on plain prose: "Place the cursor on a footnote reference or definition to rename it." and no modal
-- [ ] In Reading view the command is absent from the palette
-- [ ] With the popup open on a footnote, running the rename first settles/closes the popup (no stranded popup bound to the old name)
-- [ ] With `Per-note footnote prefix` AND the `Apply the note's footnote prefix` lint rule ON (this note's prefix is `p.`), Rename on `[^p.1]` opens with only the `1` selected (the prefix visibly stays); type `5`, Enter: it becomes `[^p.5]`. Undo, rename again, delete the prefix too and type a bare `5`: the rename ADDS the prefix itself (`[^p.5]`) and the toast says the note's prefix was added, so no later lint renames it behind your back (2026-08-29). With the `Apply the note's footnote prefix` rule OFF, the same bare rename stays bare and survives a lint
+- [ ] Caret inside `[^alpha]` above: the modal opens prefilled with `alpha`, the name is selected and the box has focus, so typing replaces it straight away
+- [ ] Rename it to `gamma`: the toast that follows reads well and its count of places makes sense at a glance
+- [ ] One undo reverts the whole rename at once (reference and definition together, not one press each)
+- [ ] With the popup open on `[^alpha]`, running the rename first settles/closes the popup (no stranded popup bound to the old name)
 
 ## The right-click menu (2026-08-13)
 
-- [ ] Right-click ON `[^menu]` above: the menu shows **Rename footnote** with the pencil icon (like the native heading rename)
+- [ ] Right-click ON `[^menu]` above: the menu shows **Rename footnote** with the pencil icon, and it sits where the native "Rename this heading" item does on a heading line
 - [ ] Choosing it opens the same modal as the command, prefilled with `menu`
-- [ ] Right-click on the `[^menu]:` definition label below: the item is there too
-- [ ] Right-click on plain prose in this line: no **Rename footnote** in the menu
-- [ ] Right-click on the fenced decoy above: no item (code is not a footnote)
 
 (There is no long-press twin on the phone: Obsidian owns that menu there and plugins cannot add to it. Sheet 24 covers the phone's route, the toolbar icon after a long press.)
 
 [^alpha]: first definition
-[^Beta]: second definition
-[^p.1]: prefixed fixture definition
 [^menu]: the definition to rename
