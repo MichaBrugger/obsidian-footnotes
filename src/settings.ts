@@ -113,12 +113,21 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
             },
             {
                 name: "Insert footnote reference at end of word",
-                desc: "A new footnote reference is only inserted at the end of the word and after any punctuation.",
+                desc: "A new footnote reference is only inserted at the end of the word, and past the punctuation after it or in front of it as the placement setting below says.",
                 control: { type: "toggle", key: "insertAtEndOfWord" },
             },
             {
+                name: "Footnote reference placement",
+                desc: "Which side of the punctuation after a word a reference goes on, for new footnotes and for the lint rule. After punctuation is English, Taiwanese, Korean and Dutch usage (word.[^1]). Before punctuation is mainland Chinese, Japanese, French, Italian, Portuguese, Polish and the EU style guide (句子[^1]。). Don't move leaves the reference at the end of the word and the lint rule idle, for conventions that place each mark differently (Russian, Polish) or by sense (German), and for notes that mix scripts. Closing quotation marks and brackets are always stepped over. Changing this moves the references in a note the next time it is linted.",
+                control: {
+                    type: "dropdown",
+                    key: "footnotePlacement",
+                    options: { after: "After punctuation", before: "Before punctuation", none: "Don't move" },
+                },
+            },
+            {
                 name: "Expand selections to whole words",
-                desc: "When a selection is turned into a footnote, cut-off words at either end are included whole, along with any punctuation right after the last word.",
+                desc: "When a selection is turned into a footnote, cut-off words at either end are included whole, along with the punctuation right after the last word when the placement is after punctuation.",
                 control: { type: "toggle", key: "expandSelectionToWholeWords" },
             },
             {
@@ -187,8 +196,8 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                         heading: "Rules",
                         items: [
                             {
-                                name: "Move footnote references after punctuation",
-                                desc: "The lint command moves footnote references that sit before punctuation to sit after it.",
+                                name: "Fix footnote reference placement",
+                                desc: "The lint command moves footnote references to the side of punctuation the Footnote reference placement setting says: after it by default, or before it. It does nothing under Don't move.",
                                 control: { type: "toggle", key: "lintFixPunctuation" },
                             },
                             {

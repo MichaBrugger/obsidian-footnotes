@@ -7,6 +7,7 @@ import {
     endOfWordForSelection,
     endOfWordOffset,
 } from "../src/editor/cursor-motion";
+import FootnotePlugin from "../src/main";
 import { lintFootnotes } from "../src/linting/linter";
 import { footnoteAfterPunctuation } from "../src/linting/rules/footnote-after-punctuation";
 import {
@@ -210,6 +211,26 @@ describe("the lint rule under 'none' does nothing", () => {
         for (const text of ["word[^1].", "word.[^1]", "word[^1]”.", "句子。[^1]"]) {
             expect(footnoteAfterPunctuation(text, "none")).toBe(text);
         }
+    });
+});
+
+describe("the saved setting is trusted only when it names one of the three placements", () => {
+    function pluginWithSavedData(data: Record<string, unknown>): FootnotePlugin {
+        const plugin = new (FootnotePlugin as unknown as new () => FootnotePlugin)();
+        plugin.loadData = () => Promise.resolve(data);
+        plugin.saveData = () => Promise.resolve();
+        return plugin;
+    }
+
+    it("keeps a known value and drops an unknown one for the default", async () => {
+        const kept = pluginWithSavedData({ settingsVersion: 2, footnotePlacement: "before" });
+        await kept.loadSettings();
+        expect(kept.settings.footnotePlacement).toBe("before");
+        // a hand edit or a sync merge can leave any string here; a value
+        // that is not one of the three would make every reader misbehave
+        const dropped = pluginWithSavedData({ settingsVersion: 2, footnotePlacement: "sideways" });
+        await dropped.loadSettings();
+        expect(dropped.settings.footnotePlacement).toBe("after");
     });
 });
 

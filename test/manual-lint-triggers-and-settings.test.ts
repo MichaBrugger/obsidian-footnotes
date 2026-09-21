@@ -147,7 +147,9 @@ describe("sheet 12: the Rules group", () => {
 
     it("holds four toggles: punctuation, move definitions, the hidden-definition fix, and the prefix rule", () => {
         expect(group(items, "Rules").items?.map((item) => item.name)).toEqual([
-            "Move footnote references after punctuation",
+            // renamed with the placement setting (T5, 2026-09-21): the rule
+            // now follows the setting, so "after" no longer belongs in its name
+            "Fix footnote reference placement",
             "Move definitions to existing footnote section heading, or to bottom",
             "Fix definitions hidden by a missing blank line",
             "Apply the note's footnote prefix",

@@ -29,7 +29,7 @@ The plugin adds its commands **without hotkeys**, so assign your own right after
 
 `Settings → Hotkeys → search for "Footnote Shortcut" → click the ⨁ next to a command → press your preferred keys`
 
-Of the plugin's 7 commands, the ones you'll press constantly should have hotkeys. I personally use:
+Of the plugin's 8 commands, the ones you'll press constantly should have hotkeys. I personally use:
 
 
 | Command                               | Recommended hotkey                           |
@@ -41,7 +41,7 @@ Of the plugin's 7 commands, the ones you'll press constantly should have hotkeys
 
 <img src="README/hotkeys.png" width="800" alt="The Hotkeys settings tab filtered to Footnote Shortcut, with the four recommended bindings set">
 
-The other 3 (**Lint footnotes**, **Rename footnote**, and **Set footnote prefix**) come up less often, so running them from the command palette works fine. Give them hotkeys too if they become part of your routine.
+The other 4 (**Lint footnotes**, **Rename footnote**, **Delete footnote definition and all references**, and **Set footnote prefix**) come up less often, so running them from the command palette works fine. Give them hotkeys too if they become part of your routine.
 
 Everything also works on mobile from the toolbar, each with their own unique toolbar icons.
 
@@ -137,7 +137,7 @@ Creating or visiting a footnote opens its definition text in a small editor righ
 
 Writing and revising can leave footnotes messy. The **Lint footnotes** command cleans up the whole note in one pass:
 
-- **Move footnote references after punctuation**: Moves references that sit before punctuation, or inside closing quotation marks, brackets, or emphasis, to sit after them. Inline footnotes move the same way, whole (`word^[note].` becomes `word.^[note]`). (`word[^1].` becomes `word.[^1]`, and `"quote[^1]".` becomes `"quote".[^1]`), the placement every major style guide recommends.
+- **Fix footnote reference placement**: Moves references that sit inside closing quotation marks, brackets, or emphasis out past them, and to the side of the punctuation your **Footnote reference placement** setting says: after it by default (`word[^1].` becomes `word.[^1]`, and `"quote[^1]".` becomes `"quote".[^1]`), or before it (`句子。[^1]` becomes `句子[^1]。`). Inline footnotes move the same way, whole (`word^[note].` becomes `word.^[note]`). Under **Don't move** the rule does nothing.
 - **Gather definitions**: Moves every footnote definition under your specified footnote section heading, or to the bottom of the note.
 - **Fix definitions hidden by a missing blank line**: a `[^1]:` line typed directly under a paragraph is plain text to Obsidian, and its footnote never shows. The linter inserts the blank line it needs (or, with the rule off, alerts you about it).
 - **Alert/delete orphans**: Orphans are footnote references without a definition or definitions without a reference. You choose whether the plugin alerts you or deletes orphans.
@@ -175,7 +175,8 @@ Notes without the property keep normal `[^1]`, `[^2]`, … numbering. A prefix f
 
 ## Other settings
 
-- **Insert footnote reference at end of word** *(on by default)*: pressing the hotkey mid-word places the reference at the end of the word, past any closing quotation marks, brackets, or emphasis and the punctuation after them, so you don't have to aim.
+- **Insert footnote reference at end of word** *(on by default)*: pressing the hotkey mid-word places the reference at the end of the word, past any closing quotation marks, brackets, or emphasis, and past or in front of the punctuation after them as the placement setting says, so you don't have to aim.
+- **Footnote reference placement** *(after punctuation by default)*: which side of the punctuation a reference goes on, for new footnotes and for the lint rule. **After punctuation** is what English, Taiwanese, Korean and Dutch writing do (`word.[^1]`). **Before punctuation** is mainland Chinese, Japanese, French, Italian, Portuguese, Polish and the EU style guide (`句子[^1]。`; China's GB/T 7714-2015 shows it in its worked examples). **Don't move** leaves the reference at the end of the word and the lint rule idle, for conventions that place each mark differently (Russian, Polish) or by sense (German), and for notes that mix scripts. A closing quotation mark or bracket is always stepped over, since every convention puts the marker outside the quote. Changing the setting moves the references in a note the next time it is linted.
 - **Expand selections to whole words** *(on by default)*: the selection twin of the above; a selection converted into a footnote grows to whole words first.
 - **Enable section heading** *(off by default)*: automatically adds a heading (e.g. `# Footnotes`) above your footnote definitions. The heading text is fully customizable, can span multiple lines, and if it already exists in the note it's reused instead of duplicated.
 - **Trim blank lines** *(on by default)*: removes stray blank lines from the end of the note when the first footnote is added.

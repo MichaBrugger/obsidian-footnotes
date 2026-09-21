@@ -344,6 +344,10 @@ function parseSavedSettings(saved: unknown): Partial<FootnotePluginSettings> {
   for (const [key, value] of Object.entries(saved)) {
     const expected = defaultTypes.get(key);
     if (expected !== undefined && typeof value !== expected) continue;
+    // a string setting with a fixed set of values is trusted only for one
+    // of those values: any other string would reach every reader of the
+    // placement and be treated as none of the three (T5, 2026-09-21)
+    if (key === "footnotePlacement" && value !== "after" && value !== "before" && value !== "none") continue;
     parsed[key] = value;
   }
   return parsed;
