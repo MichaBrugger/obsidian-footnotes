@@ -1,6 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
-import { convertNormalFootnotesToInline } from "../src/commands/convert-footnotes";
+import { fakeEditor } from "./helpers/fake-editor";
+import { fakePlugin } from "./helpers/fake-plugin";
+import { messages, resetNotices } from "./helpers/notices";
+import {
+    convertInlineFootnotesToNormal,
+    convertNormalFootnotesToInline,
+} from "../src/commands/convert-footnotes";
 
 // Converting a note's footnotes between the two styles (T6 of the 2026-09
 // feature round; Jason's rulings 2026-09-19 to 21). Normal to inline is a
@@ -86,5 +92,72 @@ describe("convertNormalFootnotesToInline", () => {
         expect(convert(lazy)).toMatchObject({ markdown: lazy.join("\n"), converted: 0, skipped: [] });
         const once = convert(["a[^1] b[^2]", "", "[^1]: one", "[^2]: two"]);
         expect(convertNormalFootnotesToInline(once.markdown)).toMatchObject({ markdown: once.markdown, converted: 0 });
+    });
+});
+
+// Inline to normal runs editor-side, so it can reuse the definition-append
+// decision tree (last block, section heading slot, end of note) instead of
+// copying it in text form. Every "^[body]" becomes "[^N]" and its
+// definition is appended; identical bodies merge into one definition with
+// several references, always, with the count in the toast (Jason,
+// 2026-09-21). All in one transaction.
+describe("convertInlineFootnotesToNormal", () => {
+    beforeEach(resetNotices);
+
+    function run(lines: string[], settings: Record<string, unknown> = {}) {
+        const doc = fakeEditor(lines, { wholeDoc: true, edits: true, cursor: { line: 0, ch: 0 } });
+        const plugin = fakePlugin(settings, doc);
+        const result = convertInlineFootnotesToNormal(plugin, doc);
+        return { doc, result };
+    }
+
+    it("turns every inline footnote into a numbered one with its definition appended, in one transaction", () => {
+        const { doc, result } = run(["a^[one] b^[two]"]);
+        expect(doc.lines).toEqual(["a[^1] b[^2]", "", "[^1]: one", "[^2]: two"]);
+        expect(doc.transactions).toBe(1);
+        expect(result).toMatchObject({ converted: 2, definitions: 2, merged: 0 });
+    });
+
+    it("merges identical bodies into one definition with several references and counts the merge", () => {
+        const { doc, result } = run(["a^[same] b^[same] c^[other]"]);
+        expect(doc.lines).toEqual(["a[^1] b[^1] c[^2]", "", "[^1]: same", "[^2]: other"]);
+        expect(result).toMatchObject({ converted: 3, definitions: 2, merged: 1 });
+    });
+
+    it("numbers past the existing footnotes and appends after the last definition block", () => {
+        const { doc } = run(["x[^1] y^[new]", "", "[^1]: one"]);
+        expect(doc.lines).toEqual(["x[^1] y[^2]", "", "[^1]: one", "[^2]: new"]);
+    });
+
+    it("carries the note's footnote prefix when that feature is on", () => {
+        const { doc } = run(["---", "footnote-prefix: 2-", "---", "a^[one]"], { enableFootnotePrefix: true });
+        expect(doc.lines).toEqual(["---", "footnote-prefix: 2-", "---", "a[^2-1]", "", "[^2-1]: one"]);
+    });
+
+    it("leaves an inline footnote inside a definition's body (no nesting) and an empty one alone, and says so", () => {
+        const { doc, result } = run(["a^[ok] b^[ ]", "", "[^1]: body ^[nested]"]);
+        expect(doc.lines).toEqual(["a[^2] b^[ ]", "", "[^1]: body ^[nested]", "[^2]: ok"]);
+        expect(result).toMatchObject({
+            converted: 1,
+            skipped: [
+                { reason: "empty", count: 1 },
+                { reason: "inside a footnote definition", count: 1 },
+            ],
+        });
+    });
+
+    it("does nothing, and says so, when the note has no inline footnote outside protected text", () => {
+        const { doc, result } = run(["plain `^[code]` here"]);
+        expect(doc.lines).toEqual(["plain `^[code]` here"]);
+        expect(doc.transactions).toBe(0);
+        expect(result).toMatchObject({ converted: 0 });
+        expect(messages()).toContain("No inline footnotes to convert.");
+    });
+
+    it("tells the user what happened, merges included", () => {
+        run(["a^[same] b^[same] c^[other]"]);
+        expect(messages()).toContain(
+            "Converted 3 inline footnotes into 2 normal footnotes (1 identical body merged).",
+        );
     });
 });

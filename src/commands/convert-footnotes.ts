@@ -19,6 +19,19 @@ import {
 import { linesReadDifferently } from "../linting/rules/remove-orphaned-definitions";
 import { readsDifferently } from "../linting/rules/remove-orphaned-references";
 import { sanitizeInlineFootnoteContent } from "./inline-footnotes";
+import { Editor, EditorChange, MarkdownView } from "obsidian";
+
+import type FootnotePlugin from "../main";
+import { docContext, listExistingFootnoteDefinitions } from "../editor/doc-context";
+import { showNotice } from "../editor/notice";
+import { runOutsideTableCell } from "../editor/table-cursor";
+import { replaceMinimal } from "../editor/write-back";
+import { noticeLintAlerts } from "../linting/lint-alerts";
+import { lintAfterFootnoteCreation } from "../linting/linter";
+import { computeNextFootnoteNumber, definitionLabel, quotedReference } from "../parsing/footnote-grammar";
+import { activeFootnotePrefix, footnotePrefixFromEditor } from "../parsing/footnote-prefix";
+import { buildDefinitionAppend, seedDefinitionBody } from "./definition-append";
+import { withEditableEditor } from "./insert-or-navigate-footnotes";
 
 // Converting a note's footnotes between the two styles (T6 of the 2026-09
 // feature round; Jason's rulings 2026-09-19 to 2026-09-21).
@@ -223,4 +236,207 @@ export function convertNormalFootnotesToInline(markdown: string): ConversionToIn
         duplicated: eligible.filter(({ refs: its }) => its.length > 1).length,
         skipped: named,
     };
+}
+
+/** What converting a note's inline footnotes to normal did. */
+export interface ConversionToNormal {
+    /** inline footnotes replaced by a reference */
+    converted: number;
+    /** definitions appended (fewer than `converted` when identical bodies merged) */
+    definitions: number;
+    /** inline footnotes that shared an earlier one's body and so share its definition */
+    merged: number;
+    /** the inline footnotes left alone, by reason, in the order first met */
+    skipped: { reason: string; count: number }[];
+}
+
+const nothingToConvert: ConversionToNormal = { converted: 0, definitions: 0, merged: 0, skipped: [] };
+
+/**
+ * Turn every "^[body]" in the editor's note into a "[^N]" reference with
+ * its definition appended, in ONE transaction. Identical bodies (after
+ * trimming) share one definition. Numbering continues past the note's
+ * numbered footnotes and carries the note's prefix when that feature is
+ * on, exactly as a creation press would. Where the definitions land is
+ * the creation press's own decision (buildDefinitionAppend): after the
+ * last definition block, under the section heading, or at the end of the
+ * note.
+ *
+ * Left alone, and counted in the result: an empty inline footnote (a
+ * definition with no body is a footnote still being written), and one
+ * inside a definition's body, where a reference would nest footnotes
+ * (ADR 1). A body that runs onto the next line never closes on its line,
+ * so the scanner does not see it and it stays as it is. Protected text is
+ * never read.
+ *
+ * Then the lint-on-creation trigger runs when that setting is on, as it
+ * does after every press that creates a footnote.
+ */
+export function convertInlineFootnotesToNormal(plugin: FootnotePlugin, doc: Editor): ConversionToNormal {
+    const ctx = docContext(doc);
+    const lines = ctx.lines;
+    const masked = ctx.maskedLines();
+    const starts = ctx.definitionStarts();
+    // the lines that belong to some definition's body, of every shape the
+    // plugin recognises
+    const insideDefinition = new Array<boolean>(lines.length).fill(false);
+    for (const block of ctx.blocks()) {
+        for (let i = block.start; i <= block.end; i++) insideDefinition[i] = true;
+    }
+    for (let i = 0; i < lines.length; i++) {
+        if (ctx.scan.isProtected[i] || !starts[i]) continue;
+        const hit = definitionLabelWithName(lines[i], masked[i]);
+        if (!hit?.label.quoted) continue;
+        const end = hit.label.afterCloser ? i : quotedDefinitionEnd(lines, ctx.scan, starts, i);
+        for (let j = i; j <= end; j++) insideDefinition[j] = true;
+    }
+    for (const hit of inItemDefinitionLabels(lines, ctx.scan, masked, starts)) insideDefinition[hit.line] = true;
+
+    const skipped: { reason: string; count: number }[] = [];
+    const skip = (reason: string) => {
+        const entry = skipped.find((s) => s.reason === reason);
+        if (entry) entry.count++;
+        else skipped.push({ reason, count: 1 });
+    };
+    // every convertible inline footnote, in document order, with its
+    // body's key for merging (the body as written, trimmed)
+    const spans: { line: number; open: number; close: number; body: string }[] = [];
+    for (let i = 0; i < lines.length; i++) {
+        if (ctx.scan.isProtected[i] || !lines[i].includes("^[")) continue;
+        for (const span of inlineFootnoteSpans(masked[i])) {
+            const body = lines[i].slice(span.open + 2, span.close).trim();
+            if (body === "") {
+                skip("empty");
+                continue;
+            }
+            if (insideDefinition[i]) {
+                skip("inside a footnote definition");
+                continue;
+            }
+            spans.push({ line: i, open: span.open, close: span.close, body });
+        }
+    }
+    if (spans.length === 0) {
+        showNotice(
+            skipped.length === 0
+                ? "No inline footnotes to convert."
+                : `No inline footnotes converted: skipped ${skippedList(skipped)}.`,
+        );
+        return { ...nothingToConvert, skipped };
+    }
+
+    // one id per distinct body, in order of first appearance, numbered the
+    // way a creation press numbers (an invalid prefix has already been
+    // toasted by activeFootnotePrefix)
+    const prefix = activeFootnotePrefix(plugin, footnotePrefixFromEditor(doc));
+    if (prefix === null) return { ...nothingToConvert, skipped };
+    const maskedText = masked.join("\n");
+    const first = computeNextFootnoteNumber(maskedText, prefix, maskedText);
+    const idOf = new Map<string, string>();
+    const bodies: string[] = [];
+    for (const span of spans) {
+        if (!idOf.has(span.body)) {
+            idOf.set(span.body, `${prefix}${first + bodies.length}`);
+            bodies.push(span.body);
+        }
+    }
+    const ids = bodies.map((body) => idOf.get(body) as string);
+
+    // the reference replacements, plus the definitions as ONE append: the
+    // creation press's own append for the first id, seeded with its body,
+    // then the other labels on the lines after it
+    const changes: EditorChange[] = spans.map((span) => ({
+        from: { line: span.line, ch: span.open },
+        to: { line: span.line, ch: span.close + 1 },
+        text: `[^${idOf.get(span.body) as string}]`,
+    }));
+    const isFirstFootnote = listExistingFootnoteDefinitions(doc, ctx).length === 0;
+    const definition = seedDefinitionBody(
+        buildDefinitionAppend(doc, ids[0], isFirstFootnote, plugin, ctx),
+        ids[0],
+        bodies[0],
+    );
+    const textLines = definition.change.text.split("\n");
+    textLines.splice(
+        definition.labelLineOffset + 1,
+        0,
+        ...ids.slice(1).map((id, k) => `${definitionLabel(id)} ${bodies[k + 1]}`),
+    );
+    if (definition.prepend) changes.push(definition.prepend);
+    changes.push({ ...definition.change, text: textLines.join("\n") });
+    doc.transaction({ changes });
+
+    const result: ConversionToNormal = {
+        converted: spans.length,
+        definitions: ids.length,
+        merged: spans.length - ids.length,
+        skipped,
+    };
+    const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+    showNotice(
+        `Converted ${plural(result.converted, "inline footnote")} into ${plural(result.definitions, "normal footnote")}` +
+            (result.merged > 0 ? ` (${plural(result.merged, "identical body")} merged)` : "") +
+            "." +
+            (skipped.length > 0 ? ` Skipped ${skippedList(skipped)}.` : ""),
+    );
+    // anything that creates a footnote lints, when that setting is on;
+    // otherwise the alerts alone speak (ADR 2)
+    if (lintAfterFootnoteCreation(plugin, false) === null && !plugin.settings.lintOnFootnoteCreation) {
+        noticeLintAlerts(plugin, doc.getValue());
+    }
+    return result;
+}
+
+/** "1 empty, 2 inside a footnote definition" */
+function skippedList(skipped: { reason: string; count: number }[]): string {
+    return skipped.map((s) => `${s.count} ${s.reason}`).join(", ");
+}
+
+/** The "Convert inline footnotes to normal footnotes" command: the whole note, one transaction. */
+export async function convertInlineToNormalCommand(plugin: FootnotePlugin) {
+    await withEditableEditor(plugin, (doc) => {
+        runOutsideTableCell(doc, () => {
+            convertInlineFootnotesToNormal(plugin, doc);
+        });
+    }, "Move the cursor into the note's text to convert its footnotes.");
+}
+
+/**
+ * The "Convert normal footnotes to inline footnotes" command: the pure
+ * transform above, written back as one transaction that keeps folds and
+ * the caret, then a toast with the counts and every skipped definition's
+ * name and reason, then the lint alerts.
+ */
+export async function convertNormalToInlineCommand(plugin: FootnotePlugin) {
+    await withEditableEditor(plugin, (doc) => {
+        runOutsideTableCell(doc, () => {
+            const before = doc.getValue();
+            const result = convertNormalFootnotesToInline(before);
+            const skippedText =
+                result.skipped.length > 0
+                    ? ` Skipped ${result.skipped.map((s) => `${quotedReference(s.name)} (${s.reason})`).join(", ")}.`
+                    : "";
+            if (result.refused) {
+                showNotice(`Nothing was converted. ${result.refused}${skippedText}`, 8000);
+                return;
+            }
+            if (result.converted === 0) {
+                showNotice(result.skipped.length === 0 ? "No footnotes to convert." : `No footnotes converted.${skippedText}`, 8000);
+                return;
+            }
+            const mdView = plugin.app.workspace.getActiveViewOfType(MarkdownView) ?? undefined;
+            replaceMinimal(doc, before, result.markdown, mdView);
+            const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+            showNotice(
+                `Converted ${plural(result.converted, "footnote")} into inline footnotes at ${plural(result.references, "reference")}` +
+                    (result.duplicated > 0
+                        ? ` (${plural(result.duplicated, "definition")} used more than once became copies)`
+                        : "") +
+                    "." +
+                    skippedText,
+                result.skipped.length > 0 ? 8000 : undefined,
+            );
+            noticeLintAlerts(plugin, result.markdown);
+        });
+    }, "Move the cursor into the note's text to convert its footnotes.");
 }
