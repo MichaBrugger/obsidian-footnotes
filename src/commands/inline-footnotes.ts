@@ -8,11 +8,10 @@ import { cellCaret, TableCellEditor } from "../editor/table-cursor";
 
 import { showNotice } from "../editor/notice";
 import { readingViewActive } from "../editor/obsidian-internals";
-// Inline footnotes, the self-contained "^[...]" form. This file holds three
-// things: sanitizing pasted content so it is safe as a body, the scanner
-// that finds an inline footnote's span while respecting backslash escapes,
-// and the two caret guards every command shares. Split out of the
-// all-in-one commands file 2026-08-11.
+// Inline footnotes, the self-contained "^[...]" form. This file holds
+// sanitizing pasted content so it is safe as a body and the two caret
+// guards every command shares (the span scanner moved down to the grammar
+// on 2026-09-21). Split out of the all-in-one commands file 2026-08-11.
 
 /**
  * The last stretch of both paste commands, shared by the single-caret and
@@ -141,53 +140,13 @@ export function inlineWrapLandsIntact(
     );
 }
 
-/**
- * The inline footnote whose brackets contain position `ch` on `lineText`,
- * reported as `open` (where its "^" is) and `close` (where its "]" is), or
- * null when there is none.
- *
- * The bracket matching respects backslash escapes and steps over nested
- * balanced pairs, such as a markdown link inside the body. "Inside" runs
- * from just after the "^" through the closing "]" itself.
- */
-export function inlineFootnoteSpanAt(
-    lineText: string,
-    ch: number,
-): { open: number; close: number } | null {
-    for (let i = 0; i < lineText.length - 1; i++) {
-        const c = lineText[i];
-        if (c === "\\") {
-            i++;
-            continue;
-        }
-        if (c !== "^" || lineText[i + 1] !== "[") continue;
-
-        let depth = 0;
-        let close = -1;
-        for (let j = i + 1; j < lineText.length; j++) {
-            const cj = lineText[j];
-            if (cj === "\\") {
-                j++;
-            } else if (cj === "[") {
-                depth++;
-            } else if (cj === "]") {
-                depth--;
-                if (depth === 0) {
-                    close = j;
-                    break;
-                }
-            }
-        }
-        // this candidate never closes, so it is not an inline footnote. A
-        // LATER "^[" on the same line may still close properly, because its
-        // opening "[" was counted as nesting above, so keep scanning rather
-        // than giving up here.
-        if (close === -1) continue;
-        if (ch > i && ch <= close) return { open: i, close };
-        i = close; // the cursor is not in this one, so scan on past it
-    }
-    return null;
-}
+// The span scanner (inlineFootnoteSpanAt, and the inlineFootnoteSpans
+// enumerator the punctuation rule uses) lives in parsing/footnote-grammar
+// since 2026-09-21, so the linting layer can read inline spans without
+// importing this editor-facing module. It is re-exported here for the
+// callers that always found it here.
+import { inlineFootnoteSpanAt } from "../parsing/footnote-grammar";
+export { inlineFootnoteSpanAt };
 
 /** The position just past an inline footnote's closing bracket, when `ch` sits inside one. Null when it does not. */
 export function inlineFootnoteExitCh(lineText: string, ch: number): number | null {

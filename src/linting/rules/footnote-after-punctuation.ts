@@ -1,5 +1,5 @@
 import { inItemDefinitionLabels } from "../../parsing/list-item-definitions";
-import { referenceOccurrences } from "../../parsing/footnote-grammar";
+import { inlineFootnoteSpans, referenceOccurrences } from "../../parsing/footnote-grammar";
 import { ClosingMarkChars, definitionLabelIn, referenceLandingAfter, TrailingPunctuationChars } from "../../parsing/markdown-scan";
 import { rewriteDocument } from "../rewrite-document";
 import { FootnoteRule } from "../rule";
@@ -23,8 +23,18 @@ const AlreadyPlacedAfter = new RegExp(
     `[${PunctuationClass}${ClosingMarkChars.replace(/[.*+?^${}()|[\]\\-]/g, "\\$&")}]`,
 );
 
-// Swap each run of references with the run of punctuation after it, within
-// one stretch of a line.
+// A stretch of text the rule moves as one thing: a "[^x]" reference, or a
+// whole "^[...]" inline footnote.
+interface MovableUnit {
+    start: number;
+    /** just past the last character */
+    end: number;
+    /** a "[^x]" reference (true) or an inline footnote (false); only a lone reference can be a label the label reader missed */
+    reference: boolean;
+}
+
+// Swap each run of references and inline footnotes with the run of
+// punctuation after it, within one stretch of a line.
 //
 // The references come from referenceOccurrences, so everything the shared
 // grammar refuses to count as a reference is refused here too: an escaped
@@ -34,31 +44,45 @@ const AlreadyPlacedAfter = new RegExp(
 // text the user had typed on purpose into a live reference (2026-08-11
 // review, bug #1).
 //
+// An inline footnote moves too, as ONE unit, its whole "^[...]" span with
+// the body untouched (N1 of the 2026-09 feature round; Jason, 2026-09-19:
+// the exclusion was never intended, and inline and normal footnotes should
+// place the same way). The span comes from the grammar's inline scanner,
+// never from treating the footnote's brackets as a reference, which is
+// exactly what bug #1 was. A body that runs onto the next line never
+// closes on this line, so it is not a unit and stays where it is.
+//
 // The searching is done on the masked twin, but the text handed back is
 // built from the original line. Otherwise a footnote name could come out
 // with the blanking characters in it.
 function swapInSegment(original: string, masked: string, insideBody = false, mayBeLabel = true): string {
+    const spans: MovableUnit[] = inlineFootnoteSpans(masked).map((span) => ({
+        start: span.open,
+        end: span.close + 1,
+        reference: false,
+    }));
     // a name holding whitespace is prose to Obsidian, not a reference to
-    // move (Claude sweep 2026-09-13)
-    const occurrences = referenceOccurrences(original, masked).filter(
-        (occurrence) => !/\s/.test(occurrence.name),
-    );
+    // move (Claude sweep 2026-09-13); and a reference-shaped string inside
+    // an inline footnote's body belongs to that body (footnotes never nest,
+    // ADR 1), so it moves with the footnote, not on its own
+    const references: MovableUnit[] = referenceOccurrences(original, masked)
+        .filter((occurrence) => !/\s/.test(occurrence.name))
+        .filter((occurrence) => !spans.some((span) => occurrence.start >= span.start && occurrence.end <= span.end))
+        .map((occurrence) => ({ start: occurrence.start, end: occurrence.end, reference: true }));
+    const units = [...references, ...spans].sort((a, b) => a.start - b.start);
     let out = "";
     let copied = 0;
     let k = 0;
-    while (k < occurrences.length) {
-        // References written back to back move as one unit. Anything the
-        // grammar refuses to count, sitting between two of them, ends the
-        // run.
+    while (k < units.length) {
+        // Units written back to back move as one run. Anything the grammar
+        // refuses to count, sitting between two of them, ends the run.
         let last = k;
-        while (
-            last + 1 < occurrences.length &&
-            occurrences[last + 1].start === occurrences[last].end
-        ) {
+        while (last + 1 < units.length && units[last + 1].start === units[last].end) {
             last++;
         }
-        const start = occurrences[k].start;
-        const end = occurrences[last].end;
+        const start = units[k].start;
+        const end = units[last].end;
+        const loneReference = last === k && units[k].reference;
         k = last + 1;
         // The run of punctuation AND closing marks immediately after it,
         // the same walk the insert commands use (referenceLandingAfter:
@@ -85,7 +109,7 @@ function swapInSegment(original: string, masked: string, insideBody = false, may
         // body starts with a reference (Kimi hunt cycle 4, probed
         // 2026-09-16); both cross the colon like any punctuation.
         if (
-            occurrences[last].start === start &&
+            loneReference &&
             !insideBody &&
             mayBeLabel &&
             masked[end] === ":" &&
@@ -110,7 +134,8 @@ function swapInSegment(original: string, masked: string, insideBody = false, may
 
 /**
  * Move every footnote reference that sits before punctuation so it sits
- * after it instead: "word[^1]." becomes "word.[^1]".
+ * after it instead: "word[^1]." becomes "word.[^1]". An inline footnote
+ * moves the same way, as one unit: "word^[note]." becomes "word.^[note]".
  *
  * A definition's own label is never touched. The body of a definition is
  * prose like any other, so references in it are moved too. Code blocks,
@@ -174,6 +199,11 @@ export const footnoteAfterPunctuationRule: FootnoteRule = {
             description: "A run of references crosses a run of punctuation as one unit",
             before: "wait[^1]?!",
             after: "wait?![^1]",
+        },
+        {
+            description: "An inline footnote moves whole, its body untouched",
+            before: "word^[an inline note].",
+            after: "word.^[an inline note]",
         },
         {
             description: "References inside inline code are left alone",

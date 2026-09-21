@@ -155,6 +155,80 @@ export function occurrenceAtCursor(
     return null;
 }
 
+/** One inline footnote on a line: where its "^" is and where its closing "]" is. */
+export interface InlineFootnoteSpan {
+    open: number;
+    close: number;
+}
+
+/**
+ * Every inline footnote "^[...]" on `lineText`, in order, each reported as
+ * `open` (where its "^" is) and `close` (where its "]" is).
+ *
+ * The bracket matching respects backslash escapes and steps over nested
+ * balanced pairs, such as a markdown link inside the body. A "^[" that
+ * never closes on this line is not an inline footnote (a body that runs
+ * onto the next line is left for the next scanner generation), and a later
+ * "^[" on the same line is still tried on its own.
+ *
+ * Pass the line already masked when protected text must be ignored: a
+ * "^[" inside a code span is then NUL characters and opens nothing. Moved
+ * here from commands/inline-footnotes.ts on 2026-09-21 so the punctuation
+ * rule can move inline footnotes as units (N1) without the linting layer
+ * importing the commands layer.
+ */
+export function inlineFootnoteSpans(lineText: string): InlineFootnoteSpan[] {
+    const spans: InlineFootnoteSpan[] = [];
+    for (let i = 0; i < lineText.length - 1; i++) {
+        const c = lineText[i];
+        if (c === "\\") {
+            i++;
+            continue;
+        }
+        if (c !== "^" || lineText[i + 1] !== "[") continue;
+
+        let depth = 0;
+        let close = -1;
+        for (let j = i + 1; j < lineText.length; j++) {
+            const cj = lineText[j];
+            if (cj === "\\") {
+                j++;
+            } else if (cj === "[") {
+                depth++;
+            } else if (cj === "]") {
+                depth--;
+                if (depth === 0) {
+                    close = j;
+                    break;
+                }
+            }
+        }
+        // this candidate never closes, so it is not an inline footnote. A
+        // LATER "^[" on the same line may still close properly, because its
+        // opening "[" was counted as nesting above, so keep scanning rather
+        // than giving up here.
+        if (close === -1) continue;
+        spans.push({ open: i, close });
+        i = close; // scan on past this one
+    }
+    return spans;
+}
+
+/**
+ * The inline footnote whose brackets contain position `ch` on `lineText`,
+ * or null when there is none. "Inside" runs from just after the "^"
+ * through the closing "]" itself.
+ */
+export function inlineFootnoteSpanAt(
+    lineText: string,
+    ch: number,
+): InlineFootnoteSpan | null {
+    for (const span of inlineFootnoteSpans(lineText)) {
+        if (ch > span.open && ch <= span.close) return span;
+    }
+    return null;
+}
+
 /**
  * Whether the character at `index` is escaped by a backslash, meaning an
  * ODD number of backslashes sits directly in front of it. (Backslashes pair

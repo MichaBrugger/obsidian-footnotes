@@ -70,9 +70,11 @@ describe("footnoteAfterPunctuation", () => {
         expect(footnoteAfterPunctuation(text)).toBe(text);
     });
 
-    it("never tears the tail reference out of an inline footnote", () => {
-        const text = "see ^[^1]. end";
-        expect(footnoteAfterPunctuation(text)).toBe(text);
+    it("never tears the tail reference out of an inline footnote: the footnote moves whole (N1, 2026-09-21)", () => {
+        // before N1 the inline footnote was left where it was; now it is a
+        // movable unit of its own, and its "[^1]" body is still never a
+        // reference
+        expect(footnoteAfterPunctuation("see ^[^1]. end")).toBe("see .^[^1] end");
     });
 
     it("moves the live reference on a line while leaving the escaped one", () => {
@@ -140,6 +142,60 @@ describe("footnoteAfterPunctuation and single-line HTML comments", () => {
 });
 
 // CJK punctuation joins the shared class (Jason, 2026-08-10)
+// Inline footnotes move as units (N1 of the 2026-09 feature round; Jason,
+// 2026-09-19: "I did not intend for our punctuation rule to deliberately
+// exclude inline footnotes"). The whole "^[...]" span crosses the
+// punctuation after it, body untouched; referenceOccurrences still never
+// reports the footnote's own brackets (the 2026-08-11 bug #1 stays fixed).
+describe("inline footnotes move as units (N1)", () => {
+    it("moves an inline footnote past a period", () => {
+        expect(footnoteAfterPunctuation("Content^[note].")).toBe("Content.^[note]");
+    });
+
+    it("keeps the body intact, punctuation and nested brackets included", () => {
+        expect(footnoteAfterPunctuation("see^[a [link](url), p. 5.].")).toBe("see.^[a [link](url), p. 5.]");
+    });
+
+    it("a reference and an inline footnote back to back move as one run", () => {
+        expect(footnoteAfterPunctuation("word[^1]^[x].")).toBe("word.[^1]^[x]");
+        expect(footnoteAfterPunctuation("word^[x][^1]?!")).toBe("word?!^[x][^1]");
+    });
+
+    it("steps past closing marks the way a reference does", () => {
+        expect(footnoteAfterPunctuation('"quoted^[n]".')).toBe('"quoted".^[n]');
+    });
+
+    it("is settled once after the punctuation, so the rule stays idempotent", () => {
+        const settled = "word.^[n] more";
+        expect(footnoteAfterPunctuation(settled)).toBe(settled);
+        const once = footnoteAfterPunctuation("a^[x]. b[^1]^[y]?! c^[z],^[w].");
+        expect(footnoteAfterPunctuation(once)).toBe(once);
+    });
+
+    it("moves an inline footnote inside a definition body", () => {
+        expect(footnoteAfterPunctuation("[^1]: body^[n].")).toBe("[^1]: body.^[n]");
+    });
+
+    it("leaves an inline footnote inside inline code alone", () => {
+        const text = "use `x^[n].` as-is";
+        expect(footnoteAfterPunctuation(text)).toBe(text);
+    });
+
+    it("leaves an inline footnote whose body runs onto the next line alone", () => {
+        const text = "start^[body that\ncontinues].";
+        expect(footnoteAfterPunctuation(text)).toBe(text);
+    });
+
+    it("an escaped caret opens no inline footnote", () => {
+        const text = "lit \\^[n]. end";
+        expect(footnoteAfterPunctuation(text)).toBe(text);
+    });
+
+    it("swaps an inline footnote across CJK punctuation", () => {
+        expect(footnoteAfterPunctuation("句子^[注]。")).toBe("句子。^[注]");
+    });
+});
+
 describe("CJK punctuation", () => {
     it("swaps a reference across a CJK full stop", () => {
         expect(footnoteAfterPunctuation("中文[^1]。")).toBe("中文。[^1]");

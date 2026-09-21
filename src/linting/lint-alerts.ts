@@ -21,7 +21,7 @@ import {
     referenceOccurrences,
     referenceText,
 } from "../parsing/footnote-grammar";
-import { inlineFootnoteSpanAt } from "../commands/inline-footnotes";
+import { inlineFootnoteSpanAt } from "../parsing/footnote-grammar";
 import { duplicateFootnoteDefinitionNames, mergeDuplicateFootnoteDefinitions } from "./rules/merge-duplicate-definitions";
 import {
     orphanedFootnoteDefinitionNames,
