@@ -24,22 +24,45 @@ const DefinitionStart = /^ {0,3}\[\^([^[\]\s]+)\]:/;
  * word. The footnote-after-punctuation lint rule moves references around
  * this very same set of characters, so the two features can't disagree
  * about where a reference belongs. It is the ASCII punctuation plus the
- * CJK fullwidth forms 。，、；：！？ (Jason, 2026-08-10).
+ * CJK fullwidth forms 。，、；：！？ (Jason, 2026-08-10), plus, since
+ * 2026-09-21 (the CJK coverage audit of 2026-09-19), the fullwidth full
+ * stop ．, the halfwidth ideographic stop ｡ and comma ､ that some input
+ * methods emit instead, the Chinese ⋯ and Japanese ‥ ellipses, and the
+ * doubled marks ‼ ⁇ ⁈ ⁉. Word-internal marks stay out on purpose: the
+ * Japanese prolonged sound mark ー, the middle dots ・ ･, the fullwidth
+ * hyphen －, and the wave dash and tilde 〜 ～, which usually mean a range.
  *
  * It lives in this file because both users of it, cursor-motion and the
  * lint rule, already sit above this leaf module. The import cycle that
  * first forced it here is gone, but no better shared home turned up.
  */
-export const TrailingPunctuationChars = ".,;:!?\u2026。，、；：！？";
+export const TrailingPunctuationChars = ".,;:!?\u2026。，、；：！？．｡､⋯‥‼⁇⁈⁉";
+
+/**
+ * Where a footnote reference goes relative to the punctuation after a word
+ * (T5 of the 2026-09 feature round; Jason's ruling 2026-09-20: one global
+ * setting, no per-language table). "after" is today's behaviour and the
+ * default: English, Taiwanese, Korean and Dutch writing. "before" is
+ * mainland Chinese, Japanese, French, Italian, Portuguese, Polish and the
+ * EU style guide. "none" leaves the reference at the end of the word and
+ * the lint rule idle, for conventions that place per mark (Russian,
+ * Polish) or per sense (German), and for notes mixing scripts. Closing
+ * marks are stepped over in every mode: every convention found puts the
+ * marker after a closing quotation bracket, never inside it.
+ */
+export type FootnotePlacement = "after" | "before" | "none";
 
 /**
  * The closing marks a footnote reference also steps past: closing quotes
  * (straight, curly, and the CJK corner brackets), closing brackets of every
  * kind, and the markers that close bold, italics, highlight, and
  * strikethrough. Together with TrailingPunctuationChars they make up the
- * landing convention below.
+ * landing convention below. The halfwidth and fullwidth CJK brackets ｣ ］
+ * ｝ ｠ 〗 〙 〛 and the prime quotation marks 〞 〟 joined on 2026-09-21
+ * (the CJK coverage audit of 2026-09-19). Opening halves are absent on
+ * purpose: a reference never steps over an opening bracket.
  */
-export const ClosingMarkChars = "\"'’”)]}」』）】〕》〉*_~=";
+export const ClosingMarkChars = "\"'’”)]}」』）】〕》〉*_~=｣］｝｠〗〙〛〞〟";
 
 /**
  * Where a footnote reference belongs after the word ending at `end`: past
@@ -51,13 +74,22 @@ export const ClosingMarkChars = "\"'’”)]}」』）】〕》〉*_~=";
  *     see (bravo).            ->   see (bravo).[^1]
  *     This is **some bravo**. ->   This is **some bravo**.[^1]
  *
- * That is the Chicago Manual of Style's rule, the one every major style
- * guide shares (Jason's ask, former sheet 01, 2026-09-09). A markdown link's
- * "(url)" tail right after a "]" is stepped over whole, so the reference
- * never splits "[text](url)". A space, a letter, or an opening bracket
- * (the start of a following reference) ends the walk.
+ * That is the Chicago Manual of Style's rule, which English, Taiwanese,
+ * Korean and Dutch writing share (Jason's ask, former sheet 01,
+ * 2026-09-09; it was called "the one every major style guide shares"
+ * until the 2026-09-20 research found that mainland Chinese, Japanese,
+ * French and the EU style guide put the marker before the punctuation).
+ * `placement` picks the convention (see FootnotePlacement): "before"
+ * stops the walk in front of punctuation, except a punctuation run that
+ * a closing mark follows, which is stepped over with the mark so the
+ * reference still lands outside the quote; "none" stops in front of
+ * punctuation always. Closing marks are stepped over in every mode.
+ *
+ * A markdown link's "(url)" tail right after a "]" is stepped over whole,
+ * so the reference never splits "[text](url)". A space, a letter, or an
+ * opening bracket (the start of a following reference) ends the walk.
  */
-export function referenceLandingAfter(text: string, end: number): number {
+export function referenceLandingAfter(text: string, end: number, placement: FootnotePlacement = "after"): number {
     let at = end;
     for (;;) {
         if (at >= text.length) return at;
@@ -72,6 +104,25 @@ export function referenceLandingAfter(text: string, end: number): number {
             continue;
         }
         if (!ClosingMarkChars.includes(c) && !TrailingPunctuationChars.includes(c)) return at;
+        if (placement !== "after" && TrailingPunctuationChars.includes(c)) {
+            if (placement === "none") return at;
+            // "before": the run of punctuation from here is stepped over
+            // only when a closing mark follows it (the period inside
+            // "quoted." or 「句子。」), and that mark must be a real closer,
+            // not glued to the next word; otherwise the reference stops in
+            // front of the punctuation
+            let runEnd = at;
+            while (runEnd < text.length && TrailingPunctuationChars.includes(text[runEnd])) runEnd++;
+            if (
+                runEnd >= text.length ||
+                !ClosingMarkChars.includes(text[runEnd]) ||
+                isWordCharAt(text, runEnd + 1)
+            ) {
+                return at;
+            }
+            at = runEnd;
+            continue;
+        }
         // A mark or punctuation character glued to a word character on its
         // far side is not a closer: an emphasis OPENER ("[^1]*important*"),
         // an opening quote, or punctuation inside a word ("Marx's",
