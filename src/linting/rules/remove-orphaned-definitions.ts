@@ -287,8 +287,11 @@ export function removeOrphanedFootnoteDefinitions(markdown: string): string {
  * where it was live, or a definition start where it was not (or the other
  * way round). The kept lines are walked in step with the result; a blank
  * line the cut collapsed is skipped over.
+ *
+ * Shared with the Delete footnote command, which cuts a definition block
+ * the same way (T4, 2026-09-21).
  */
-function linesReadDifferently(
+export function linesReadDifferently(
     lines: string[],
     scan: DocumentScan,
     dead: DefinitionBlock[],

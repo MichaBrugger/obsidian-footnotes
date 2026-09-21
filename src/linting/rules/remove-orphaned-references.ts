@@ -221,17 +221,6 @@ export function removeOrphanedFootnoteReferences(
     ]);
     const orphanSafeFolded = orphanSafePrefix.toLowerCase();
 
-    // One orphan's cut, with the gap closed the way the user would close
-    // it: a space just after the cut goes when the text before the cut
-    // already ends in a space or the cut was at the line's very start, and
-    // a reference that ended the line takes the space in front of it.
-    const cutOne = (line: string, start: number, end: number): string => {
-        const head = line.slice(0, start);
-        let copied = end;
-        if (line[copied] === " " && (head === "" || head.endsWith(" "))) copied++;
-        const tail = line.slice(copied);
-        return tail === "" ? head.replace(/[ \t]+$/, "") : head + tail;
-    };
     // the orphans on each line, rightmost first so that cutting one keeps
     // the offsets of the ones before it
     const orphansOn = (i: number): { start: number; end: number }[] =>
@@ -243,38 +232,14 @@ export function removeOrphanedFootnoteReferences(
                   .reverse();
     if (!lines.some((_, i) => orphansOn(i).length > 0)) return markdown;
 
-    // Deleting reference text can change how Obsidian reads a line far
-    // away. Emptying the paragraph between a definition and an indented
-    // block turns that block from indented CODE into a continuation line of
-    // the definition, because Obsidian carries a definition on across any
-    // number of blank lines. (Verified against metadataCache, 2026-08-10;
-    // found by the idempotence property.) The next lint would then edit
-    // text this one promised to leave alone. Emptying the line above a
-    // lazy label would turn that label into a real definition (second
-    // review, 2026-09-09). And a leftover marker can turn a kept line into
-    // a block of another kind: "#[^9] tail" is prose ("#" needs a space
-    // after it) and "# tail" a heading, "-[^9]" is prose and "-" a bullet
-    // (Kimi hunt cycle 4, 2026-09-16). A cut that changes any of these for
-    // ANY line is refused, and the orphan stays for the user to sort out.
+    // A cut that changes how Obsidian reads ANY line is refused, and the
+    // orphan stays for the user to sort out (readsDifferently says why).
     //
     // Each orphaned NAME is judged on its own, all of its references
     // together: one refused cut used to veto every safe one in the note
     // (Kimi hunt cycle 4), and a name half deleted would confuse the alert
     // that speaks in names. The whole set is tried first, since that is
     // the common case and costs one scan.
-    const readsDifferently = (before: string[], scanBefore: DocumentScan, startsBefore: boolean[], after: string[]): boolean => {
-        const scanAfter = scanDocument(after);
-        for (let i = 0; i < before.length; i++) {
-            if (scanBefore.isProtected[i] !== scanAfter.isProtected[i]) return true;
-        }
-        const maskedAfter = maskProtectedLines(after, scanAfter);
-        const startsAfter = definitionStartLines(after, scanAfter, (i) => maskedAfter[i]);
-        for (let i = 0; i < before.length; i++) {
-            if (startsBefore[i] !== startsAfter[i]) return true;
-            if (before[i] !== after[i] && blockKind(before[i]) !== blockKind(after[i])) return true;
-        }
-        return false;
-    };
     const all = lines.map((line, i) => orphansOn(i).reduce((text, { start, end }) => cutOne(text, start, end), line));
     if (!readsDifferently(lines, scan, starts, all)) return restoreEol(all.join("\n"), eol);
 
@@ -309,6 +274,59 @@ export function removeOrphanedFootnoteReferences(
     }
     if (current === lines) return markdown;
     return restoreEol(current.join("\n"), eol);
+}
+
+/**
+ * One reference's cut out of its line, with the gap closed the way the
+ * user would close it: a space just after the cut goes when the text
+ * before the cut already ends in a space or the cut was at the line's very
+ * start, and a reference that ended the line takes the space in front of
+ * it. Spaces the line already ended with stay, because two of them at the
+ * end of a line are a markdown line break the user typed on purpose.
+ *
+ * Shared with the Delete footnote command, which cuts references the same
+ * way (T4, 2026-09-21).
+ */
+export function cutOne(line: string, start: number, end: number): string {
+    const head = line.slice(0, start);
+    let copied = end;
+    if (line[copied] === " " && (head === "" || head.endsWith(" "))) copied++;
+    const tail = line.slice(copied);
+    return tail === "" ? head.replace(/[ \t]+$/, "") : head + tail;
+}
+
+/**
+ * Whether cutting reference text changed how Obsidian reads ANY line of
+ * the note. `before` and `after` are the same lines with the cuts made,
+ * so they are the same length.
+ *
+ * Deleting reference text can change how Obsidian reads a line far away.
+ * Emptying the paragraph between a definition and an indented block turns
+ * that block from indented CODE into a continuation line of the
+ * definition, because Obsidian carries a definition on across any number
+ * of blank lines. (Verified against metadataCache, 2026-08-10; found by
+ * the idempotence property.) The next lint would then edit text this one
+ * promised to leave alone. Emptying the line above a lazy label would turn
+ * that label into a real definition (second review, 2026-09-09). And a
+ * leftover marker can turn a kept line into a block of another kind:
+ * "#[^9] tail" is prose ("#" needs a space after it) and "# tail" a
+ * heading, "-[^9]" is prose and "-" a bullet (Kimi hunt cycle 4,
+ * 2026-09-16).
+ *
+ * Shared with the Delete footnote command (T4, 2026-09-21).
+ */
+export function readsDifferently(before: string[], scanBefore: DocumentScan, startsBefore: boolean[], after: string[]): boolean {
+    const scanAfter = scanDocument(after);
+    for (let i = 0; i < before.length; i++) {
+        if (scanBefore.isProtected[i] !== scanAfter.isProtected[i]) return true;
+    }
+    const maskedAfter = maskProtectedLines(after, scanAfter);
+    const startsAfter = definitionStartLines(after, scanAfter, (i) => maskedAfter[i]);
+    for (let i = 0; i < before.length; i++) {
+        if (startsBefore[i] !== startsAfter[i]) return true;
+        if (before[i] !== after[i] && blockKind(before[i]) !== blockKind(after[i])) return true;
+    }
+    return false;
 }
 
 /**
