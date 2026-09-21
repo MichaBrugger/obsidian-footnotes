@@ -1,9 +1,15 @@
-import { referenceOccurrences } from "../parsing/footnote-grammar";
 import {
+    definitionLabelWithName,
+    quotedDefinitionLabel,
+    referenceOccurrences,
+} from "../parsing/footnote-grammar";
+import {
+    DefinitionBlock,
     definitionStartLines,
     findDefinitionBlocks,
     maskProtectedLines,
     normalizeEol,
+    quotedDefinitionEnd,
     removeLineRanges,
     restoreEol,
     scanDocument,
@@ -54,9 +60,31 @@ export function deleteFootnoteEverywhere(markdown: string, name: string): Delete
     const masked = maskProtectedLines(lines, scan);
     const starts = definitionStartLines(lines, scan, (i) => masked[i]);
 
-    const blocks = findDefinitionBlocks(lines, scan, masked, starts).filter(
+    const blocks: DefinitionBlock[] = findDefinitionBlocks(lines, scan, masked, starts).filter(
         (block) => block.name.toLowerCase() === folded,
     );
+    // A label inside a blockquote or callout ("> [^x]: ...") is a real
+    // definition everywhere else in the plugin but never forms a block, so
+    // it is collected here with the quoted continuation Obsidian gives it
+    // (the same reading the orphan-definition rule uses). A label that
+    // shares its line with the "%%" closing a comment is never cut, since
+    // the line would take the closer with it and leave the comment open
+    // over the rest of the note; the command refuses and says so.
+    for (let i = 0; i < lines.length; i++) {
+        if (scan.isProtected[i] || !starts[i]) continue;
+        const hit = definitionLabelWithName(lines[i], masked[i]);
+        if (!hit || hit.name.toLowerCase() !== folded) continue;
+        if (hit.label.afterCloser) {
+            return {
+                kind: "refused",
+                reason: `Nothing was deleted: the ${quotedDefinitionLabel(hit.name)} definition shares its line with the "%%" that closes a comment, so cutting it would leave the comment open. Delete it by hand.`,
+            };
+        }
+        if (hit.label.quoted) {
+            blocks.push({ name: hit.name, start: i, end: quotedDefinitionEnd(lines, scan, starts, i) });
+        }
+    }
+    blocks.sort((a, b) => a.start - b.start);
     // the lines a block cut takes with it: a reference on one of them
     // goes with the block and is not cut, or counted, on its own
     const cut = new Set<number>();
