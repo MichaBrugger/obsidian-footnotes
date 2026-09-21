@@ -181,6 +181,7 @@ Notes for writing new smoke tests:
   removed exports.
 - Before committing anything that touches editor behavior: `npm run
   test:smoke`.
+- Bumping the version: `npm version 0.2.1-beta.1` writes manifest-beta.json alone (a BRAT beta); `npm version 0.2.1` writes manifest.json, versions.json, and manifest-beta.json together, because older BRAT builds install whatever version manifest-beta.json names on the default branch, so the beta manifest must never lag a stable release (the release workflow refuses a stable tag while it does).
 - Before a release: all of the above, a property soak (`FC_NUM_RUNS`),
   `npm run mutation`, and the manual sheets (`manual-tests/0 - How to
   use.md`, mirrored into the sandbox vault's "Footnote Tests" folder).

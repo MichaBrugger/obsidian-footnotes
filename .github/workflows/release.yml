@@ -51,6 +51,16 @@ jobs:
             elif [ "$tag" != "$version" ]; then
               echo "Tag ($tag) matches neither manifest.json ($version) nor manifest-beta.json ($beta_version)." >&2
               exit 1
+            elif [ "$beta_version" != "$version" ]; then
+              # Older BRAT builds read manifest-beta.json's version straight
+              # off the default branch and install THAT release, so a beta
+              # manifest left at an old beta keeps every BRAT tester on it
+              # after the stable release ships (Jason's report 2026-09-21,
+              # beta.16 outranking 0.2.0). A stable release therefore has
+              # to carry the same version in both manifests; the bump
+              # script writes both, and this refuses a tag that skipped it.
+              echo "manifest-beta.json ($beta_version) must match manifest.json ($version) for a stable release, or BRAT testers stay on the old beta." >&2
+              exit 1
             fi
           fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
