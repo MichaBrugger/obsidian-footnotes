@@ -5,7 +5,9 @@ import { fakePlugin } from "./helpers/fake-plugin";
 import { messages, resetNotices } from "./helpers/notices";
 import {
     convertInlineFootnotesToNormal,
+    convertInlineToNormalCommand,
     convertNormalFootnotesToInline,
+    convertNormalToInlineCommand,
 } from "../src/commands/convert-footnotes";
 
 // Converting a note's footnotes between the two styles (T6 of the 2026-09
@@ -159,5 +161,45 @@ describe("convertInlineFootnotesToNormal", () => {
         expect(messages()).toContain(
             "Converted 3 inline footnotes into 2 normal footnotes (1 identical body merged).",
         );
+    });
+});
+
+describe("the two command entries", () => {
+    beforeEach(resetNotices);
+
+    it("normal to inline writes the transform back in one transaction and names what it skipped", async () => {
+        const doc = fakeEditor(["a[^1] b[^n] c[^n]", "", "[^1]: one", "[^n]: shared", "[^long]: first", "    second"], {
+            wholeDoc: true,
+            edits: true,
+            cursor: { line: 0, ch: 0 },
+            selection: { anchor: { line: 0, ch: 0 }, head: { line: 0, ch: 0 } },
+        });
+        await convertNormalToInlineCommand(fakePlugin({}, doc));
+        expect(doc.lines).toEqual(["a^[one] b^[shared] c^[shared]", "", "[^long]: first", "    second"]);
+        expect(doc.transactions).toBe(1);
+        expect(messages()).toContain(
+            'Converted 2 footnotes into inline footnotes at 3 references (1 definition used more than once became copies). Skipped "[^long]" (more than one line).',
+        );
+    });
+
+    it("normal to inline says so when there is nothing it can convert", async () => {
+        const doc = fakeEditor(["a[^m]", "", "[^m]: first", "    second"], {
+            wholeDoc: true,
+            cursor: { line: 0, ch: 0 },
+            selection: { anchor: { line: 0, ch: 0 }, head: { line: 0, ch: 0 } },
+        });
+        await convertNormalToInlineCommand(fakePlugin({}, doc));
+        expect(messages()).toContain('No footnotes converted. Skipped "[^m]" (more than one line).');
+    });
+
+    it("inline to normal runs through the command entry", async () => {
+        const doc = fakeEditor(["a^[one]"], {
+            wholeDoc: true,
+            edits: true,
+            cursor: { line: 0, ch: 0 },
+            selection: { anchor: { line: 0, ch: 0 }, head: { line: 0, ch: 0 } },
+        });
+        await convertInlineToNormalCommand(fakePlugin({}, doc));
+        expect(doc.lines).toEqual(["a[^1]", "", "[^1]: one"]);
     });
 });

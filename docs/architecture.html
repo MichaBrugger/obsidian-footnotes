@@ -453,7 +453,7 @@
 <div class="stats">
   <div class="stat" style="--st: var(--commands)"><div class="n">43</div><div class="l">source files, 16,491 lines (about 40% of them comments)</div></div>
   <div class="stat" style="--st: var(--scaffold)"><div class="n">397</div><div class="l">test files (286 of them are pinned bugs)</div></div>
-  <div class="stat" style="--st: var(--commands)"><div class="n">8</div><div class="l">commands you can bind to a key</div></div>
+  <div class="stat" style="--st: var(--commands)"><div class="n">10</div><div class="l">commands you can bind to a key</div></div>
   <div class="stat" style="--st: var(--linting)"><div class="n">8</div><div class="l">lint rules, run in a fixed order</div></div>
 </div>
 
@@ -485,7 +485,7 @@
   <div class="gap"><span>loads</span></div>
   <div class="band l-plumbing">
     <div><span class="name">plumbing</span><span class="count">main.ts + settings.ts · 2 files · 714 lines</span></div>
-    <div class="what">Registers the 8 commands and 7 icons, loads and migrates settings, installs the save hook and the vim hook, and puts it all back on unload.</div>
+    <div class="what">Registers the 10 commands and 9 icons, loads and migrates settings, installs the save hook and the vim hook, and puts it all back on unload.</div>
     <div class="uses"><span class="lbl">leans on</span><span class="chip l-commands">commands</span><span class="chip l-linting">linting</span><span class="chip l-editor">editor</span><span class="chip l-parsing">parsing</span></div>
   </div>
   <div class="gap"><span>calls</span></div>
@@ -562,7 +562,7 @@
 <section data-layer="commands">
 <div class="prose">
 <h2><sup>3</sup>Commands: what happens when you press the key</h2>
-<p>Obsidian sees eight commands. Four of them share one piece of machinery, the <strong>cascade</strong>, and that machinery is most of the commands folder.</p>
+<p>Obsidian sees ten commands. Four of them share one piece of machinery, the <strong>cascade</strong>, and that machinery is most of the commands folder.</p>
 </div>
 <div class="table-wrap">
 <table>
@@ -573,6 +573,8 @@
   <tr><td>Insert inline footnote from clipboard</td><td>Same, with the clipboard as the body. Every guard runs before the clipboard is read.</td><td><span class="dot l-commands"></span><span class="mono">inline-footnotes.ts</span></td></tr>
   <tr><td>Rename footnote</td><td>Dialog to rename the footnote under the caret everywhere at once. Also in the right-click menu on the desktop. On a phone, where Obsidian owns the long-press menu, long-press to select the name and then use the toolbar icon or the command palette.</td><td><span class="dot l-commands"></span><span class="mono">rename-footnote.ts</span></td></tr>
   <tr><td>Delete footnote definition and all references</td><td>Removes the footnote under the caret everywhere: its definition and every reference to it, in one transaction. Obsidian's own right-click delete removes only the clicked reference. Also in the right-click menu and, on a phone, the toolbar icon.</td><td><span class="dot l-commands"></span><span class="mono">delete-footnote.ts</span></td></tr>
+  <tr><td>Convert inline footnotes to normal footnotes</td><td>Every <code>^[body]</code> in the note becomes a numbered reference with its definition appended where a creation press would put it; identical bodies merge into one definition. One transaction.</td><td><span class="dot l-commands"></span><span class="mono">convert-footnotes.ts</span></td></tr>
+  <tr><td>Convert normal footnotes to inline footnotes</td><td>Every single-line definition becomes <code>^[body]</code> at each of its references and its block is cut; anything the inline form cannot hold is skipped and named. A pure transform written back as one transaction.</td><td><span class="dot l-commands"></span><span class="mono">convert-footnotes.ts</span></td></tr>
   <tr><td>Set footnote prefix</td><td>Modal that writes the <code>footnote-prefix</code> property. Works in Reading view too.</td><td><span class="dot l-commands"></span><span class="mono">set-footnote-prefix.ts</span></td></tr>
   <tr><td>Lint footnotes</td><td>Runs the whole cleanup pipeline (section 4).</td><td><span class="dot l-linting"></span><span class="mono">linting/linter.ts</span></td></tr>
 </table>
@@ -745,7 +747,7 @@
 <section data-layer="plumbing">
 <div class="prose">
 <h2><sup>5</sup>Plumbing: main.ts, settings, and the danger zone</h2>
-<p><code>main.ts</code> is the only file Obsidian loads. On load it registers the eight commands and seven icons (six hand-drawn, one placeholder for the delete command until its own arrives), installs the save hook and the vim hook, registers the undo-orphan extension, wires the right-click rename and delete entries, and runs settings migrations. On unload it puts everything back.</p>
+<p><code>main.ts</code> is the only file Obsidian loads. On load it registers the ten commands and nine icons (six hand-drawn, three placeholders for the delete and convert commands until their own arrive), installs the save hook and the vim hook, registers the undo-orphan extension, wires the right-click rename and delete entries, and runs settings migrations. On unload it puts everything back.</p>
 <p><code>settings.ts</code> holds the settings interface, the defaults, and the settings tab, written against the declarative settings API in Obsidian 1.13. The migrations live in <code>main.ts</code>: version 1 renamed every <code>tidy*</code> key to <code>lint*</code> when the feature was renamed, and version 2 flipped the polarity of the orphan-definition toggle. Loading also type-checks every saved key against the defaults and drops mismatches, so a hand-edited <code>"no"</code> cannot be read as true.</p>
 <p><span class="dot l-editor"></span><code>editor/obsidian-internals.ts</code> is the deliberate quarantine for everything undocumented: the raw CodeMirror view behind the editor, the embed registry the popup hijacks, the property type manager, the hotkey manager (so the name modal can read your real key bindings), vim's internal state (so Escape in the popup can tell insert mode from normal mode), and the command executor. Every access is optional-chained so a future Obsidian release degrades a feature rather than crashing the plugin. Anything that touches this file is smoke-test territory, not unit-test territory, because a mocked test would only encode the plugin's own assumptions.</p>
 </div>
@@ -836,7 +838,7 @@
     create-footnote.ts, definition-append.ts, navigation.ts, press-guards.ts
     selection-footnote.ts, multi-caret.ts, inline-footnotes.ts
     footnote-popup.ts, popup-retry.ts
-    rename-footnote.ts, delete-footnote.ts, set-footnote-prefix.ts, validated-text-modal.ts</span>
+    rename-footnote.ts, delete-footnote.ts, convert-footnotes.ts, set-footnote-prefix.ts, validated-text-modal.ts</span>
 <span class="l-linting">  linting/                the cleanup
     linter.ts               order, triggers, the write-back
     rules/                  the eight rules

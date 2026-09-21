@@ -29,7 +29,7 @@ The plugin adds its commands **without hotkeys**, so assign your own right after
 
 `Settings → Hotkeys → search for "Footnote Shortcut" → click the ⨁ next to a command → press your preferred keys`
 
-Of the plugin's 8 commands, the ones you'll press constantly should have hotkeys. I personally use:
+Of the plugin's 10 commands, the ones you'll press constantly should have hotkeys. I personally use:
 
 
 | Command                               | Recommended hotkey                           |
@@ -41,7 +41,7 @@ Of the plugin's 8 commands, the ones you'll press constantly should have hotkeys
 
 <img src="README/hotkeys.png" width="800" alt="The Hotkeys settings tab filtered to Footnote Shortcut, with the four recommended bindings set">
 
-The other 4 (**Lint footnotes**, **Rename footnote**, **Delete footnote definition and all references**, and **Set footnote prefix**) come up less often, so running them from the command palette works fine. Give them hotkeys too if they become part of your routine.
+The other 6 (**Lint footnotes**, **Rename footnote**, **Delete footnote definition and all references**, the two **Convert** commands, and **Set footnote prefix**) come up less often, so running them from the command palette works fine. Give them hotkeys too if they become part of your routine.
 
 Everything also works on mobile from the toolbar, each with their own unique toolbar icons.
 
@@ -128,6 +128,15 @@ Put your cursor on any reference or definition and run **Rename footnote**. It w
 ### Deleting a footnote
 
 Put your cursor on any reference or definition and run **Delete footnote definition and all references**. The definition and every reference to it go in one step and one undo, and the toast tells you how many of each went. It's also in the right-click menu on a footnote, next to Obsidian's own **Delete footnote and reference**, which removes only the one reference you clicked: if the same footnote is cited in two places, Obsidian's item leaves the other reference behind pointing at nothing. Copies inside code, math or comments are plain text and stay. A deletion that would change how Obsidian reads the surrounding text (a footnote defined inside a list item, a definition sharing its line with the end of a `%%` comment) is refused with a reason instead of half done.
+
+### Converting between footnote styles
+
+Two commands convert a whole note at once, each way, in one undo:
+
+- **Convert inline footnotes to normal footnotes** turns every `^[body]` into a numbered reference with its definition appended where a new footnote would go (after the last definition, under your section heading, or at the end of the note), carrying the note's prefix if it has one. Identical bodies become one definition with several references, and the toast says how many merged. An empty `^[]` and one inside a definition's body are left alone.
+- **Convert normal footnotes to inline footnotes** turns every single-line definition into `^[body]` at each of its references and removes the definition. A definition of more than one line has no inline form, so it is skipped and named, as is one whose body holds a footnote (footnotes never nest), one referenced from inside another footnote, one inside a blockquote or list item, an orphan, and a name defined twice. A definition cited in three places necessarily becomes three copies; the toast says so.
+
+Why: Obsidian's embed renderer drops normal footnote definitions, so a transcluded section keeps only its inline footnotes. Convert to inline before embedding and back afterwards, and a shared definition comes back shared.
 
 ### The popup editor
 

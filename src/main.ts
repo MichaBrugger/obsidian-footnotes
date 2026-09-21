@@ -22,6 +22,7 @@ import { insertAutonumFootnote, insertInlineFootnote, insertNamedFootnote, paste
 import { footnotePrefixFromEditor } from "./parsing/footnote-prefix";
 import { registerRenameFootnoteMenu, renameFootnote } from "./commands/rename-footnote";
 import { deleteFootnote, registerDeleteFootnoteMenu } from "./commands/delete-footnote";
+import { convertInlineToNormalCommand, convertNormalToInlineCommand } from "./commands/convert-footnotes";
 import { SetFootnotePrefixModal } from "./commands/set-footnote-prefix";
 import {
   installLintOnSave,
@@ -83,6 +84,12 @@ export default class FootnotePlugin extends Plugin {
     // Delete footnote definition and all references (T4, 2026-09-21). A
     // placeholder until Jason's custom icon lands: Lucide's trash-2 outline.
     addIcon("footnote-delete", `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /><line x1="10" x2="10" y1="11" y2="17" /><line x1="14" x2="14" y1="11" y2="17" /></g></svg>`);
+    // Convert inline footnotes to normal, and back (T6, 2026-09-21).
+    // Placeholders until Jason's own icons land: Lucide's arrow-down-to-line
+    // (the definitions go down to the bottom) and arrow-up-from-line (they
+    // come back up into the text).
+    addIcon("footnote-to-normal", `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17V3" /><path d="m6 11 6 6 6-6" /><path d="M19 21H5" /></g></svg>`);
+    addIcon("footnote-to-inline", `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 9-6-6-6 6" /><path d="M12 3v14" /><path d="M5 21h14" /></g></svg>`);
     addIcon("footnote-rename", `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M 19,20 V 13" /><path d="m 22,18 -3,3 -3,-3" /><path d="M 19.005,8.96 21.174,6.812 v 0 C 23.832,4.155 19.846,0.168 17.188,2.825 L 3.842,16.174 c -0.232,0.232 -0.404,0.517 -0.5,0.83 l -1.321,4.352 c -0.114,0.381 0.242,0.737 0.623,0.622 l 4.353,-1.32 c 0.313,-0.095 0.598,-0.266 0.83,-0.497 l 7.177,-7.197" /></g></svg>`);
     addIcon("footnote-inline-cursor", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g transform="translate(0,-62)" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><g transform="translate(0,62)"><path d="m12 18v-12c0-2.2091 1.7909-4 4-4h1"/><path d="m7 22h1a4 4 0 0 0 4-4"/><path d="m7 2h1a4 4 0 0 1 4 4"/></g><path d="m22 81-3-3-3 3"/></g></svg>`);
     addIcon("footnote-inline-paste", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><g transform="translate(0,-27)"><rect x="8" y="29" width="8" height="4" rx="1" ry="1"/><path d="m16 31h2c1.1046 0 2 0.89543 2 2v6m-7 10h-7c-1.1046 0-2-0.89543-2-2v-14c0-1.1046 0.89543-2 2-2h2"/></g><path d="m22 19-3-3-3 3"/></g></svg>`);
@@ -172,6 +179,31 @@ export default class FootnotePlugin extends Plugin {
     });
     this.editorCommandIds.push(`${this.manifest.id}:delete-footnote`);
     registerDeleteFootnoteMenu(this);
+    // Convert a whole note's footnotes between the two styles (T6 of the
+    // 2026-09 feature round). Obsidian's embed renderer drops normal
+    // footnote definitions, so people switched to inline by hand before
+    // transcluding, permanently; these make it one keystroke each way, and
+    // the merge on the way back restores a shared definition.
+    this.addCommand({
+      id: "convert-inline-to-normal",
+      name: "Convert inline footnotes to normal footnotes",
+      icon: "footnote-to-normal",
+      checkCallback: (checking: boolean) => {
+        if (checking) return !!this.editableMarkdownView();
+        void convertInlineToNormalCommand(this);
+      },
+    });
+    this.editorCommandIds.push(`${this.manifest.id}:convert-inline-to-normal`);
+    this.addCommand({
+      id: "convert-normal-to-inline",
+      name: "Convert normal footnotes to inline footnotes",
+      icon: "footnote-to-inline",
+      checkCallback: (checking: boolean) => {
+        if (checking) return !!this.editableMarkdownView();
+        void convertNormalToInlineCommand(this);
+      },
+    });
+    this.editorCommandIds.push(`${this.manifest.id}:convert-normal-to-inline`);
     this.addCommand({
       id: "set-footnote-prefix",
       name: "Set footnote prefix",
