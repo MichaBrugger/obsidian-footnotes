@@ -1,6 +1,22 @@
+import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 
-import { deleteFootnoteEverywhere } from "../src/commands/delete-footnote";
+import { docArb } from "./arbitraries";
+import { fakeEditor } from "./helpers/fake-editor";
+import { fakePlugin } from "./helpers/fake-plugin";
+import { messages, resetNotices } from "./helpers/notices";
+import {
+    deleteFootnote,
+    deleteFootnoteEverywhere,
+    DeleteTargetNotice,
+} from "../src/commands/delete-footnote";
+import { definitionLabelWithName, referenceOccurrences } from "../src/parsing/footnote-grammar";
+import {
+    definitionStartLines,
+    maskProtectedLines,
+    normalizeEol,
+    scanDocument,
+} from "../src/parsing/markdown-scan";
 
 // Deleting a footnote everywhere (T4, Jason's rulings 2026-09-19 to 21):
 // the definition and EVERY reference to it go in one step, whichever end
@@ -126,5 +142,79 @@ describe("deleteFootnoteEverywhere", () => {
         expect(plan.kind).toBe("refused");
         if (plan.kind !== "refused") throw new Error("unreachable");
         expect(plan.reason).toContain('"[^9]"');
+    });
+});
+
+/** Every live mention of a name in `markdown`, lower-cased: references on unprotected lines (a lazy label's head counts, as it renders) and the labels that start definitions. */
+function liveNames(markdown: string): string[] {
+    const lines = normalizeEol(markdown).text.split("\n");
+    const scan = scanDocument(lines);
+    const masked = maskProtectedLines(lines, scan);
+    const starts = definitionStartLines(lines, scan, (i) => masked[i]);
+    const names: string[] = [];
+    for (let i = 0; i < lines.length; i++) {
+        if (scan.isProtected[i]) continue;
+        for (const { name } of referenceOccurrences(lines[i], masked[i], starts[i])) {
+            names.push(name.toLowerCase());
+        }
+        if (starts[i]) {
+            const hit = definitionLabelWithName(lines[i], masked[i]);
+            if (hit) names.push(hit.name.toLowerCase());
+        }
+    }
+    return names;
+}
+
+describe("delete property", () => {
+    fc.configureGlobal({ numRuns: Number(process.env.FC_NUM_RUNS ?? 200) });
+
+    it("is total, and after a deletion no live reference or definition of the name remains, and deleting again finds nothing", () => {
+        fc.assert(
+            fc.property(docArb, fc.nat(1000), (raw, pick) => {
+                const names = [...new Set(liveNames(raw))];
+                if (names.length === 0) {
+                    expect(deleteFootnoteEverywhere(raw, "zz-absent")).toEqual({ kind: "nothing" });
+                    return;
+                }
+                const name = names[pick % names.length];
+                const plan = deleteFootnoteEverywhere(raw, name);
+                if (plan.kind === "nothing") {
+                    // every live name found above is a reference or a
+                    // definition, so there is always something to delete
+                    throw new Error(`nothing to delete for a live name ${name}`);
+                }
+                if (plan.kind === "refused") return;
+                expect(liveNames(plan.markdown)).not.toContain(name);
+                expect(deleteFootnoteEverywhere(plan.markdown, name)).toEqual({ kind: "nothing" });
+                expect(plan.references + plan.definitions).toBeGreaterThan(0);
+            }),
+        );
+    });
+});
+
+describe("the command entry", () => {
+    it("deletes the footnote under the caret in ONE transaction and says what went", async () => {
+        resetNotices();
+        const doc = fakeEditor(["a[^n] b[^n] c", "", "[^n]: n"], {
+            wholeDoc: true,
+            edits: true,
+            cursor: { line: 0, ch: 3 },
+            selection: { anchor: { line: 0, ch: 3 }, head: { line: 0, ch: 3 } },
+        });
+        await deleteFootnote(fakePlugin({}, doc));
+        expect(doc.lines).toEqual(["a b c"]);
+        expect(doc.transactions).toBe(1);
+        expect(messages()).toContain('Deleted "[^n]" everywhere: 2 references and 1 definition.');
+    });
+
+    it("explains itself when the caret is on nothing deletable", async () => {
+        resetNotices();
+        const doc = fakeEditor(["plain prose here"], {
+            wholeDoc: true,
+            cursor: { line: 0, ch: 3 },
+            selection: { anchor: { line: 0, ch: 3 }, head: { line: 0, ch: 3 } },
+        });
+        await deleteFootnote(fakePlugin({}, doc));
+        expect(messages()).toContain(DeleteTargetNotice);
     });
 });

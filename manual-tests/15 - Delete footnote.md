@@ -1,0 +1,35 @@
+# 15: delete footnote definition and all references (2026-09-21)
+
+Claude: automated coverage lives in test/delete-footnote.test.ts (the transform, its refusals, a property over random notes, and the command entry); run `npm test` before this sheet. What is left here needs the live app: how the toast reads, undo grouping, the right-click menu, the popup, and the phone.
+
+Settings: defaults. Undo between checks. Every fixture is already in this note: a footnote cited twice[^twice] and again here[^twice], a right-click fixture[^menu], and a chained one[^chain] whose definition cites another footnote.
+
+## The command
+
+Run **Delete footnote definition and all references** from the command palette with the caret in each spot:
+
+- [ ] Caret inside the first `[^twice]` above: BOTH references and the definition go; the toast reads well and its counts ("2 references and 1 definition") make sense at a glance
+- [ ] One undo brings everything back at once (both references and the definition, not one press each), with the caret where it was
+- [ ] Caret inside the `[^twice]:` label at the bottom: the same deletion happens from the definition's end
+- [ ] Caret inside `[^chain]`: the chained definition goes, and the lint alert that follows names `[^inner]` as a definition nothing references now (the deleted body was its only citation)
+- [ ] With the popup open on `[^menu]`, running the command first settles/closes the popup and does not delete anything on that press (the same rule as rename)
+
+## The right-click menu
+
+- [ ] Right-click ON `[^menu]` above: the menu shows **Delete footnote definition and all references** with the trash icon, in the same section as **Rename footnote**, and Obsidian's own **Delete footnote and reference** is still there beside it
+- [ ] Choosing it deletes the definition and the reference, with the same toast as the command
+
+## Compare with Obsidian's own item
+
+- [ ] Right-click the first `[^twice]` and choose Obsidian's own **Delete footnote and reference**: only that one reference and the definition go, and the second `[^twice]` is left behind (the core behaviour this command exists to fix; Jason's report 2026-09-19). Undo.
+
+## The phone
+
+(There is no long-press twin on the phone: Obsidian owns that menu there. The route is the toolbar icon or the command palette after a long press selects the name, as for rename on sheet 13.)
+
+- [ ] On the phone, long-press `[^menu]` so the word is selected, then tap the command's toolbar icon: the deletion happens and the toast reads well at phone width
+
+[^twice]: cited twice
+[^menu]: the right-click fixture
+[^chain]: this body cites[^inner] another footnote
+[^inner]: only the chained body cites this one

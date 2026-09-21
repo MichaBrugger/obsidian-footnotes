@@ -125,6 +125,10 @@ Put your cursor on any reference or definition and run **Rename footnote**. It w
 
 ![Rename footnote: every reference and the definition take the new name together](README/rename.gif)
 
+### Deleting a footnote
+
+Put your cursor on any reference or definition and run **Delete footnote definition and all references**. The definition and every reference to it go in one step and one undo, and the toast tells you how many of each went. It's also in the right-click menu on a footnote, next to Obsidian's own **Delete footnote and reference**, which removes only the one reference you clicked: if the same footnote is cited in two places, Obsidian's item leaves the other reference behind pointing at nothing. Copies inside code, math or comments are plain text and stay. A deletion that would change how Obsidian reads the surrounding text (a footnote defined inside a list item, a definition sharing its line with the end of a `%%` comment) is refused with a reason instead of half done.
+
 ### The popup editor
 
 Creating or visiting a footnote opens its definition text in a small editor right at your cursor, so you never lose your place in the note. Close it with the same hotkey, <kbd>Escape</kbd>, or by clicking anywhere outside. Switching to Reading view closes it too. If a footnote has more than one definition, the hotkey jumps to the last definition instead (the one Reading View renders) so you can sort it out (or let the linter merge them). If you prefer the classic jump-to-the-bottom behavior, turn off **Edit footnotes in a popup** in the settings.

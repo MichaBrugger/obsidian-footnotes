@@ -29,6 +29,7 @@ The smoke suite drives the real plugin inside the running sandbox vault (Obsidia
 | 12 | Lint triggers (on save, on creation) and the settings page | 5 |
 | 13 | Phone and mobile emulation (needs a beta on the phone) | 9 |
 | 14 | Definition labels directly after a prose line are prose (Obsidian's rule, matched 2026-09-09) | 2 |
+| 15 | Delete footnote definition and all references: the command, the right-click menu, undo, the phone (added 2026-09-21) | 9 |
 
 Inter-plugin compatibility sheets live separately in the repo's `compat-tests/` folder (vault mirror: "Footnote Compat Tests"); they need other plugins installed and follow different pass/fail rules.
 

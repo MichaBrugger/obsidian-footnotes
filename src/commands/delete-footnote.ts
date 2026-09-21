@@ -20,6 +20,15 @@ import {
 } from "../parsing/markdown-scan";
 import { linesReadDifferently } from "../linting/rules/remove-orphaned-definitions";
 import { cutOne, readsDifferently } from "../linting/rules/remove-orphaned-references";
+import { MarkdownView } from "obsidian";
+
+import type FootnotePlugin from "../main";
+import { showNotice } from "../editor/notice";
+import { runOutsideTableCell } from "../editor/table-cursor";
+import { replaceMinimal } from "../editor/write-back";
+import { noticeLintAlerts } from "../linting/lint-alerts";
+import { withEditableEditor } from "./insert-or-navigate-footnotes";
+import { renameTargetAtCursor, renameTargetInSelection } from "./rename-footnote";
 
 // Deleting a footnote everywhere (T4 of the 2026-09 feature round; Jason's
 // rulings 2026-09-19 to 2026-09-21).
@@ -162,4 +171,97 @@ export function deleteFootnoteEverywhere(markdown: string, name: string): Delete
         references,
         definitions: blocks.length,
     };
+}
+
+export const DeleteTargetNotice =
+    "Place the cursor on a footnote reference or definition to delete it.";
+
+/** The toast after a deletion: what went, in numbers. */
+function deleteFootnoteNotice(name: string, references: number, definitions: number): string {
+    const count = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+    return `Deleted ${quotedReference(name)} everywhere: ${count(references, "reference")} and ${count(definitions, "definition")}.`;
+}
+
+/**
+ * The "Delete footnote definition and all references" command. It works
+ * out the name under the caret (or under the selection, the way the
+ * rename command does for a phone's long-press selection), runs the
+ * transform, and writes the result back as one transaction that keeps
+ * folds and the caret. Then the lint alerts speak, since a deletion can
+ * leave something for them to say (a definition only the deleted one's
+ * body was citing is now an orphan).
+ */
+export async function deleteFootnote(plugin: FootnotePlugin) {
+    await withEditableEditor(
+        plugin,
+        (doc) => {
+            runOutsideTableCell(doc, (cursorPosition) => {
+                const selection = doc.listSelections()[0];
+                const collapsed =
+                    selection.anchor.line === selection.head.line &&
+                    selection.anchor.ch === selection.head.ch;
+                // the rename command's resolvers find the footnote under a
+                // caret or a selection; they are about the caret, not the
+                // rename, so this command shares them
+                const target = collapsed
+                    ? renameTargetAtCursor(doc, cursorPosition)
+                    : renameTargetInSelection(doc, selection.anchor, selection.head);
+                if (target === null) {
+                    showNotice(DeleteTargetNotice, 8000);
+                    return;
+                }
+                const before = doc.getValue();
+                const plan = deleteFootnoteEverywhere(before, target);
+                switch (plan.kind) {
+                    case "nothing":
+                        // the target came from this very document, so this
+                        // is unreachable in practice; say something honest
+                        // rather than nothing if it ever happens
+                        showNotice(`Nothing was deleted: ${quotedReference(target)} was not found in this note.`, 8000);
+                        return;
+                    case "refused":
+                        showNotice(plan.reason, 8000);
+                        return;
+                    case "deleted": {
+                        const mdView = plugin.app.workspace.getActiveViewOfType(MarkdownView) ?? undefined;
+                        replaceMinimal(doc, before, plan.markdown, mdView);
+                        showNotice(deleteFootnoteNotice(target, plan.references, plan.definitions));
+                        noticeLintAlerts(plugin, plan.markdown);
+                    }
+                }
+            });
+        },
+        // focus in the Properties panel: no footnote under a property
+        // field, and the editor's caret is stale (the rename command's
+        // reasoning)
+        DeleteTargetNotice,
+    );
+}
+
+/**
+ * "Delete footnote definition and all references" in the editor's
+ * right-click menu, beside the rename item and Obsidian's own "Delete
+ * footnote and reference", when the click landed on a reference or a
+ * definition label. Desktop only in practice, as the rename item is: on a
+ * phone Obsidian owns the long-press menu and never fires this event for a
+ * reference, so the phone's route is the toolbar icon.
+ */
+export function registerDeleteFootnoteMenu(plugin: FootnotePlugin) {
+    plugin.registerEvent(
+        plugin.app.workspace.on("editor-menu", (menu, editor, info) => {
+            if (!(info instanceof MarkdownView)) return;
+            const selection = editor.listSelections()[0];
+            const target = renameTargetInSelection(editor, selection.anchor, selection.head);
+            if (target === null) return;
+            menu.addItem((item) =>
+                item
+                    .setTitle("Delete footnote definition and all references")
+                    .setIcon("footnote-delete")
+                    .setSection("selection")
+                    .onClick(() => {
+                        void deleteFootnote(plugin);
+                    }),
+            );
+        }),
+    );
 }
