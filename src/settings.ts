@@ -197,8 +197,15 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                         items: [
                             {
                                 name: "Fix footnote reference placement",
-                                desc: "The lint command moves footnote references to the side of punctuation the Footnote reference placement setting says: after it by default, or before it. It does nothing under Don't move.",
-                                control: { type: "toggle", key: "lintFixPunctuation" },
+                                desc: "The lint command moves footnote references to the side of punctuation the Footnote reference placement setting says: after it by default, or before it. Greyed out under Don't move, where the rule has nothing to do.",
+                                control: {
+                                    type: "toggle",
+                                    key: "lintFixPunctuation",
+                                    // under Don't move the rule is idle, so the
+                                    // toggle is greyed rather than left looking
+                                    // live (Jason, 2026-09-21)
+                                    disabled: () => this.plugin.settings.footnotePlacement === "none",
+                                },
                             },
                             {
                                 name: "Move definitions to existing footnote section heading, or to bottom",

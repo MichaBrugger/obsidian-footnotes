@@ -162,6 +162,16 @@ describe("sheet 12: the Rules group", () => {
 });
 
 describe("sheet 12: which controls are greyed out", () => {
+    // Jason, 2026-09-21: under Don't move the placement rule can do
+    // nothing, so its toggle is greyed out rather than left looking live
+    it("Fix footnote reference placement is greyed while the placement is Don't move, and live otherwise", () => {
+        const rules = (placement: "after" | "before" | "none") =>
+            controlOf(group(lintingPage({ footnotePlacement: placement }), "Rules"), "Fix footnote reference placement");
+        expect(rules("none")?.disabled?.()).toBe(true);
+        expect(rules("after")?.disabled?.()).toBe(false);
+        expect(rules("before")?.disabled?.()).toBe(false);
+    });
+
     it("Renumber named footnotes is greyed while Reindex is off, and live while it is on", () => {
         const off = group(lintingPage({ lintReindex: false }), "Reindexing");
         expect(controlOf(off, "Renumber named footnotes")?.disabled?.()).toBe(true);
