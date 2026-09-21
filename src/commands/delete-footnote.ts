@@ -1,20 +1,25 @@
 import {
     definitionLabelWithName,
     quotedDefinitionLabel,
+    quotedReference,
     referenceOccurrences,
 } from "../parsing/footnote-grammar";
+import { inItemDefinitionNamesFolded } from "../parsing/list-item-definitions";
 import {
     DefinitionBlock,
     definitionStartLines,
     findDefinitionBlocks,
+    lazyDefinitionLabelLines,
     maskProtectedLines,
     normalizeEol,
     quotedDefinitionEnd,
     removeLineRanges,
     restoreEol,
     scanDocument,
+    underlinedDefinitionLabelLines,
 } from "../parsing/markdown-scan";
-import { cutOne } from "../linting/rules/remove-orphaned-references";
+import { linesReadDifferently } from "../linting/rules/remove-orphaned-definitions";
+import { cutOne, readsDifferently } from "../linting/rules/remove-orphaned-references";
 
 // Deleting a footnote everywhere (T4 of the 2026-09 feature round; Jason's
 // rulings 2026-09-19 to 2026-09-21).
@@ -60,6 +65,17 @@ export function deleteFootnoteEverywhere(markdown: string, name: string): Delete
     const masked = maskProtectedLines(lines, scan);
     const starts = definitionStartLines(lines, scan, (i) => masked[i]);
 
+    // a footnote defined inside a list item is recognized but never cut,
+    // the same ruling the rename command follows (Jason's ruling 1,
+    // 2026-09-20): the plugin does not model such a definition's extent,
+    // and deleting the references while leaving the label would orphan it
+    if (inItemDefinitionNamesFolded(lines, scan, masked, starts).has(folded)) {
+        return {
+            kind: "refused",
+            reason: `Nothing was deleted: ${quotedReference(name)} is defined inside a list item, which the plugin does not delete. Delete it by hand.`,
+        };
+    }
+
     const blocks: DefinitionBlock[] = findDefinitionBlocks(lines, scan, masked, starts).filter(
         (block) => block.name.toLowerCase() === folded,
     );
@@ -84,6 +100,20 @@ export function deleteFootnoteEverywhere(markdown: string, name: string): Delete
             blocks.push({ name: hit.name, start: i, end: quotedDefinitionEnd(lines, scan, starts, i) });
         }
     }
+    // A lazy label (a "[^x]:" line directly under prose, one blank line
+    // short of a definition) and an underlined label (a "[^x]:" line with
+    // a setext underline under it, which makes it a heading) are the
+    // definitions the user MEANT to write, so they go too: the lazy line
+    // alone, the underlined line together with its underline, which has
+    // no business staying behind under the line above.
+    const labelOf = (i: number): boolean =>
+        definitionLabelWithName(lines[i], masked[i])?.name.toLowerCase() === folded;
+    for (const i of lazyDefinitionLabelLines(lines, scan, masked, starts)) {
+        if (labelOf(i)) blocks.push({ name, start: i, end: i });
+    }
+    for (const i of underlinedDefinitionLabelLines(lines, scan, masked, starts)) {
+        if (labelOf(i)) blocks.push({ name, start: i, end: i + 1 });
+    }
     blocks.sort((a, b) => a.start - b.start);
     // the lines a block cut takes with it: a reference on one of them
     // goes with the block and is not cut, or counted, on its own
@@ -105,7 +135,27 @@ export function deleteFootnoteEverywhere(markdown: string, name: string): Delete
     });
     if (references === 0 && blocks.length === 0) return { kind: "nothing" };
 
+    // The promise the two orphan rules make, kept here too: a deletion
+    // that changes how Obsidian reads a line it was not asked to touch is
+    // refused whole, rather than half done. Cutting reference text can
+    // turn "-[^9] tail" into a bullet; cutting a block can put the line
+    // below it under a setext underline or a blank line and so promote a
+    // lazy label there into a definition (the guards' own comments list
+    // the cases).
+    const byHand = " would change how Obsidian reads the text around it. Delete it by hand.";
+    if (references > 0 && readsDifferently(lines, scan, starts, cutLines)) {
+        return { kind: "refused", reason: `Nothing was deleted: removing ${quotedReference(name)}${byHand}` };
+    }
     const out = removeLineRanges(cutLines, blocks);
+    if (
+        blocks.length > 0 &&
+        linesReadDifferently(cutLines, references > 0 ? scanDocument(cutLines) : scan, blocks, out)
+    ) {
+        return {
+            kind: "refused",
+            reason: `Nothing was deleted: removing the ${quotedDefinitionLabel(name)} definition${byHand}`,
+        };
+    }
     return {
         kind: "deleted",
         markdown: restoreEol(out.join("\n"), eol),

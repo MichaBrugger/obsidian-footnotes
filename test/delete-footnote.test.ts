@@ -94,4 +94,37 @@ describe("deleteFootnoteEverywhere", () => {
         expect(plan.reason).toContain('"[^c]:"');
         expect(plan.reason).toContain("%%");
     });
+
+    it("deletes a lazy label (a label directly under prose) as the definition the user meant", () => {
+        expect(del(["prose[^l] here", "[^l]: one blank line short", "", "after"], "l")).toEqual({
+            kind: "deleted",
+            markdown: "prose here\n\nafter",
+            references: 1,
+            definitions: 1,
+        });
+    });
+
+    it("deletes an underlined label together with the setext underline that made it a heading", () => {
+        expect(del(["p[^u]", "", "[^u]: text", "===", "", "after"], "u")).toEqual({
+            kind: "deleted",
+            markdown: "p\n\nafter",
+            references: 1,
+            definitions: 1,
+        });
+    });
+
+    it("refuses a footnote defined inside a list item, as the rename command does", () => {
+        const plan = del(["- item[^i]", "- [^i]: in the item"], "i");
+        expect(plan.kind).toBe("refused");
+        if (plan.kind !== "refused") throw new Error("unreachable");
+        expect(plan.reason).toContain('"[^i]"');
+        expect(plan.reason).toContain("list item");
+    });
+
+    it("refuses a cut that would change how Obsidian reads the line (a leftover marker turning prose into a bullet)", () => {
+        const plan = del(["-[^9] tail", "", "[^9]: nine"], "9");
+        expect(plan.kind).toBe("refused");
+        if (plan.kind !== "refused") throw new Error("unreachable");
+        expect(plan.reason).toContain('"[^9]"');
+    });
 });
