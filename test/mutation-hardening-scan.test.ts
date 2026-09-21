@@ -430,14 +430,12 @@ describe("scanDocument: YAML frontmatter", () => {
     // line 355: the closer regex accepts "---" or "..." with only
     // trailing whitespace - anchoring differently (no "^", or requiring
     // nothing but the delimiter with \S*) changes which lines close it.
-    it("a bare \"...\" line closes frontmatter, matching YAML's document-end marker", () => {
+    it("a bare \"...\" line does not close frontmatter: Obsidian renders the whole block as prose", () => {
+        // probed in Reading view 2026-09-21 (Opus hunt cycle 1): the
+        // Properties panel shows nothing and the three lines render as
+        // text, so the block never closes and nothing is protected
         const doc = "---\nkey: 1\n...\nafter[^1]";
-        expect(protectedLines(doc.split("\n"))).toEqual([
-            true,
-            true,
-            true,
-            false,
-        ]);
+        expect(protectedLines(doc.split("\n"))).toEqual([false, false, false, false]);
     });
     it("trailing whitespace after the closing delimiter is still a valid closer", () => {
         const doc = "---\nkey: 1\n---   \nafter";

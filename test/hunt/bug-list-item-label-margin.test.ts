@@ -72,8 +72,13 @@ describe("a definition label indented into a list item (relative indent 1-3)", (
         expect(orphanedFootnoteReferenceNames("- item\n\n    [^1]: def\n\nuse[^1]")).toEqual([]);
     });
 
-    it("control: dash item, relative indent 0 (absolute 2) is already seen", () => {
-        expect(startsOf("- item\n\n  [^1]: def\n\nuse[^1]")[2]).toBe(true);
+    it("a label at the item's own margin (absolute 2) is an in-item definition, not a margin start", () => {
+        // since 2026-09-21 the in-item reader owns it (Reading view renders
+        // it as a definition; ruling 1 keeps it inside the item), so the
+        // label pass steps over the line and the orphan alert stays quiet
+        const doc = "- item\n\n  [^1]: def\n\nuse[^1]";
+        expect(startsOf(doc)[2]).toBe(false);
+        expect(orphanedFootnoteReferenceNames(doc)).toEqual([]);
     });
 
     it("control: dash item, relative indent 4 (absolute 6) is indented code to both parsers", () => {

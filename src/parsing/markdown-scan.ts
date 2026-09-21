@@ -1,3 +1,4 @@
+import { inItemDefinitionLineSet } from "./list-item-definitions";
 // The basic scanning pieces that the whole-document footnote transforms
 // share: reindex, move-to-bottom, and after-punctuation. Nothing in this
 // file touches an Editor. Lines go in, facts about them come out.
@@ -1288,9 +1289,15 @@ export function scanDocument(lines: string[]): DocumentScan {
     const commentBlockCloseAt = new Array<number>(lines.length).fill(-1);
     let i = 0;
 
-    if (src[0] === "---") {
+    // Obsidian's frontmatter opens on "---" as the first line, a byte order
+    // mark in front allowed (the Properties panel still shows the block),
+    // and closes on "---" alone: YAML's own "..." end marker is not a
+    // closer, the block then never closes, and Obsidian renders every
+    // line of it as prose (probed in Reading view 2026-09-21, Opus hunt
+    // cycle 1)
+    if (src[0] === "---" || src[0] === "\ufeff---") {
         for (let j = 1; j < src.length; j++) {
-            if (/^(---|\.\.\.)\s*$/.test(src[j])) {
+            if (/^---\s*$/.test(src[j])) {
                 for (let k = 0; k <= j; k++) isProtected[k] = true;
                 i = j + 1;
                 break;
@@ -2628,7 +2635,16 @@ export function definitionStartLines(
     // the line above was a link reference label alone ("[foo]:") whose
     // destination follows on this line
     let lrdDestinationNext = false;
+    // a definition inside a list item is recognized elsewhere (Jason's
+    // ruling 1, 2026-09-20) and is neither a start here nor lazy text: it
+    // is a block of its own that opens nothing
+    const inItemLines = inItemDefinitionLineSet(lines, scan, maskedAt);
     for (let i = 0; i < lines.length; i++) {
+        if (inItemLines.has(i)) {
+            open = "none";
+            previousDepth = blockquoteDepth(lines[i]).depth;
+            continue;
+        }
         // a trailing carriage return is dropped before the line is judged,
         // as scanDocument drops it, so the end-anchored patterns below
         // (a rule, a setext underline, a table row) still match a note
@@ -3329,11 +3345,13 @@ export function lazyDefinitionLabelLines(
     starts: boolean[],
 ): number[] {
     const out: number[] = [];
+    // a definition inside a list item is a definition, not a lazy label
+    const inItemLines = inItemDefinitionLineSet(lines, scan, masked);
     for (let i = 0; i < lines.length; i++) {
         // a label inside a "%%" block comment is dead text, not a
         // definition one blank line short of working, so there is nothing
         // to report and nothing to fix
-        if (scan.isProtected[i] || starts[i] || scan.inCommentBlock[i]) continue;
+        if (scan.isProtected[i] || starts[i] || scan.inCommentBlock[i] || inItemLines.has(i)) continue;
         const hit = definitionLabelWithName(lines[i], masked[i]);
         // a label behind a "%%" that is not a block's closer sits inside a
         // one-line "%% ... %%" pair: Obsidian hides it, and no blank line

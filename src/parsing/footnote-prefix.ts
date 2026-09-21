@@ -93,9 +93,12 @@ export function footnotePrefix(markdownText: string): string {
         if (lineEnd === -1) lineEnd = markdownText.length;
         const line = stripCrLine(markdownText.slice(lineStart, lineEnd));
         if (first) {
-            if (line !== "---") return "";
+            // a byte order mark in front of the opener is Obsidian's own
+            // frontmatter still; YAML's "..." end marker is no closer to
+            // Obsidian (both probed 2026-09-21)
+            if (line.replace(/^\ufeff/, "") !== "---") return "";
             first = false;
-        } else if (/^(---|\.\.\.)\s*$/.test(line)) {
+        } else if (/^---\s*$/.test(line)) {
             return value ?? "";
         } else if (value === null) {
             // YAML wants a space after the colon. Written without one,
@@ -131,12 +134,12 @@ export function footnotePrefix(markdownText: string): string {
  * two readers cannot drift apart.
  */
 export function footnotePrefixFromEditor(doc: Editor): string {
-    if (stripCrLine(doc.getLine(0)) !== "---") return "";
+    if (stripCrLine(doc.getLine(0)).replace(/^\ufeff/, "") !== "---") return "";
     const lines = ["---"];
     for (let i = 1; i < doc.lineCount(); i++) {
         const line = stripCrLine(doc.getLine(i));
         lines.push(line);
-        if (/^(---|\.\.\.)\s*$/.test(line)) break;
+        if (/^---\s*$/.test(line)) break;
     }
     return footnotePrefix(lines.join("\n"));
 }
