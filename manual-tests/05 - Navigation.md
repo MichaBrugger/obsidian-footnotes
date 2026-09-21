@@ -53,3 +53,20 @@ A trailing use so the multi-line definition jumps: from me[^multiline].
 
 [^orphan]: no reference anywhere uses this definition, on purpose
     its continuation line behaves the same way
+
+## Definitions inside a list item (ruling 1, 2026-09-20)
+
+Settings: defaults. Reading view renders a footnote definition inside a list item, written right after the marker or indented to the item's margin. The plugin recognizes such definitions where ignoring them misfired (this hotkey, the orphan alert, the two renamers); it never moves them.
+
+- [^la]: a definition written right after the list marker
+- item two
+
+- item three
+
+    [^lb]: a definition indented to the item's margin (four spaces)
+
+Uses: alpha[^la] and bravo[^lb].
+
+- [ ] Caret in `alpha[^la]`, numbered key: the caret lands at the end of the marker line (with the popup on, the popup opens on that definition) and NO second definition is appended at the bottom
+- [ ] Caret in `bravo[^lb]`, numbered key: lands at the end of the indented line, nothing appended
+- [ ] Rename footnote with the caret on `alpha[^la]`: the modal refuses, saying the footnote is defined inside a list item

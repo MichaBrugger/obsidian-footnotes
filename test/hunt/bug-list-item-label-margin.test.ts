@@ -1,4 +1,5 @@
 // Imported from the Kimi K3 cycle 3 hunt of 2026-09-16 (OpenCode worktree); 5 of 7 tests carry it.fails: 0 were red there and marked on import, the rest the hunter marked itself.
+// RESOLVED 2026-09-20 by Jason's ruling 1 (option b): a definition inside a list item is recognized by the orphan-reference alert and its deletion, the hotkey's navigate-or-create decision, and the renamers (reindex leaves the name alone, the rename command refuses); it is still never moved and never forms a block.
 // VERIFIED IN READING VIEW 2026-09-16, NOT YET FIXED: a label indented into a list item (absolute indent 4 under "- item", 7 under "10. item") renders as a definition, and one indented 6 under "- item" is code, exactly as pinned. The plugin has never recognized definitions inside list items (labels read relative to the document margin, like the C22 quoted-definition rule); fixing it touches every label reader, so it waits for Jason's ruling on whether definitions inside list items are in scope.
 import { describe, expect, it } from "vitest";
 
@@ -67,7 +68,7 @@ describe("a definition label indented into a list item (relative indent 1-3)", (
         expect(findDefinitionBlocks(lines, scan, masked, starts).map((b) => b.name)).toEqual(["1"]);
     });
 
-    it.fails("the missing-definition alert stays silent about it", () => {
+    it("the missing-definition alert stays silent about it", () => {
         expect(orphanedFootnoteReferenceNames("- item\n\n    [^1]: def\n\nuse[^1]")).toEqual([]);
     });
 

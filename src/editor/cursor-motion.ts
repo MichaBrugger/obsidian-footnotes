@@ -193,6 +193,14 @@ export function startOfWordOffset(text: string, offset: number): number {
     // code point's start before the checks below run
     const unitAt = text.charCodeAt(start);
     if (unitAt >= 0xdc00 && unitAt <= 0xdfff) start--;
+    // A selection that starts AT a word's trailing dot ("U.S.| Senate",
+    // dragged from just before the dot) grows back over the word, so the
+    // footnote reads "U.S. Senate" rather than ". Senate" (Jason's ruling
+    // 3, 2026-09-20): the dot is the word's last character here, and the
+    // walk below starts from the character before it.
+    if (text[start] === "." && isWordCp(cpBefore(text, start)) && !isWordCp(text.codePointAt(start + 1))) {
+        start--;
+    }
     // an apostrophe (straight or curly) or a dot between two word
     // characters belongs to the word, the same rule the end walk applies
     // ("don't", "example.com"): the walk back crosses it instead of

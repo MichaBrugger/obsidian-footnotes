@@ -1,3 +1,4 @@
+import { inItemDefinitionNamesFolded } from "../../parsing/list-item-definitions";
 import { footnotePrefixProblem } from "../../parsing/footnote-prefix";
 import {
     definitionLabelWithName,
@@ -254,13 +255,27 @@ function reindexOnce(
         // it a plain number here and the next apply-prefix pass would put
         // the prefix on it anyway.
         const renames = new Map<string, string>();
+        // A name defined inside a list item is never renamed (Jason's
+        // ruling 1, 2026-09-20: such a definition is recognized, not
+        // modelled), and the number it holds is handed to nobody else, or
+        // two footnotes would share a name.
+        const inItem = inItemDefinitionNamesFolded(lines, scan, maskedLines, starts);
         let nextNumber = 1;
         let nextPrefixed = 1;
+        const takePlain = (): string => {
+            while (inItem.has(String(nextNumber))) nextNumber++;
+            return String(nextNumber++);
+        };
+        const takePrefixed = (): string => {
+            while (inItem.has(`${prefixFolded}${nextPrefixed}`)) nextPrefixed++;
+            return `${prefixOut}${nextPrefixed++}`;
+        };
         for (const name of order) {
+            if (inItem.has(name)) continue;
             if (isPrefixedNumbered(name)) {
-                renames.set(name, `${prefixOut}${nextPrefixed++}`);
+                renames.set(name, takePrefixed());
             } else if (/^\d+$/.test(name)) {
-                renames.set(name, String(nextNumber++));
+                renames.set(name, takePlain());
             } else if (renumberNamed) {
                 // the bare-prefix placeholder ("[^3.]" under a "3." prefix)
                 // is a footnote the user is still naming: the unnamed
@@ -269,12 +284,7 @@ function reindexOnce(
                 // alert and hijack the name the user goes on to type (Kimi
                 // hunt cycle 3, 2026-09-16)
                 if (prefixOut !== "" && name === prefixFolded) continue;
-                renames.set(
-                    name,
-                    prefixOut
-                        ? `${prefixOut}${nextPrefixed++}`
-                        : String(nextNumber++),
-                );
+                renames.set(name, prefixOut ? takePrefixed() : takePlain());
             }
         }
 

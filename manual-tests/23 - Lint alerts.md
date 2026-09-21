@@ -62,3 +62,17 @@ Obsidian renders only the LAST definition of a duplicated footnote; earlier ones
     ```
 [^dup]: body
 [^dup]: another body
+
+## Definitions inside a list item (ruling 1, 2026-09-20)
+
+Settings: all lint rules ON. The fixture below defines two footnotes inside list items; Reading view renders both.
+
+- [^la]: a definition written right after the list marker
+- item three
+
+    [^lb]: a definition indented to the item's margin (four spaces)
+
+Uses: alpha[^la] and bravo[^lb].
+
+- [ ] Lint footnotes: no alert names `[^la]` or `[^lb]` as a reference with no definition, and neither reference is deleted with orphan-reference deletion on
+- [ ] After the lint, both names read exactly as before (reindex leaves a name defined inside an item alone, and hands its number to no other footnote)

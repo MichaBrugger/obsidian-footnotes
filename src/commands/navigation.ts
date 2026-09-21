@@ -1,3 +1,4 @@
+import { inItemDefinitionLabels } from "../parsing/list-item-definitions";
 import { Editor, EditorPosition } from "obsidian";
 
 import type FootnotePlugin from "../main";
@@ -199,6 +200,13 @@ export function jumpToFootnoteDefinition(
         const hit = definitionLabelWithName(lines[i], masked[i]);
         if (hit && hit.name.toLowerCase() === footnoteName.toLowerCase()) {
             labelLine = i;
+        }
+    }
+    // a definition inside a list item is a landing too, its own line
+    // only, since it never forms a block (Jason's ruling 1, 2026-09-20)
+    for (const hit of inItemDefinitionLabels(lines, ctx.scan, masked, starts)) {
+        if (hit.name.toLowerCase() === footnoteName.toLowerCase() && hit.line > labelLine) {
+            labelLine = hit.line;
         }
     }
     if (labelLine !== -1) {

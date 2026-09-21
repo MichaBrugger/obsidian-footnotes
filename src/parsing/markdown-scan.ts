@@ -1084,6 +1084,8 @@ export interface DocumentScan {
     isProtected: boolean[];
     /** Line `i` is CommonMark indented code (four columns past its container, outside any definition), as opposed to a protected line a definition's content owns. */
     indentedCode: boolean[];
+    /** Line `i` is a setext underline ("===" or "---") that turns the one line above it into a heading, a label line included; a literal underline under a two-line paragraph, a rule after a blank line, and an underline that is a definition's body text are not marked. */
+    setextUnderline: boolean[];
     /** Line `i` begins inside a multi-line HTML comment, so it is a closer or an interior line. */
     startsInComment: boolean[];
     /** Line `i` begins inside a multi-line $$ math block (a closer or interior line). */
@@ -1282,6 +1284,7 @@ export function scanDocument(lines: string[]): DocumentScan {
     const startsInFence = new Array<boolean>(lines.length).fill(false);
     const inCommentBlock = new Array<boolean>(lines.length).fill(false);
     const indentedCode = new Array<boolean>(lines.length).fill(false);
+    const setextUnderline = new Array<boolean>(lines.length).fill(false);
     const commentBlockCloseAt = new Array<number>(lines.length).fill(-1);
     let i = 0;
 
@@ -2138,6 +2141,20 @@ export function scanDocument(lines: string[]): DocumentScan {
         // starts afresh (Jason's ruling A2 for the label; GLM hunt cycle 1
         // for the scan's own state, 2026-09-16)
         const paragraphOpenBefore = prevParagraph;
+        // the underline that makes a heading of the line above: a one-line
+        // paragraph, a definition's lazy line, or a label line (the press
+        // guards refuse a caret there; Jason's ruling 5, 2026-09-20)
+        if (
+            /^ {0,3}(=+|-+) *$/.test(rest) &&
+            i > 0 &&
+            prevDepth === depth &&
+            !isProtected[i - 1] &&
+            src[i - 1].trim() !== ""
+        ) {
+            setextUnderline[i] = prevParagraph
+                ? oneLineParagraphAbove(i, depth)
+                : DefinitionStart.test(blockquoteDepth(src[i - 1]).rest);
+        }
         blockBoundary =
             blockEnder(rest, prevParagraph && prevDepth === depth && oneLineParagraphAbove(i, depth)) ||
             tableRows[i] ||
@@ -2393,6 +2410,7 @@ export function scanDocument(lines: string[]): DocumentScan {
     return {
         isProtected,
         indentedCode,
+        setextUnderline,
         startsInComment,
         startsInMath,
         startsInCode,

@@ -1,3 +1,4 @@
+import { inItemDefinitionNamesFolded } from "../../parsing/list-item-definitions";
 import {
     definitionLabelWithName,
     referenceOccurrences,
@@ -43,13 +44,21 @@ import { FootnoteRule } from "../rule";
  * twin but cuts its name out of the raw line, so names never come back with
  * blanking characters in them.
  */
-function definitionNamesFolded(lines: string[], masked: string[], starts: boolean[]): Set<string> {
+function definitionNamesFolded(
+    lines: string[],
+    masked: string[],
+    starts: boolean[],
+    scan: Pick<DocumentScan, "isProtected">,
+): Set<string> {
     const names = new Set<string>();
     for (let i = 0; i < masked.length; i++) {
         if (!starts[i]) continue;
         const hit = definitionLabelWithName(lines[i], masked[i]);
         if (hit) names.add(hit.name.toLowerCase());
     }
+    // a definition inside a list item renders, so the reference to it is
+    // no orphan (Jason's ruling 1, 2026-09-20)
+    for (const name of inItemDefinitionNamesFolded(lines, scan, masked, starts)) names.add(name);
     return names;
 }
 
@@ -162,7 +171,7 @@ export function orphanedFootnoteReferenceNames(
     const scan = precomputed?.scan ?? scanDocument(lines);
     const masked = precomputed?.masked ?? maskProtectedLines(lines, scan);
     const starts = precomputed?.starts ?? definitionStartLines(lines, scan, (i) => masked[i]);
-    const definitions = definitionNamesFolded(lines, masked, starts);
+    const definitions = definitionNamesFolded(lines, masked, starts, scan);
     const lazyLabels = new Set([
         ...lazyDefinitionLabelNames(lines, scan, masked, starts).map((n) => n.toLowerCase()),
         // and an underlined label, one blank line short in the other direction
@@ -204,7 +213,7 @@ export function removeOrphanedFootnoteReferences(
     const scan = scanDocument(lines);
     const masked = maskProtectedLines(lines, scan);
     const starts = definitionStartLines(lines, scan, (i) => masked[i]);
-    const definitions = definitionNamesFolded(lines, masked, starts);
+    const definitions = definitionNamesFolded(lines, masked, starts, scan);
     const lazyLabels = new Set([
         ...lazyDefinitionLabelNames(lines, scan, masked, starts).map((n) => n.toLowerCase()),
         // and an underlined label, one blank line short in the other direction

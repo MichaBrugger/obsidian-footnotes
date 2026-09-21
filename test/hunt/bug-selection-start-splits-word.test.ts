@@ -1,4 +1,5 @@
 // Imported from the Kimi K3 cycle 5 hunt of 2026-09-16 (OpenCode worktree); 3 of 6 tests carry it.fails: 0 were red there and marked on import, the rest the hunter marked itself.
+// RESOLVED 2026-09-20 by Jason's ruling 3 (option a): a selection that starts at a word's trailing dot grows back over the word.
 import { describe, expect, it } from "vitest";
 
 import { endOfWordOffset, startOfWordOffset } from "../../src/editor/cursor-motion";
@@ -43,7 +44,7 @@ describe("startOfWordOffset crosses an apostrophe or dot between word characters
     // word; the end walk reaches it only through the landing convention
     // (punctuation after the word). Whether a selection that starts at a
     // trailing dot should grow back over the word is a ruling for Jason.
-    it.fails("a selection starting after the dot in \"U.S.\" grows to the word's start", () => {
+    it("a selection starting after the dot in \"U.S.\" grows to the word's start", () => {
         expect(startOfWordOffset("U.S. Senate", 3)).toBe(0);
     });
 

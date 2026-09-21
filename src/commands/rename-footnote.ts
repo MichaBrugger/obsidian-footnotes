@@ -1,3 +1,4 @@
+import { inItemDefinitionNamesFolded } from "../parsing/list-item-definitions";
 import { Editor, EditorChange, EditorPosition, MarkdownView } from "obsidian";
 
 import type FootnotePlugin from "../main";
@@ -234,12 +235,24 @@ export function planFootnoteRename(
             labels.push({ line, name: hit.name, nameStart: hit.label.nameStart, nameEnd: hit.label.nameEnd });
         }
     }
+    // a footnote defined inside a list item is recognized but never
+    // renamed (Jason's ruling 1, 2026-09-20): renaming its references and
+    // leaving the label would orphan both halves, so the rename refuses
+    // and says why; and a new name such a definition holds is taken
+    const inItem = inItemDefinitionNamesFolded(ctx.lines, ctx.scan, ctx.maskedLines(), starts);
+    if (inItem.has(oldFolded)) {
+        return {
+            kind: "invalid",
+            reason: `"[^${oldName}]" is defined inside a list item, which the plugin does not rename. Rename it by hand.`,
+        };
+    }
 
     // a collision means the new name already belongs to ANOTHER footnote,
     // whatever its casing. Changing only the casing of the SAME footnote is
     // fine: that is cosmetic.
     if (newFolded !== oldFolded) {
         const taken =
+            inItem.has(newFolded) ||
             labels.some((label) => label.name.toLowerCase() === newFolded) ||
             ctx.lines.some(
                 (lineText, line) =>

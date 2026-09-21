@@ -64,3 +64,11 @@ Fixture for the definition checks[^d].
 
 [^d]: press the inline hotkey with the caret right here
 [^n]: nesting-refusal fixture definition
+
+## A selection starting at a word's trailing dot (ruling 3, 2026-09-20)
+
+Settings: defaults (whole-word expansion on).
+
+The U.S. Senate met.
+
+- [ ] Select from just before the second dot of `U.S.` through `Senate` and press the numbered key: the definition reads `U.S. Senate`, not `. Senate`

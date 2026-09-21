@@ -1,3 +1,4 @@
+import { inItemDefinitionNamesFolded } from "../src/parsing/list-item-definitions";
 import fc from "fast-check";
 import { fromMarkdown } from "mdast-util-from-markdown";
 import { gfmFootnoteFromMarkdown } from "mdast-util-gfm-footnote";
@@ -1019,11 +1020,15 @@ describe("scanner and alert invariants", () => {
     // footnote, or a numbered name minted past the slot count, breaks a
     // footnote's pairing with its definition.
     soakIt("reindex conserves the non-numeric names and numbers the rest within 1..k", () => {
-        const nameSets = (text: string): { named: Set<string>; numbered: Set<string> } => {
+        const nameSets = (text: string): { named: Set<string>; numbered: Set<string>; held: Set<string> } => {
             const lines = normalizeEol(text).text.split("\n");
             const scan = scanDocument(lines);
             const masked = maskProtectedLines(lines, scan);
             const starts = definitionStartLines(lines, scan, (i) => masked[i]);
+            // a name defined inside a list item is never renumbered and
+            // its number is handed to nobody else (Jason's ruling 1,
+            // 2026-09-20), so it sits outside the 1..k slots
+            const held = inItemDefinitionNamesFolded(lines, scan, masked, starts);
             const named = new Set<string>();
             const numbered = new Set<string>();
             for (let i = 0; i < lines.length; i++) {
@@ -1035,7 +1040,7 @@ describe("scanner and alert invariants", () => {
                     if (hit) (/^\d+$/.test(hit.name) ? numbered : named).add(hit.name.toLowerCase());
                 }
             }
-            return { named, numbered };
+            return { named, numbered, held };
         };
         fc.assert(
             fc.property(docArb, (doc) => {
@@ -1043,6 +1048,7 @@ describe("scanner and alert invariants", () => {
                 const after = nameSets(reindexFootnotes(doc, { renumberNamedFootnotes: false }));
                 expect([...after.named].sort()).toEqual([...before.named].sort());
                 for (const name of after.numbered) {
+                    if (before.held.has(name)) continue;
                     expect(Number(name)).toBeGreaterThanOrEqual(1);
                     expect(Number(name)).toBeLessThanOrEqual(before.numbered.size);
                 }

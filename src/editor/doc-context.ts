@@ -1,3 +1,4 @@
+import { inItemDefinitionLabels } from "../parsing/list-item-definitions";
 import { Editor, EditorPosition } from "obsidian";
 
 import {
@@ -89,6 +90,12 @@ export function listExistingFootnoteDefinitions(
         // matters because a code span inside a name masks to NULs
         const hit = definitionLabelWithName(lines[i], masked[i]);
         if (hit) definitionNames.push(hit.name);
+    }
+    // a definition inside a list item counts too, so the press on its
+    // reference navigates instead of appending a second definition
+    // (Jason's ruling 1, 2026-09-20)
+    for (const hit of inItemDefinitionLabels(lines, ctx.scan, masked, starts)) {
+        definitionNames.push(hit.name);
     }
     return definitionNames;
 }

@@ -128,8 +128,18 @@ export function warnProtectedCaretIfInside(
             line + 1 < ctx.lines.length
                 ? scan.startsInComment[line + 1] || scan.startsInMath[line + 1]
                 : scan.endsProtected;
+        // A caret in front of a blockquote marker would write the
+        // reference before the ">" and drop the line out of its quote,
+        // and a caret on a setext underline would write into the underline
+        // and turn the heading above back into prose; both refuse with
+        // this same toast, as the table delimiter-row press does (Jason's
+        // rulings 4 and 5, 2026-09-20).
+        const markerRun = (ctx.lines[line] ?? "").match(/^(\s*>)+/);
+        const beforeQuoteMarker = markerRun !== null && cursorPosition.ch < markerRun[0].length;
         inside =
             scan.isProtected[line] ||
+            beforeQuoteMarker ||
+            scan.setextUnderline[line] ||
             caretInsideMaskedSpan(
                 ctx.maskedLine(line),
                 cursorPosition.ch,

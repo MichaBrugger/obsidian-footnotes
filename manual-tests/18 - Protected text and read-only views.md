@@ -130,3 +130,17 @@ span[^7] that wraps` onto the next line.
 - [ ] Caret at the end of the paragraph, press the numbered key: the new footnote is `[^1]`, not `[^8]` (the `[^7]` inside the span reserves no number)
 - [ ] Lint footnotes: no alert names `[^7]` as a reference with no definition
 - [ ] Add a blank line between the two lines: now `[^7]` is a live reference again, the next number is `[^8]`, and the lint alert names it
+
+## In front of a quote marker, and on a setext underline (rulings 4 and 5, 2026-09-20)
+
+Settings: defaults. Both spots refuse with the protected-text toast, the way the table delimiter row does: a reference written before a `>` would drop the line out of its quote, and one written into an underline would turn the heading above back into prose.
+
+> A quoted line.
+> Another quoted line.
+
+Setext heading
+==============
+
+- [ ] Caret at the very start of `Another quoted line` (before the `>`), numbered key: the toast, nothing inserted
+- [ ] Caret at the end of the `====` line, numbered key: the toast, nothing inserted
+- [ ] Caret after `> ` on the second quoted line: the footnote is inserted as usual and the line stays quoted

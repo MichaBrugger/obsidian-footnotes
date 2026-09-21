@@ -1,4 +1,5 @@
 // Imported from the Kimi K3 cycle 3 hunt of 2026-09-16 (OpenCode worktree); 2 of 3 tests carry it.fails: 0 were red there and marked on import, the rest the hunter marked itself.
+// RESOLVED 2026-09-20 by Jason's ruling 1 (option b): a label right after a list marker is a definition to the orphan-reference alert and the hotkey (Reading view renders it, probed 2026-09-16).
 // VERIFIED IN READING VIEW 2026-09-16, NOT YET FIXED: "- [^a]: def", "1. [^a]: def", and "> - [^a]: def" all render as definitions; a lazy line under the marker line joins the footnote, a following "- item" does not, and a continuation indented to the item's content column plus four does. Same scope question as bug-list-item-label-margin: waits for Jason's ruling.
 import { describe, expect, it } from "vitest";
 
@@ -49,7 +50,7 @@ describe("spec: a footnote label directly after a list marker", () => {
         expect(definitionStartLines(lines, scan, (i) => masked[i])[0]).toBe(true);
     });
 
-    it.fails("micromark's reading: \"use[^a]\" is not an orphaned reference", () => {
+    it("micromark's reading: \"use[^a]\" is not an orphaned reference", () => {
         expect(orphanedFootnoteReferenceNames("- [^a]: def\n\nuse[^a]")).toEqual([]);
     });
 
