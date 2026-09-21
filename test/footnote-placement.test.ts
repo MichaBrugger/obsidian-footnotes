@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
 
+import { fakeEditor } from "./helpers/fake-editor";
+import { fakePlugin } from "./helpers/fake-plugin";
+import {
+    adjustFootnotePosition,
+    endOfWordForSelection,
+    endOfWordOffset,
+} from "../src/editor/cursor-motion";
 import {
     ClosingMarkChars,
     FootnotePlacement,
@@ -103,5 +110,52 @@ describe("the fourteen marks added on 2026-09-21 (the CJK coverage audit of 2026
         expect(landing("word｣.", 4)).toBe(6);
         expect(landing("word.｣", 4, "before")).toBe(6);
         expect(landing("word‼", 4, "none")).toBe(4);
+    });
+});
+
+describe("the end-of-word hop follows the placement", () => {
+    it("after: past the punctuation, as before", () => {
+        expect(endOfWordOffset("Sit, dolor", 1)).toBe(4);
+        expect(endOfWordOffset("Sit, dolor", 1, "after")).toBe(4);
+    });
+
+    it("before: at the end of the word, still past a closing quote", () => {
+        expect(endOfWordOffset("Sit, dolor", 1, "before")).toBe(3);
+        expect(endOfWordOffset('say "hello". next', 6, "before")).toBe('say "hello"'.length);
+    });
+
+    it("none: at the end of the word", () => {
+        expect(endOfWordOffset("wait... what", 2, "none")).toBe(4);
+    });
+
+    it("a link is still one word, and the hop after it follows the placement", () => {
+        expect(endOfWordOffset("see [x](http://a.b/c). next", 6, "before")).toBe("see [x](http://a.b/c)".length);
+        expect(endOfWordOffset("see [x](http://a.b/c). next", 6, "after")).toBe("see [x](http://a.b/c).".length);
+    });
+});
+
+describe("the selection grab follows the placement", () => {
+    it("after: one trailing punctuation mark comes along, as before", () => {
+        expect(endOfWordForSelection("word. next", 2)).toBe(5);
+        expect(endOfWordForSelection("word. next", 2, "after")).toBe(5);
+    });
+
+    it("before and none: no trailing mark, so the reference lands in front of it", () => {
+        expect(endOfWordForSelection("word. next", 2, "before")).toBe(4);
+        expect(endOfWordForSelection("word. next", 2, "none")).toBe(4);
+    });
+});
+
+describe("the caret adjustment reads the setting", () => {
+    function adjusted(placement: FootnotePlacement, line = "word. next") {
+        const doc = fakeEditor([line], { cursor: { line: 0, ch: 2 } });
+        const plugin = fakePlugin({ insertAtEndOfWord: true, footnotePlacement: placement }, doc);
+        return adjustFootnotePosition({ line: 0, ch: 2 }, doc, line, plugin).ch;
+    }
+
+    it("lands after the punctuation under 'after' and before it under 'before' and 'none'", () => {
+        expect(adjusted("after")).toBe(5);
+        expect(adjusted("before")).toBe(4);
+        expect(adjusted("none")).toBe(4);
     });
 });

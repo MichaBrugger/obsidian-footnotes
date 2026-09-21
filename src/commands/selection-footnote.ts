@@ -219,7 +219,7 @@ export function selectionPressHandled(
         // main-editor branch below does.
         if (plugin.settings.expandSelectionToWholeWords) {
             from = startOfWordOffset(cellText, from);
-            to = endOfWordForSelection(cellText, to);
+            to = endOfWordForSelection(cellText, to, plugin.settings.footnotePlacement);
         }
         // Refuse an edge that cuts into protected text here and now,
         // rather than leaving it to the simulation. The liveness checks
@@ -322,7 +322,7 @@ export function selectionPressHandled(
         };
         trimmed.to = {
             line: trimmed.to.line,
-            ch: endOfWordForSelection(doc.getLine(trimmed.to.line), trimmed.to.ch),
+            ch: endOfWordForSelection(doc.getLine(trimmed.to.line), trimmed.to.ch, plugin.settings.footnotePlacement),
         };
     }
     // The inline key works within a single line only. A selection that

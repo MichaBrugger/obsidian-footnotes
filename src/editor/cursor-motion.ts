@@ -2,7 +2,7 @@ import { Editor, EditorChange, EditorPosition } from "obsidian";
 
 import type FootnotePlugin from "../main";
 import { safeInsertionCh } from "./insertion-liveness";
-import { linkLikeEndAt, referenceLandingAfter, TrailingPunctuationChars } from "../parsing/markdown-scan";
+import { FootnotePlacement, linkLikeEndAt, referenceLandingAfter, TrailingPunctuationChars } from "../parsing/markdown-scan";
 import {
     EditorWithCm,
     VaultWithConfig,
@@ -107,18 +107,19 @@ export function comparePositions(a: EditorPosition, b: EditorPosition): number {
  * This is `adjustFootnotePosition`'s job done for table cells, where the
  * main editor's `wordAt` cannot see the cell editor's text.
  */
-export function endOfWordOffset(text: string, offset: number): number {
+export function endOfWordOffset(text: string, offset: number, placement: FootnotePlacement = "after"): number {
     // Inside a link, a wikilink, or a URL the "word" is the whole
     // construct: a reference written inside "[text](url)" or between the
     // segments of "example.com" breaks the link (Jason's landing rulings,
     // 2026-09-15).
     const linkEnd = linkLikeEndAt(text, offset);
-    if (linkEnd !== -1) return referenceLandingAfter(text, linkEnd);
+    if (linkEnd !== -1) return referenceLandingAfter(text, linkEnd, placement);
     const end = wordEndOffset(text, offset);
     if (end === -1) return offset;
-    // then past the closing marks and punctuation that follow the word
-    // (the landing convention, referenceLandingAfter)
-    return referenceLandingAfter(text, end);
+    // then past the closing marks, and past or in front of the punctuation
+    // that follows the word as the placement setting says (the landing
+    // convention, referenceLandingAfter)
+    return referenceLandingAfter(text, end, placement);
 }
 
 /**
@@ -170,9 +171,13 @@ function wordEndOffset(text: string, offset: number): number {
  * Claude sweep 2026-09-13, the README's "plus one trailing punctuation
  * mark").
  */
-export function endOfWordForSelection(text: string, offset: number): number {
+export function endOfWordForSelection(text: string, offset: number, placement: FootnotePlacement = "after"): number {
     const end = wordEndOffset(text, offset);
     if (end === -1) return offset;
+    // the trailing mark comes along only when the reference is to land
+    // after it: under "before" or "don't move" the reference goes in front
+    // of the mark, so the mark stays outside the selection (T5, 2026-09-21)
+    if (placement !== "after") return end;
     return end < text.length && TrailingPunctuationChars.includes(text[end]) ? end + 1 : end;
 }
 
@@ -251,7 +256,7 @@ export function adjustFootnotePosition(
         // editor's stops at an apostrophe or a dot inside a word and knows
         // nothing of links (Jason's landing rulings, 2026-09-15). A caret
         // on no word at all stays where it is.
-        const landing = endOfWordOffset(lineText, cursorPosition.ch);
+        const landing = endOfWordOffset(lineText, cursorPosition.ch, plugin.settings.footnotePlacement);
         if (landing !== cursorPosition.ch) {
             cursorPosition = { line: cursorPosition.line, ch: landing };
         }

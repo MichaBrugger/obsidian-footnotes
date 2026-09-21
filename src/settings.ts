@@ -5,12 +5,21 @@
 import { App, PluginSettingTab, SettingDefinitionItem } from "obsidian";
 import type FootnotePlugin from "./main";
 import { AppWithPlugins } from "./editor/obsidian-internals";
+import type { FootnotePlacement } from "./parsing/markdown-scan";
 
 export interface FootnotePluginSettings {
     /** Records which one-time migrations this saved data has already been
      * through (see loadSettings). Never shown in the settings tab. */
     settingsVersion: number;
     insertAtEndOfWord: boolean;
+    /** Where a reference goes relative to the punctuation after a word:
+     * after it (English and most of East Asia outside the mainland and
+     * Japan), before it (mainland Chinese, Japanese, French, Italian,
+     * Portuguese, Polish, the EU style guide), or left at the end of the
+     * word and never moved by the lint. One global choice, no per-language
+     * table (Jason's ruling 2026-09-20). Read by the end-of-word hop, the
+     * selection grab and the punctuation lint rule. */
+    footnotePlacement: FootnotePlacement;
     /** When a selection is turned into a footnote, a word the selection cut
      * in half is taken whole, and the end is moved to the end of the word
      * plus one trailing punctuation mark. The selection twin of the
@@ -59,6 +68,10 @@ export const DEFAULT_SETTINGS: FootnotePluginSettings = {
     // in main.ts then stamps the current version and saves once.
     settingsVersion: 0,
     insertAtEndOfWord: true,
+    // "after" is the behaviour every note had before the setting existed,
+    // so nothing moves on upgrade; users of a before-punctuation convention
+    // pick "before" themselves
+    footnotePlacement: "after",
     expandSelectionToWholeWords: true,
     enablePopupEditor: true,
     enableFootnotePrefix: false,

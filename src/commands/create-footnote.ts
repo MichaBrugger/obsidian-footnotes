@@ -76,7 +76,7 @@ export function insertInTableCell(
     const at = safeInsertionCh(
         cellText,
         plugin.settings.insertAtEndOfWord
-            ? endOfWordOffset(cellText, head)
+            ? endOfWordOffset(cellText, head, plugin.settings.footnotePlacement)
             : head,
     );
     return dispatchCellEditIfLive(cell, text, at, at, caretOffsetInText);
