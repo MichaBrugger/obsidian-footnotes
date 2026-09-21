@@ -6,7 +6,7 @@ Settings: defaults. Undo between checks. Every fixture is already in this note: 
 
 ## The command
 
-Run **Delete footnote definition and all references** from the command palette with the caret in each spot:
+Run **Delete footnote everywhere** from the command palette with the caret in each spot:
 
 - [ ] Caret inside the first `[^twice]` above: BOTH references and the definition go; the toast reads well and its counts ("2 references and 1 definition") make sense at a glance
 - [ ] One undo brings everything back at once (both references and the definition, not one press each), with the caret where it was
@@ -16,7 +16,7 @@ Run **Delete footnote definition and all references** from the command palette w
 
 ## The right-click menu
 
-- [ ] Right-click ON `[^menu]` above: the menu shows **Delete footnote definition and all references** with the trash icon, in the same section as **Rename footnote**, and Obsidian's own **Delete footnote and reference** is still there beside it
+- [ ] Right-click ON `[^menu]` above: the menu shows **Delete footnote everywhere** with the trash icon, in the same section as **Rename footnote**, and Obsidian's own **Delete footnote and reference** is still there beside it
 - [ ] Choosing it deletes the definition and the reference, with the same toast as the command
 
 ## Compare with Obsidian's own item

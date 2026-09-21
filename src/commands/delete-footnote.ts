@@ -183,7 +183,7 @@ function deleteFootnoteNotice(name: string, references: number, definitions: num
 }
 
 /**
- * The "Delete footnote definition and all references" command. It works
+ * The "Delete footnote everywhere" command. It works
  * out the name under the caret (or under the selection, the way the
  * rename command does for a phone's long-press selection), runs the
  * transform, and writes the result back as one transaction that keeps
@@ -239,7 +239,7 @@ export async function deleteFootnote(plugin: FootnotePlugin) {
 }
 
 /**
- * "Delete footnote definition and all references" in the editor's
+ * "Delete footnote everywhere" in the editor's
  * right-click menu, beside the rename item and Obsidian's own "Delete
  * footnote and reference", when the click landed on a reference or a
  * definition label. Desktop only in practice, as the rename item is: on a
@@ -255,7 +255,7 @@ export function registerDeleteFootnoteMenu(plugin: FootnotePlugin) {
             if (target === null) return;
             menu.addItem((item) =>
                 item
-                    .setTitle("Delete footnote definition and all references")
+                    .setTitle("Delete footnote everywhere")
                     .setIcon("footnote-delete")
                     .setSection("selection")
                     .onClick(() => {

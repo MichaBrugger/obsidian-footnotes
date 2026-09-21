@@ -41,7 +41,7 @@ Of the plugin's 10 commands, the ones you'll press constantly should have hotkey
 
 <img src="README/hotkeys.png" width="800" alt="The Hotkeys settings tab filtered to Footnote Shortcut, with the four recommended bindings set">
 
-The other 6 (**Lint footnotes**, **Rename footnote**, **Delete footnote definition and all references**, the two **Convert** commands, and **Set footnote prefix**) come up less often, so running them from the command palette works fine. Give them hotkeys too if they become part of your routine.
+The other 6 (**Lint footnotes**, **Rename footnote**, **Delete footnote everywhere**, the two **Convert** commands, and **Set footnote prefix**) come up less often, so running them from the command palette works fine. Give them hotkeys too if they become part of your routine.
 
 Everything also works on mobile from the toolbar, each with their own unique toolbar icons.
 
@@ -127,7 +127,7 @@ Put your cursor on any reference or definition and run **Rename footnote**. It w
 
 ### Deleting a footnote
 
-Put your cursor on any reference or definition and run **Delete footnote definition and all references**. The definition and every reference to it go in one step and one undo, and the toast tells you how many of each went. It's also in the right-click menu on a footnote, next to Obsidian's own **Delete footnote and reference**, which removes only the one reference you clicked: if the same footnote is cited in two places, Obsidian's item leaves the other reference behind pointing at nothing. Copies inside code, math or comments are plain text and stay. A deletion that would change how Obsidian reads the surrounding text (a footnote defined inside a list item, a definition sharing its line with the end of a `%%` comment) is refused with a reason instead of half done.
+Put your cursor on any reference or definition and run **Delete footnote everywhere**. The definition and every reference to it go in one step and one undo (the name was "Delete footnote definition and all references" until the right-click menu proved too narrow for it), and the toast tells you how many of each went. It's also in the right-click menu on a footnote, next to Obsidian's own **Delete footnote and reference**, which removes only the one reference you clicked: if the same footnote is cited in two places, Obsidian's item leaves the other reference behind pointing at nothing. Copies inside code, math or comments are plain text and stay. A deletion that would change how Obsidian reads the surrounding text (a footnote defined inside a list item, a definition sharing its line with the end of a `%%` comment) is refused with a reason instead of half done.
 
 ### Converting between footnote styles
 

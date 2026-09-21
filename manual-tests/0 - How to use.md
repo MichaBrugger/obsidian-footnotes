@@ -29,7 +29,7 @@ The smoke suite drives the real plugin inside the running sandbox vault (Obsidia
 | 12 | Lint triggers (on save, on creation) and the settings page | 5 |
 | 13 | Phone and mobile emulation (needs a beta on the phone) | 9 |
 | 14 | Definition labels directly after a prose line are prose (Obsidian's rule, matched 2026-09-09) | 2 |
-| 15 | Delete footnote definition and all references: the command, the right-click menu, undo, the phone (added 2026-09-21) | 9 |
+| 15 | Delete footnote everywhere: the command, the right-click menu, undo, the phone (added 2026-09-21) | 9 |
 | 16 | Footnote reference placement: the dropdown, inserting under each placement, the lint rule under Before (added 2026-09-21) | 8 |
 | 17 | Converting between footnote styles: both commands, undo, the transclusion round trip (added 2026-09-21) | 7 |
 

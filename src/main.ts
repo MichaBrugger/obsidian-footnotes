@@ -81,7 +81,7 @@ export default class FootnotePlugin extends Plugin {
     addIcon("footnote-named", `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><g transform="translate(24,-62)" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><g transform="translate(-24,27)"><path d="m12 53v-12c0-2.209 1.791-4 4-4h1" /><path d="m7 57h1a4 4 0 0 0 4-4" /><path d="m7 37h1a4 4 0 0 1 4 4" /></g><path d="m -2,80 -3,3 -3,-3" /><path d="M -5,82 V 75" /></g></svg>`);
     addIcon("footnote-lint", `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><g fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m 22,18 -3,3 -3,-3" stroke="currentColor" /><path d="M 19,20 V 13" stroke="currentColor" /><g transform="translate(.006 -.019)" stroke="currentColor"><path d="M 16.588,9.019 13.73,4 c -0.766,-1.352 -2.714,-1.352 -3.48,0 l -8,14 c -0.774,1.34 0.202,3.014 1.75,3 h 8.994" fill="none" /><path d="m 11.994,9.019 v 4" /><path d="m 12,17 -0.006,0.019" /></g></g></svg>`);
     addIcon("footnote-prefix", `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><g fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M 19,20 V 13" stroke="currentColor" /><path d="m 22,18 -3,3 -3,-3" stroke="currentColor" /><g stroke="currentColor"><path d="m8 7-5 5 5 5v-10" /><path d="m12 20v2" /><path d="m12 14v2" /><path d="m12 8v2" /><path d="m12 2v2" /></g></g></svg>`);
-    // Delete footnote definition and all references (T4, 2026-09-21; Jason's
+    // Delete footnote everywhere (T4, 2026-09-21; Jason's
     // icon, drawn 2026-09-21: the family's bin with the footnote arrow).
     addIcon("footnote-delete", `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><g transform="translate(-1)" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m10 11v6"/><path d="m14 11v4"/><path d="m15 22h-8c-1.105 0-2-0.895-2-2v-14" fill="none"/><path d="m19 6v2" fill="none"/><path d="m3 6h18"/><path d="m8 6v-2a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path transform="translate(1)" d="m19 20v-8" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/><path transform="translate(1)" d="m22 18-3 3-3-3" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/></g></svg>`);
     // Convert inline footnotes to normal, and back (T6, 2026-09-21).
@@ -170,7 +170,7 @@ export default class FootnotePlugin extends Plugin {
     // phone's toolbar icon all run the same thing.
     this.addCommand({
       id: "delete-footnote",
-      name: "Delete footnote definition and all references",
+      name: "Delete footnote everywhere",
       icon: "footnote-delete",
       checkCallback: (checking: boolean) => {
         if (checking) return !!this.editableMarkdownView();
