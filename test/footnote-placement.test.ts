@@ -7,6 +7,8 @@ import {
     endOfWordForSelection,
     endOfWordOffset,
 } from "../src/editor/cursor-motion";
+import { lintFootnotes } from "../src/linting/linter";
+import { footnoteAfterPunctuation } from "../src/linting/rules/footnote-after-punctuation";
 import {
     ClosingMarkChars,
     FootnotePlacement,
@@ -157,5 +159,65 @@ describe("the caret adjustment reads the setting", () => {
         expect(adjusted("after")).toBe(5);
         expect(adjusted("before")).toBe(4);
         expect(adjusted("none")).toBe(4);
+    });
+});
+
+describe("the lint rule under 'before': references move back in front of punctuation", () => {
+    const before = (text: string) => footnoteAfterPunctuation(text, "before");
+
+    it("moves a reference that sits after punctuation back in front of it", () => {
+        expect(before("word.[^1]")).toBe("word[^1].");
+        expect(before("句子。[^1]")).toBe("句子[^1]。");
+        expect(before("word...[^1] next")).toBe("word[^1]... next");
+    });
+
+    it("leaves a reference already in front of punctuation, so the rule is idempotent", () => {
+        expect(before("word[^1].")).toBe("word[^1].");
+        const once = before("a.[^1] b[^2].” c,[^3][^4]! d[^5]");
+        expect(before(once)).toBe(once);
+    });
+
+    it("still moves a reference out past a closing quote, together with the punctuation inside it", () => {
+        expect(before("word[^1].”")).toBe("word.”[^1]");
+        expect(before("「句子[^1]。」")).toBe("「句子。」[^1]");
+        expect(before("**bold[^1]**")).toBe("**bold**[^1]");
+    });
+
+    it("leaves a reference after a closing quote where it is, punctuation before the quote or not", () => {
+        expect(before("word.”[^1]")).toBe("word.”[^1]");
+        expect(before('"word"[^1].')).toBe('"word"[^1].');
+    });
+
+    it("moves a run of references and inline footnotes back as one", () => {
+        expect(before("word.[^1][^2]")).toBe("word[^1][^2].");
+        expect(before("word.^[n]")).toBe("word^[n].");
+        expect(before("word[^1]^[n].")).toBe("word[^1]^[n].");
+    });
+
+    it("never touches a definition's own label, and moves the references in its body", () => {
+        expect(before("[^1]: word.[^2]")).toBe("[^1]: word[^2].");
+        expect(before("> [^1]: quoted.[^2]")).toBe("> [^1]: quoted[^2].");
+    });
+
+    it("leaves protected text alone", () => {
+        const text = "use `x.[^1]` and\n```\ncode.[^2]\n```";
+        expect(before(text)).toBe(text);
+    });
+});
+
+describe("the lint rule under 'none' does nothing", () => {
+    it("moves nothing in either direction", () => {
+        for (const text of ["word[^1].", "word.[^1]", "word[^1]”.", "句子。[^1]"]) {
+            expect(footnoteAfterPunctuation(text, "none")).toBe(text);
+        }
+    });
+});
+
+describe("the lint pipeline threads the placement", () => {
+    it("defaults to after and honours before", () => {
+        expect(lintFootnotes("word[^1].\n\n[^1]: one")).toBe("word.[^1]\n\n[^1]: one");
+        expect(lintFootnotes("word.[^1]\n\n[^1]: one", { placement: "before" })).toBe("word[^1].\n\n[^1]: one");
+        const untouched = "word.[^1]\n\n[^1]: one";
+        expect(lintFootnotes(untouched, { placement: "none" })).toBe(untouched);
     });
 });

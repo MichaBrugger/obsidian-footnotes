@@ -1,6 +1,6 @@
 import { inItemDefinitionLabels } from "../../parsing/list-item-definitions";
 import { inlineFootnoteSpans, referenceOccurrences } from "../../parsing/footnote-grammar";
-import { ClosingMarkChars, definitionLabelIn, referenceLandingAfter, TrailingPunctuationChars } from "../../parsing/markdown-scan";
+import { ClosingMarkChars, definitionLabelIn, FootnotePlacement, referenceLandingAfter, TrailingPunctuationChars } from "../../parsing/markdown-scan";
 import { rewriteDocument } from "../rewrite-document";
 import { FootnoteRule } from "../rule";
 
@@ -55,7 +55,13 @@ interface MovableUnit {
 // The searching is done on the masked twin, but the text handed back is
 // built from the original line. Otherwise a footnote name could come out
 // with the blanking characters in it.
-function swapInSegment(original: string, masked: string, insideBody = false, mayBeLabel = true): string {
+function swapInSegment(
+    original: string,
+    masked: string,
+    insideBody = false,
+    mayBeLabel = true,
+    placement: FootnotePlacement = "after",
+): string {
     const spans: MovableUnit[] = inlineFootnoteSpans(masked).map((span) => ({
         start: span.open,
         end: span.close + 1,
@@ -90,9 +96,27 @@ function swapInSegment(original: string, masked: string, insideBody = false, may
         // **bold**[^1], and a link's "(url)" tail is stepped over whole).
         // Taking both sides as whole runs is what lets one pass finish the
         // job, so running the lint again changes nothing: "[^1][^2]?!"
-        // moves in one go.
-        const punctuationEnd = referenceLandingAfter(masked, end);
-        if (punctuationEnd === end) continue;
+        // moves in one go. Under "before" the walk stops in front of
+        // punctuation and steps over it only together with a closing mark
+        // that follows, so the forward move then carries the run out of a
+        // quote and no further.
+        const punctuationEnd = referenceLandingAfter(masked, end, placement);
+        if (punctuationEnd === end) {
+            // Under "before", a run that sits right AFTER punctuation moves
+            // back in front of it: "word.[^1]" becomes "word[^1].", and
+            // "句子。[^1]" becomes "句子[^1]。" (T5, 2026-09-21). A run after
+            // a closing mark stays: the marker belongs outside the quote in
+            // every convention found, punctuation inside the quote or not.
+            if (placement !== "before" || start === 0 || !TrailingPunctuationChars.includes(masked[start - 1])) continue;
+            let punctuationStart = start;
+            while (punctuationStart > 0 && TrailingPunctuationChars.includes(masked[punctuationStart - 1])) punctuationStart--;
+            out +=
+                original.slice(copied, punctuationStart) +
+                original.slice(start, end) +
+                original.slice(punctuationStart, start);
+            copied = end;
+            continue;
+        }
         // A SINGLE reference followed by ":" with nothing but whitespace,
         // quote markers, or dead text before it is a label the label reader
         // did not claim: one indented past three spaces inside a list item
@@ -121,8 +145,9 @@ function swapInSegment(original: string, masked: string, insideBody = false, may
         // closing mark is where it should be. Any punctuation after it
         // belongs to the next clause, and moving the references again
         // would walk them further and further from the words they belong
-        // to.
-        if (start > 0 && AlreadyPlacedAfter.test(masked[start - 1])) continue;
+        // to. Under "before" the forward move only ever carries a run out
+        // of a quote, which is right wherever the run started.
+        if (placement === "after" && start > 0 && AlreadyPlacedAfter.test(masked[start - 1])) continue;
         out +=
             original.slice(copied, start) +
             original.slice(end, punctuationEnd) +
@@ -133,15 +158,20 @@ function swapInSegment(original: string, masked: string, insideBody = false, may
 }
 
 /**
- * Move every footnote reference that sits before punctuation so it sits
- * after it instead: "word[^1]." becomes "word.[^1]". An inline footnote
+ * Move every footnote reference to the side of the punctuation the
+ * placement setting says: under "after" (the default) "word[^1]." becomes
+ * "word.[^1]"; under "before" the opposite, "word.[^1]" becomes
+ * "word[^1]."; under "none" nothing moves at all. An inline footnote
  * moves the same way, as one unit: "word^[note]." becomes "word.^[note]".
+ * Closing marks are stepped over whatever the setting, so a reference
+ * never lands inside a quote.
  *
  * A definition's own label is never touched. The body of a definition is
  * prose like any other, so references in it are moved too. Code blocks,
  * inline code and frontmatter are left alone.
  */
-export function footnoteAfterPunctuation(markdown: string): string {
+export function footnoteAfterPunctuation(markdown: string, placement: FootnotePlacement = "after"): string {
+    if (placement === "none") return markdown;
     // The masked twin is built with the whole note in view. On a line where
     // a comment opens or closes, the part inside the comment is blanked
     // while the part outside it still gets the swap
@@ -176,6 +206,7 @@ export function footnoteAfterPunctuation(markdown: string): string {
                     masked.slice(prefixLength),
                     prefixLength > bom,
                     i === 0 || lines[i - 1].trim() === "",
+                    placement,
                 )
             );
         });
@@ -183,39 +214,56 @@ export function footnoteAfterPunctuation(markdown: string): string {
     });
 }
 
-/** This rule's catalogue entry. The id matches obsidian-linter's file name. */
-export const footnoteAfterPunctuationRule: FootnoteRule = {
+/** This rule's catalogue entry. The id matches obsidian-linter's file name; the option is the placement setting. */
+export const footnoteAfterPunctuationRule: FootnoteRule<{ placement?: FootnotePlacement }> = {
     id: "footnote-after-punctuation",
     name: "Footnote after punctuation",
     description:
-        'Move footnote references that sit before punctuation to sit after it ("word[^1]." → "word.[^1]").',
+        'Move footnote references to the side of punctuation the placement setting says: after it by default ("word[^1]." → "word.[^1]"), before it, or not at all.',
     examples: [
         {
             description: "Reference before a period moves after it",
             before: "word[^1].",
             after: "word.[^1]",
+            options: {},
         },
         {
             description: "A run of references crosses a run of punctuation as one unit",
             before: "wait[^1]?!",
             after: "wait?![^1]",
+            options: {},
         },
         {
             description: "An inline footnote moves whole, its body untouched",
             before: "word^[an inline note].",
             after: "word.^[an inline note]",
+            options: {},
         },
         {
             description: "References inside inline code are left alone",
             before: "use `x[^1].` as-is",
             after: "use `x[^1].` as-is",
+            options: {},
         },
         {
             description:
                 "An escaped literal \\[^1] is prose, not a reference - never moved",
             before: "prose \\[^1]. tail",
             after: "prose \\[^1]. tail",
+            options: {},
+        },
+        {
+            description: "Under 'before', a reference after a period moves in front of it",
+            before: "句子。[^1]",
+            after: "句子[^1]。",
+            options: { placement: "before" },
+        },
+        {
+            description: "Under 'before', a reference still lands outside a closing quote",
+            before: "「句子[^1]。」",
+            after: "「句子。」[^1]",
+            options: { placement: "before" },
         },
     ],
-    apply: (text) => footnoteAfterPunctuation(text),
+    apply: (text, options) => footnoteAfterPunctuation(text, options.placement),
 };

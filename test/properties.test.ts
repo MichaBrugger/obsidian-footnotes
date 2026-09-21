@@ -62,6 +62,9 @@ const soakIt = (name: string, fn: () => void) => { it(name, fn, SOAK_TIMEOUT); }
 
 const optionsArb: fc.Arbitrary<LintOptions> = fc.record({
     fixPunctuation: fc.boolean(),
+    // all three placements (T5, 2026-09-21), so the idempotence and
+    // conservation properties exercise the backward move too
+    placement: fc.constantFrom("after" as const, "before" as const, "none" as const),
     fixLazyDefinitions: fc.boolean(),
     moveDefinitionsToBottom: fc.boolean(),
     reindex: fc.boolean(),

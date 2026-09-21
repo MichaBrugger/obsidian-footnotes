@@ -14,8 +14,7 @@ import { definitionLabel, definitionLabelWithName, quotedReference, referenceOcc
 import { footnotePrefix, footnotePrefixProblem } from "../parsing/footnote-prefix";
 import {
     findDefinitionBlocks,
-    maskInlineRegions,
-} from "../parsing/markdown-scan";
+    maskInlineRegions, FootnotePlacement } from "../parsing/markdown-scan";
 import { AppWithCommands, AppWithPlugins, readingViewActive, viewEditor, WindowWithVim } from "../editor/obsidian-internals";
 import { activeTableCellEditor, nestedSubEditorOwnsFocus, runOutsideTableCell } from "../editor/table-cursor";
 // The pipeline calls each rule through its catalogue entry (rule.apply), not
@@ -81,6 +80,7 @@ export function lintOptionsFromSettings(
     return {
         sectionHeading,
         fixPunctuation: plugin.settings.lintFixPunctuation,
+        placement: plugin.settings.footnotePlacement,
         fixLazyDefinitions: plugin.settings.lintFixLazyDefinitions,
         moveDefinitionsToBottom: plugin.settings.lintMoveToBottom,
         reindex: plugin.settings.lintReindex,
@@ -102,6 +102,10 @@ export interface LintOptions {
     sectionHeading?: string;
     /** Run footnoteAfterPunctuation (default on). */
     fixPunctuation?: boolean;
+    /** Which side of the punctuation the rule puts references on (default
+     * after; the caller passes the footnotePlacement setting). Under
+     * "none" the rule does nothing even when fixPunctuation is on. */
+    placement?: FootnotePlacement;
     /**
      * Run fixLazyDefinitions (default on). A "[^x]:" line sitting directly
      * under a line of prose gets the blank line that turns it into a real
@@ -224,7 +228,7 @@ export function lintFootnotes(
             result = removeOrphanedDefinitionsRule.apply(result);
         }
         if (options.fixPunctuation ?? true) {
-            result = footnoteAfterPunctuationRule.apply(result);
+            result = footnoteAfterPunctuationRule.apply(result, { placement: options.placement });
         }
         if (options.moveDefinitionsToBottom ?? true) {
             result = moveFootnotesToTheBottomRule.apply(
