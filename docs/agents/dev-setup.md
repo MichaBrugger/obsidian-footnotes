@@ -1,0 +1,65 @@
+# Dev environment
+
+What the config files cannot tell you. `TESTING.md` covers the test layers and their commands; `package.json` covers the scripts; the release workflow and `scripts/version-bump.mjs` explain their own checks in comments. Everything below was learned the hard way and dated when it bit.
+
+## Where things live
+
+- The plugin is checked out inside the **Obsidian-Plugin-Sandbox** vault at `.obsidian/plugins/obsidian-footnotes`, on branch master. The vault root is two levels above this folder. Jason keeps his personal "Second Brain" vault open in the same app at the same time.
+- Commits are authored as `Comprehensive-Jason <jasonindestructible@gmail.com>` from the global gitconfig. If another author appears, look for a stale override in `.git/config`.
+- Pushing needs the `gh auth setup-git` credentials; a bare `git push` can hang on an interactive prompt.
+- `main.js` is gitignored but must exist on disk for the vault to load the plugin. `npm run build` runs `tsc -noEmit`, then the minified esbuild bundle; `npm run dev` is the esbuild watch with a readable bundle and inline sourcemap.
+- The vault runs the **hot-reload** community plugin: a new `main.js` in this folder reloads the plugin by itself. The installed CLI has no `plugin:reload` command.
+- `npm run test:smoke` copies the current `main.js` into place and tests it. It does not build, so a stale bundle passes or fails the wrong code (2026-09-04). Build first.
+- Obsidian 1.13's `Plugin` class has its own `settings` property, so the subclass declares it with `declare settings: ...`; a plain class field errors under ES2022 class-field semantics and would shadow the base property.
+- eslint runs the `eslint-plugin-obsidianmd` recommended flat config, type-aware. Its key rules forbid `eslint-disable` comments, so quiet a `no-unsafe-*` finding with a typed interface, never a disable.
+- `npm run mutation` (Stryker) is a local pre-release audit, never CI: Jason finds Actions too slow. It caches in `reports/stryker-incremental.json`. A Survived verdict on a freshly added test may be a coverage-attribution artifact; hand-apply the mutant to check.
+- `test/properties.test.ts` holds fast-check properties with a remark/micromark differential oracle. Soak it with `FC_NUM_RUNS=5000`. It recuses itself from documents with `$` in a footnote name because micromark's math extension disagrees with Obsidian there.
+
+## Driving the live app through the Obsidian CLI
+
+`Obsidian.com` is the CLI on Windows; spawn it directly, never through a shell, because quoting breaks. `obsidian eval` runs code in the app; `app.commands.executeCommandById('obsidian-footnotes:<command>')` presses a command, and `app.plugins.plugins['obsidian-footnotes'].settings` can be mutated in memory without persisting.
+
+Rules that protect Jason's open notes and the app itself:
+
+1. **Pass `vault=Obsidian-Plugin-Sandbox` as the first CLI argument on every call.** Without it the CLI targets whichever vault window has focus, and on 2026-09-08 a probe wrote its scratch note into his personal vault.
+2. **Resolve the target note's leaf by file path and activate it** with `app.workspace.setActiveLeaf(leaf, {focus: true})` before pressing any command, and refuse to press when it is not active. The CLI's `open` command does not switch tabs, so anything that reads `activeLeaf` writes into whatever note Jason has in front; that overwrote his working sheets twice (2026-09-05, 2026-09-08). The File Recovery core plugin restores such a note: `app.internalPlugins.plugins['file-recovery'].instance.getLastVersionByPath(path)`, then `vault.modify`. The smoke suite does all of this already; ad-hoc probes must too.
+3. **Guard every destructive eval with a file-path check** on `activeLeaf.view.file.path`, because Jason may be editing in the vault while a probe runs.
+4. **Keep eval arguments small.** Code over about 4 KB crashed the renderer twice (2026-08-28). Write the script to a vault dotfile and eval a tiny loader that runs `adapter.read(...)`.
+5. **End every fire-and-forget eval with a sentinel expression** (`...; 'fired'`). The CLI awaits a bare async IIFE, and killing the client mid-eval wedges the eval server until the app relaunches.
+6. **Sleep and poll on the Node side, not in the app.** Electron throttles background timers to about one per minute when the window is occluded, so in-app `await sleep()` chains stall. ResizeObserver and requestAnimationFrame callbacks never fire while the window is hidden or minimized either, so anything that must happen deterministically (initial layout, positioning) needs a direct synchronous call.
+7. **Wait for the view buffer to catch up.** `MarkdownView.data` lags a tick behind editor API changes, and `Editor.transaction` and `replaceRange` resolve positions against that lagging buffer, so after `setValue` wait for `view.data === editor.getValue()` before any command. Set note content through `editor.setValue`, never by overwriting the file, or the unsaved buffer merges garbage.
+8. **Record `app.isMobile` alongside every live-probe result.** Jason uses Obsidian's mobile emulation (`app.emulateMobile(bool)`, which reloads the window; the state survives `app:reload`). Vim does not exist on mobile, layouts and popups differ, so validate fixes in both modes. If the sandbox is stuck emulating mobile: `eval "code=app.emulateMobile(false)"`.
+9. **After heavy table-cell testing, run `app:reload`.** Ghost cell editors survive and poison later edits with "RangeError: Invalid change range" from stale sync-backs. `dev:debug on` plus `dev:console level=error` shows swallowed errors. The CLI is also flaky under parallel use (empty results, exit 127): pause and retry.
+
+Two proven techniques:
+
+- **Debug capture** (cracked the table bug, 2026-07-15): temporarily instrument the command to snapshot the state in question into `window.__footnoteDebug`, build in place, have Jason perform the real gesture once, read the snapshot through eval, then remove the instrumentation. A real gesture beats a scripted approximation.
+- **Ground truth for ambiguous markdown**: `metadataCache.getFileCache(f).sections` says exactly how Obsidian classifies a block (yaml versus thematic break, code versus continuation). Rendering claims are settled against Reading view.
+
+## Table cells
+
+Obsidian's table editor runs a sub-editor per focused cell that syncs back asynchronously.
+
+- The main editor's `getCursor()` does not track a cell's caret, and the cell's DOM exposes no `cmView`. Recover the cell's EditorView through CodeMirror's registry: `editor.cm.constructor.findFromDOM(document.activeElement)`, guarding `view !== cm`. That is `resolveTableCellCursor()` in src.
+- Never edit a table row through the main editor while a cell has focus: the sync-back and the full-table re-normalization on close shred the row. Dispatch insertions into the cell view itself (`activeTableCellEditor()` and `insertInTableCell()`), and the widget writes the markdown back.
+- Several `Editor` dispatches in one tick race the sync ("Applying change set to a document with the wrong length"). Bundle every mutation into one `Editor.transaction({changes, selection})`; Obsidian resolves the selection against the post-change document. `editorCallback` hands you the document editor, never a cell-scoped one.
+- Live repro: `editor.focus(); editor.setCursor(<pos inside table>)` activates cell editing (an editing cell's `td.textContent` doubles, "appleapple"). Synthetic MouseEvents do not reliably focus cells.
+- Smoke tests poll for a landmark substring instead of byte-exact table content (the widget re-normalizes padding), and `setupNote` parks the cursor at {0,0} and waits about 150 ms before `setValue`, so a lingering cell editor closes before the next test's content lands.
+
+## Popup editor and embeds
+
+- The markdown embed's `save(t, n)` needs the section text and `n = true` to write to disk; `n` defaults to in-memory only. An argless `embed.save()` feeds `undefined` into the parent `set()`, which throws and first assigns `this.text = undefined`, so the embed's own debounced saves crash afterwards (Obsidian 1.13.6, 2026-08-13). Prototype-patch logging (wrapping the embed's save, set, and onunload through eval) is how this was pinned.
+- Anything that saves right after editor edits waits for the view buffer first (rule 7 above); the popup editor does.
+
+## Release and beta flow
+
+`npm version <patch|minor|x.y.z|x.y.z-beta.N>` on a clean tree does the whole local step: the version script syncs the manifests and versions file (a version with a "-" is a BRAT beta and touches `manifest-beta.json` only; a stable version sets all three and lifts `manifest-beta.json` to the same version so BRAT testers leave the beta), and npm commits and tags without a "v" prefix. Then `git push origin master <version>` and publish the draft the workflow creates; BRAT cannot see drafts. The workflow fails fast when the tag matches neither manifest, and marks beta tags as pre-releases shipping `manifest-beta.json` renamed as the asset. Manual test mode: Actions, "Release Obsidian plugin", Run workflow, which drafts `<version>-manual-test` with no tag; delete the draft after checking.
+
+## README GIFs
+
+`scripts/readme-gifs/record.mjs <scene>` runs one `scene-<name>.js` in-app through `inapp.js` and `scene-shared.js`. Facts from 2026-09-08:
+
+- A scene whose first line is `// @mobile` gets emulation toggled on either side by the driver, because `app.emulateMobile` reloads the window and kills the scene mid-run.
+- The Settings dialog opens in its own popout window on this build: `document.querySelectorAll('.modal')` in the main window is empty. Use `app.setting.modalEl` and capture through that window's webContents (match `getContentSize()[0]` to `modalEl.ownerDocument.defaultView.innerWidth` across `remote.BrowserWindow.getAllWindows()`).
+- The sandbox window is maximized with DevTools docked beside the page, so `setBounds` is ignored until `unmaximize()` and page `innerWidth` sits far below the window width; size to a target page width by measuring and correcting in a loop, then restore the bounds and maximize.
+- GIF frames need the window visible, or typing outruns the command awaits.
