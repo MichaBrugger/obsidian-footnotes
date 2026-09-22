@@ -12,7 +12,7 @@ import {
     scanDocument,
 } from "../parsing/markdown-scan";
 
-// Carrying footnote definitions along on copy, cut and paste (issue #59;
+// Carrying footnote definitions along on copy, cut, and paste (issue #59;
 // Jason's rulings 2026-09-21 and 2026-09-22).
 //
 // Copy a paragraph holding "[^3]" into another note and the reference
@@ -143,6 +143,8 @@ export interface CarriedPastePlan {
     added: number;
     /** incoming definitions whose body an existing definition already holds, so the existing one serves */
     reused: number;
+    /** the reused ones whose existing definition goes by another name, so the pasted references were pointed at it (a second paste of a footnote the first paste renamed lands here; Jason's question, 2026-09-22) */
+    repointed: number;
     /** incoming names the destination already used for a different body, given a new name */
     renamed: number;
 }
@@ -155,7 +157,7 @@ export interface CarriedPastePlan {
  * its label, and the references to it are pointed at the existing name; a
  * name the destination does not use (as a definition or a reference) is
  * kept; a name the destination uses for a different body is renamed, a
- * number to the smallest free number, a name to name-2, name-3 and so on.
+ * number to the smallest free number, a name to name-2, name-3, and so on.
  * The renames are made in the body and inside the carried blocks (labels
  * and references alike), so a carried definition that cites another keeps
  * citing it. Protected text in the body is left as it is.
@@ -195,6 +197,7 @@ export function planCarriedPaste(destination: string, body: string, carried: Car
     const reusedNames = new Set<string>();
     let added = 0;
     let reused = 0;
+    let repointed = 0;
     let renamed = 0;
     const occupied = (folded: string) => taken.has(folded) || assigned.has(folded);
     for (const definition of carried) {
@@ -204,6 +207,7 @@ export function planCarriedPaste(destination: string, body: string, carried: Car
             finalName.set(folded, existing);
             reusedNames.add(folded);
             reused++;
+            if (existing.toLowerCase() !== folded) repointed++;
             continue;
         }
         if (!occupied(folded)) {
@@ -262,12 +266,13 @@ export function planCarriedPaste(destination: string, body: string, carried: Car
             name: finalName.get(definition.name.toLowerCase()) as string,
             lines: rename(definition.lines),
         }));
-    return { body: rename(normalizeEol(body).text.split("\n")).join("\n"), definitions, added, reused, renamed };
+    return { body: rename(normalizeEol(body).text.split("\n")).join("\n"), definitions, added, reused, repointed, renamed };
 }
 
 /**
  * The clipboard text with the carried blocks appended after one blank
- * line, for the "Include the definitions in the copied text" setting. A
+ * line: what copy and cut write to the clipboard (Jason, 2026-09-22:
+ * always, so a paste outside Obsidian keeps the definitions). A
  * body with no definitions to carry comes back untouched.
  */
 export function withCarriedText(body: string, carried: CarriedDefinition[]): string {

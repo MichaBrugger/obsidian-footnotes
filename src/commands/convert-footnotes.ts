@@ -325,20 +325,33 @@ export function convertInlineFootnotesToNormal(plugin: FootnotePlugin, doc: Edit
         return { ...nothingToConvert, skipped };
     }
 
-    // one id per distinct body, in order of first appearance, numbered the
-    // way a creation press numbers (an invalid prefix has already been
-    // toasted by activeFootnotePrefix)
+    // one id per distinct body, in order of first appearance: numbered the
+    // way a creation press numbers, or, when the setting says so, named
+    // after the first meaningful word of the body (Jason, 2026-09-22),
+    // with a number for a body that offers no word; an invalid prefix has
+    // already been toasted by activeFootnotePrefix
     const prefix = activeFootnotePrefix(plugin, footnotePrefixFromEditor(doc));
     if (prefix === null) return { ...nothingToConvert, skipped };
     const maskedText = masked.join("\n");
-    const first = computeNextFootnoteNumber(maskedText, prefix, maskedText);
+    let nextNumber = computeNextFootnoteNumber(maskedText, prefix, maskedText);
+    const named = plugin.settings.convertedFootnoteNames === "named";
+    // every name the note uses, folded, so a generated name never collides
+    const taken = new Set<string>();
+    if (named) {
+        for (const name of listExistingFootnoteDefinitions(doc, ctx)) taken.add(name.toLowerCase());
+        for (let i = 0; i < lines.length; i++) {
+            if (ctx.scan.isProtected[i] || !lines[i].includes("[^")) continue;
+            for (const occurrence of referenceOccurrences(lines[i], masked[i], starts[i])) taken.add(occurrence.name.toLowerCase());
+        }
+    }
     const idOf = new Map<string, string>();
     const bodies: string[] = [];
     for (const span of spans) {
-        if (!idOf.has(span.body)) {
-            idOf.set(span.body, `${prefix}${first + bodies.length}`);
-            bodies.push(span.body);
-        }
+        if (idOf.has(span.body)) continue;
+        const name = (named ? nameForBody(span.body, taken, prefix) : null) ?? `${prefix}${nextNumber++}`;
+        taken.add(name.toLowerCase());
+        idOf.set(span.body, name);
+        bodies.push(span.body);
     }
     const ids = bodies.map((body) => idOf.get(body) as string);
 
@@ -385,6 +398,33 @@ export function convertInlineFootnotesToNormal(plugin: FootnotePlugin, doc: Edit
         noticeLintAlerts(plugin, doc.getValue());
     }
     return result;
+}
+
+// Words that say nothing about what a footnote is about, skipped when a
+// name is taken from its body. English only, and short on purpose: a word
+// wrongly kept costs a less telling name, a word wrongly skipped costs
+// nothing worse.
+const FillerWords = new Set(
+    "a an the of in on at to and or but for with by from as is are was were be been being this that these those it its see cf eg ie also not no than then so if we he she they i you my our your their his her which who whom what when where into over under per via vs et al".split(" "),
+);
+
+/**
+ * A footnote name taken from a body: its first word that is not a filler
+ * word (a one-letter word only when nothing longer follows), spelled as
+ * written, with the note's prefix in front, and "-2", "-3" appended while
+ * the name is taken. Null when no word will do, so the caller numbers it.
+ * Names are matched without regard to case, as Obsidian matches them.
+ */
+export function nameForBody(body: string, taken: ReadonlySet<string>, prefix = ""): string | null {
+    const words = [...body.matchAll(/[\p{L}\p{N}]+/gu)].map((m) => m[0]).filter((w) => !FillerWords.has(w.toLowerCase()));
+    const word = words.find((w) => w.length > 1) ?? words.at(0);
+    if (word === undefined) return null;
+    const base = `${prefix}${word.slice(0, 30)}`;
+    if (!taken.has(base.toLowerCase())) return base;
+    for (let k = 2; ; k++) {
+        const candidate = `${base}-${k}`;
+        if (!taken.has(candidate.toLowerCase())) return candidate;
+    }
 }
 
 /** "1 empty, 2 inside a footnote definition" */

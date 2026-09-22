@@ -2,7 +2,7 @@
 
 Claude: one pass over everything built 2026-09-21 and 22, for Jason to run before the beta. It gathers the human checks of sheets 15 (delete), 16 (placement), 17 (conversions) and 18 (copy and paste), adds the inline-footnote lint change and the icons, and orders them so settings change as few times as possible. Run `npm test` first; 2907 tests pass with 31 expected failures as of the last commit. Every fixture is in this note or in the companion note **19b - Paste target**. Undo (Ctrl+Z) between checks unless a check says otherwise.
 
-Settings to start: defaults. **Footnote reference placement** = After punctuation, **Carry footnote definitions on copy, cut and paste** on, **Include the definitions in the copied text** off, **Lint on footnote creation** off.
+Settings to start: defaults. **Footnote reference placement** = After punctuation, **Carry footnote definitions on copy, cut, and paste** on, **Names for converted inline footnotes** = Numbers, **Lint on footnote creation** off.
 
 ## 1. Delete footnote everywhere
 
@@ -46,25 +46,25 @@ Fixtures: two inline footnotes with the same body^[the same note] and again^[the
 
 - [ ] Run **Convert inline footnotes to normal footnotes**: the three inline footnotes above become numbered references, two definitions are appended after the last definition block (the identical bodies share one), the toast reads "Converted 3 inline footnotes into 2 normal footnotes (1 identical body merged)."
 - [ ] One undo brings all three inline footnotes back and removes both definitions
+- [ ] Set **Names for converted inline footnotes** to **First word of the body** and run the command again: the references read `[^same]`, `[^same]`, `[^different]`, with definitions to match. Undo, set it back to Numbers
 - [ ] Turn **Lint on footnote creation** on and run the same command: it lints straight after (numbering follows the text) and the note reads right in Reading view. Undo, turn the setting off
 - [ ] Run **Convert normal footnotes to inline footnotes**: `[^twice]` (if you restored it) becomes identical inline copies, `[^single]` becomes one, `[^long]` and `[^item]` stay, and the toast names them with their reasons ("more than one line", "inside a list item") and says a definition used more than once became copies
 - [ ] One undo restores references and definitions together
 - [ ] Round trip: convert to inline, then back to normal: a footnote that was used twice comes back as ONE definition with two references (the name is now a number, the sharing is restored)
 
-## 5. Copying, cutting and pasting
+## 5. Copying, cutting, and pasting
 
 Open **19b - Paste target** in a second pane. Fixture paragraph: a paragraph with a shared footnote[^shared] and another use of it[^shared], one with its own[^own], and the chained one[^chain].
 
 - [ ] Select the fixture paragraph, Ctrl+C, click at the end of the line in 19b, Ctrl+V: the text lands, definitions for `shared`, `own`, `chain` and `inner` are appended after `[^1]: an existing one`, the toast reads "Pasted with 4 footnote definitions: 4 added, 0 reused, 0 renamed.", Reading view renders every footnote
 - [ ] One undo in 19b removes the text and all four definitions together
-- [ ] Ctrl+V a second time: 0 added, 4 reused, and the references point at the existing definitions
+- [ ] Ctrl+V a second time: 0 added, 4 reused, and the references point at the existing definitions. Paste once more after the `[^own-2]` rename of the next check: the toast says "4 reused (1 under a name this note already had)"
 - [ ] In 19b add a line `[^own]: a different body` at the bottom, Ctrl+V again: `[^own]` arrives renamed to `[^own-2]` with its own definition, toast says 1 renamed
 - [ ] Copy `Existing[^1] text.` from 19b, paste it here at the end of a paragraph: it lands as `[^1]` with its definition (this note has no `[^1]`). Undo
 - [ ] Cut: select exactly `one with its own[^own]` and Ctrl+X: the phrase and the `[^own]` definition leave in the SAME undo step, the toast says one definition was cut; Ctrl+V elsewhere in this note brings both back. Undo twice
 - [ ] Cut one of the two `[^shared]` uses: the definition stays, and pasting it elsewhere reuses it
-- [ ] Paste the copied paragraph into Notepad or a browser field: plain text, no definition lines
-- [ ] Turn on **Include the definitions in the copied text**, copy the paragraph, paste into the other app: the definition lines follow after a blank line. Paste into 19b as well: the definitions still land at the bottom, not in the middle of the text. Turn the setting off
-- [ ] Settings page: with **Carry footnote definitions** off, the include toggle is greyed out; turn carrying back on
+- [ ] Paste the copied paragraph into Notepad or a browser field: the text, then a blank line, then the four definition lines (they travel in the clipboard text on purpose, so a cut pasted outside Obsidian loses nothing)
+- [ ] Cut a phrase whose footnote only it uses, paste it into Notepad: the definition line is there; paste it back into this note: it lands as a footnote again, not as a stray definition line
 
 ## 6. Icons and the palette
 

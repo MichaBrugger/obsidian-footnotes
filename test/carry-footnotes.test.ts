@@ -99,6 +99,7 @@ describe("planCarriedPaste", () => {
             definitions: [one("2", "[^2]: two")],
             added: 1,
             reused: 0,
+            repointed: 0,
             renamed: 0,
         });
     });
@@ -114,6 +115,14 @@ describe("planCarriedPaste", () => {
             definitions: [],
             reused: 1,
             renamed: 0,
+            // the references were pointed at a name the note already had,
+            // which the toast says (Jason's question, 2026-09-22: a second
+            // paste of a renamed footnote reuses own-2 by its body)
+            repointed: 1,
+        });
+        expect(planCarriedPaste("s[^s]\n\n[^s]: Smith 2024", "a[^s]", [one("s", "[^s]: Smith 2024")])).toMatchObject({
+            reused: 1,
+            repointed: 0,
         });
     });
 
@@ -131,6 +140,7 @@ describe("planCarriedPaste", () => {
             definitions: [one("2", "[^2]: uno")],
             added: 1,
             reused: 0,
+            repointed: 0,
             renamed: 1,
         });
     });
@@ -168,10 +178,11 @@ describe("planCarriedPaste", () => {
     });
 });
 
-// The clipboard text itself, for the "Include the definitions in the
-// copied text" setting (off by default) and for the paste fallback that
-// reads a clipboard carrying definition lines from anywhere: a manual copy,
-// the setting turned on, or Copy with Footnotes.
+// The clipboard text itself, which copy and cut always write (the
+// definitions ride after the selection, so a paste outside Obsidian keeps
+// them; Jason, 2026-09-22), and the reading the paste fallback gives any
+// clipboard that ends in definition lines, wherever it came from: a manual
+// copy, or Copy with Footnotes.
 describe("the clipboard text with definitions in it", () => {
     it("appends the carried blocks after one blank line, and splits them back off", () => {
         const text = withCarriedText("a[^1] b", [{ name: "1", lines: ["[^1]: one", "    more"] }]);

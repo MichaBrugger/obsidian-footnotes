@@ -11,14 +11,18 @@ import {
     resetCarryRegister,
 } from "../src/commands/carry-footnotes-hooks";
 
-// The editor side of carrying footnotes (issue #59): the copy, cut and
+// The editor side of carrying footnotes (issue #59): the copy, cut, and
 // paste hooks over the pure seams, driven here with a fake clipboard
-// event. Copy remembers what the selection needs in a plugin-side
-// register and leaves the clipboard alone (unless the include setting is
-// on); cut takes the event over and deletes the selection together with
-// the definitions it orphans, in one transaction; paste takes the event
-// over when the text matches the register, or when the text itself ends
-// in definition lines, and lands body plus definitions in one transaction.
+// event. Copy and cut always write the definitions into the clipboard
+// text after the selection (Jason, 2026-09-22: otherwise a cut pasted
+// outside Obsidian loses them, which reads as data loss; and a clipboard
+// that carries them has no downside inside Obsidian, since paste strips
+// them back off), and remember the same in a plugin-side register. Cut
+// takes the event over only when the deletion orphans a definition, and
+// then deletes the selection together with those definitions in one
+// transaction. Paste takes the event over when the text matches the
+// register or ends in definition lines, and lands body plus definitions in
+// one transaction.
 
 interface FakeClipboardEvent {
     clipboardData: { getData(type: string): string; setData(type: string, value: string): void; types: string[] };
@@ -32,7 +36,6 @@ function clipboardEvent(text = "", types = ["text/plain"]): FakeClipboardEvent {
     const event: FakeClipboardEvent = {
         written: {},
         defaultPrevented: false,
-        types: undefined as never,
         clipboardData: {
             types,
             getData: (type: string) => (type === "text/plain" ? text : ""),
@@ -44,7 +47,7 @@ function clipboardEvent(text = "", types = ["text/plain"]): FakeClipboardEvent {
             event.defaultPrevented = true;
         },
         stopPropagation() {},
-    } as FakeClipboardEvent;
+    };
     return event;
 }
 
@@ -63,25 +66,27 @@ beforeEach(() => {
 });
 
 describe("copy", () => {
-    it("remembers the selection's text and the definitions it needs, and leaves the clipboard to the editor", () => {
+    it("writes the selection plus the definitions it needs into the clipboard text, and remembers both", () => {
         const doc = editor(["a[^1] b", "", "[^1]: one"], { line: 0, ch: 0 }, { line: 0, ch: 7 });
         const event = clipboardEvent();
         handleCopy(fakePlugin({ carryFootnotesOnCopy: true }, doc), event as never);
+        expect(event.written["text/plain"]).toBe("a[^1] b\n\n[^1]: one");
+        expect(event.defaultPrevented).toBe(true);
         expect(carryRegister()).toEqual({
-            text: "a[^1] b",
+            text: "a[^1] b\n\n[^1]: one",
+            body: "a[^1] b",
             carried: [{ name: "1", lines: ["[^1]: one"] }],
             missing: [],
         });
-        expect(event.defaultPrevented).toBe(false);
-        expect(event.written).toEqual({});
     });
 
-    it("writes the definitions into the clipboard text when that setting is on", () => {
-        const doc = editor(["a[^1] b", "", "[^1]: one"], { line: 0, ch: 0 }, { line: 0, ch: 7 });
+    it("leaves the clipboard to the editor when the selection needs no definition", () => {
+        const doc = editor(["plain text"], { line: 0, ch: 0 }, { line: 0, ch: 5 });
         const event = clipboardEvent();
-        handleCopy(fakePlugin({ carryFootnotesOnCopy: true, includeDefinitionsInClipboard: true }, doc), event as never);
-        expect(event.written["text/plain"]).toBe("a[^1] b\n\n[^1]: one");
-        expect(event.defaultPrevented).toBe(true);
+        handleCopy(fakePlugin({ carryFootnotesOnCopy: true }, doc), event as never);
+        expect(event.defaultPrevented).toBe(false);
+        expect(event.written).toEqual({});
+        expect(carryRegister()).toMatchObject({ text: "plain", body: "plain", carried: [] });
     });
 
     it("does nothing while the feature is off, or with nothing selected", () => {
@@ -99,7 +104,7 @@ describe("paste", () => {
         const source = editor(["a[^1] b", "", "[^1]: one"], { line: 0, ch: 0 }, { line: 0, ch: 7 });
         handleCopy(fakePlugin({ carryFootnotesOnCopy: true }, source), clipboardEvent() as never);
         const destination = editor(["x[^1]", "", "[^1]: uno"], { line: 0, ch: 5 });
-        const event = clipboardEvent("a[^1] b");
+        const event = clipboardEvent("a[^1] b\n\n[^1]: one");
         handlePaste(fakePlugin({ carryFootnotesOnCopy: true }, destination), event as never, destination);
         expect(event.defaultPrevented).toBe(true);
         expect(destination.lines).toEqual(["x[^1]a[^2] b", "", "[^1]: uno", "[^2]: one"]);
@@ -113,6 +118,14 @@ describe("paste", () => {
         handlePaste(fakePlugin({ carryFootnotesOnCopy: true }, destination), event as never, destination);
         expect(event.defaultPrevented).toBe(true);
         expect(destination.lines).toEqual(["pc[^7]", "", "[^7]: seven"]);
+    });
+
+    it("says when a definition was reused under a name the note already had", () => {
+        const destination = editor(["s[^own-2]", "", "[^own-2]: the body"], { line: 0, ch: 9 });
+        const event = clipboardEvent("a[^own]\n\n[^own]: the body");
+        handlePaste(fakePlugin({ carryFootnotesOnCopy: true }, destination), event as never, destination);
+        expect(destination.lines).toEqual(["s[^own-2]a[^own-2]", "", "[^own-2]: the body"]);
+        expect(messages()).toContain("Pasted with 1 footnote definition: 0 added, 1 reused (1 under a name this note already had), 0 renamed.");
     });
 
     it("leaves a plain paste, a paste while the feature is off, and one another plugin already handled, to the editor", () => {
@@ -141,23 +154,31 @@ describe("paste", () => {
 });
 
 describe("cut", () => {
-    it("takes the cut over: the clipboard gets the selection, the register its definitions, and the note loses the selection and what it orphaned in ONE transaction", () => {
+    it("takes the cut over: the clipboard gets the selection with its definitions, and the note loses the selection and what it orphaned in ONE transaction", () => {
         const doc = editor(["a[^1] b[^2]", "", "[^1]: one", "[^2]: two"], { line: 0, ch: 0 }, { line: 0, ch: 6 });
         const event = clipboardEvent();
         handleCut(fakePlugin({ carryFootnotesOnCopy: true }, doc), event as never);
-        expect(event.written["text/plain"]).toBe("a[^1] ");
+        expect(event.written["text/plain"]).toBe("a[^1] \n\n[^1]: one");
         expect(event.defaultPrevented).toBe(true);
         expect(doc.lines).toEqual(["b[^2]", "", "[^2]: two"]);
         expect(doc.transactions).toBe(1);
-        expect(carryRegister()).toMatchObject({ text: "a[^1] ", carried: [{ name: "1", lines: ["[^1]: one"] }] });
+        expect(carryRegister()).toMatchObject({ body: "a[^1] ", carried: [{ name: "1", lines: ["[^1]: one"] }] });
     });
 
-    it("leaves a cut that orphans nothing to the editor, but still fills the register", () => {
+    it("takes a cut that orphans nothing over as well, so the definitions still reach the clipboard text", () => {
         const doc = editor(["a[^1] b[^1]", "", "[^1]: one"], { line: 0, ch: 0 }, { line: 0, ch: 6 });
         const event = clipboardEvent();
         handleCut(fakePlugin({ carryFootnotesOnCopy: true }, doc), event as never);
+        expect(event.written["text/plain"]).toBe("a[^1] \n\n[^1]: one");
+        expect(event.defaultPrevented).toBe(true);
+        expect(doc.lines).toEqual(["b[^1]", "", "[^1]: one"]);
+    });
+
+    it("leaves a cut that needs no definition to the editor", () => {
+        const doc = editor(["plain text"], { line: 0, ch: 0 }, { line: 0, ch: 5 });
+        const event = clipboardEvent();
+        handleCut(fakePlugin({ carryFootnotesOnCopy: true }, doc), event as never);
         expect(event.defaultPrevented).toBe(false);
-        expect(doc.lines).toEqual(["a[^1] b[^1]", "", "[^1]: one"]);
-        expect(carryRegister()).toMatchObject({ text: "a[^1] " });
+        expect(doc.lines).toEqual(["plain text"]);
     });
 });

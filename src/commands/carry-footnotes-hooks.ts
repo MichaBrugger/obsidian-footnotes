@@ -20,39 +20,44 @@ import {
 } from "./carry-footnotes";
 import { buildDefinitionAppend, seedDefinitionBody } from "./definition-append";
 
-// The editor side of carrying footnote definitions on copy, cut and paste
+// The editor side of carrying footnote definitions on copy, cut, and paste
 // (issue #59; Jason's rulings 2026-09-21 and 2026-09-22). The pure pieces
 // are in carry-footnotes.ts; this file hooks them to the keys people
 // already press.
 //
-// Copy: the editor's own copy goes ahead; the plugin only remembers, in a
-// register of its own, what the selection needs (its text and the
-// definition blocks its references point at outside it). The clipboard
-// stays clean, unless the "Include the definitions in the copied text"
-// setting is on, in which case the definitions are appended to the
-// clipboard text so they reach other vaults, windows and apps.
+// Copy and cut write the selection AND the definition blocks its
+// references need into the clipboard text, after one blank line, and
+// remember the same in a register of the plugin's own. The definitions
+// travel in the text on purpose (Jason, 2026-09-22): a cut pasted outside
+// Obsidian would otherwise lose them, which reads as data loss, and a
+// clipboard that carries them costs nothing inside Obsidian, because the
+// paste strips them back off before landing them properly. An earlier
+// design kept the clipboard clean behind a setting; Jason found no
+// downside to carrying and the setting went.
 //
-// Cut: when the deletion would orphan definitions, the plugin takes the
-// event over: the selection goes to the clipboard, and the selection AND
-// the definitions it orphaned leave the note in one transaction. A
-// definition still used elsewhere stays, and only its copy travels.
+// Cut takes the event over whenever the selection needs a definition
+// (the editor's own cut would write the bare text) or the deletion
+// orphans one: the selection AND the definitions it orphaned leave the
+// note in one transaction. A definition still used elsewhere stays, and
+// only its copy travels.
 //
 // Paste: Obsidian's editor-paste event hands over the ClipboardEvent
 // before the insert, and its text is read synchronously from the event,
 // with no Clipboard API permission (the async read is what makes Copy
 // with Footnotes fragile on the phone). When the text matches the
-// register, the plugin takes the paste over and lands the body plus the
-// carried definitions in one transaction, renamed to fit the destination
-// (planCarriedPaste), where a creation press would put them
-// (buildDefinitionAppend). When it does not match but the text itself
-// ends in definition lines (a manual copy, the include setting, a Copy
-// with Footnotes clipboard), the same thing happens with those lines read
-// off the text. Then the lint-on-creation trigger runs, as after every
-// press that creates a footnote.
+// register, or ends in definition lines from anywhere (a manual copy, a
+// Copy with Footnotes clipboard), the plugin takes the paste over and
+// lands the body plus the carried definitions in one transaction, merged
+// and renamed to fit the destination (planCarriedPaste), where a creation
+// press would put them (buildDefinitionAppend). Then the lint-on-creation
+// trigger runs, as after every press that creates a footnote.
 
 /** What the last copy or cut from this window took with it. */
 export interface CarryRegister {
+    /** the clipboard text as written: the body, then the carried blocks */
     text: string;
+    /** the selection alone */
+    body: string;
     carried: CarriedDefinition[];
     missing: string[];
 }
@@ -94,48 +99,44 @@ function textBetween(doc: Editor, from: EditorPosition, to: EditorPosition): str
     return parts.join("\n");
 }
 
-/** Remember what the selection needs. Returns what was remembered, or null when nothing was. */
-function remember(plugin: FootnotePlugin): { doc: Editor; from: EditorPosition; to: EditorPosition; text: string } | null {
+/** Remember what the selection needs, and return it with the editor and the range. Null when there is nothing to remember. */
+function remember(plugin: FootnotePlugin): { doc: Editor; from: EditorPosition; to: EditorPosition; entry: CarryRegister } | null {
     const selection = carryableSelection(plugin);
     if (!selection) return null;
     const { doc, from, to } = selection;
-    const text = textBetween(doc, from, to);
+    const body = textBetween(doc, from, to);
     const { carried, missing } = carriedDefinitions(doc.getValue(), from, to);
-    register = { text, carried, missing };
-    return { doc, from, to, text };
+    const entry = { text: withCarriedText(body, carried), body, carried, missing };
+    register = entry;
+    return { doc, from, to, entry };
 }
 
 /**
  * The copy hook (a bubbling document listener, so it runs after the
- * editor's own copy has written the clipboard and can override the text
- * when the include setting is on).
+ * editor's own copy has written the clipboard and can override the text).
+ * A selection that needs no definition is left to the editor.
  */
 export function handleCopy(plugin: FootnotePlugin, event: ClipboardEvent): void {
     const remembered = remember(plugin);
-    if (!remembered || !register) return;
-    if (plugin.settings.includeDefinitionsInClipboard && register.carried.length > 0 && event.clipboardData) {
-        event.clipboardData.setData("text/plain", withCarriedText(remembered.text, register.carried));
-        event.preventDefault();
-    }
+    if (!remembered || remembered.entry.carried.length === 0 || !event.clipboardData) return;
+    event.clipboardData.setData("text/plain", remembered.entry.text);
+    event.preventDefault();
 }
 
 /**
  * The cut hook (a capturing document listener, so it runs before the
- * editor's own cut and can take the event over). It takes over only when
- * the deletion orphans a definition; otherwise the editor cuts as usual
- * and the register alone is filled.
+ * editor's own cut and can take the event over). It takes over when the
+ * selection needs a definition or the deletion orphans one; a cut that
+ * needs neither is the editor's own.
  */
 export function handleCut(plugin: FootnotePlugin, event: ClipboardEvent): void {
     const remembered = remember(plugin);
-    if (!remembered || !register || !event.clipboardData) return;
-    const { doc, from, to, text } = remembered;
+    if (!remembered || !event.clipboardData) return;
+    const { doc, from, to, entry } = remembered;
     const before = doc.getValue();
     const orphaned = definitionsOrphanedByCut(before, from, to);
-    if (orphaned.length === 0) return;
-    event.clipboardData.setData(
-        "text/plain",
-        plugin.settings.includeDefinitionsInClipboard ? withCarriedText(text, register.carried) : text,
-    );
+    if (entry.carried.length === 0 && orphaned.length === 0) return;
+    event.clipboardData.setData("text/plain", entry.text);
     event.preventDefault();
     event.stopPropagation();
     // the note as it reads without the selection and without the orphaned
@@ -157,8 +158,10 @@ export function handleCut(plugin: FootnotePlugin, event: ClipboardEvent): void {
     const after = restoreEol(removeLineRanges(joined, ranges).join("\n"), eol);
     replaceMinimal(doc, before, after, plugin.app.workspace.getActiveViewOfType(MarkdownView) ?? undefined);
     doc.setCursor(from);
-    const count = orphaned.length;
-    showNotice(`Cut with ${count} footnote definition${count === 1 ? "" : "s"}; paste to carry ${count === 1 ? "it" : "them"} along.`);
+    if (orphaned.length > 0) {
+        const count = orphaned.length;
+        showNotice(`Cut with ${count} footnote definition${count === 1 ? "" : "s"} that nothing else used; paste to carry ${count === 1 ? "it" : "them"} along.`);
+    }
 }
 
 /**
@@ -175,15 +178,12 @@ export function handlePaste(plugin: FootnotePlugin, event: ClipboardEvent, doc: 
     let carried: CarriedDefinition[];
     let missing: string[];
     if (register && normalizeEol(register.text).text === normalizeEol(text).text) {
-        // the plugin's own copy: the body is the text as copied, and the
-        // definitions are what the register remembered
-        ({ carried, missing } = register);
-        body = text;
+        // the plugin's own copy: the exact blocks it remembered, and the
+        // names it could not find
+        ({ body, carried, missing } = register);
     } else {
         // a clipboard from anywhere that ends in definition lines
-        const split = splitCarriedText(text);
-        if (split.carried.length === 0) return false;
-        ({ body, carried } = split);
+        ({ body, carried } = splitCarriedText(text));
         missing = [];
     }
     if (carried.length === 0) {
@@ -232,7 +232,10 @@ export function handlePaste(plugin: FootnotePlugin, event: ClipboardEvent, doc: 
     doc.transaction({ changes, selection: { from: end } });
 
     const total = plan.added + plan.reused;
-    let notice = `Pasted with ${total} footnote definition${total === 1 ? "" : "s"}: ${plan.added} added, ${plan.reused} reused, ${plan.renamed} renamed.`;
+    let notice =
+        `Pasted with ${total} footnote definition${total === 1 ? "" : "s"}: ${plan.added} added, ${plan.reused} reused` +
+        (plan.repointed > 0 ? ` (${plan.repointed} under a name this note already had)` : "") +
+        `, ${plan.renamed} renamed.`;
     if (missing.length > 0) {
         notice += ` ${missing.map(quotedReference).join(", ")} ${missing.length === 1 ? "has" : "have"} no definition to carry.`;
     }

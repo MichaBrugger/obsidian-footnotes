@@ -204,7 +204,7 @@ export default class FootnotePlugin extends Plugin {
       },
     });
     this.editorCommandIds.push(`${this.manifest.id}:convert-normal-to-inline`);
-    // Copy, cut and paste carry footnote definitions along (issue #59).
+    // Copy, cut, and paste carry footnote definitions along (issue #59).
     // Nothing to register in the palette: the hooks sit on the keys people
     // already press, and the setting turns them off.
     installCarryFootnoteHooks(this);
@@ -372,6 +372,12 @@ export default class FootnotePlugin extends Plugin {
  * one-time migrations below read the legacy keys out of them (and delete
  * them).
  */
+/** The settings whose value is one of a few names, and those names. */
+const FIXED_CHOICES: Record<string, readonly string[]> = {
+  footnotePlacement: ["after", "before", "none"],
+  convertedFootnoteNames: ["numbered", "named"],
+};
+
 function parseSavedSettings(saved: unknown): Partial<FootnotePluginSettings> {
   if (typeof saved !== "object" || saved === null) return {};
   const defaultTypes = new Map(
@@ -382,9 +388,9 @@ function parseSavedSettings(saved: unknown): Partial<FootnotePluginSettings> {
     const expected = defaultTypes.get(key);
     if (expected !== undefined && typeof value !== expected) continue;
     // a string setting with a fixed set of values is trusted only for one
-    // of those values: any other string would reach every reader of the
-    // placement and be treated as none of the three (T5, 2026-09-21)
-    if (key === "footnotePlacement" && value !== "after" && value !== "before" && value !== "none") continue;
+    // of those values: any other string would reach every reader and be
+    // treated as none of them (T5, 2026-09-21)
+    if (key in FIXED_CHOICES && !FIXED_CHOICES[key].includes(value as string)) continue;
     parsed[key] = value;
   }
   return parsed;

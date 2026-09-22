@@ -1,8 +1,8 @@
-# 18: copying, cutting and pasting footnotes (2026-09-22)
+# 18: copying, cutting, and pasting footnotes (2026-09-22)
 
-Claude: automated coverage lives in test/carry-footnotes.test.ts (which definitions a selection needs, how they merge and rename in the destination, the clipboard text with definitions in it, what a cut orphans) and test/carry-footnotes-hooks.test.ts (the copy, cut and paste hooks over a fake clipboard); run `npm test` before this sheet. What is left needs the live app: the real clipboard, Obsidian's own paste, undo grouping, a second note, the phone, and the toasts at a glance.
+Claude: automated coverage lives in test/carry-footnotes.test.ts (which definitions a selection needs, how they merge and rename in the destination, the clipboard text with definitions in it, what a cut orphans) and test/carry-footnotes-hooks.test.ts (the copy, cut, and paste hooks over a fake clipboard); run `npm test` before this sheet. What is left needs the live app: the real clipboard, Obsidian's own paste, undo grouping, a second note, the phone, and the toasts at a glance.
 
-Settings: defaults (**Carry footnote definitions on copy, cut and paste** on, **Include the definitions in the copied text** off). Undo between checks. Fixtures: this note holds a paragraph with a shared footnote[^shared] and another use of it[^shared], one with its own footnote[^own], and a chained one[^chain]. Make a second note called "Paste target" holding one line, `Existing[^1] text.`, and its definition `[^1]: an existing one`.
+Settings: defaults (**Carry footnote definitions on copy, cut, and paste** on). Undo between checks. Fixtures: this note holds a paragraph with a shared footnote[^shared] and another use of it[^shared], one with its own footnote[^own], and a chained one[^chain]. Make a second note called "Paste target" holding one line, `Existing[^1] text.`, and its definition `[^1]: an existing one`.
 
 ## Copy and paste into another note
 
@@ -19,8 +19,7 @@ Settings: defaults (**Carry footnote definitions on copy, cut and paste** on, **
 
 ## The clipboard text and other apps
 
-- [ ] With the setting at its default, paste the copied paragraph into another app (Notepad, a browser field): plain text, no definition lines
-- [ ] Turn on **Include the definitions in the copied text**, copy the paragraph again, paste into the other app: the definition lines follow after a blank line. Paste it into "Paste target" as well: the definitions still land at the bottom, not in the middle of the text
+- [ ] Paste the copied paragraph into another app (Notepad, a browser field): the text, a blank line, then the definition lines, which travel in the clipboard text on purpose. Paste it into "Paste target" as well: the definitions land at the bottom, not in the middle of the text
 - [ ] Copy with Footnotes compatibility (optional, if that plugin is installed in a scratch vault): text it copied pastes here with its definitions landed and merged
 
 ## The phone

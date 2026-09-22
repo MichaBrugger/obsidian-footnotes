@@ -8,6 +8,7 @@ import {
     convertInlineToNormalCommand,
     convertNormalFootnotesToInline,
     convertNormalToInlineCommand,
+    nameForBody,
 } from "../src/commands/convert-footnotes";
 
 // Converting a note's footnotes between the two styles (T6 of the 2026-09
@@ -161,6 +162,35 @@ describe("convertInlineFootnotesToNormal", () => {
         expect(messages()).toContain(
             "Converted 3 inline footnotes into 2 normal footnotes (1 identical body merged).",
         );
+    });
+
+    // Jason, 2026-09-22: an option to name the converted footnotes after
+    // the first meaningful word of the body ("same", "different", never
+    // "the") instead of numbering them
+    it("names the converted footnotes after the first meaningful word of each body when that setting says so", () => {
+        const { doc } = run(["a^[the same note] b^[A different note] c^[the same note]"], { convertedFootnoteNames: "named" });
+        expect(doc.lines).toEqual(["a[^same] b[^different] c[^same]", "", "[^same]: the same note", "[^different]: A different note"]);
+    });
+
+    it("keeps generated names unique against the note and each other, carries the prefix, and falls back to a number when no word will do", () => {
+        const { doc } = run(["x[^same] y^[the same again] z^[of the]", "", "[^same]: taken"], { convertedFootnoteNames: "named" });
+        expect(doc.lines).toEqual(["x[^same] y[^same-2] z[^1]", "", "[^same]: taken", "[^same-2]: the same again", "[^1]: of the"]);
+        const prefixed = run(["---", "footnote-prefix: 2-", "---", "a^[the Smith paper]"], { convertedFootnoteNames: "named", enableFootnotePrefix: true });
+        expect(prefixed.doc.lines).toEqual(["---", "footnote-prefix: 2-", "---", "a[^2-Smith]", "", "[^2-Smith]: the Smith paper"]);
+    });
+});
+
+describe("nameForBody", () => {
+    it("takes the first word that is not a stop word, keeps its spelling, and skips one-letter words when longer ones exist", () => {
+        expect(nameForBody("the same note", new Set())).toBe("same");
+        expect(nameForBody("See p. 5 of Smith", new Set())).toBe("Smith");
+        expect(nameForBody("引用来源。", new Set())).toBe("引用来源");
+    });
+
+    it("returns null when only stop words remain, and adds a suffix when the name is taken", () => {
+        expect(nameForBody("of the and", new Set())).toBeNull();
+        expect(nameForBody("the same note", new Set(["same"]))).toBe("same-2");
+        expect(nameForBody("the same note", new Set(["same", "same-2"]))).toBe("same-3");
     });
 });
 

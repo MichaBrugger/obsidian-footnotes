@@ -63,7 +63,7 @@ export type DeleteFootnotePlan =
  * `markdown` with the footnote called `name` gone: every live reference to
  * it cut out of the text with the gap closed, and every definition block
  * of that name removed. Names match without regard to case, as Obsidian
- * matches them. Copies inside code, math, comments or frontmatter are
+ * matches them. Copies inside code, math, comments, or frontmatter are
  * plain text and stay.
  */
 export function deleteFootnoteEverywhere(markdown: string, name: string): DeleteFootnotePlan {

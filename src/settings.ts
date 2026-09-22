@@ -25,11 +25,10 @@ export interface FootnotePluginSettings {
      * to fit (issue #59; Jason, 2026-09-21: one toggle, default on, no
      * prompt). */
     carryFootnotesOnCopy: boolean;
-    /** Copy also appends the carried definitions to the clipboard text
-     * itself, so they reach other vaults, windows and apps, at the cost of
-     * every other app receiving them as extra lines (off by default;
-     * Jason's ruling 2026-09-21). */
-    includeDefinitionsInClipboard: boolean;
+    /** How Convert inline footnotes to normal footnotes names what it
+     * makes: numbers ([^1], [^2]) or the first meaningful word of each
+     * body ([^same], [^different]; Jason's ask, 2026-09-22). */
+    convertedFootnoteNames: "numbered" | "named";
     /** When a selection is turned into a footnote, a word the selection cut
      * in half is taken whole, and the end is moved to the end of the word
      * plus one trailing punctuation mark. The selection twin of the
@@ -83,7 +82,7 @@ export const DEFAULT_SETTINGS: FootnotePluginSettings = {
     // pick "before" themselves
     footnotePlacement: "after",
     carryFootnotesOnCopy: true,
-    includeDefinitionsInClipboard: false,
+    convertedFootnoteNames: "numbered",
     expandSelectionToWholeWords: true,
     enablePopupEditor: true,
     enableFootnotePrefix: false,
@@ -140,6 +139,15 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                 },
             },
             {
+                name: "Names for converted inline footnotes",
+                desc: "How Convert inline footnotes to normal footnotes names what it makes. Numbers gives [^1], [^2], and so on. First word of the body names each footnote after the first word that is not a filler word ([^same], [^different]), with -2, -3 for repeats, and a number when no word will do.",
+                control: {
+                    type: "dropdown",
+                    key: "convertedFootnoteNames",
+                    options: { numbered: "Numbers", named: "First word of the body" },
+                },
+            },
+            {
                 name: "Expand selections to whole words",
                 desc: "When a selection is turned into a footnote, cut-off words at either end are included whole, along with any following punctuation, as the placement setting says.",
                 control: { type: "toggle", key: "expandSelectionToWholeWords" },
@@ -149,18 +157,9 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                 heading: "Copying and pasting",
                 items: [
                     {
-                        name: "Carry footnote definitions on copy, cut and paste",
-                        desc: "Copying or cutting text takes along the definitions its footnotes need, and pasting adds them to the destination note, reusing definitions it already has and renaming names it already uses. A cut also removes the definitions it leaves unused. The clipboard text itself is unchanged.",
+                        name: "Carry footnote definitions on copy, cut, and paste",
+                        desc: "Copying or cutting text takes along the definitions its footnotes need, and pasting adds them to the destination note, reusing definitions it already has and renaming names it already uses. A cut also removes the definitions it leaves unused. The definitions travel in the clipboard text itself, after the selection, so they survive a paste into another vault or app; pasting inside Obsidian puts them where they belong.",
                         control: { type: "toggle", key: "carryFootnotesOnCopy" },
-                    },
-                    {
-                        name: "Include the definitions in the copied text",
-                        desc: "Copy appends the definitions to the clipboard text so they follow into other vaults, windows and apps. Other apps then receive them as extra lines, and a paste from another window is tidied after the paste rather than in one step.",
-                        control: {
-                            type: "toggle",
-                            key: "includeDefinitionsInClipboard",
-                            disabled: () => !this.plugin.settings.carryFootnotesOnCopy,
-                        },
                     },
                 ],
             },
@@ -222,7 +221,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                     },
                     {
                         name: "Lint on footnote creation",
-                        desc: "Lint the note right after a new footnote is created in it.",
+                        desc: "Lint the note right after a new footnote is created in it, including by the convert and paste commands, which create footnotes too.",
                         control: { type: "toggle", key: "lintOnFootnoteCreation" },
                     },
                     {
