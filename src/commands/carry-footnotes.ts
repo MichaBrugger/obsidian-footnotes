@@ -1,6 +1,7 @@
 import { EditorPosition } from "obsidian";
 
 import { definitionLabelWithName, referenceOccurrences } from "../parsing/footnote-grammar";
+import { orphanedDefinitionBlocks } from "../linting/rules/remove-orphaned-definitions";
 import {
     DefinitionBlock,
     definitionStartLines,
@@ -262,6 +263,79 @@ export function planCarriedPaste(destination: string, body: string, carried: Car
             lines: rename(definition.lines),
         }));
     return { body: rename(normalizeEol(body).text.split("\n")).join("\n"), definitions, added, reused, renamed };
+}
+
+/**
+ * The clipboard text with the carried blocks appended after one blank
+ * line, for the "Include the definitions in the copied text" setting. A
+ * body with no definitions to carry comes back untouched.
+ */
+export function withCarriedText(body: string, carried: CarriedDefinition[]): string {
+    if (carried.length === 0) return body;
+    return body.replace(/\n+$/, "") + "\n\n" + carried.map((definition) => definition.lines.join("\n")).join("\n");
+}
+
+/**
+ * A pasted text split back into its body and the trailing definition
+ * blocks it carries: the mirror of withCarriedText, and the reading the
+ * paste fallback gives any clipboard that ends in definition lines,
+ * wherever it came from. Only a trailing run of definitions (blank lines
+ * between them allowed) counts; a definition in the middle of the text is
+ * part of the body, since the text around it is. A definition-shaped line
+ * inside a code fence is protected text and not a definition.
+ */
+export function splitCarriedText(text: string): { body: string; carried: CarriedDefinition[] } {
+    const lines = normalizeEol(text).text.split("\n");
+    const scan = scanDocument(lines);
+    const masked = maskProtectedLines(lines, scan);
+    const starts = definitionStartLines(lines, scan, (i) => masked[i]);
+    const blocks = findDefinitionBlocks(lines, scan, masked, starts);
+    const byEnd = new Map(blocks.map((block) => [block.end, block]));
+    let cut = lines.length;
+    for (;;) {
+        while (cut > 0 && lines[cut - 1].trim() === "") cut--;
+        const block = byEnd.get(cut - 1);
+        if (!block) break;
+        cut = block.start;
+    }
+    if (cut === lines.length) return { body: text, carried: [] };
+    const carried = blocks
+        .filter((block) => block.start >= cut)
+        .map((block) => ({ name: block.name, lines: lines.slice(block.start, block.end + 1) }));
+    let bodyEnd = cut;
+    while (bodyEnd > 0 && lines[bodyEnd - 1].trim() === "") bodyEnd--;
+    return { body: lines.slice(0, bodyEnd).join("\n"), carried };
+}
+
+/**
+ * The definition blocks that deleting the text between `from` and `to`
+ * would leave with nothing pointing at them, chains included, in the
+ * note's own line numbers, so a cut can delete them in the same
+ * transaction as the selection. A definition that was an orphan already,
+ * and one the plugin never cuts (its line closes a comment), are not
+ * among them: the cut only takes what it orphans. The reading is the
+ * orphan-definition rule's own, run on the note as it would be after the
+ * deletion.
+ */
+export function definitionsOrphanedByCut(markdown: string, from: EditorPosition, to: EditorPosition): DefinitionBlock[] {
+    const lines = normalizeEol(markdown).text.split("\n");
+    const before = new Set(orphanedDefinitionBlocks(lines, scanDocument(lines)).map((block) => block.name.toLowerCase()));
+    const after = [
+        ...lines.slice(0, from.line),
+        lines[from.line].slice(0, from.ch) + lines[to.line].slice(to.ch),
+        ...lines.slice(to.line + 1),
+    ];
+    const shift = to.line - from.line;
+    const orphaned: DefinitionBlock[] = [];
+    for (const block of orphanedDefinitionBlocks(after, scanDocument(after))) {
+        if (before.has(block.name.toLowerCase())) continue;
+        // a block on the line the deletion joined is one the selection cut
+        // through, which is outside what the cut carries
+        if (block.start === from.line) continue;
+        const back = (line: number) => (line < from.line ? line : line + shift);
+        orphaned.push({ name: block.name, start: back(block.start), end: back(block.end) });
+    }
+    return orphaned;
 }
 
 /** A definition block's body with the label stripped and whitespace collapsed, the key two definitions are compared by. */

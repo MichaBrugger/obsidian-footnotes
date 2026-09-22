@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { carriedDefinitions, planCarriedPaste } from "../src/commands/carry-footnotes";
+import {
+    carriedDefinitions,
+    definitionsOrphanedByCut,
+    planCarriedPaste,
+    splitCarriedText,
+    withCarriedText,
+} from "../src/commands/carry-footnotes";
 
 // Carrying footnote definitions along on copy, cut and paste (issue #59;
 // Jason's rulings 2026-09-21 and 22). The first seam: which definition
@@ -159,5 +165,60 @@ describe("planCarriedPaste", () => {
             body: "a[^2]",
             renamed: 1,
         });
+    });
+});
+
+// The clipboard text itself, for the "Include the definitions in the
+// copied text" setting (off by default) and for the paste fallback that
+// reads a clipboard carrying definition lines from anywhere: a manual copy,
+// the setting turned on, or Copy with Footnotes.
+describe("the clipboard text with definitions in it", () => {
+    it("appends the carried blocks after one blank line, and splits them back off", () => {
+        const text = withCarriedText("a[^1] b", [{ name: "1", lines: ["[^1]: one", "    more"] }]);
+        expect(text).toBe("a[^1] b\n\n[^1]: one\n    more");
+        expect(splitCarriedText(text)).toEqual({ body: "a[^1] b", carried: [{ name: "1", lines: ["[^1]: one", "    more"] }] });
+    });
+
+    it("keeps the body's own trailing newline count sensible and adds nothing when there is nothing to carry", () => {
+        expect(withCarriedText("a[^1]\n", [{ name: "1", lines: ["[^1]: one"] }])).toBe("a[^1]\n\n[^1]: one");
+        expect(withCarriedText("plain", [])).toBe("plain");
+    });
+
+    it("splits only a trailing run of definitions; a definition in the middle stays in the body", () => {
+        expect(splitCarriedText("a[^1]\n\n[^1]: one\n\nmore prose[^2]\n\n[^2]: two")).toEqual({
+            body: "a[^1]\n\n[^1]: one\n\nmore prose[^2]",
+            carried: [{ name: "2", lines: ["[^2]: two"] }],
+        });
+        expect(splitCarriedText("no footnotes here")).toEqual({ body: "no footnotes here", carried: [] });
+    });
+
+    it("never reads a definition-shaped line inside a code fence as one", () => {
+        const text = "a\n```\n[^1]: fake\n```";
+        expect(splitCarriedText(text)).toEqual({ body: text, carried: [] });
+    });
+});
+
+// Cut: the definitions the deletion leaves with nothing pointing at them go
+// with it, chains included, and nothing that was already an orphan or that
+// the plugin never cuts. Reported in the note's own line numbers so the
+// cut can delete them in the same transaction as the selection.
+describe("definitionsOrphanedByCut", () => {
+    it("names the blocks the deletion orphans, in the note's line numbers, and leaves the still-used ones", () => {
+        expect(definitionsOrphanedByCut("a[^1] b[^2] c[^2]\n\n[^1]: one\n[^2]: two", { line: 0, ch: 0 }, { line: 0, ch: 12 })).toEqual([
+            { name: "1", start: 2, end: 2 },
+        ]);
+    });
+
+    it("follows a chain, and ignores a definition that was an orphan before the cut", () => {
+        const note = "a[^a] keep\n\n[^a]: see[^b]\n[^b]: bee\n[^old]: already an orphan";
+        expect(definitionsOrphanedByCut(note, { line: 0, ch: 0 }, { line: 0, ch: 5 })).toEqual([
+            { name: "a", start: 2, end: 2 },
+            { name: "b", start: 3, end: 3 },
+        ]);
+    });
+
+    it("finds nothing when the selection holds no reference, or holds the definition itself", () => {
+        expect(definitionsOrphanedByCut("plain[^1]\n\n[^1]: one", { line: 0, ch: 0 }, { line: 0, ch: 5 })).toEqual([]);
+        expect(definitionsOrphanedByCut("plain[^1]\n\n[^1]: one", { line: 0, ch: 0 }, { line: 2, ch: 9 })).toEqual([]);
     });
 });
