@@ -14,7 +14,7 @@ Fixtures: a footnote used twice[^twice] and again[^twice], a right-click one[^me
 - [ ] Caret inside the FIRST `[^twice]`, run **Delete footnote everywhere** from the palette: both references and the definition go, the toast reads well ("2 references and 1 definition")
 - [ ] One undo brings both references and the definition back together, caret where it was
 - [ ] Caret inside the `[^twice]:` label at the bottom: the same deletion from the definition's end
-- [ ] Caret inside `[^chain]`: it goes, and a lint alert then names `[^inner]` as a definition nothing references (the deleted body was its only citation)
+- [ ] Caret inside `[^chain]`: it goes, and a lint alert then names `[^inner]` as a definition nothing references (the deleted body was its only citation). Every delete in this section is followed by the lint alerts, which is why the nested-footnote alert also speaks while `[^chain]` exists: its body cites `[^inner]`, and the plugin calls a reference inside a definition body a nested footnote (ADR 1)
 - [ ] Caret inside `[^item]`: refused with a toast that says it is defined inside a list item, nothing changes
 - [ ] Right-click ON `[^menu]`: the menu shows **Delete footnote everywhere** with your new icon, in the same section as **Rename footnote**, and the menu is no wider than before; choosing it deletes with the same toast
 - [ ] Right-click the first `[^twice]` and choose Obsidian's OWN **Delete footnote and reference**: only that reference and the definition go, the second `[^twice]` is left pointing at nothing. This is the core bug the command exists to fix; undo
@@ -36,7 +36,7 @@ Fixtures: This is "some bravo". 这是一个句子，引用来源。 他说「�
 
 ## 3. Inline footnotes and the punctuation rule
 
-Fixture: Content^[an inline note]. And "quoted^[another]". And a pair[^twice]^[third].
+Fixture: Content^[an inline note]. And "quoted^[another]". And a pair[^pair]^[third].
 
 - [ ] Run **Lint footnotes**: the inline footnotes move past the full stop and past the closing quote and full stop, whole, bodies untouched (`Content.^[an inline note]`, `"quoted".^[another]`), and the reference-plus-inline pair crosses the full stop together. Reading view renders them. Undo
 
@@ -78,6 +78,7 @@ Open **19b - Paste target** in a second pane. Fixture paragraph: a paragraph wit
 - [ ] Cut a phrase whose footnote only it uses: the definition leaves with it in one undo
 
 [^twice]: cited twice, one line
+[^pair]: for the pair check in section 3
 [^menu]: the right-click fixture
 [^chain]: this body cites[^inner] another
 [^inner]: only the chained body cites this
