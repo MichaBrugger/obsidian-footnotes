@@ -25,10 +25,13 @@ export interface FootnotePluginSettings {
      * to fit (issue #59; Jason, 2026-09-21: one toggle, default on, no
      * prompt). */
     carryFootnotesOnCopy: boolean;
-    /** How Convert inline footnotes to normal footnotes names what it
-     * makes: numbers ([^1], [^2]) or the first meaningful word of each
-     * body ([^same], [^different]; Jason's ask, 2026-09-22). */
-    convertedFootnoteNames: "numbered" | "named";
+    /** One choice for every footnote name (Jason, 2026-09-22): keep names
+     * as written; numbered, so linting renumbers named footnotes too; or
+     * named, so linting names numbered footnotes after their definition's
+     * first meaningful word and leaves the already named alone. The
+     * inline-to-normal converter follows it. Replaces the old Renumber
+     * named footnotes toggle and the converter's own dropdown. */
+    footnoteNaming: "keep" | "numbered" | "named";
     /** When a selection is turned into a footnote, a word the selection cut
      * in half is taken whole, and the end is moved to the end of the word
      * plus one trailing punctuation mark. The selection twin of the
@@ -42,7 +45,6 @@ export interface FootnotePluginSettings {
 
     enableRemoveBlankLastLines: boolean;
 
-    renumberNamedFootnotes: boolean;
     /** Linting deletes references that have no definition. While this is
      * off, it raises a lint alert about them instead: an orphan is never
      * silent either way (Jason, 2026-08-10). */
@@ -82,7 +84,7 @@ export const DEFAULT_SETTINGS: FootnotePluginSettings = {
     // pick "before" themselves
     footnotePlacement: "after",
     carryFootnotesOnCopy: true,
-    convertedFootnoteNames: "numbered",
+    footnoteNaming: "keep",
     expandSelectionToWholeWords: true,
     enablePopupEditor: true,
     enableFootnotePrefix: false,
@@ -92,7 +94,6 @@ export const DEFAULT_SETTINGS: FootnotePluginSettings = {
 
     enableRemoveBlankLastLines: true,
 
-    renumberNamedFootnotes: false,
     lintDeleteOrphanedReferences: false,
     lintDeleteOrphanedDefinitions: false,
     lintMergeDuplicateDefinitions: false,
@@ -179,12 +180,12 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                 heading: "Footnote names",
                 items: [
                     {
-                        name: "Names for converted inline footnotes",
-                        desc: rich("How **Convert inline footnotes to normal footnotes** names what it makes. **Numbered** gives `[^1]`, `[^2]`, and so on. **Named** names each footnote after the first word that is not a filler word (`[^same]`, `[^different]`), with `-2`, `-3` for repeats, and a number when no word will do."),
+                        name: "Footnote names",
+                        desc: rich("**Keep as written** leaves every footnote's name alone. **Numbered** gives every footnote a number: linting renumbers named footnotes by order of appearance. **Named** names footnotes after the first word of their definition that is not a filler word (`[^same]`), with `-2`, `-3` for repeats: linting names the numbered ones and leaves the already named alone. **Convert inline footnotes to normal footnotes** follows the same choice."),
                         control: {
                             type: "dropdown",
-                            key: "convertedFootnoteNames",
-                            options: { numbered: "Numbered", named: "Named" },
+                            key: "footnoteNaming",
+                            options: { keep: "Keep as written", numbered: "Numbered", named: "Named" },
                         },
                     },
                     {
@@ -328,17 +329,8 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                         items: [
                             {
                                 name: "Reindex",
-                                desc: rich("Linting also renumbers footnotes and reorders their definitions by order of appearance, following the options below."),
+                                desc: rich("Linting also renumbers footnotes and reorders their definitions by order of appearance. Under **Footnote names** it renumbers the named ones (**Numbered**) or names the numbered ones (**Named**)."),
                                 control: { type: "toggle", key: "lintReindex" },
-                            },
-                            {
-                                name: "Renumber named footnotes",
-                                desc: rich("Reindexing gives named footnotes (like `[^note]`) numbers by order of appearance instead of preserving their names."),
-                                control: {
-                                    type: "toggle",
-                                    key: "renumberNamedFootnotes",
-                                    disabled: () => !this.plugin.settings.lintReindex,
-                                },
                             },
                         ],
                     },

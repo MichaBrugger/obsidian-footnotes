@@ -39,7 +39,7 @@ describe("one-shot settings migration (heading-mangle bug fix)", () => {
         // value saved from the settings tab looks like on disk
         const { plugin, saves } = pluginWithSavedData({
             footnoteSectionHeading: "**Footnotes**",
-            settingsVersion: 2,
+            settingsVersion: 3,
         });
         await plugin.loadSettings();
         expect(plugin.settings.footnoteSectionHeading).toBe("**Footnotes**");
@@ -56,7 +56,7 @@ describe("one-shot settings migration (heading-mangle bug fix)", () => {
         });
         await plugin.loadSettings();
         expect(plugin.settings.footnoteSectionHeading).toBe("**Footnotes**");
-        expect(plugin.settings.settingsVersion).toBe(2);
+        expect(plugin.settings.settingsVersion).toBe(3);
         expect(saves()).toBe(1);
     });
 
@@ -66,7 +66,7 @@ describe("one-shot settings migration (heading-mangle bug fix)", () => {
         });
         await plugin.loadSettings();
         expect(plugin.settings.footnoteSectionHeading).toBe("# Footnotes");
-        expect(plugin.settings.settingsVersion).toBe(2);
+        expect(plugin.settings.settingsVersion).toBe(3);
     });
 
     it("a fully legacy payload migrates in ONE save", async () => {
@@ -83,7 +83,7 @@ describe("one-shot settings migration (heading-mangle bug fix)", () => {
         expect(plugin.settings.lintOnSave).toBe(true);
         expect("enableAutoSuggest" in plugin.settings).toBe(false);
         expect("lintOnFileChange" in plugin.settings).toBe(false);
-        expect(plugin.settings.settingsVersion).toBe(2);
+        expect(plugin.settings.settingsVersion).toBe(3);
         expect(saves()).toBe(1);
     });
 
@@ -102,7 +102,7 @@ describe("one-shot settings migration (heading-mangle bug fix)", () => {
         plugin.loadData = () => Promise.resolve(null);
         plugin.saveData = () => Promise.resolve();
         await plugin.loadSettings();
-        expect(plugin.settings.settingsVersion).toBe(2);
+        expect(plugin.settings.settingsVersion).toBe(3);
         expect(plugin.settings.footnoteSectionHeading).toBe("# Footnotes");
     });
 });

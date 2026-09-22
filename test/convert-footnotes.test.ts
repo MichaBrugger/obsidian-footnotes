@@ -8,8 +8,8 @@ import {
     convertInlineToNormalCommand,
     convertNormalFootnotesToInline,
     convertNormalToInlineCommand,
-    nameForBody,
 } from "../src/commands/convert-footnotes";
+import { nameForBody } from "../src/parsing/footnote-grammar";
 
 // Converting a note's footnotes between the two styles (T6 of the 2026-09
 // feature round; Jason's rulings 2026-09-19 to 21). Normal to inline is a
@@ -168,14 +168,14 @@ describe("convertInlineFootnotesToNormal", () => {
     // the first meaningful word of the body ("same", "different", never
     // "the") instead of numbering them
     it("names the converted footnotes after the first meaningful word of each body when that setting says so", () => {
-        const { doc } = run(["a^[the same note] b^[A different note] c^[the same note]"], { convertedFootnoteNames: "named" });
+        const { doc } = run(["a^[the same note] b^[A different note] c^[the same note]"], { footnoteNaming: "named" });
         expect(doc.lines).toEqual(["a[^same] b[^different] c[^same]", "", "[^same]: the same note", "[^different]: A different note"]);
     });
 
     it("keeps generated names unique against the note and each other, carries the prefix, and falls back to a number when no word will do", () => {
-        const { doc } = run(["x[^same] y^[the same again] z^[of the]", "", "[^same]: taken"], { convertedFootnoteNames: "named" });
+        const { doc } = run(["x[^same] y^[the same again] z^[of the]", "", "[^same]: taken"], { footnoteNaming: "named" });
         expect(doc.lines).toEqual(["x[^same] y[^same-2] z[^1]", "", "[^same]: taken", "[^same-2]: the same again", "[^1]: of the"]);
-        const prefixed = run(["---", "footnote-prefix: 2-", "---", "a^[the Smith paper]"], { convertedFootnoteNames: "named", enableFootnotePrefix: true });
+        const prefixed = run(["---", "footnote-prefix: 2-", "---", "a^[the Smith paper]"], { footnoteNaming: "named", enableFootnotePrefix: true });
         expect(prefixed.doc.lines).toEqual(["---", "footnote-prefix: 2-", "---", "a[^2-Smith]", "", "[^2-Smith]: the Smith paper"]);
     });
 });

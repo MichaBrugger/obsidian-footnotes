@@ -172,11 +172,8 @@ describe("sheet 12: which controls are greyed out", () => {
         expect(rules("before")?.disabled?.()).toBe(false);
     });
 
-    it("Renumber named footnotes is greyed while Reindex is off, and live while it is on", () => {
-        const off = group(lintingPage({ lintReindex: false }), "Reindexing");
-        expect(controlOf(off, "Renumber named footnotes")?.disabled?.()).toBe(true);
-        const on = group(lintingPage({ lintReindex: true }), "Reindexing");
-        expect(controlOf(on, "Renumber named footnotes")?.disabled?.()).toBe(false);
+    it("the Reindexing group holds only the Reindex toggle now: naming moved to the main page's Footnote names dropdown (2026-09-22)", () => {
+        expect(group(lintingPage(), "Reindexing").items?.map((item) => item.name)).toEqual(["Reindex"]);
     });
 
     it("Apply the note's footnote prefix is greyed while the prefix feature is off", () => {

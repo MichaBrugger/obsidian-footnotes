@@ -60,7 +60,8 @@ function reindexOptionsFromSettings(
     plugin: FootnotePlugin,
 ): ReindexOptions {
     return {
-        renumberNamedFootnotes: plugin.settings.renumberNamedFootnotes,
+        renumberNamedFootnotes: plugin.settings.footnoteNaming === "numbered",
+        nameNumberedFootnotes: plugin.settings.footnoteNaming === "named",
     };
 }
 

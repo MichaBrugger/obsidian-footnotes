@@ -59,7 +59,7 @@ describe("settings migration to v2 (symmetric orphan toggles)", () => {
         await plugin.loadSettings();
         expect(plugin.settings.footnoteSectionHeading).toBe("# Notes");
         expect(plugin.settings.lintDeleteOrphanedDefinitions).toBe(true);
-        expect(plugin.settings.settingsVersion).toBe(2);
+        expect(plugin.settings.settingsVersion).toBe(3);
     });
 
     it("a fresh install gets both toggles off", async () => {

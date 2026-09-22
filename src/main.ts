@@ -37,7 +37,7 @@ import {
 import { showNotice } from "./editor/notice";
 // raise this by one whenever a new one-time settings migration is added
 // to loadSettings
-const CURRENT_SETTINGS_VERSION = 2;
+const CURRENT_SETTINGS_VERSION = 3;
 
 export default class FootnotePlugin extends Plugin {
   // `declare` narrows the type of the base Plugin.settings (Obsidian
@@ -347,6 +347,9 @@ export default class FootnotePlugin extends Plugin {
       if (this.settings.settingsVersion < 2) {
         migrateSettingsToV2(this.settings);
       }
+      if (this.settings.settingsVersion < 3) {
+        migrateSettingsToV3(this.settings);
+      }
       this.settings.settingsVersion = CURRENT_SETTINGS_VERSION;
       await this.saveSettings();
     }
@@ -375,7 +378,7 @@ export default class FootnotePlugin extends Plugin {
 /** The settings whose value is one of a few names, and those names. */
 const FIXED_CHOICES: Record<string, readonly string[]> = {
   footnotePlacement: ["after", "before", "none"],
-  convertedFootnoteNames: ["numbered", "named"],
+  footnoteNaming: ["keep", "numbered", "named"],
 };
 
 function parseSavedSettings(saved: unknown): Partial<FootnotePluginSettings> {
@@ -483,6 +486,25 @@ function migrateSettingsToV1(
  * carries over with its true and false swapped. The short-lived
  * lintOrphanedMarkers dropdown only ever existed in dev builds, but mapping
  * it across costs just as little. */
+/** v3: the Renumber named footnotes toggle and the converter's own naming
+ * dropdown folded into one Footnote names choice (Jason, 2026-09-22). A
+ * user who renumbered named footnotes is on Numbered; one who named
+ * converted footnotes is on Named; everyone else keeps names as written,
+ * which is what their notes had. */
+function migrateSettingsToV3(settings: FootnotePluginSettings) {
+  const legacy = settings as FootnotePluginSettings & {
+    renumberNamedFootnotes?: boolean;
+    convertedFootnoteNames?: string;
+  };
+  if (legacy.renumberNamedFootnotes === true) {
+    settings.footnoteNaming = "numbered";
+  } else if (legacy.convertedFootnoteNames === "named") {
+    settings.footnoteNaming = "named";
+  }
+  delete legacy.renumberNamedFootnotes;
+  delete legacy.convertedFootnoteNames;
+}
+
 function migrateSettingsToV2(settings: FootnotePluginSettings) {
   const legacyOrphans = settings as FootnotePluginSettings & {
     keepOrphanedDefinitions?: boolean;

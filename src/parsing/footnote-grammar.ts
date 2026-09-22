@@ -401,3 +401,35 @@ export function computeNextFootnoteNumber(
     }
     return currentMax;
 }
+
+// Words that say nothing about what a footnote is about, skipped when a
+// name is taken from its body. English only, and short on purpose: a word
+// wrongly kept costs a less telling name, a word wrongly skipped costs
+// nothing worse.
+const FillerWords = new Set(
+    "a an the of in on at to and or but for with by from as is are was were be been being this that these those it its see cf eg ie also not no than then so if we he she they i you my our your their his her which who whom what when where into over under per via vs et al".split(" "),
+);
+
+/**
+ * A footnote name taken from a body: its first word that is not a filler
+ * word (a one-letter word only when nothing longer follows, and never a
+ * word made of digits alone, which would read as a numbered footnote),
+ * spelled as written, with the note's prefix in front, and "-2", "-3"
+ * appended while the name is taken. Null when no word will do, so the
+ * caller numbers it. Names are matched without regard to case, as
+ * Obsidian matches them. Used by the inline-to-normal converter and, under
+ * the Named setting, by the reindex rule (Jason, 2026-09-22).
+ */
+export function nameForBody(body: string, taken: ReadonlySet<string>, prefix = ""): string | null {
+    const words = [...body.matchAll(/[\p{L}\p{N}]+/gu)]
+        .map((m) => m[0])
+        .filter((w) => /\p{L}/u.test(w) && !FillerWords.has(w.toLowerCase()));
+    const word = words.find((w) => w.length > 1) ?? words.at(0);
+    if (word === undefined) return null;
+    const base = `${prefix}${word.slice(0, 30)}`;
+    if (!taken.has(base.toLowerCase())) return base;
+    for (let k = 2; ; k++) {
+        const candidate = `${base}-${k}`;
+        if (!taken.has(candidate.toLowerCase())) return candidate;
+    }
+}

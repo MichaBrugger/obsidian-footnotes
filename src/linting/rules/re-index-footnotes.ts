@@ -2,8 +2,7 @@ import { inItemDefinitionNamesFolded } from "../../parsing/list-item-definitions
 import { footnotePrefixProblem } from "../../parsing/footnote-prefix";
 import {
     definitionLabelWithName,
-    referenceOccurrences,
-} from "../../parsing/footnote-grammar";
+    referenceOccurrences, nameForBody } from "../../parsing/footnote-grammar";
 import {
     definitionStartLines,
     findDefinitionBlocks,
@@ -43,6 +42,15 @@ export interface ReindexOptions {
      * play, they are renumbered into that namespace.
      */
     renumberNamedFootnotes?: boolean;
+    /**
+     * Give numbered footnotes names taken from their definitions, the
+     * first meaningful word of the body (off by default; the Named half of
+     * the Footnote names setting, Jason, 2026-09-22). A footnote that is
+     * already named is left alone, so a lint never renames twice; a
+     * numbered one whose definition offers no word, or has no definition
+     * block, stays numbered and is renumbered as usual.
+     */
+    nameNumberedFootnotes?: boolean;
     /**
      * The note's own footnote-prefix.
      *
@@ -165,6 +173,7 @@ function reindexOnce(
 ): string {
     const keepOrphans = options.keepOrphanedDefinitions ?? true;
     const renumberNamed = options.renumberNamedFootnotes ?? false;
+    const nameNumbered = options.nameNumberedFootnotes ?? false;
     // The namespace prefix. It is written out with the case the user gave
     // it, but matched without regard to case, since footnote names are
     // compared that way everywhere.
@@ -260,6 +269,31 @@ function reindexOnce(
         // modelled), and the number it holds is handed to nobody else, or
         // two footnotes would share a name.
         const inItem = inItemDefinitionNamesFolded(lines, scan, maskedLines, starts);
+        // Under Named, a numbered footnote with a definition block takes
+        // the first meaningful word of that body as its name, kept clear
+        // of every name the note holds and of the names handed out before
+        // it in this pass (the last block of a name is the one Obsidian
+        // renders, so it is the one read).
+        const bodyOf = new Map<string, string>();
+        const taken = new Set<string>([...order, ...inItem]);
+        if (nameNumbered) {
+            for (const block of blocks) {
+                const hit = definitionLabelWithName(lines[block.start], maskedLines[block.start]);
+                if (!hit) continue;
+                taken.add(block.name.toLowerCase());
+                bodyOf.set(
+                    block.name.toLowerCase(),
+                    [lines[block.start].slice(hit.label.labelEnd), ...lines.slice(block.start + 1, block.end + 1)].join("\n"),
+                );
+            }
+        }
+        const nameFromBody = (name: string, prefix: string): string | null => {
+            const body = bodyOf.get(name);
+            if (body === undefined) return null;
+            const generated = nameForBody(body, taken, prefix);
+            if (generated !== null) taken.add(generated.toLowerCase());
+            return generated;
+        };
         let nextNumber = 1;
         let nextPrefixed = 1;
         const takePlain = (): string => {
@@ -273,9 +307,9 @@ function reindexOnce(
         for (const name of order) {
             if (inItem.has(name)) continue;
             if (isPrefixedNumbered(name)) {
-                renames.set(name, takePrefixed());
+                renames.set(name, (nameNumbered ? nameFromBody(name, prefixOut) : null) ?? takePrefixed());
             } else if (/^\d+$/.test(name)) {
-                renames.set(name, takePlain());
+                renames.set(name, (nameNumbered ? nameFromBody(name, "") : null) ?? takePlain());
             } else if (renumberNamed) {
                 // the bare-prefix placeholder ("[^3.]" under a "3." prefix)
                 // is a footnote the user is still naming: the unnamed

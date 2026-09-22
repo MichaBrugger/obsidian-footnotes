@@ -45,7 +45,7 @@ describe("a settingsVersion whose type does not match its default", () => {
         // default, so "2" is dropped, the version reads as 0, and the v1
         // heading rewrite prepends "# " to a value the user chose on purpose
         const { plugin, saves } = withSaved({
-            settingsVersion: "2",
+            settingsVersion: "3",
             footnoteSectionHeading: "**Footnotes**",
         });
         await plugin.loadSettings();
@@ -66,7 +66,7 @@ describe("a settingsVersion whose type does not match its default", () => {
 
     it("control: a correctly typed version is honoured, fractional or not", async () => {
         const { plugin, saves } = withSaved({
-            settingsVersion: 2.5,
+            settingsVersion: 3.5,
             footnoteSectionHeading: "**Footnotes**",
         });
         await plugin.loadSettings();
