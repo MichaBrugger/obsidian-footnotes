@@ -143,6 +143,11 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                 control: { type: "toggle", key: "enablePopupEditor" },
             },
             {
+                name: "Carry footnote definitions on copy, cut, and paste",
+                desc: rich("Copying or cutting a footnote reference takes its definition along. Pasting inside Obsidian puts the definitions where they belong, reusing duplicates and renaming names that clash; pasting outside Obsidian leaves them after the pasted text."),
+                control: { type: "toggle", key: "carryFootnotesOnCopy" },
+            },
+            {
                 type: "group",
                 heading: "Footnote reference placement",
                 items: [
@@ -164,29 +169,30 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                     },
                     {
                         name: "Expand selections to whole words",
-                        desc: rich("When a selection is turned into a footnote, cut-off words at either end are included whole. The punctuation after the last word is included only under **After punctuation**, so the reference lands after it."),
+                        desc: rich("When a selection is turned into a footnote, cut-off words at either end are included whole. The punctuation after the last word is included only under **After punctuation**, so that the reference lands after it."),
                         control: { type: "toggle", key: "expandSelectionToWholeWords" },
                     },
                 ],
             },
-            {
-                name: "Carry footnote definitions on copy, cut, and paste",
-                desc: rich("Copying or cutting a footnote reference takes its definition along. Pasting inside Obsidian puts the definitions where they belong, reusing duplicates and renaming names that clash; pasting outside Obsidian leaves them after the pasted text."),
-                control: { type: "toggle", key: "carryFootnotesOnCopy" },
             },
             {
-                name: "Converted inline footnotes get",
-                desc: rich("How **Convert inline footnotes to normal footnotes** names what it makes. **Numbers** gives `[^1]`, `[^2]`, and so on. **Names** names each footnote after the first word that is not a filler word (`[^same]`, `[^different]`), with `-2`, `-3` for repeats, and a number when no word will do."),
-                control: {
-                    type: "dropdown",
-                    key: "convertedFootnoteNames",
-                    options: { numbered: "Numbers", named: "Names" },
+                type: "group",
+                heading: "Footnote names",
+                items: [
+                {
+                    name: "Names for converted inline footnotes",
+                    desc: rich("How **Convert inline footnotes to normal footnotes** names what it makes. **Numbered** gives `[^1]`, `[^2]`, and so on. **Named** names each footnote after the first word that is not a filler word (`[^same]`, `[^different]`), with `-2`, `-3` for repeats, and a number when no word will do."),
+                    control: {
+                        type: "dropdown",
+                        key: "convertedFootnoteNames",
+                        options: { numbered: "Numbered", named: "Named" },
+                    },
+                {
+                    name: "Per-note footnote prefix",
+                    desc: rich("Footnotes use the note's `footnote-prefix` property: with `footnote-prefix: 2-`, the numbered command inserts `[^2-1]`, `[^2-2]`, and so on, and the named command prefills `[^2-]`. Useful when chapter notes merge into one document. Set it with the **Set footnote prefix** command."),
+                    control: { type: "toggle", key: "enableFootnotePrefix" },
                 },
-            },
-            {
-                name: "Per-note footnote prefix",
-                desc: rich("Footnotes use the note's `footnote-prefix` property: with `footnote-prefix: 2-`, the numbered command inserts `[^2-1]`, `[^2-2]`, and so on, and the named command prefills `[^2-]`. Useful when chapter notes merge into one document. Set it with the **Set footnote prefix** command."),
-                control: { type: "toggle", key: "enableFootnotePrefix" },
+                ],
             },
             {
                 type: "group",
