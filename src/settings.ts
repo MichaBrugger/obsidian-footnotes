@@ -105,6 +105,26 @@ export const DEFAULT_SETTINGS: FootnotePluginSettings = {
     lintOnFootnoteCreation: false,
 };
 
+/**
+ * A setting description with a little markup: **double asterisks** around
+ * a command, setting, or dropdown name make it bold, and `backticks` around
+ * footnote syntax set it in code, so a reader can tell where a name starts
+ * and ends (Jason's ask, 2026-09-22: "How Convert inline footnotes to
+ * normal footnotes names what it makes" read as one run of words).
+ * Obsidian renders a DocumentFragment in the row; where there is no DOM
+ * (the unit tests) the plain words come back with the markup stripped.
+ */
+function rich(text: string): string | DocumentFragment {
+    if (typeof createFragment !== "function") return text.replace(/\*\*|`/g, "");
+    const fragment = createFragment();
+    for (const part of text.split(/(\*\*[^*]+\*\*|`[^`]+`)/)) {
+        if (part.startsWith("**")) fragment.createEl("b", { text: part.slice(2, -2) });
+        else if (part.startsWith("`")) fragment.createEl("code", { text: part.slice(1, -1) });
+        else if (part) fragment.appendText(part);
+    }
+    return fragment;
+}
+
 export class FootnotePluginSettingTab extends PluginSettingTab {
     plugin: FootnotePlugin;
 
@@ -119,28 +139,47 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
         return [
             {
                 name: "Edit footnotes in a popup",
-                desc: "Open the footnote definition in a small editor where you're typing, instead of jumping to the bottom of the note. Close with the footnote hotkey, the escape key, or by clicking outside.",
+                desc: rich("Open the footnote definition in a small editor where you're typing, instead of jumping to the bottom of the note. Close with the footnote hotkey, the escape key, or by clicking outside."),
                 control: { type: "toggle", key: "enablePopupEditor" },
             },
             {
+                name: "Expand selections to whole words",
+                desc: rich("When a selection is turned into a footnote, cut-off words at either end are included whole, along with any following punctuation, as **Footnote reference placement** says."),
+                control: { type: "toggle", key: "expandSelectionToWholeWords" },
+            },
+            {
                 name: "Carry footnote definitions on copy, cut, and paste",
-                desc: "Copying or cutting text takes along the definitions its footnotes need, and pasting adds them to the destination note, reusing definitions it already has and renaming names it already uses. A cut also removes the definitions it leaves unused. The definitions travel in the clipboard text itself, after the selection, so they survive a paste into another vault or app; pasting inside Obsidian puts them where they belong.",
+                desc: rich("Copying or cutting a footnote takes its definition along. Pasting inside Obsidian puts the definitions where they belong, reusing duplicates and renaming names that clash; pasting outside Obsidian leaves them after the pasted text."),
                 control: { type: "toggle", key: "carryFootnotesOnCopy" },
             },
             {
+                name: "Names for converted inline footnotes",
+                desc: rich("How **Convert inline footnotes to normal footnotes** names what it makes. **Numbers** gives `[^1]`, `[^2]`, and so on. **First word of the body** names each footnote after the first word that is not a filler word (`[^same]`, `[^different]`), with `-2`, `-3` for repeats, and a number when no word will do."),
+                control: {
+                    type: "dropdown",
+                    key: "convertedFootnoteNames",
+                    options: { numbered: "Numbers", named: "First word of the body" },
+                },
+            },
+            {
+                name: "Per-note footnote prefix",
+                desc: rich("Footnotes use the note's `footnote-prefix` property: with `footnote-prefix: 2-`, the numbered command inserts `[^2-1]`, `[^2-2]`, and so on, and the named command prefills `[^2-]`. Useful when chapter notes merge into one document. Set it with the **Set footnote prefix** command."),
+                control: { type: "toggle", key: "enableFootnotePrefix" },
+            },
+            {
                 type: "group",
-                heading: "Reference placement",
+                heading: "Footnote reference placement",
                 items: [
                 {
                     name: "Insert footnote reference at end of word",
-                    desc: "A new footnote reference is inserted at the end of the word rather than inside it, and relative to any following punctuation as the placement setting below says.",
+                    desc: rich("A new footnote reference is inserted at the end of the word rather than inside it, and relative to any following punctuation as **Footnote reference placement** says."),
                     control: { type: "toggle", key: "insertAtEndOfWord" },
                 },
                 {
-                    name: "Footnote reference placement",
+                    name: "Reference placement relative to punctuation",
                     // Jason's pick A of three, 2026-09-21: no language list, people
                     // know what they want; the README keeps the conventions
-                    desc: "Where the footnote reference goes relative to following punctuation: After punctuation (word.[^1]), Before punctuation (word[^1].), or Don't move. Applies to new footnotes inserted at the end of the word, to converted selections, and to linting. Closing quotation marks and brackets are always stepped over.",
+                    desc: rich("Where the footnote reference goes relative to following punctuation: **After punctuation** (`word.[^1]`), **Before punctuation** (`word[^1].`), or **Don't move**. Applies to new footnotes inserted at the end of the word, to converted selections, and to linting. Closing quotation marks and brackets are always stepped over."),
                     control: {
                         type: "dropdown",
                         key: "footnotePlacement",
@@ -150,36 +189,17 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                 ],
             },
             {
-                name: "Names for converted inline footnotes",
-                desc: "How Convert inline footnotes to normal footnotes names what it makes. Numbers gives [^1], [^2], and so on. First word of the body names each footnote after the first word that is not a filler word ([^same], [^different]), with -2, -3 for repeats, and a number when no word will do.",
-                control: {
-                    type: "dropdown",
-                    key: "convertedFootnoteNames",
-                    options: { numbered: "Numbers", named: "First word of the body" },
-                },
-            },
-            {
-                name: "Expand selections to whole words",
-                desc: "When a selection is turned into a footnote, cut-off words at either end are included whole, along with any following punctuation, as the placement setting says.",
-                control: { type: "toggle", key: "expandSelectionToWholeWords" },
-            },
-            {
-                name: "Per-note footnote prefix",
-                desc: "Footnotes use the note's footnote-prefix property: with \"footnote-prefix: 2-\", the numbered command inserts [^2-1], [^2-2], and so on, and the named command prefills [^2-]. Useful when chapter notes merge into one document. Set it with the \"Set footnote prefix\" command.",
-                control: { type: "toggle", key: "enableFootnotePrefix" },
-            },
-            {
                 type: "group",
                 heading: "Footnotes section",
                 items: [
                     {
                         name: "Enable section heading",
-                        desc: "Adds a heading above the footnote definitions at the bottom of the note. An existing one is reused.",
+                        desc: rich("Adds a heading above the footnote definitions at the bottom of the note. An existing one is reused."),
                         control: { type: "toggle", key: "enableFootnoteSectionHeading" },
                     },
                     {
                         name: "Section heading",
-                        desc: "Heading to place above the footnotes section. Accepts standard Markdown, including multiple lines and dividers.",
+                        desc: rich("Heading to place above the footnotes section. Accepts standard Markdown, including multiple lines and dividers."),
                         control: {
                             type: "textarea",
                             key: "footnoteSectionHeading",
@@ -190,7 +210,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                     },
                     {
                         name: "Trim blank lines",
-                        desc: "Remove blank lines from the end of the note when the first footnote (and its section heading, if enabled) is added at the bottom.",
+                        desc: rich("Remove blank lines from the end of the note when the first footnote (and its section heading, if enabled) is added at the bottom."),
                         control: { type: "toggle", key: "enableRemoveBlankLastLines" },
                     },
                 ],
@@ -198,7 +218,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
             {
                 type: "page",
                 name: "Linting",
-                desc: "Cleanup rules, automatic lint triggers, and reindexing behavior.",
+                desc: rich("Cleanup rules, automatic lint triggers, and reindexing behavior."),
                 items: [
                     {
                         // A row with no control: it shows as plain information
@@ -208,7 +228,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                         // footnote rules rewrite the same footnotes this plugin
                         // does.
                         name: "Using the Linter plugin?",
-                        desc: "Turn off Linter's own footnote rules (footnote after punctuation, move footnotes to the bottom, re-index footnotes) so the two plugins don't fight over the same footnotes.",
+                        desc: rich("Turn off Linter's own footnote rules (**footnote after punctuation**, **move footnotes to the bottom**, **re-index footnotes**) so the two plugins don't fight over the same footnotes."),
                         visible: () =>
                             !!(this.app as AppWithPlugins).plugins?.plugins?.[
                                 "obsidian-linter"
@@ -216,12 +236,12 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                     },
                     {
                         name: "Lint on save",
-                        desc: "Lint the note when it is saved by hand (Ctrl+S, or :w with Vim key bindings).",
+                        desc: rich("Lint the note when it is saved by hand (`Ctrl+S`, or `:w` with Vim key bindings)."),
                         control: { type: "toggle", key: "lintOnSave" },
                     },
                     {
                         name: "Lint on footnote creation",
-                        desc: "Lint the note right after a new footnote is created in it, including by the convert and paste commands, which create footnotes too.",
+                        desc: rich("Lint the note right after a new footnote is created in it, including by the convert and paste commands, which create footnotes too."),
                         control: { type: "toggle", key: "lintOnFootnoteCreation" },
                     },
                     {
@@ -230,7 +250,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                         items: [
                             {
                                 name: "Fix footnote reference placement",
-                                desc: "Linting moves footnote references to the side of punctuation that Footnote reference placement is set to. Disabled when set to Don't move.",
+                                desc: rich("Linting moves footnote references to the side of punctuation that **Footnote reference placement** is set to. Disabled when set to **Don't move**."),
                                 control: {
                                     type: "toggle",
                                     key: "lintFixPunctuation",
@@ -242,17 +262,17 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                             },
                             {
                                 name: "Move definitions to existing footnote section heading, or to bottom",
-                                desc: "Linting gathers all footnote definitions under the note's existing section heading, or at the end of the note when there is none.",
+                                desc: rich("Linting gathers all footnote definitions under the note's existing section heading, or at the end of the note when there is none."),
                                 control: { type: "toggle", key: "lintMoveToBottom" },
                             },
                             {
                                 name: "Fix definitions hidden by a missing blank line",
-                                desc: "Linting inserts the blank line a footnote definition needs when its \"[^7]:\" line sits directly under a paragraph, list item, or quote line (Obsidian reads such a line as plain text and shows no footnote). While off, linting alerts you about them instead.",
+                                desc: rich("Linting inserts the blank line a footnote definition needs when its `[^7]:` line sits directly under a paragraph, list item, or quote line (Obsidian reads such a line as plain text and shows no footnote). While off, linting alerts you about them instead."),
                                 control: { type: "toggle", key: "lintFixLazyDefinitions" },
                             },
                             {
                                 name: "Apply the note's footnote prefix",
-                                desc: "Linting adds the note's footnote-prefix to plain footnotes and renumbers the prefixed ones within their namespace. The Rename footnote command adds the prefix the same way. While off, prefixed footnotes are treated as named and keep their names.",
+                                desc: rich("Linting adds the note's `footnote-prefix` to plain footnotes and renumbers the prefixed ones within their namespace. The **Rename footnote** command adds the prefix the same way. While off, prefixed footnotes are treated as named and keep their names."),
                                 control: {
                                     type: "toggle",
                                     key: "lintApplyPrefix",
@@ -272,7 +292,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                         items: [
                             {
                                 name: "Delete orphaned references",
-                                desc: "Linting deletes footnote references that have no definition (a \"[^5]\" with no \"[^5]:\" line, which Obsidian renders as plain text). While off, linting alerts you about them instead.",
+                                desc: rich("Linting deletes footnote references that have no definition (a `[^5]` with no `[^5]:` line, which Obsidian renders as plain text). While off, linting alerts you about them instead."),
                                 control: {
                                     type: "toggle",
                                     key: "lintDeleteOrphanedReferences",
@@ -280,7 +300,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                             },
                             {
                                 name: "Delete orphaned definitions",
-                                desc: "Linting deletes footnote definitions that have no references (a \"[^6]:\" line with no \"[^6]\", which Obsidian doesn't render). While off, linting alerts you about them instead and reindexing numbers them after everything else.",
+                                desc: rich("Linting deletes footnote definitions that have no references (a `[^6]:` line with no `[^6]`, which Obsidian doesn't render). While off, linting alerts you about them instead and reindexing numbers them after everything else."),
                                 control: {
                                     type: "toggle",
                                     key: "lintDeleteOrphanedDefinitions",
@@ -288,7 +308,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                             },
                             {
                                 name: "Merge duplicate definitions",
-                                desc: "Linting merges later duplicate definitions of the same footnote into the first one, keeping every body (Obsidian only renders the last definition otherwise). While off, linting alerts you about duplicates instead.",
+                                desc: rich("Linting merges later duplicate definitions of the same footnote into the first one, keeping every body (Obsidian only renders the last definition otherwise). While off, linting alerts you about duplicates instead."),
                                 control: {
                                     type: "toggle",
                                     key: "lintMergeDuplicateDefinitions",
@@ -302,12 +322,12 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                         items: [
                             {
                                 name: "Reindex",
-                                desc: "Linting also renumbers footnotes and reorders their definitions by order of appearance, following the options below.",
+                                desc: rich("Linting also renumbers footnotes and reorders their definitions by order of appearance, following the options below."),
                                 control: { type: "toggle", key: "lintReindex" },
                             },
                             {
                                 name: "Renumber named footnotes",
-                                desc: "Reindexing gives named footnotes (like [^note]) numbers by order of appearance instead of preserving their names.",
+                                desc: rich("Reindexing gives named footnotes (like `[^note]`) numbers by order of appearance instead of preserving their names."),
                                 control: {
                                     type: "toggle",
                                     key: "renumberNamedFootnotes",
