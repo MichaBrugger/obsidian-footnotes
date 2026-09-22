@@ -181,7 +181,9 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                 items: [
                     {
                         name: "Preferred footnote naming style",
-                        desc: rich("**Keep as written** leaves every footnote's name alone. **Numbered** gives every footnote a number: linting renumbers named footnotes by order of appearance. **Named** names footnotes after the first word of their definition that is not a filler word (`[^same]`), with `-2`, `-3` for repeats: linting names the numbered ones and leaves the already named alone. **Convert inline footnotes to normal footnotes** follows the same choice."),
+                        // Jason's pick A of three, 2026-09-22: lead with what follows the
+                        // setting, since the insert hotkeys deliberately do not
+                        desc: rich("Followed by linting and by **Convert inline footnotes to normal footnotes**; the numbered and named hotkeys insert what they always did. **Keep as written** changes nothing. **Numbered** renumbers named footnotes by order of appearance. **Named** names numbered footnotes after the first meaningful word of their definition (`[^1]: the Smith paper` becomes `[^Smith]`, with `-2` for repeats) and leaves the already named alone."),
                         control: {
                             type: "dropdown",
                             key: "footnoteNaming",
