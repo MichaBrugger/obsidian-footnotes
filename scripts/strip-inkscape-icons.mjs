@@ -97,6 +97,10 @@ function strip(svg) {
     );
 
     out = out
+        // a hidden Inkscape layer (display="none") is scaffolding the
+        // artist kept for reference, never part of the icon: the to-inline
+        // icon carried the down arrow that way (2026-09-21)
+        .replace(/<g[^>]*\sdisplay="none"[^>]*>[\s\S]*?<\/g>/g, "")
         .replace(/<defs\s*\/>|<defs\s*>\s*<\/defs>/g, "")
         .replace(/\s*\n\s*/g, " ")
         .replace(/\s{2,}/g, " ")
