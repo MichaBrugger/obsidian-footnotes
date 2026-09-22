@@ -129,8 +129,25 @@ describe("deleteFootnoteEverywhere", () => {
         });
     });
 
-    it("refuses a footnote defined inside a list item, as the rename command does", () => {
-        const plan = del(["- item[^i]", "- [^i]: in the item"], "i");
+    // Jason, 2026-09-22: Obsidian's own delete removes a definition inside a
+    // list item, so this command does too where it can tell the extent: a
+    // single line, on the item's marker line or indented under the item.
+    it("deletes a single-line definition inside a list item, on the marker line or indented under the item", () => {
+        expect(del(["- item[^i]", "- [^i]: in the item"], "i")).toEqual({
+            kind: "deleted",
+            markdown: "- item",
+            references: 1,
+            definitions: 1,
+        });
+        expect(del(["- item[^i]", "", "  [^i]: under the item", "- next"], "i")).toMatchObject({
+            kind: "deleted",
+            markdown: "- item\n\n- next",
+            definitions: 1,
+        });
+    });
+
+    it("still refuses an in-item definition that runs on to another line, since the plugin does not model where it ends", () => {
+        const plan = del(["- item[^i]", "- [^i]: first line", "  continued"], "i");
         expect(plan.kind).toBe("refused");
         if (plan.kind !== "refused") throw new Error("unreachable");
         expect(plan.reason).toContain('"[^i]"');

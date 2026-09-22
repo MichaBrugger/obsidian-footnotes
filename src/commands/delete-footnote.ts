@@ -4,7 +4,7 @@ import {
     quotedReference,
     referenceOccurrences,
 } from "../parsing/footnote-grammar";
-import { inItemDefinitionNamesFolded } from "../parsing/list-item-definitions";
+import { inItemDefinitionLabels } from "../parsing/list-item-definitions";
 import {
     DefinitionBlock,
     definitionStartLines,
@@ -74,20 +74,28 @@ export function deleteFootnoteEverywhere(markdown: string, name: string): Delete
     const masked = maskProtectedLines(lines, scan);
     const starts = definitionStartLines(lines, scan, (i) => masked[i]);
 
-    // a footnote defined inside a list item is recognized but never cut,
-    // the same ruling the rename command follows (Jason's ruling 1,
-    // 2026-09-20): the plugin does not model such a definition's extent,
-    // and deleting the references while leaving the label would orphan it
-    if (inItemDefinitionNamesFolded(lines, scan, masked, starts).has(folded)) {
-        return {
-            kind: "refused",
-            reason: `Nothing was deleted: ${quotedReference(name)} is defined inside a list item, which the plugin does not delete. Delete it by hand.`,
-        };
-    }
-
     const blocks: DefinitionBlock[] = findDefinitionBlocks(lines, scan, masked, starts).filter(
         (block) => block.name.toLowerCase() === folded,
     );
+    // A definition inside a list item ("- [^x]: text", or a label indented
+    // under the item) is deleted when it is one line long, since Obsidian's
+    // own delete removes it too (Jason, 2026-09-22). The plugin does not
+    // model where such a definition ends, so one that runs on to another
+    // line (anything below it that is not blank, the end of the note, or a
+    // new list item) is refused with a reason, as the rename command
+    // refuses every in-item definition (Jason's ruling 1, 2026-09-20).
+    for (const hit of inItemDefinitionLabels(lines, scan, masked, starts)) {
+        if (hit.name.toLowerCase() !== folded) continue;
+        const next = lines[hit.line + 1];
+        const endsHere = next === undefined || next.trim() === "" || /^ {0,3}(?:[-+*]|\d{1,9}[.)])(?: |$)/.test(next);
+        if (!endsHere) {
+            return {
+                kind: "refused",
+                reason: `Nothing was deleted: ${quotedReference(name)} is defined inside a list item over more than one line, which the plugin does not delete. Delete it by hand.`,
+            };
+        }
+        blocks.push({ name: hit.name, start: hit.line, end: hit.line });
+    }
     // A label inside a blockquote or callout ("> [^x]: ...") is a real
     // definition everywhere else in the plugin but never forms a block, so
     // it is collected here with the quoted continuation Obsidian gives it
