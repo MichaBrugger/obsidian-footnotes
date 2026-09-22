@@ -86,8 +86,10 @@ export function deleteFootnoteEverywhere(markdown: string, name: string): Delete
     // refuses every in-item definition (Jason's ruling 1, 2026-09-20).
     for (const hit of inItemDefinitionLabels(lines, scan, masked, starts)) {
         if (hit.name.toLowerCase() !== folded) continue;
-        const next = lines[hit.line + 1];
-        const endsHere = next === undefined || next.trim() === "" || /^ {0,3}(?:[-+*]|\d{1,9}[.)])(?: |$)/.test(next);
+        const endsHere =
+            hit.line + 1 >= lines.length ||
+            lines[hit.line + 1].trim() === "" ||
+            /^ {0,3}(?:[-+*]|\d{1,9}[.)])(?: |$)/.test(lines[hit.line + 1]);
         if (!endsHere) {
             return {
                 kind: "refused",
