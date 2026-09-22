@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { carriedDefinitions } from "../src/commands/carry-footnotes";
+import { carriedDefinitions, planCarriedPaste } from "../src/commands/carry-footnotes";
 
 // Carrying footnote definitions along on copy, cut and paste (issue #59;
 // Jason's rulings 2026-09-21 and 22). The first seam: which definition
@@ -73,5 +73,91 @@ describe("carriedDefinitions", () => {
         expect(carriedDefinitions("a[^1]\r\n\r\n[^1]: one", { line: 0, ch: 0 }, { line: 0, ch: 5 }).carried).toEqual([
             { name: "1", lines: ["[^1]: one"] },
         ]);
+    });
+});
+
+// The second seam: how carried definitions land in a destination note.
+// An incoming definition whose body equals an existing one is merged into
+// it whatever its label (Jason, 2026-09-21: "if there are identical
+// footnotes, merge them"); a name the destination already uses for a
+// different body is renamed, a number to the next free number, a name to
+// name-2, name-3; a free name is kept. The renames reach the pasted body
+// and the carried blocks alike, so the pasted footnotes come out unique
+// with no setup on the user's side (the forum threads' requirement).
+describe("planCarriedPaste", () => {
+    const one = (name: string, ...lines: string[]) => ({ name, lines });
+
+    it("keeps a free name and adds its definition", () => {
+        expect(planCarriedPaste("x[^1]\n\n[^1]: one", "a[^2]", [one("2", "[^2]: two")])).toEqual({
+            body: "a[^2]",
+            definitions: [one("2", "[^2]: two")],
+            added: 1,
+            reused: 0,
+            renamed: 0,
+        });
+    });
+
+    it("reuses an identical definition, under the same label or another one, and points the references at it", () => {
+        expect(planCarriedPaste("s[^s]\n\n[^s]: Smith 2024", "a[^s]", [one("s", "[^s]: Smith 2024")])).toMatchObject({
+            body: "a[^s]",
+            definitions: [],
+            reused: 1,
+        });
+        expect(planCarriedPaste("s[^smith]\n\n[^smith]: Smith 2024", "a[^1] b[^1]", [one("1", "[^1]: Smith 2024")])).toMatchObject({
+            body: "a[^smith] b[^smith]",
+            definitions: [],
+            reused: 1,
+            renamed: 0,
+        });
+    });
+
+    it("compares bodies with whitespace collapsed, continuation lines included", () => {
+        const destination = "m[^m]\n\n[^m]: first\n    second";
+        expect(planCarriedPaste(destination, "a[^x]", [one("x", "[^x]:  first", "     second ")])).toMatchObject({
+            body: "a[^m]",
+            reused: 1,
+        });
+    });
+
+    it("renames a numeric name the destination uses for a different body to the next FREE number, not max plus one", () => {
+        expect(planCarriedPaste("x[^1] y[^3]\n\n[^1]: one\n[^3]: three", "a[^1]", [one("1", "[^1]: uno")])).toEqual({
+            body: "a[^2]",
+            definitions: [one("2", "[^2]: uno")],
+            added: 1,
+            reused: 0,
+            renamed: 1,
+        });
+    });
+
+    it("renames a named collision to name-2, name-3, skipping names the destination already holds", () => {
+        const destination = "a[^smith] b[^smith-2]\n\n[^smith]: old\n[^smith-2]: reserved";
+        expect(planCarriedPaste(destination, "c[^smith]", [one("smith", "[^smith]: incoming")])).toMatchObject({
+            body: "c[^smith-3]",
+            definitions: [one("smith-3", "[^smith-3]: incoming")],
+            renamed: 1,
+        });
+    });
+
+    it("renames inside carried blocks too, so a definition citing another keeps pointing at the right one", () => {
+        const destination = "d[^a] e[^b]\n\n[^a]: other a\n[^b]: other b";
+        expect(planCarriedPaste(destination, "x[^a]", [one("a", "[^a]: see[^b]"), one("b", "[^b]: bee")])).toMatchObject({
+            body: "x[^a-2]",
+            definitions: [one("a-2", "[^a-2]: see[^b-2]"), one("b-2", "[^b-2]: bee")],
+            renamed: 2,
+        });
+    });
+
+    it("renames a quoted block's label and leaves references inside the body's protected text alone", () => {
+        expect(planCarriedPaste("q[^q]\n\n[^q]: other", "`[^q]` a[^q]", [one("q", "> [^q]: quoted", "> more")])).toMatchObject({
+            body: "`[^q]` a[^q-2]",
+            definitions: [one("q-2", "> [^q-2]: quoted", "> more")],
+        });
+    });
+
+    it("treats a name only referenced in the destination as taken", () => {
+        expect(planCarriedPaste("orphan[^1]", "a[^1]", [one("1", "[^1]: uno")])).toMatchObject({
+            body: "a[^2]",
+            renamed: 1,
+        });
     });
 });

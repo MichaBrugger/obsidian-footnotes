@@ -133,3 +133,142 @@ export function carriedDefinitions(markdown: string, from: EditorPosition, to: E
     }
     return { carried, missing };
 }
+
+/** How carried definitions land in a destination note: the pasted body and the blocks to append, both with the collision renames made, and the counts for the toast. */
+export interface CarriedPastePlan {
+    body: string;
+    /** the blocks to append, renamed, in carried order; a merged one is not among them */
+    definitions: CarriedDefinition[];
+    added: number;
+    /** incoming definitions whose body an existing definition already holds, so the existing one serves */
+    reused: number;
+    /** incoming names the destination already used for a different body, given a new name */
+    renamed: number;
+}
+
+/**
+ * Decide how `carried` definitions and the pasted `body` fit into the
+ * `destination` note (T6's merge rule applied on paste; Jason,
+ * 2026-09-21). In carried order: a definition whose body, whitespace
+ * collapsed, equals an existing definition's is merged into it whatever
+ * its label, and the references to it are pointed at the existing name; a
+ * name the destination does not use (as a definition or a reference) is
+ * kept; a name the destination uses for a different body is renamed, a
+ * number to the smallest free number, a name to name-2, name-3 and so on.
+ * The renames are made in the body and inside the carried blocks (labels
+ * and references alike), so a carried definition that cites another keeps
+ * citing it. Protected text in the body is left as it is.
+ */
+export function planCarriedPaste(destination: string, body: string, carried: CarriedDefinition[]): CarriedPastePlan {
+    const lines = normalizeEol(destination).text.split("\n");
+    const scan = scanDocument(lines);
+    const masked = maskProtectedLines(lines, scan);
+    const starts = definitionStartLines(lines, scan, (i) => masked[i]);
+
+    // what the destination holds: every name in use (definitions and
+    // references, folded), and every definition body by its normalised
+    // text, the last block of a name winning as it does in Obsidian
+    const taken = new Set<string>();
+    const bodies = new Map<string, string>();
+    const blocks: DefinitionBlock[] = findDefinitionBlocks(lines, scan, masked, starts);
+    for (let i = 0; i < lines.length; i++) {
+        if (scan.isProtected[i] || !starts[i]) continue;
+        const hit = definitionLabelWithName(lines[i], masked[i]);
+        if (hit?.label.quoted) {
+            blocks.push({ name: hit.name, start: i, end: hit.label.afterCloser ? i : quotedDefinitionEnd(lines, scan, starts, i) });
+        }
+    }
+    blocks.sort((a, b) => a.start - b.start);
+    for (const block of blocks) {
+        taken.add(block.name.toLowerCase());
+        bodies.set(normalisedBody(lines.slice(block.start, block.end + 1)), block.name);
+    }
+    for (let i = 0; i < lines.length; i++) {
+        if (scan.isProtected[i] || !lines[i].includes("[^")) continue;
+        for (const occurrence of referenceOccurrences(lines[i], masked[i], starts[i])) taken.add(occurrence.name.toLowerCase());
+    }
+
+    // the final name of every incoming name, folded
+    const finalName = new Map<string, string>();
+    const assigned = new Set<string>();
+    const reusedNames = new Set<string>();
+    let added = 0;
+    let reused = 0;
+    let renamed = 0;
+    const occupied = (folded: string) => taken.has(folded) || assigned.has(folded);
+    for (const definition of carried) {
+        const folded = definition.name.toLowerCase();
+        const existing = bodies.get(normalisedBody(definition.lines));
+        if (existing !== undefined) {
+            finalName.set(folded, existing);
+            reusedNames.add(folded);
+            reused++;
+            continue;
+        }
+        if (!occupied(folded)) {
+            finalName.set(folded, definition.name);
+            assigned.add(folded);
+            added++;
+            continue;
+        }
+        let name: string;
+        if (/^\d+$/.test(definition.name)) {
+            let n = 1;
+            while (occupied(String(n))) n++;
+            name = String(n);
+        } else {
+            let k = 2;
+            while (occupied(`${folded}-${k}`)) k++;
+            name = `${definition.name}-${k}`;
+        }
+        finalName.set(folded, name);
+        assigned.add(name.toLowerCase());
+        added++;
+        renamed++;
+    }
+
+    // the renames, made right to left on each line so that one keeps the
+    // offsets of the ones before it; a line's own label is renamed too
+    const rename = (text: string[]): string[] => {
+        const textScan = scanDocument(text);
+        const textMasked = maskProtectedLines(text, textScan);
+        const textStarts = definitionStartLines(text, textScan, (i) => textMasked[i]);
+        return text.map((line, i) => {
+            if (textScan.isProtected[i] || !line.includes("[^")) return line;
+            const edits: { start: number; end: number; name: string }[] = [];
+            const label = textStarts[i] ? definitionLabelWithName(line, textMasked[i]) : null;
+            const labelStart = label ? label.label.nameStart - 2 : -1;
+            if (label) edits.push({ start: label.label.nameStart, end: label.label.nameEnd, name: label.name });
+            for (const occurrence of referenceOccurrences(line, textMasked[i], textStarts[i])) {
+                if (occurrence.start === labelStart) continue;
+                edits.push({ start: occurrence.start + 2, end: occurrence.end - 1, name: occurrence.name });
+            }
+            return edits
+                .filter((edit) => {
+                    const target = finalName.get(edit.name.toLowerCase());
+                    return target !== undefined && target !== edit.name;
+                })
+                .sort((a, b) => b.start - a.start)
+                .reduce(
+                    (kept, edit) => kept.slice(0, edit.start) + (finalName.get(edit.name.toLowerCase()) as string) + kept.slice(edit.end),
+                    line,
+                );
+        });
+    };
+    const definitions = carried
+        .filter((definition) => !reusedNames.has(definition.name.toLowerCase()))
+        .map((definition) => ({
+            name: finalName.get(definition.name.toLowerCase()) as string,
+            lines: rename(definition.lines),
+        }));
+    return { body: rename(normalizeEol(body).text.split("\n")).join("\n"), definitions, added, reused, renamed };
+}
+
+/** A definition block's body with the label stripped and whitespace collapsed, the key two definitions are compared by. */
+function normalisedBody(blockLines: string[]): string {
+    const scan = scanDocument(blockLines);
+    const masked = maskProtectedLines(blockLines, scan);
+    const label = definitionLabelWithName(blockLines[0], masked[0]);
+    const first = label ? blockLines[0].slice(label.label.labelEnd) : blockLines[0];
+    return [first, ...blockLines.slice(1)].join("\n").replace(/\s+/g, " ").trim();
+}
