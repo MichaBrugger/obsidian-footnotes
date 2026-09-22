@@ -174,24 +174,24 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                     },
                 ],
             },
-            },
             {
                 type: "group",
                 heading: "Footnote names",
                 items: [
-                {
-                    name: "Names for converted inline footnotes",
-                    desc: rich("How **Convert inline footnotes to normal footnotes** names what it makes. **Numbered** gives `[^1]`, `[^2]`, and so on. **Named** names each footnote after the first word that is not a filler word (`[^same]`, `[^different]`), with `-2`, `-3` for repeats, and a number when no word will do."),
-                    control: {
-                        type: "dropdown",
-                        key: "convertedFootnoteNames",
-                        options: { numbered: "Numbered", named: "Named" },
+                    {
+                        name: "Names for converted inline footnotes",
+                        desc: rich("How **Convert inline footnotes to normal footnotes** names what it makes. **Numbered** gives `[^1]`, `[^2]`, and so on. **Named** names each footnote after the first word that is not a filler word (`[^same]`, `[^different]`), with `-2`, `-3` for repeats, and a number when no word will do."),
+                        control: {
+                            type: "dropdown",
+                            key: "convertedFootnoteNames",
+                            options: { numbered: "Numbered", named: "Named" },
+                        },
                     },
-                {
-                    name: "Per-note footnote prefix",
-                    desc: rich("Footnotes use the note's `footnote-prefix` property: with `footnote-prefix: 2-`, the numbered command inserts `[^2-1]`, `[^2-2]`, and so on, and the named command prefills `[^2-]`. Useful when chapter notes merge into one document. Set it with the **Set footnote prefix** command."),
-                    control: { type: "toggle", key: "enableFootnotePrefix" },
-                },
+                    {
+                        name: "Per-note footnote prefix",
+                        desc: rich("Footnotes use the note's `footnote-prefix` property: with `footnote-prefix: 2-`, the numbered command inserts `[^2-1]`, `[^2-2]`, and so on, and the named command prefills `[^2-]`. Useful when chapter notes merge into one document. Set it with the **Set footnote prefix** command."),
+                        control: { type: "toggle", key: "enableFootnotePrefix" },
+                    },
                 ],
             },
             {
