@@ -20,6 +20,16 @@ export interface FootnotePluginSettings {
      * table (Jason's ruling 2026-09-20). Read by the end-of-word hop, the
      * selection grab and the punctuation lint rule. */
     footnotePlacement: FootnotePlacement;
+    /** Copying or cutting text carries the definitions its references
+     * need, and pasting lands them in the destination, merged and renamed
+     * to fit (issue #59; Jason, 2026-09-21: one toggle, default on, no
+     * prompt). */
+    carryFootnotesOnCopy: boolean;
+    /** Copy also appends the carried definitions to the clipboard text
+     * itself, so they reach other vaults, windows and apps, at the cost of
+     * every other app receiving them as extra lines (off by default;
+     * Jason's ruling 2026-09-21). */
+    includeDefinitionsInClipboard: boolean;
     /** When a selection is turned into a footnote, a word the selection cut
      * in half is taken whole, and the end is moved to the end of the word
      * plus one trailing punctuation mark. The selection twin of the
@@ -72,6 +82,8 @@ export const DEFAULT_SETTINGS: FootnotePluginSettings = {
     // so nothing moves on upgrade; users of a before-punctuation convention
     // pick "before" themselves
     footnotePlacement: "after",
+    carryFootnotesOnCopy: true,
+    includeDefinitionsInClipboard: false,
     expandSelectionToWholeWords: true,
     enablePopupEditor: true,
     enableFootnotePrefix: false,
@@ -129,6 +141,26 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                 name: "Expand selections to whole words",
                 desc: "When a selection is turned into a footnote, cut-off words at either end are included whole, along with the punctuation right after the last word when the placement is after punctuation.",
                 control: { type: "toggle", key: "expandSelectionToWholeWords" },
+            },
+            {
+                type: "group",
+                heading: "Copying and pasting",
+                items: [
+                    {
+                        name: "Carry footnote definitions on copy, cut and paste",
+                        desc: "Copying or cutting text takes the definitions its footnotes need along, and pasting puts them in the destination note: a definition the note already has is reused, a name it already uses for something else is renamed so every footnote stays unique, and a cut removes the definitions it leaves unused. Works within this Obsidian window; the clipboard text itself stays clean.",
+                        control: { type: "toggle", key: "carryFootnotesOnCopy" },
+                    },
+                    {
+                        name: "Include the definitions in the copied text",
+                        desc: "Copy appends the definitions to the clipboard text, so they follow into other vaults, windows and apps. The cost: every other app you paste into receives them as extra lines, and a paste from another window is tidied after Obsidian pastes it rather than in one step. Off is the mode that just works inside one window.",
+                        control: {
+                            type: "toggle",
+                            key: "includeDefinitionsInClipboard",
+                            disabled: () => !this.plugin.settings.carryFootnotesOnCopy,
+                        },
+                    },
+                ],
             },
             {
                 name: "Per-note footnote prefix",

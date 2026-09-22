@@ -23,6 +23,7 @@ import { footnotePrefixFromEditor } from "./parsing/footnote-prefix";
 import { registerRenameFootnoteMenu, renameFootnote } from "./commands/rename-footnote";
 import { deleteFootnote, registerDeleteFootnoteMenu } from "./commands/delete-footnote";
 import { convertInlineToNormalCommand, convertNormalToInlineCommand } from "./commands/convert-footnotes";
+import { installCarryFootnoteHooks, resetCarryRegister } from "./commands/carry-footnotes-hooks";
 import { SetFootnotePrefixModal } from "./commands/set-footnote-prefix";
 import {
   installLintOnSave,
@@ -204,6 +205,10 @@ export default class FootnotePlugin extends Plugin {
       },
     });
     this.editorCommandIds.push(`${this.manifest.id}:convert-normal-to-inline`);
+    // Copy, cut and paste carry footnote definitions along (issue #59).
+    // Nothing to register in the palette: the hooks sit on the keys people
+    // already press, and the setting turns them off.
+    installCarryFootnoteHooks(this);
     this.addCommand({
       id: "set-footnote-prefix",
       name: "Set footnote prefix",
@@ -298,6 +303,7 @@ export default class FootnotePlugin extends Plugin {
 
   onunload() {
     dismissFootnotePopup();
+    resetCarryRegister();
   }
 
   async loadSettings() {

@@ -129,6 +129,18 @@ Put your cursor on any reference or definition and run **Rename footnote**. It w
 
 Put your cursor on any reference or definition and run **Delete footnote everywhere**. The definition and every reference to it go in one step and one undo (the name was "Delete footnote definition and all references" until the right-click menu proved too narrow for it), and the toast tells you how many of each went. It's also in the right-click menu on a footnote, next to Obsidian's own **Delete footnote and reference**, which removes only the one reference you clicked: if the same footnote is cited in two places, Obsidian's item leaves the other reference behind pointing at nothing. Copies inside code, math or comments are plain text and stay. A deletion that would change how Obsidian reads the surrounding text (a footnote defined inside a list item, a definition sharing its line with the end of a `%%` comment) is refused with a reason instead of half done.
 
+### Copying, cutting and pasting footnotes
+
+Copy or cut text that holds footnote references and the definitions come along. Nothing to run: it hooks the keys you already press, within one Obsidian window.
+
+- **Copy** remembers which definitions the selection needs, including a definition that another carried definition cites. The clipboard text itself stays clean, so pasting into other apps is unchanged.
+- **Paste** lands the text and the definitions in one undo, where a new footnote would go. A definition the destination already has (same text, whatever its name) is reused; a name the destination already uses for something else is renamed, a number to the next free number, a name to `name-2`, so the pasted footnotes come out unique with no setup. The toast says how many were added, reused and renamed, and names any reference that travelled without a definition.
+- **Cut** takes the definitions that nothing else in the note uses along with the text, in the same undo step. A definition still used elsewhere stays.
+- A clipboard that ends in definition lines, from anywhere (a copy you made by hand, or the Copy with Footnotes plugin), pastes the same way.
+- **Include the definitions in the copied text** *(off by default)* appends the definitions to the clipboard text, so they reach other vaults, windows and apps. Every other app then receives them as extra lines, which is why it is off.
+
+Turn the whole thing off with **Carry footnote definitions on copy, cut and paste** in the settings.
+
 ### Converting between footnote styles
 
 Two commands convert a whole note at once, each way, in one undo:
