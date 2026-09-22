@@ -125,14 +125,14 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
             },
             {
                 name: "Insert footnote reference at end of word",
-                desc: "A new footnote reference is only inserted at the end of the word, and past the punctuation after it or in front of it as the placement setting below says.",
+                desc: "A new footnote reference is inserted at the end of the word rather than inside it, and relative to any following punctuation as the placement setting below says.",
                 control: { type: "toggle", key: "insertAtEndOfWord" },
             },
             {
                 name: "Footnote reference placement",
                 // Jason's pick A of three, 2026-09-21: no language list, people
                 // know what they want; the README keeps the conventions
-                desc: "Where a footnote reference goes relative to the punctuation after a word: after it (word.[^1]), before it (word[^1].), or left at the end of the word. Applies to new footnotes and to the lint rule. Closing quotation marks and brackets are always stepped over.",
+                desc: "Where the footnote reference goes relative to following punctuation: After punctuation (word.[^1]), Before punctuation (word[^1].), or Don't move. Applies to new footnotes and linting. Closing quotation marks and brackets are always stepped over.",
                 control: {
                     type: "dropdown",
                     key: "footnotePlacement",
@@ -141,7 +141,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
             },
             {
                 name: "Expand selections to whole words",
-                desc: "When a selection is turned into a footnote, cut-off words at either end are included whole, along with the punctuation right after the last word when the placement is after punctuation.",
+                desc: "When a selection is turned into a footnote, cut-off words at either end are included whole, along with any following punctuation, as the placement setting says.",
                 control: { type: "toggle", key: "expandSelectionToWholeWords" },
             },
             {
@@ -150,12 +150,12 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                 items: [
                     {
                         name: "Carry footnote definitions on copy, cut and paste",
-                        desc: "Copying or cutting text takes the definitions its footnotes need along, and pasting puts them in the destination note: a definition the note already has is reused, a name it already uses for something else is renamed so every footnote stays unique, and a cut removes the definitions it leaves unused. Works within this Obsidian window; the clipboard text itself stays clean.",
+                        desc: "Copying or cutting text takes along the definitions its footnotes need, and pasting adds them to the destination note, reusing definitions it already has and renaming names it already uses. A cut also removes the definitions it leaves unused. The clipboard text itself is unchanged.",
                         control: { type: "toggle", key: "carryFootnotesOnCopy" },
                     },
                     {
                         name: "Include the definitions in the copied text",
-                        desc: "Copy appends the definitions to the clipboard text, so they follow into other vaults, windows and apps. The cost: every other app you paste into receives them as extra lines, and a paste from another window is tidied after Obsidian pastes it rather than in one step. Off is the mode that just works inside one window.",
+                        desc: "Copy appends the definitions to the clipboard text so they follow into other vaults, windows and apps. Other apps then receive them as extra lines, and a paste from another window is tidied after the paste rather than in one step.",
                         control: {
                             type: "toggle",
                             key: "includeDefinitionsInClipboard",
@@ -175,7 +175,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                 items: [
                     {
                         name: "Enable section heading",
-                        desc: "Automatically adds a heading separating footnote definitions at the bottom of the note from the rest of the text. If the section heading is already present, it will be used instead of adding a new one.",
+                        desc: "Adds a heading above the footnote definitions at the bottom of the note. An existing one is reused.",
                         control: { type: "toggle", key: "enableFootnoteSectionHeading" },
                     },
                     {
@@ -217,7 +217,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                     },
                     {
                         name: "Lint on save",
-                        desc: "Lint the file on manual save (when ctrl+s is pressed or when :w is executed while using vim keybindings)",
+                        desc: "Lint the note when it is saved by hand (Ctrl+S, or :w with Vim key bindings).",
                         control: { type: "toggle", key: "lintOnSave" },
                     },
                     {
@@ -231,7 +231,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                         items: [
                             {
                                 name: "Fix footnote reference placement",
-                                desc: "The lint command moves footnote references to the side of punctuation the Footnote reference placement setting says: after it by default, or before it. Greyed out under Don't move, where the rule has nothing to do.",
+                                desc: "Linting moves footnote references to the side of punctuation that Footnote reference placement is set to. Disabled when set to Don't move.",
                                 control: {
                                     type: "toggle",
                                     key: "lintFixPunctuation",
@@ -243,7 +243,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                             },
                             {
                                 name: "Move definitions to existing footnote section heading, or to bottom",
-                                desc: "The lint command gathers all footnote definitions under the note's existing section heading, or at the end of the note when there is none.",
+                                desc: "Linting gathers all footnote definitions under the note's existing section heading, or at the end of the note when there is none.",
                                 control: { type: "toggle", key: "lintMoveToBottom" },
                             },
                             {
@@ -253,7 +253,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                             },
                             {
                                 name: "Apply the note's footnote prefix",
-                                desc: "Linting adds the note's footnote-prefix to plain footnotes and renumbers the prefixed ones within their namespace. The Rename footnote command adds the prefix the same way. While off, prefixed footnotes are treated as named and keep their ids.",
+                                desc: "Linting adds the note's footnote-prefix to plain footnotes and renumbers the prefixed ones within their namespace. The Rename footnote command adds the prefix the same way. While off, prefixed footnotes are treated as named and keep their names.",
                                 control: {
                                     type: "toggle",
                                     key: "lintApplyPrefix",
@@ -303,7 +303,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                         items: [
                             {
                                 name: "Reindex",
-                                desc: "The lint command also renumbers footnotes and reorders their definitions by order of appearance, following the options in this reindexing section below.",
+                                desc: "Linting also renumbers footnotes and reorders their definitions by order of appearance, following the options below.",
                                 control: { type: "toggle", key: "lintReindex" },
                             },
                             {
