@@ -487,7 +487,7 @@ function migrateSettingsToV1(
  * lintOrphanedMarkers dropdown only ever existed in dev builds, but mapping
  * it across costs just as little. */
 /** v3: the Renumber named footnotes toggle and the converter's own naming
- * dropdown folded into one Footnote names choice (Jason, 2026-09-22). A
+ * dropdown folded into one Preferred footnote naming style choice (Jason, 2026-09-22). A
  * user who renumbered named footnotes is on Numbered; one who named
  * converted footnotes is on Named; everyone else keeps names as written,
  * which is what their notes had. */

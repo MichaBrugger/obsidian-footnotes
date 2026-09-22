@@ -4,7 +4,7 @@ import FootnotePlugin from "../src/main";
 import { reindexFootnotes } from "../src/linting/rules/re-index-footnotes";
 import { nameForBody } from "../src/parsing/footnote-grammar";
 
-// One universal Footnote names setting (Jason, 2026-09-22): Keep as
+// One universal Preferred footnote naming style setting (Jason, 2026-09-22): Keep as
 // written (the default, and what every note had before), Numbered (the
 // linter renumbers named footnotes, the old Renumber named footnotes
 // toggle), or Named (the linter names numbered footnotes after the first
@@ -67,7 +67,7 @@ function pluginWithSavedData(data: Record<string, unknown>): FootnotePlugin {
     return plugin;
 }
 
-describe("the Footnote names setting", () => {
+describe("the Preferred footnote naming style setting", () => {
     it("defaults to keeping names as written", async () => {
         const plugin = pluginWithSavedData({ settingsVersion: 3 });
         await plugin.loadSettings();

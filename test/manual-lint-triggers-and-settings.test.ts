@@ -172,7 +172,7 @@ describe("sheet 12: which controls are greyed out", () => {
         expect(rules("before")?.disabled?.()).toBe(false);
     });
 
-    it("the Reindexing group holds only the Reindex toggle now: naming moved to the main page's Footnote names dropdown (2026-09-22)", () => {
+    it("the Reindexing group holds only the Reindex toggle now: naming moved to the main page's Preferred footnote naming style dropdown (2026-09-22)", () => {
         expect(group(lintingPage(), "Reindexing").items?.map((item) => item.name)).toEqual(["Reindex"]);
     });
 

@@ -70,7 +70,7 @@ const optionsArb: fc.Arbitrary<LintOptions> = fc.record({
     reindex: fc.boolean(),
     reindexOptions: fc.record({
         renumberNamedFootnotes: fc.boolean(),
-        // the Named half of the Footnote names setting (2026-09-22)
+        // the Named half of the Preferred footnote naming style setting (2026-09-22)
         nameNumberedFootnotes: fc.boolean(),
         keepOrphanedDefinitions: fc.boolean(),
     }),

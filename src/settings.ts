@@ -180,7 +180,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                 heading: "Footnote names",
                 items: [
                     {
-                        name: "Footnote names",
+                        name: "Preferred footnote naming style",
                         desc: rich("**Keep as written** leaves every footnote's name alone. **Numbered** gives every footnote a number: linting renumbers named footnotes by order of appearance. **Named** names footnotes after the first word of their definition that is not a filler word (`[^same]`), with `-2`, `-3` for repeats: linting names the numbered ones and leaves the already named alone. **Convert inline footnotes to normal footnotes** follows the same choice."),
                         control: {
                             type: "dropdown",
@@ -329,7 +329,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                         items: [
                             {
                                 name: "Reindex",
-                                desc: rich("Linting also renumbers footnotes and reorders their definitions by order of appearance. Under **Footnote names** it renumbers the named ones (**Numbered**) or names the numbered ones (**Named**)."),
+                                desc: rich("Linting also renumbers footnotes and reorders their definitions by order of appearance. Under **Preferred footnote naming style** it renumbers the named ones (**Numbered**) or names the numbered ones (**Named**)."),
                                 control: { type: "toggle", key: "lintReindex" },
                             },
                         ],

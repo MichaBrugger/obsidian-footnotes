@@ -45,7 +45,7 @@ export interface ReindexOptions {
     /**
      * Give numbered footnotes names taken from their definitions, the
      * first meaningful word of the body (off by default; the Named half of
-     * the Footnote names setting, Jason, 2026-09-22). A footnote that is
+     * the Preferred footnote naming style setting, Jason, 2026-09-22). A footnote that is
      * already named is left alone, so a lint never renames twice; a
      * numbered one whose definition offers no word, or has no definition
      * block, stays numbered and is renumbered as usual.
