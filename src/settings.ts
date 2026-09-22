@@ -123,20 +123,31 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                 control: { type: "toggle", key: "enablePopupEditor" },
             },
             {
-                name: "Insert footnote reference at end of word",
-                desc: "A new footnote reference is inserted at the end of the word rather than inside it, and relative to any following punctuation as the placement setting below says.",
-                control: { type: "toggle", key: "insertAtEndOfWord" },
+                name: "Carry footnote definitions on copy, cut, and paste",
+                desc: "Copying or cutting text takes along the definitions its footnotes need, and pasting adds them to the destination note, reusing definitions it already has and renaming names it already uses. A cut also removes the definitions it leaves unused. The definitions travel in the clipboard text itself, after the selection, so they survive a paste into another vault or app; pasting inside Obsidian puts them where they belong.",
+                control: { type: "toggle", key: "carryFootnotesOnCopy" },
             },
             {
-                name: "Footnote reference placement",
-                // Jason's pick A of three, 2026-09-21: no language list, people
-                // know what they want; the README keeps the conventions
-                desc: "Where the footnote reference goes relative to following punctuation: After punctuation (word.[^1]), Before punctuation (word[^1].), or Don't move. Applies to new footnotes inserted at the end of the word, to converted selections, and to linting. Closing quotation marks and brackets are always stepped over.",
-                control: {
-                    type: "dropdown",
-                    key: "footnotePlacement",
-                    options: { after: "After punctuation", before: "Before punctuation", none: "Don't move" },
+                type: "group",
+                heading: "Reference placement",
+                items: [
+                {
+                    name: "Insert footnote reference at end of word",
+                    desc: "A new footnote reference is inserted at the end of the word rather than inside it, and relative to any following punctuation as the placement setting below says.",
+                    control: { type: "toggle", key: "insertAtEndOfWord" },
                 },
+                {
+                    name: "Footnote reference placement",
+                    // Jason's pick A of three, 2026-09-21: no language list, people
+                    // know what they want; the README keeps the conventions
+                    desc: "Where the footnote reference goes relative to following punctuation: After punctuation (word.[^1]), Before punctuation (word[^1].), or Don't move. Applies to new footnotes inserted at the end of the word, to converted selections, and to linting. Closing quotation marks and brackets are always stepped over.",
+                    control: {
+                        type: "dropdown",
+                        key: "footnotePlacement",
+                        options: { after: "After punctuation", before: "Before punctuation", none: "Don't move" },
+                    },
+                },
+                ],
             },
             {
                 name: "Names for converted inline footnotes",
@@ -151,17 +162,6 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                 name: "Expand selections to whole words",
                 desc: "When a selection is turned into a footnote, cut-off words at either end are included whole, along with any following punctuation, as the placement setting says.",
                 control: { type: "toggle", key: "expandSelectionToWholeWords" },
-            },
-            {
-                type: "group",
-                heading: "Copying and pasting",
-                items: [
-                    {
-                        name: "Carry footnote definitions on copy, cut, and paste",
-                        desc: "Copying or cutting text takes along the definitions its footnotes need, and pasting adds them to the destination note, reusing definitions it already has and renaming names it already uses. A cut also removes the definitions it leaves unused. The definitions travel in the clipboard text itself, after the selection, so they survive a paste into another vault or app; pasting inside Obsidian puts them where they belong.",
-                        control: { type: "toggle", key: "carryFootnotesOnCopy" },
-                    },
-                ],
             },
             {
                 name: "Per-note footnote prefix",
