@@ -150,7 +150,7 @@ describe("sheet 12: the Rules group", () => {
             // renamed with the placement setting (T5, 2026-09-21): the rule
             // now follows the setting, so "after" no longer belongs in its name
             "Fix footnote reference placement",
-            "Move definitions to existing footnote section heading, or to bottom",
+            "Move definitions to the footnote section",
             "Fix definitions hidden by a missing blank line",
             "Apply the note's footnote prefix",
         ]);

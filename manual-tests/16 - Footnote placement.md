@@ -6,7 +6,7 @@ Settings: defaults except where a check says otherwise. Undo between checks. Fix
 
 ## The settings page
 
-- [ ] Settings > Footnote Shortcut: **Footnote reference placement** is a dropdown with three choices (After punctuation, Before punctuation, Don't move), it shows After punctuation on a fresh install, and its description reads well and fits without cutting off on a phone-width window
+- [ ] Settings > Footnote Shortcut: **Placement relative to punctuation**, in the Footnote reference placement section, is a dropdown with three choices (After punctuation, Before punctuation, Don't move), it shows After punctuation on a fresh install, and its description reads well and fits without cutting off on a phone-width window
 - [ ] Settings search for "placement" finds it (Obsidian 1.13 settings search)
 
 ## Inserting under each placement

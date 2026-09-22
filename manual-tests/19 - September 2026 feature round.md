@@ -2,7 +2,7 @@
 
 Claude: one pass over everything built 2026-09-21 and 22, for Jason to run before the beta. It gathers the human checks of sheets 15 (delete), 16 (placement), 17 (conversions) and 18 (copy and paste), adds the inline-footnote lint change and the icons, and orders them so settings change as few times as possible. Run `npm test` first; 2907 tests pass with 31 expected failures as of the last commit. Every fixture is in this note or in the companion note **19b - Paste target**. Undo (Ctrl+Z) between checks unless a check says otherwise.
 
-Settings to start: defaults. **Footnote reference placement** = After punctuation, **Carry footnote definitions on copy, cut, and paste** on, **Names for converted inline footnotes** = Numbers, **Lint on footnote creation** off.
+Settings to start: defaults. **Placement relative to punctuation** = After punctuation, **Carry footnote definitions on copy, cut, and paste** on, **Converted inline footnotes get** = Numbers, **Lint on footnote creation** off.
 
 ## 1. Delete footnote everywhere
 
@@ -23,7 +23,7 @@ Fixtures: a footnote used twice[^twice] and again[^twice], a right-click one[^me
 
 Fixtures: This is "some bravo". 这是一个句子，引用来源。 他说「引用来源。」
 
-- [ ] Settings page: **Footnote reference placement** is a dropdown (After punctuation, Before punctuation, Don't move), shows After punctuation, and its description reads well and does not cut off at phone width; settings search for "placement" finds it
+- [ ] Settings page: **Placement relative to punctuation**, in the Footnote reference placement section, is a dropdown (After punctuation, Before punctuation, Don't move), shows After punctuation, and its description reads well and does not cut off at phone width; settings search for "placement" finds it
 - [ ] After punctuation (default): caret inside `bravo`, numbered hotkey: the reference lands after the closing quote AND the full stop. Undo
 - [ ] Set **Before punctuation**. Same press: after the closing quote, in front of the full stop. Undo
 - [ ] Before, Chinese: caret in 来源 of the first Chinese sentence: the reference lands in front of the 。 and Reading view shows the superscript before the full stop. Undo
@@ -46,7 +46,7 @@ Fixtures: two inline footnotes with the same body^[the same note] and again^[the
 
 - [ ] Run **Convert inline footnotes to normal footnotes**: the three inline footnotes above become numbered references, two definitions are appended after the last definition block (the identical bodies share one), the toast reads "Converted 3 inline footnotes into 2 normal footnotes (1 identical body merged)."
 - [ ] One undo brings all three inline footnotes back and removes both definitions
-- [ ] Set **Names for converted inline footnotes** to **First word of the body** and run the command again: the references read `[^same]`, `[^same]`, `[^different]`, with definitions to match. Undo, set it back to Numbers
+- [ ] Set **Converted inline footnotes get** to **Names** and run the command again: the references read `[^same]`, `[^same]`, `[^different]`, with definitions to match. Undo, set it back to Numbers
 - [ ] Turn **Lint on footnote creation** on and run the same command: it lints straight after (numbering follows the text) and the note reads right in Reading view. Undo, turn the setting off
 - [ ] Run **Convert normal footnotes to inline footnotes**: `[^twice]` (if you restored it) becomes identical inline copies, `[^single]` becomes one, `[^long]` and `[^item]` stay, and the toast names them with their reasons ("more than one line", "inside a list item") and says a definition used more than once became copies
 - [ ] One undo restores references and definitions together

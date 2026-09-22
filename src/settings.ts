@@ -143,50 +143,50 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                 control: { type: "toggle", key: "enablePopupEditor" },
             },
             {
-                name: "Expand selections to whole words",
-                desc: rich("When a selection is turned into a footnote, cut-off words at either end are included whole, along with any following punctuation, as **Footnote reference placement** says."),
-                control: { type: "toggle", key: "expandSelectionToWholeWords" },
+                type: "group",
+                heading: "Footnote reference placement",
+                items: [
+                    {
+                        name: "Insert footnote reference at end of word",
+                        desc: rich("A new footnote reference goes at the end of the word rather than inside it, on the side of any following punctuation chosen in the setting below."),
+                        control: { type: "toggle", key: "insertAtEndOfWord" },
+                    },
+                    {
+                        name: "Placement relative to punctuation",
+                        // Jason's pick A of three, 2026-09-21: no language list, people
+                        // know what they want; the README keeps the conventions
+                        desc: rich("Where the footnote reference goes relative to following punctuation: **After punctuation** (`word.[^1]`), **Before punctuation** (`word[^1].`), or **Don't move**. Applies to new footnotes inserted at the end of the word, to converted selections, and to linting. Closing quotation marks and brackets are always stepped over."),
+                        control: {
+                            type: "dropdown",
+                            key: "footnotePlacement",
+                            options: { after: "After punctuation", before: "Before punctuation", none: "Don't move" },
+                        },
+                    },
+                    {
+                        name: "Expand selections to whole words",
+                        desc: rich("When a selection is turned into a footnote, cut-off words at either end are included whole. The punctuation after the last word is included only under **After punctuation**, so the reference lands after it."),
+                        control: { type: "toggle", key: "expandSelectionToWholeWords" },
+                    },
+                ],
             },
             {
                 name: "Carry footnote definitions on copy, cut, and paste",
-                desc: rich("Copying or cutting a footnote takes its definition along. Pasting inside Obsidian puts the definitions where they belong, reusing duplicates and renaming names that clash; pasting outside Obsidian leaves them after the pasted text."),
+                desc: rich("Copying or cutting a footnote reference takes its definition along. Pasting inside Obsidian puts the definitions where they belong, reusing duplicates and renaming names that clash; pasting outside Obsidian leaves them after the pasted text."),
                 control: { type: "toggle", key: "carryFootnotesOnCopy" },
             },
             {
-                name: "Names for converted inline footnotes",
-                desc: rich("How **Convert inline footnotes to normal footnotes** names what it makes. **Numbers** gives `[^1]`, `[^2]`, and so on. **First word of the body** names each footnote after the first word that is not a filler word (`[^same]`, `[^different]`), with `-2`, `-3` for repeats, and a number when no word will do."),
+                name: "Converted inline footnotes get",
+                desc: rich("How **Convert inline footnotes to normal footnotes** names what it makes. **Numbers** gives `[^1]`, `[^2]`, and so on. **Names** names each footnote after the first word that is not a filler word (`[^same]`, `[^different]`), with `-2`, `-3` for repeats, and a number when no word will do."),
                 control: {
                     type: "dropdown",
                     key: "convertedFootnoteNames",
-                    options: { numbered: "Numbers", named: "First word of the body" },
+                    options: { numbered: "Numbers", named: "Names" },
                 },
             },
             {
                 name: "Per-note footnote prefix",
                 desc: rich("Footnotes use the note's `footnote-prefix` property: with `footnote-prefix: 2-`, the numbered command inserts `[^2-1]`, `[^2-2]`, and so on, and the named command prefills `[^2-]`. Useful when chapter notes merge into one document. Set it with the **Set footnote prefix** command."),
                 control: { type: "toggle", key: "enableFootnotePrefix" },
-            },
-            {
-                type: "group",
-                heading: "Footnote reference placement",
-                items: [
-                {
-                    name: "Insert footnote reference at end of word",
-                    desc: rich("A new footnote reference is inserted at the end of the word rather than inside it, and relative to any following punctuation as **Footnote reference placement** says."),
-                    control: { type: "toggle", key: "insertAtEndOfWord" },
-                },
-                {
-                    name: "Reference placement relative to punctuation",
-                    // Jason's pick A of three, 2026-09-21: no language list, people
-                    // know what they want; the README keeps the conventions
-                    desc: rich("Where the footnote reference goes relative to following punctuation: **After punctuation** (`word.[^1]`), **Before punctuation** (`word[^1].`), or **Don't move**. Applies to new footnotes inserted at the end of the word, to converted selections, and to linting. Closing quotation marks and brackets are always stepped over."),
-                    control: {
-                        type: "dropdown",
-                        key: "footnotePlacement",
-                        options: { after: "After punctuation", before: "Before punctuation", none: "Don't move" },
-                    },
-                },
-                ],
             },
             {
                 type: "group",
@@ -218,7 +218,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
             {
                 type: "page",
                 name: "Linting",
-                desc: rich("Cleanup rules, automatic lint triggers, and reindexing behavior."),
+                desc: rich("Lint triggers, cleanup rules, and reindexing."),
                 items: [
                     {
                         // A row with no control: it shows as plain information
@@ -241,7 +241,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                     },
                     {
                         name: "Lint on footnote creation",
-                        desc: rich("Lint the note right after a new footnote is created in it, including by the convert and paste commands, which create footnotes too."),
+                        desc: rich("Lint the note right after a new footnote is created in it, including when the convert commands or a paste create them."),
                         control: { type: "toggle", key: "lintOnFootnoteCreation" },
                     },
                     {
@@ -250,7 +250,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                         items: [
                             {
                                 name: "Fix footnote reference placement",
-                                desc: rich("Linting moves footnote references to the side of punctuation that **Footnote reference placement** is set to. Disabled when set to **Don't move**."),
+                                desc: rich("Linting moves footnote references to the side of punctuation that **Placement relative to punctuation** is set to. Disabled when set to **Don't move**."),
                                 control: {
                                     type: "toggle",
                                     key: "lintFixPunctuation",
@@ -261,7 +261,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                                 },
                             },
                             {
-                                name: "Move definitions to existing footnote section heading, or to bottom",
+                                name: "Move definitions to the footnote section",
                                 desc: rich("Linting gathers all footnote definitions under the note's existing section heading, or at the end of the note when there is none."),
                                 control: { type: "toggle", key: "lintMoveToBottom" },
                             },
