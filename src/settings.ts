@@ -130,7 +130,9 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
             },
             {
                 name: "Footnote reference placement",
-                desc: "Which side of the punctuation after a word a reference goes on, for new footnotes and for the lint rule. After punctuation is English, Taiwanese, Korean and Dutch usage (word.[^1]). Before punctuation is mainland Chinese, Japanese, French, Italian, Portuguese, Polish and the EU style guide (句子[^1]。). Don't move leaves the reference at the end of the word and the lint rule idle, for conventions that place each mark differently (Russian, Polish) or by sense (German), and for notes that mix scripts. Closing quotation marks and brackets are always stepped over. Changing this moves the references in a note the next time it is linted.",
+                // Jason's pick A of three, 2026-09-21: no language list, people
+                // know what they want; the README keeps the conventions
+                desc: "Where a footnote reference goes relative to the punctuation after a word: after it (word.[^1]), before it (word[^1].), or left at the end of the word. Applies to new footnotes and to the lint rule. Closing quotation marks and brackets are always stepped over.",
                 control: {
                     type: "dropdown",
                     key: "footnotePlacement",
