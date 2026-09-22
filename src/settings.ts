@@ -161,7 +161,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                         name: "Placement relative to punctuation",
                         // Jason's pick A of three, 2026-09-21: no language list, people
                         // know what they want; the README keeps the conventions
-                        desc: rich("Where the footnote reference goes relative to following punctuation: **After punctuation** (`word.[^1]`), **Before punctuation** (`word[^1].`), or **Don't move**. Applies to new footnotes inserted at the end of the word, to converted selections, and to linting. Closing quotation marks and brackets are always stepped over."),
+                        desc: rich("Where the footnote reference goes relative to following punctuation: **After punctuation** (`word.[^1]`), **Before punctuation** (`word[^1].`), or **Don't move**. Applies to new footnotes inserted at the end of the word, to converted selections, and to linting. Under **After punctuation** and **Before punctuation**, closing quotation marks and brackets are always stepped over; **Don't move** steps over nothing."),
                         control: {
                             type: "dropdown",
                             key: "footnotePlacement",

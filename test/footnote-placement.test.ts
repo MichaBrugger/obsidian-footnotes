@@ -24,10 +24,12 @@ import {
 // Chinese, Japanese, French, Italian, Portuguese, Polish and the EU style
 // guide; "don't move" is for Russian, Polish per-mark placement, German and
 // mixed-script notes placed by hand. Every convention found puts the marker
-// AFTER a closing quotation bracket, so closing marks are stepped over in
-// every mode, and in "before" mode a punctuation run that a closing mark
-// follows is stepped over together with it. Research saved in the
-// project's "Footnote placement research 2026-09-20.md".
+// AFTER a closing quotation bracket, so "after" and "before" step over
+// closing marks, and in "before" mode a punctuation run that a closing mark
+// follows is stepped over together with it. "Don't move" steps over nothing
+// at all, closing marks included (Jason, 2026-09-22: the value must mean
+// what it says, so a user who wants no automation has one value to pick).
+// Research saved in the project's "Footnote placement research 2026-09-20.md".
 
 /** Where a reference lands after the word that ends `word.length` characters into `text`. */
 function landing(text: string, wordLength: number, placement?: FootnotePlacement): number {
@@ -77,12 +79,13 @@ describe("referenceLandingAfter, don't move", () => {
         expect(landing("word.", 4, "none")).toBe(4);
     });
 
-    it("still steps past closing marks, and stops before the punctuation after them", () => {
-        expect(landing('"word".', 5, "none")).toBe(6);
-        expect(landing("word)", 4, "none")).toBe(5);
+    it("steps over nothing, not even a closing quote or bracket (Jason, 2026-09-22)", () => {
+        expect(landing('"word".', 5, "none")).toBe(5);
+        expect(landing("word)", 4, "none")).toBe(4);
+        expect(landing("**word**.", 6, "none")).toBe(6);
     });
 
-    it("does not step over punctuation even inside a closing quote", () => {
+    it("does not step over punctuation inside a closing quote either", () => {
         expect(landing('"quoted."', 7, "none")).toBe(7);
     });
 });
@@ -127,8 +130,13 @@ describe("the end-of-word hop follows the placement", () => {
         expect(endOfWordOffset('say "hello". next', 6, "before")).toBe('say "hello"'.length);
     });
 
-    it("none: at the end of the word", () => {
+    it("none: at the end of the word, inside a closing quote if that is where the word ends", () => {
         expect(endOfWordOffset("wait... what", 2, "none")).toBe(4);
+        expect(endOfWordOffset('say "hello". next', 6, "none")).toBe('say "hello'.length);
+    });
+
+    it("none: a link is still one word, and nothing after it is stepped over", () => {
+        expect(endOfWordOffset("see [x](http://a.b/c). next", 6, "none")).toBe("see [x](http://a.b/c)".length);
     });
 
     it("a link is still one word, and the hop after it follows the placement", () => {

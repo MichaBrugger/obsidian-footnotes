@@ -17,7 +17,7 @@ Put the caret inside the word "bravo" in each sentence below and press the numbe
 - [ ] Before punctuation: This is "some bravo". The reference lands after the closing quote and in front of the full stop
 - [ ] Before punctuation, Chinese: 这是一个句子，引用来源。 with the caret in 来源: the reference lands in front of the 。 and Reading view shows the superscript before the full stop
 - [ ] Before punctuation, quoted Chinese: 他说「引用来源。」 with the caret in 来源: the reference lands after the 」 (outside the quote, as every convention wants)
-- [ ] Don't move: This is "some bravo". The reference lands after the closing quote and in front of the full stop, and running **Lint footnotes** afterwards moves nothing
+- [ ] Don't move: This is "some bravo". The reference lands right after `bravo`, inside the closing quote (Don't move steps over nothing, Jason's ruling of 2026-09-22), and running **Lint footnotes** afterwards moves nothing
 
 ## The lint rule under Before punctuation
 

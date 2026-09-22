@@ -46,9 +46,11 @@ export const TrailingPunctuationChars = ".,;:!?\u2026。，、；：！？．｡
  * mainland Chinese, Japanese, French, Italian, Portuguese, Polish and the
  * EU style guide. "none" leaves the reference at the end of the word and
  * the lint rule idle, for conventions that place per mark (Russian,
- * Polish) or per sense (German), and for notes mixing scripts. Closing
- * marks are stepped over in every mode: every convention found puts the
- * marker after a closing quotation bracket, never inside it.
+ * Polish) or per sense (German), and for notes mixing scripts. "after" and
+ * "before" step over closing marks, since every convention found puts the
+ * marker after a closing quotation bracket, never inside it; "none" steps
+ * over nothing at all, so that the value means what it says and a user
+ * who wants no automation has one value to pick (Jason, 2026-09-22).
  */
 export type FootnotePlacement = "after" | "before" | "none";
 
@@ -82,14 +84,17 @@ export const ClosingMarkChars = "\"'’”)]}」』）】〕》〉*_~=｣］｝�
  * `placement` picks the convention (see FootnotePlacement): "before"
  * stops the walk in front of punctuation, except a punctuation run that
  * a closing mark follows, which is stepped over with the mark so the
- * reference still lands outside the quote; "none" stops in front of
- * punctuation always. Closing marks are stepped over in every mode.
+ * reference still lands outside the quote; "none" does not walk at all,
+ * closing marks included (Jason, 2026-09-22). A link inside the word is
+ * the caller's business (linkLikeEndAt), so a reference never splits one
+ * under "none" either.
  *
  * A markdown link's "(url)" tail right after a "]" is stepped over whole,
  * so the reference never splits "[text](url)". A space, a letter, or an
  * opening bracket (the start of a following reference) ends the walk.
  */
 export function referenceLandingAfter(text: string, end: number, placement: FootnotePlacement = "after"): number {
+    if (placement === "none") return end;
     let at = end;
     for (;;) {
         if (at >= text.length) return at;
@@ -104,8 +109,7 @@ export function referenceLandingAfter(text: string, end: number, placement: Foot
             continue;
         }
         if (!ClosingMarkChars.includes(c) && !TrailingPunctuationChars.includes(c)) return at;
-        if (placement !== "after" && TrailingPunctuationChars.includes(c)) {
-            if (placement === "none") return at;
+        if (placement === "before" && TrailingPunctuationChars.includes(c)) {
             // "before": the run of punctuation from here is stepped over
             // only when a closing mark follows it (the period inside
             // "quoted." or 「句子。」), and that mark must be a real closer,

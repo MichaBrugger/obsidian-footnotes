@@ -32,7 +32,7 @@ Fixtures: This is "some bravo". 这是一个句子，引用来源。 他说「�
 
 已有研究表明，该工艺可使能耗降低。[^gb] 他说「这是引文。」[^quote] An English sentence.[^en]
 
-- [ ] Set **Don't move**. In Settings > Linting, **Fix footnote reference placement** is greyed out. Caret inside `bravo`, numbered hotkey: after the quote, in front of the full stop; **Lint footnotes** moves nothing. Undo, set the placement back to **After punctuation**
+- [ ] Set **Don't move**. In Settings > Linting, **Fix footnote reference placement** is greyed out. Caret inside `bravo`, numbered hotkey: right after `bravo`, inside the closing quote (Don't move steps over nothing, your ruling of 2026-09-22); **Lint footnotes** moves nothing. Undo, set the placement back to **After punctuation**
 
 ## 3. Inline footnotes and the punctuation rule
 
