@@ -79,6 +79,18 @@
     display: none;
 }
 
+/* A bullet list inside a setting description (the rich() helper in
+   settings.ts turns "- " lines into one): Obsidian's description row has
+   no list styling of its own, so the list keeps its indent modest and its
+   spacing tight, phone width included */
+.footnote-setting-list {
+    margin: 0.25em 0 0 0;
+    padding-left: 1.2em;
+}
+.footnote-setting-list li {
+    margin: 0.15em 0;
+}
+
 /* the embed inherits the vault's "show line numbers" setting and would
    render the detail's file-absolute line number next to the label; a
    gutter has no place in a one-footnote editor */

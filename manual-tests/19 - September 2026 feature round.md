@@ -72,7 +72,7 @@ Open **19b - Paste target** in a second pane. Fixture paragraph: a paragraph wit
 
 - [ ] Command palette: **Delete footnote everywhere**, **Convert inline footnotes to normal footnotes** and **Convert normal footnotes to inline footnotes** are listed, each with its icon (the two convert icons are placeholders until yours land; the delete icon is yours)
 - [ ] Phone or mobile emulation: the three commands can be added to the toolbar and their icons read at toolbar size
-- [ ] Settings page: command and setting names in the descriptions are bold and footnote syntax is in code style (the naming dropdown and the prefix toggle show both); settings search for "filler" still finds the naming dropdown, which proves the search reads formatted descriptions
+- [ ] Settings page: command and setting names in the descriptions are bold and footnote syntax is in code style (the naming dropdown and the prefix toggle show both); **Preferred footnote naming style** and the Linting page's **Reindex** describe their values as a bullet list, one value per bullet, with a modest indent that still reads at phone width; settings search for "meaningful" still finds the naming dropdown, which proves the search reads formatted descriptions
 
 ## 7. The phone (needs the beta on the phone)
 

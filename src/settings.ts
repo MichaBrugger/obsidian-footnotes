@@ -111,19 +111,40 @@ export const DEFAULT_SETTINGS: FootnotePluginSettings = {
  * a command, setting, or dropdown name make it bold, and `backticks` around
  * footnote syntax set it in code, so a reader can tell where a name starts
  * and ends (Jason's ask, 2026-09-22: "How Convert inline footnotes to
- * normal footnotes names what it makes" read as one run of words).
- * Obsidian renders a DocumentFragment in the row; where there is no DOM
- * (the unit tests) the plain words come back with the markup stripped.
+ * normal footnotes names what it makes" read as one run of words). A line
+ * break starts a new line, and lines that start with "- " become a bullet
+ * list, so a description that lists a dropdown's values need not be one
+ * long paragraph (Jason's ask, 2026-09-22). Obsidian renders a
+ * DocumentFragment in the row; where there is no DOM (the unit tests) the
+ * plain words come back with the markup stripped.
  */
 function rich(text: string): string | DocumentFragment {
     if (typeof createFragment !== "function") return text.replace(/\*\*|`/g, "");
     const fragment = createFragment();
-    for (const part of text.split(/(\*\*[^*]+\*\*|`[^`]+`)/)) {
-        if (part.startsWith("**")) fragment.createEl("b", { text: part.slice(2, -2) });
-        else if (part.startsWith("`")) fragment.createEl("code", { text: part.slice(1, -1) });
-        else if (part) fragment.appendText(part);
+    let list: HTMLUListElement | null = null;
+    let previousWasText = false;
+    for (const line of text.split("\n")) {
+        if (line.startsWith("- ")) {
+            list ??= fragment.createEl("ul", { cls: "footnote-setting-list" });
+            richInline(list.createEl("li"), line.slice(2));
+            previousWasText = false;
+        } else {
+            list = null;
+            if (previousWasText) fragment.createEl("br");
+            richInline(fragment, line);
+            previousWasText = true;
+        }
     }
     return fragment;
+}
+
+/** One line of a description: bold names and code syntax, appended to `parent`. */
+function richInline(parent: DocumentFragment | HTMLElement, line: string): void {
+    for (const part of line.split(/(\*\*[^*]+\*\*|`[^`]+`)/)) {
+        if (part.startsWith("**")) parent.createEl("b", { text: part.slice(2, -2) });
+        else if (part.startsWith("`")) parent.createEl("code", { text: part.slice(1, -1) });
+        else if (part) parent.appendText(part);
+    }
 }
 
 export class FootnotePluginSettingTab extends PluginSettingTab {
@@ -183,7 +204,13 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                         name: "Preferred footnote naming style",
                         // Jason's pick A of three, 2026-09-22: lead with what follows the
                         // setting, since the insert hotkeys deliberately do not
-                        desc: rich("Followed by linting and by **Convert inline footnotes to normal footnotes**; the numbered and named hotkeys insert what they always did. **Keep as written** changes nothing. **Numbered** renumbers named footnotes by order of appearance. **Named** names numbered footnotes after the first meaningful word of their definition (`[^1]: the Smith paper` becomes `[^Smith]`, with `-2, -3` for repeats) and leaves the already named alone."),
+                        // Jason's own merge of two drafts, 2026-09-22, one bullet per value
+                        desc: rich(
+                            "Followed by linting and by **Convert inline footnotes to normal footnotes**, not by the numbered and named insert commands.\n" +
+                                "- **Keep as written** changes nothing, while converted inline footnotes get numbers.\n" +
+                                "- **Numbered** renumbers named footnotes by order of appearance.\n" +
+                                "- **Named** names numbered footnotes after the first meaningful word of their definition (`[^1]: the Smith paper` becomes `[^Smith]`, with `-2, -3` for repeats) and leaves already named ones alone.",
+                        ),
                         control: {
                             type: "dropdown",
                             key: "footnoteNaming",
@@ -333,7 +360,12 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                                 name: "Reindex",
                                 // Jason's pick A of three, 2026-09-22: the value before the action, so
                                 // the pairing reads left to right
-                                desc: rich("Linting also reindexes footnotes and reorders their definitions by order of appearance. **Preferred footnote naming style** decides what happens to names: under **Numbered**, named footnotes become numbers; under **Named**, numbered footnotes take names from their definitions; under **Keep as written**, names stay."),
+                                desc: rich(
+                                    "Linting also reindexes footnotes and reorders their definitions by order of appearance. **Preferred footnote naming style** decides what happens to names:\n" +
+                                        "- **Keep as written**: names stay.\n" +
+                                        "- **Numbered**: named footnotes become numbers.\n" +
+                                        "- **Named**: numbered footnotes take names from their definitions.",
+                                ),
                                 control: { type: "toggle", key: "lintReindex" },
                             },
                         ],

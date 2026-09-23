@@ -30,6 +30,7 @@ Rules that protect Jason's open notes and the app itself:
 7. **Wait for the view buffer to catch up.** `MarkdownView.data` lags a tick behind editor API changes, and `Editor.transaction` and `replaceRange` resolve positions against that lagging buffer, so after `setValue` wait for `view.data === editor.getValue()` before any command. Set note content through `editor.setValue`, never by overwriting the file, or the unsaved buffer merges garbage.
 8. **Record `app.isMobile` alongside every live-probe result.** Jason uses Obsidian's mobile emulation (`app.emulateMobile(bool)`, which reloads the window; the state survives `app:reload`). Vim does not exist on mobile, layouts and popups differ, so validate fixes in both modes. If the sandbox is stuck emulating mobile: `eval "code=app.emulateMobile(false)"`.
 9. **After heavy table-cell testing, run `app:reload`.** Ghost cell editors survive and poison later edits with "RangeError: Invalid change range" from stale sync-backs. `dev:debug on` plus `dev:console level=error` shows swallowed errors. The CLI is also flaky under parallel use (empty results, exit 127): pause and retry.
+10. **The settings window is a separate document** (Obsidian 1.13, seen 2026-09-22). `app.setting.open()` and `openTabById('obsidian-footnotes')` work, but `document.querySelectorAll('.setting-item')` in the main window finds nothing; query `app.setting.activeTab.containerEl` instead, and wait a second on the Node side after opening before reading. The plugin's `styles.css` applies there too.
 
 Two proven techniques:
 
