@@ -333,7 +333,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                                 name: "Reindex",
                                 // Jason's pick A of three, 2026-09-22: the value before the action, so
                                 // the pairing reads left to right
-                                desc: rich("Linting also renumbers footnotes and reorders their definitions by order of appearance. **Preferred footnote naming style** decides what happens to names: under **Numbered**, named footnotes become numbers; under **Named**, numbered footnotes take names from their definitions; under **Keep as written**, names stay."),
+                                desc: rich("Linting also reindexes footnotes and reorders their definitions by order of appearance. **Preferred footnote naming style** decides what happens to names: under **Numbered**, named footnotes become numbers; under **Named**, numbered footnotes take names from their definitions; under **Keep as written**, names stay."),
                                 control: { type: "toggle", key: "lintReindex" },
                             },
                         ],
