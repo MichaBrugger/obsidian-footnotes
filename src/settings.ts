@@ -183,7 +183,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                         name: "Preferred footnote naming style",
                         // Jason's pick A of three, 2026-09-22: lead with what follows the
                         // setting, since the insert hotkeys deliberately do not
-                        desc: rich("Followed by linting and by **Convert inline footnotes to normal footnotes**; the numbered and named hotkeys insert what they always did. **Keep as written** changes nothing. **Numbered** renumbers named footnotes by order of appearance. **Named** names numbered footnotes after the first meaningful word of their definition (`[^1]: the Smith paper` becomes `[^Smith]`, with `-2` for repeats) and leaves the already named alone."),
+                        desc: rich("Followed by linting and by **Convert inline footnotes to normal footnotes**; the numbered and named hotkeys insert what they always did. **Keep as written** changes nothing. **Numbered** renumbers named footnotes by order of appearance. **Named** names numbered footnotes after the first meaningful word of their definition (`[^1]: the Smith paper` becomes `[^Smith]`, with `-2, -3` for repeats) and leaves the already named alone."),
                         control: {
                             type: "dropdown",
                             key: "footnoteNaming",
@@ -331,7 +331,9 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                         items: [
                             {
                                 name: "Reindex",
-                                desc: rich("Linting also renumbers footnotes and reorders their definitions by order of appearance. Under **Preferred footnote naming style** it renumbers the named ones (**Numbered**) or names the numbered ones (**Named**)."),
+                                // Jason's pick A of three, 2026-09-22: the value before the action, so
+                                // the pairing reads left to right
+                                desc: rich("Linting also renumbers footnotes and reorders their definitions by order of appearance. **Preferred footnote naming style** decides what happens to names: under **Numbered**, named footnotes become numbers; under **Named**, numbered footnotes take names from their definitions; under **Keep as written**, names stay."),
                                 control: { type: "toggle", key: "lintReindex" },
                             },
                         ],
