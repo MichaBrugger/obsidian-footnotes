@@ -167,7 +167,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
             {
                 name: "Carry footnote definitions on copy, cut, and paste",
                 desc: rich(
-                    "Copying or cutting a footnote reference takes its definition along.\n" +
+                    "Copying or cutting a footnote reference takes its definition along so:\n" +
                         "- Pasting inside Obsidian puts the definitions where they belong, reusing duplicates and renaming names that clash.\n" +
                         "- Pasting outside Obsidian leaves them after the pasted text.",
                 ),
@@ -187,10 +187,10 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                         // Jason's pick A of three, 2026-09-21: no language list, people
                         // know what they want; the README keeps the conventions
                         desc: rich(
-                            "Where the footnote reference goes relative to following punctuation, for new footnotes inserted at the end of the word, converted selections, and linting.\n" +
-                                "- **After punctuation**: `word.[^1]`.\n" +
-                                "- **Before punctuation**: `word[^1].`.\n" +
-                                "- **Don't move**: the reference stays at the end of the word.\n" +
+                            "Where the footnote reference goes relative to following punctuation, for new footnotes inserted at the end of the word, converted selections, and linting:\n" +
+                                "- **After punctuation**: `word.[^1]`\n" +
+                                "- **Before punctuation**: `word[^1].`\n" +
+                                "- **Don't move**: the reference stays at the end of the word\n" +
                                 "The first two always step over closing quotation marks and brackets; **Don't move** steps over nothing.",
                         ),
                         control: {
@@ -217,9 +217,9 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                         // Jason's own merge of two drafts, 2026-09-22, one bullet per value
                         desc: rich(
                             "Followed by linting and by **Convert inline footnotes to normal footnotes**, not by the numbered and named insert commands.\n" +
-                                "- **Keep as written** changes nothing, while converted inline footnotes get numbers.\n" +
-                                "- **Numbered** renumbers named footnotes by order of appearance.\n" +
-                                "- **Named** names numbered footnotes after the first meaningful word of their definition (`[^1]: the Smith paper` becomes `[^Smith]`, with `-2, -3` for repeats) and leaves already named ones alone.",
+                                "- **Keep as written**: changes nothing, while converted inline footnotes get numbers\n" +
+                                "- **Numbered**: renumbers named footnotes by order of appearance\n" +
+                                "- **Named**: names numbered footnotes after the first meaningful word of their definition (`[^1]: the Smith paper` becomes `[^Smith]`, with `-2, -3` for repeats) and leaves already named ones alone",
                         ),
                         control: {
                             type: "dropdown",
@@ -376,10 +376,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                                 // Jason's pick A of three, 2026-09-22: the value before the action, so
                                 // the pairing reads left to right
                                 desc: rich(
-                                    "Linting also reindexes footnotes and reorders their definitions by order of appearance. **Preferred footnote naming style** decides what happens to names:\n" +
-                                        "- **Keep as written**: names stay.\n" +
-                                        "- **Numbered**: named footnotes become numbers.\n" +
-                                        "- **Named**: numbered footnotes take names from their definitions.",
+                                    "Linting also reindexes footnotes and reorders their definitions by order of appearance. **Preferred footnote naming style** decides what happens to names.",
                                 ),
                                 control: { type: "toggle", key: "lintReindex" },
                             },
