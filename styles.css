@@ -82,13 +82,16 @@
 /* A bullet list inside a setting description (the rich() helper in
    settings.ts turns "- " lines into one): Obsidian's description row has
    no list styling of its own, so the list keeps its indent modest and its
-   spacing tight, phone width included */
+   spacing tight, phone width included. Sizes come from Obsidian's own
+   spacing variables, as the plugin guidelines ask, so themes can retune
+   them (checked against docs.obsidian.md/Plugins/Releasing/Plugin+guidelines,
+   2026-09-22) */
 .footnote-setting-list {
-    margin: 0.25em 0 0 0;
-    padding-left: 1.2em;
+    margin: var(--size-4-1) 0 0 0;
+    padding-left: var(--size-4-6);
 }
 .footnote-setting-list li {
-    margin: 0.15em 0;
+    margin: var(--size-2-1) 0;
 }
 
 /* the embed inherits the vault's "show line numbers" setting and would

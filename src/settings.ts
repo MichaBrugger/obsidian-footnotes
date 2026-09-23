@@ -166,7 +166,11 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
             },
             {
                 name: "Carry footnote definitions on copy, cut, and paste",
-                desc: rich("Copying or cutting a footnote reference takes its definition along. Pasting inside Obsidian puts the definitions where they belong, reusing duplicates and renaming names that clash; pasting outside Obsidian leaves them after the pasted text."),
+                desc: rich(
+                    "Copying or cutting a footnote reference takes its definition along.\n" +
+                        "- Pasting inside Obsidian puts the definitions where they belong, reusing duplicates and renaming names that clash.\n" +
+                        "- Pasting outside Obsidian leaves them after the pasted text.",
+                ),
                 control: { type: "toggle", key: "carryFootnotesOnCopy" },
             },
             {
@@ -182,7 +186,13 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                         name: "Placement relative to punctuation",
                         // Jason's pick A of three, 2026-09-21: no language list, people
                         // know what they want; the README keeps the conventions
-                        desc: rich("Where the footnote reference goes relative to following punctuation: **After punctuation** (`word.[^1]`), **Before punctuation** (`word[^1].`), or **Don't move**. Applies to new footnotes inserted at the end of the word, to converted selections, and to linting. Under **After punctuation** and **Before punctuation**, closing quotation marks and brackets are always stepped over; **Don't move** steps over nothing."),
+                        desc: rich(
+                            "Where the footnote reference goes relative to following punctuation, for new footnotes inserted at the end of the word, converted selections, and linting.\n" +
+                                "- **After punctuation**: `word.[^1]`.\n" +
+                                "- **Before punctuation**: `word[^1].`.\n" +
+                                "- **Don't move**: the reference stays at the end of the word.\n" +
+                                "The first two always step over closing quotation marks and brackets; **Don't move** steps over nothing.",
+                        ),
                         control: {
                             type: "dropdown",
                             key: "footnotePlacement",
@@ -219,7 +229,12 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                     },
                     {
                         name: "Per-note footnote prefix",
-                        desc: rich("Footnotes use the note's `footnote-prefix` property: with `footnote-prefix: 2-`, the numbered command inserts `[^2-1]`, `[^2-2]`, and so on, and the named command prefills `[^2-]`. Useful when chapter notes merge into one document. Set it with the **Set footnote prefix** command."),
+                        desc: rich(
+                            "Footnotes use the note's `footnote-prefix` property, set with the **Set footnote prefix** command. With `footnote-prefix: 2-`:\n" +
+                                "- The numbered command inserts `[^2-1]`, `[^2-2]`, and so on.\n" +
+                                "- The named command prefills `[^2-]`.\n" +
+                                "Useful when chapter notes merge into one document.",
+                        ),
                         control: { type: "toggle", key: "enableFootnotePrefix" },
                     },
                 ],
