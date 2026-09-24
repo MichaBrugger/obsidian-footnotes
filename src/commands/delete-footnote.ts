@@ -83,7 +83,12 @@ export function deleteFootnoteEverywhere(markdown: string, name: string): Delete
     // model where such a definition ends, so one that runs on to another
     // line (anything below it that is not blank, the end of the note, or a
     // new list item) is refused with a reason, as the rename command
-    // refuses every in-item definition (Jason's ruling 1, 2026-09-20).
+    // refuses every in-item definition (Jason's ruling 1, 2026-09-20). On
+    // a marker line only the definition text goes and the bullet stays, an
+    // empty item, because that is what Obsidian's own delete leaves
+    // (Jason, 2026-09-24, sheet 19); a label indented under the item has
+    // no marker of its own, so its whole line goes.
+    const trimmed = new Map<number, number>();
     for (const hit of inItemDefinitionLabels(lines, scan, masked, starts)) {
         if (hit.name.toLowerCase() !== folded) continue;
         const endsHere =
@@ -96,7 +101,12 @@ export function deleteFootnoteEverywhere(markdown: string, name: string): Delete
                 reason: `Nothing was deleted: ${quotedReference(name)} is defined inside a list item over more than one line, which the plugin does not delete. Delete it by hand.`,
             };
         }
-        blocks.push({ name: hit.name, start: hit.line, end: hit.line });
+        const marker = /^ {0,3}(?:[-+*]|\d{1,9}[.)]) +/.exec(lines[hit.line]);
+        if (marker && lines[hit.line].startsWith("[^", marker[0].length)) {
+            trimmed.set(hit.line, marker[0].length);
+        } else {
+            blocks.push({ name: hit.name, start: hit.line, end: hit.line });
+        }
     }
     // A label inside a blockquote or callout ("> [^x]: ...") is a real
     // definition everywhere else in the plugin but never forms a block, so
@@ -144,6 +154,8 @@ export function deleteFootnoteEverywhere(markdown: string, name: string): Delete
     let references = 0;
     const cutLines = lines.map((line, i) => {
         if (scan.isProtected[i] || cut.has(i)) return line;
+        const keep = trimmed.get(i);
+        if (keep !== undefined) return line.slice(0, keep);
         // rightmost first, so that cutting one keeps the offsets of the
         // ones before it
         const hits = referenceOccurrences(line, masked[i], starts[i])
@@ -152,7 +164,8 @@ export function deleteFootnoteEverywhere(markdown: string, name: string): Delete
         references += hits.length;
         return hits.reduce((kept, { start, end }) => cutOne(kept, start, end), line);
     });
-    if (references === 0 && blocks.length === 0) return { kind: "nothing" };
+    const definitions = blocks.length + trimmed.size;
+    if (references === 0 && definitions === 0) return { kind: "nothing" };
 
     // The promise the two orphan rules make, kept here too: a deletion
     // that changes how Obsidian reads a line it was not asked to touch is
@@ -179,7 +192,7 @@ export function deleteFootnoteEverywhere(markdown: string, name: string): Delete
         kind: "deleted",
         markdown: restoreEol(out.join("\n"), eol),
         references,
-        definitions: blocks.length,
+        definitions,
     };
 }
 

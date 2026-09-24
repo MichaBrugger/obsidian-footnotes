@@ -15,7 +15,7 @@ Fixtures: a footnote used twice[^twice] and again[^twice], a right-click one[^me
 - [ ] One undo brings both references and the definition back together, caret where it was
 - [ ] Caret inside the `[^twice]:` label at the bottom: the same deletion from the definition's end
 - [ ] Caret inside `[^chain]`: it goes, and a lint alert then names `[^inner]` as a definition nothing references (the deleted body was its only citation). Every delete in this section is followed by the lint alerts, which is why the nested-footnote alert also speaks while `[^chain]` exists: its body cites `[^inner]`, and the plugin calls a reference inside a definition body a nested footnote (ADR 1)
-- [ ] Caret inside `[^item]`: the reference and the definition line inside the list go together, as Obsidian's own delete does (a definition inside a list item that ran over more than one line would be refused instead)
+- [ ] Caret inside `[^item]`: the reference and the definition text inside the list go together, and the bullet in front of the definition stays as an empty item, exactly as Obsidian's own delete leaves it (a definition inside a list item that ran over more than one line would be refused instead)
 - [ ] Right-click ON `[^menu]`: the menu shows **Delete footnote everywhere** with your new icon, in the same section as **Rename footnote**, and the menu is no wider than before; choosing it deletes with the same toast
 - [ ] Right-click the first `[^twice]` and choose Obsidian's OWN **Delete footnote and reference**: only that reference and the definition go, the second `[^twice]` is left pointing at nothing. This is the core bug the command exists to fix; undo
 
