@@ -209,6 +209,19 @@ describe("cut", () => {
         expect(doc.lines).toEqual(["b[^1]", "", "[^1]: one"]);
     });
 
+    // Jason, 2026-09-25: a cut that takes the last definition with it
+    // empties the section like a conversion does, so the Remove empty
+    // section heading setting applies here too
+    it("takes the empty section heading with the last definition when the setting is on, and leaves it by default", () => {
+        const on = editor(["a[^1] b", "", "# Footnotes", "", "[^1]: one"], { line: 0, ch: 0 }, { line: 0, ch: 6 });
+        handleCut(fakePlugin({ carryFootnotesOnCopy: true, enableFootnoteSectionHeading: true, footnoteSectionHeading: "# Footnotes", removeEmptySectionHeading: true }, on), clipboardEvent() as never);
+        expect(on.lines).toEqual(["b"]);
+        expect(on.transactions).toBe(1);
+        const off = editor(["a[^1] b", "", "# Footnotes", "", "[^1]: one"], { line: 0, ch: 0 }, { line: 0, ch: 6 });
+        handleCut(fakePlugin({ carryFootnotesOnCopy: true, enableFootnoteSectionHeading: true, footnoteSectionHeading: "# Footnotes" }, off), clipboardEvent() as never);
+        expect(off.lines).toEqual(["b", "", "# Footnotes"]);
+    });
+
     it("leaves a cut that needs no definition to the editor", () => {
         const doc = editor(["plain text"], { line: 0, ch: 0 }, { line: 0, ch: 5 });
         const event = clipboardEvent();

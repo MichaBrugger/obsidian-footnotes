@@ -271,7 +271,7 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                         name: "Remove empty section heading",
                         // off by default (Jason, 2026-09-25): a template's
                         // References heading should stay even while empty
-                        desc: rich("When **Convert normal footnotes to inline footnotes**, **Delete footnote everywhere**, or linting leaves no footnotes under the section heading, and nothing else below it, the heading goes too. Leave it off if your template always carries the heading."),
+                        desc: rich("When **Convert normal footnotes to inline footnotes**, **Delete footnote everywhere**, a cut, or linting leaves no footnotes under the section heading, and nothing else below it, the heading goes too. Leave it off if your template always carries the heading."),
                         control: {
                             type: "toggle",
                             key: "removeEmptySectionHeading",

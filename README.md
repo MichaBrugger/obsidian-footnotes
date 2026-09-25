@@ -200,7 +200,7 @@ Notes without the property keep normal `[^1]`, `[^2]`, … numbering. A prefix f
 - **Expand selections to whole words** *(on by default)*: the selection twin of the above; a selection converted into a footnote grows to whole words first.
 - **Enable section heading** *(off by default)*: automatically adds a heading (e.g. `# Footnotes`) above your footnote definitions. The heading text is fully customizable, can span multiple lines, and if it already exists in the note it's reused instead of duplicated.
 - **Trim blank lines** *(on by default)*: removes stray blank lines from the end of the note when the first footnote is added.
-- **Remove empty section heading** *(off by default)*: when **Convert normal footnotes to inline footnotes**, **Delete footnote everywhere**, or linting leaves no footnotes under the section heading and nothing else below it, the heading goes too. Off, the heading stays, for templates that always carry one.
+- **Remove empty section heading** *(off by default)*: when **Convert normal footnotes to inline footnotes**, **Delete footnote everywhere**, a cut that carries the last definition away, or linting leaves no footnotes under the section heading and nothing else below it, the heading goes too. Off, the heading stays, for templates that always carry one.
 
 ## More info
 

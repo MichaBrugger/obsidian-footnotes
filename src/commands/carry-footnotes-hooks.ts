@@ -8,7 +8,7 @@ import { codeMirrorViewOf, readingViewActive, viewEditor } from "../editor/obsid
 import { activeTableCellEditor } from "../editor/table-cursor";
 import { replaceMinimal } from "../editor/write-back";
 import { noticeLintAlerts } from "../linting/lint-alerts";
-import { lintAfterFootnoteCreation } from "../linting/linter";
+import { lintAfterFootnoteCreation, withEmptySectionHeadingRemoved } from "../linting/linter";
 import { quotedReference } from "../parsing/footnote-grammar";
 import { normalizeEol, removeLineRanges, restoreEol } from "../parsing/markdown-scan";
 import {
@@ -156,7 +156,10 @@ export function handleCut(plugin: FootnotePlugin, event: ClipboardEvent): void {
         start: block.start < from.line ? block.start : block.start - shift,
         end: block.end < from.line ? block.end : block.end - shift,
     }));
-    const after = restoreEol(removeLineRanges(joined, ranges).join("\n"), eol);
+    // a cut that takes the last definition with it empties the section,
+    // so the section heading goes too when the setting says so (Jason,
+    // 2026-09-25)
+    const after = withEmptySectionHeadingRemoved(plugin, restoreEol(removeLineRanges(joined, ranges).join("\n"), eol));
     replaceMinimal(doc, before, after, plugin.app.workspace.getActiveViewOfType(MarkdownView) ?? undefined);
     doc.setCursor(from);
     if (orphaned.length > 0) {
