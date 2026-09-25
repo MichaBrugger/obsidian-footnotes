@@ -26,6 +26,7 @@ import { fixLazyDefinitionsRule } from "./rules/fix-lazy-definitions";
 import { footnoteAfterPunctuationRule } from "./rules/footnote-after-punctuation";
 import { moveFootnotesToTheBottomRule } from "./rules/move-footnotes-to-the-bottom";
 import { reIndexFootnotesRule, ReindexOptions } from "./rules/re-index-footnotes";
+import { removeEmptySectionHeading } from "./rules/remove-empty-section-heading";
 import { removeOrphanedDefinitionsRule } from "./rules/remove-orphaned-definitions";
 import { removeOrphanedReferencesRule } from "./rules/remove-orphaned-references";
 import { mergeDuplicateDefinitionsRule } from "./rules/merge-duplicate-definitions";
@@ -95,12 +96,27 @@ export function lintOptionsFromSettings(
         applyNotePrefix:
             plugin.settings.enableFootnotePrefix &&
             plugin.settings.lintApplyPrefix,
+        removeEmptySectionHeading: plugin.settings.removeEmptySectionHeading,
     };
+}
+
+/**
+ * `markdown` with its footnote section heading removed when the section
+ * is empty and the "Remove empty section heading" setting asks for it;
+ * otherwise unchanged. The commands that can empty the section (Delete
+ * footnote everywhere, the normal-to-inline conversion) run their result
+ * through this before writing it back (Jason's ask, 2026-09-25).
+ */
+export function withEmptySectionHeadingRemoved(plugin: FootnotePlugin, markdown: string): string {
+    if (!plugin.settings.removeEmptySectionHeading) return markdown;
+    return removeEmptySectionHeading(markdown, configuredSectionHeading(plugin));
 }
 
 export interface LintOptions {
     /** Passed through to moveFootnoteDefinitionsToBottom (default none). */
     sectionHeading?: string;
+    /** Remove the section heading when the lint leaves nothing under it (default off; the Remove empty section heading setting). */
+    removeEmptySectionHeading?: boolean;
     /** Run footnoteAfterPunctuation (default on). */
     fixPunctuation?: boolean;
     /** Which side of the punctuation the rule puts references on (default
@@ -304,6 +320,11 @@ export function lintFootnotes(
                 // both prefix behaviours.
                 prefix: validPrefix,
             });
+        }
+        // Last of all, once every rule has had its say about what stays:
+        // a heading with nothing left under it goes, when asked
+        if (options.removeEmptySectionHeading && options.sectionHeading) {
+            result = removeEmptySectionHeading(result, options.sectionHeading);
         }
         return result;
     });

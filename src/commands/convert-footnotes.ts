@@ -27,7 +27,7 @@ import { showNotice } from "../editor/notice";
 import { runOutsideTableCell } from "../editor/table-cursor";
 import { replaceMinimal } from "../editor/write-back";
 import { noticeLintAlerts } from "../linting/lint-alerts";
-import { lintAfterFootnoteCreation } from "../linting/linter";
+import { lintAfterFootnoteCreation, withEmptySectionHeadingRemoved } from "../linting/linter";
 import { computeNextFootnoteNumber, definitionLabel, nameForBody, quotedReference } from "../parsing/footnote-grammar";
 import { activeFootnotePrefix, footnotePrefixFromEditor } from "../parsing/footnote-prefix";
 import { buildDefinitionAppend, seedDefinitionBody } from "./definition-append";
@@ -438,7 +438,10 @@ export async function convertNormalToInlineCommand(plugin: FootnotePlugin) {
                 return;
             }
             const mdView = plugin.app.workspace.getActiveViewOfType(MarkdownView) ?? undefined;
-            replaceMinimal(doc, before, result.markdown, mdView);
+            // the section heading goes when every definition became inline
+            // and the setting says so (Jason, 2026-09-25)
+            const markdown = withEmptySectionHeadingRemoved(plugin, result.markdown);
+            replaceMinimal(doc, before, markdown, mdView);
             const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
             showNotice(
                 `Converted ${plural(result.converted, "footnote")} into inline footnotes at ${plural(result.references, "reference")}` +
@@ -449,7 +452,7 @@ export async function convertNormalToInlineCommand(plugin: FootnotePlugin) {
                     skippedText,
                 result.skipped.length > 0 ? 8000 : undefined,
             );
-            noticeLintAlerts(plugin, result.markdown);
+            noticeLintAlerts(plugin, markdown);
         });
     }, "Move the cursor into the note's text to convert its footnotes.");
 }

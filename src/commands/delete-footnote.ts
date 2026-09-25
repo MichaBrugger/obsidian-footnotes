@@ -27,6 +27,7 @@ import { showNotice } from "../editor/notice";
 import { runOutsideTableCell } from "../editor/table-cursor";
 import { replaceMinimal } from "../editor/write-back";
 import { noticeLintAlerts } from "../linting/lint-alerts";
+import { withEmptySectionHeadingRemoved } from "../linting/linter";
 import { withEditableEditor } from "./insert-or-navigate-footnotes";
 import { renameTargetAtCursor, renameTargetInSelection } from "./rename-footnote";
 
@@ -251,9 +252,12 @@ export async function deleteFootnote(plugin: FootnotePlugin) {
                         return;
                     case "deleted": {
                         const mdView = plugin.app.workspace.getActiveViewOfType(MarkdownView) ?? undefined;
-                        replaceMinimal(doc, before, plan.markdown, mdView);
+                        // the section heading goes with the last footnote when
+                        // the setting says so (Jason, 2026-09-25)
+                        const markdown = withEmptySectionHeadingRemoved(plugin, plan.markdown);
+                        replaceMinimal(doc, before, markdown, mdView);
                         showNotice(deleteFootnoteNotice(target, plan.references, plan.definitions));
-                        noticeLintAlerts(plugin, plan.markdown);
+                        noticeLintAlerts(plugin, markdown);
                     }
                 }
             });

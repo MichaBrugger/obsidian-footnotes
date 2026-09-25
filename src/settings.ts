@@ -44,6 +44,8 @@ export interface FootnotePluginSettings {
     footnoteSectionHeading: string;
 
     enableRemoveBlankLastLines: boolean;
+    /** Remove the section heading when a plugin action leaves no footnotes under it (Jason, 2026-09-25; off by default, since templates carry a heading that should stay). */
+    removeEmptySectionHeading: boolean;
 
     /** Linting deletes references that have no definition. While this is
      * off, it raises a lint alert about them instead: an orphan is never
@@ -93,6 +95,7 @@ export const DEFAULT_SETTINGS: FootnotePluginSettings = {
     footnoteSectionHeading: "# Footnotes",
 
     enableRemoveBlankLastLines: true,
+    removeEmptySectionHeading: false,
 
     lintDeleteOrphanedReferences: false,
     lintDeleteOrphanedDefinitions: false,
@@ -263,6 +266,17 @@ export class FootnotePluginSettingTab extends PluginSettingTab {
                         name: "Trim blank lines",
                         desc: rich("Remove blank lines from the end of the note when the first footnote (and its section heading, if enabled) is added at the bottom."),
                         control: { type: "toggle", key: "enableRemoveBlankLastLines" },
+                    },
+                    {
+                        name: "Remove empty section heading",
+                        // off by default (Jason, 2026-09-25): a template's
+                        // References heading should stay even while empty
+                        desc: rich("When **Convert normal footnotes to inline footnotes**, **Delete footnote everywhere**, or linting leaves no footnotes under the section heading, and nothing else below it, the heading goes too. Leave it off if your template always carries the heading."),
+                        control: {
+                            type: "toggle",
+                            key: "removeEmptySectionHeading",
+                            disabled: () => !this.plugin.settings.enableFootnoteSectionHeading,
+                        },
                     },
                 ],
             },
