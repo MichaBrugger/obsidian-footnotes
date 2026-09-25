@@ -233,6 +233,29 @@ describe("the command entry", () => {
         expect(messages()).toContain('Deleted "[^n]" everywhere: 2 references and 1 definition.');
     });
 
+    // a zero count is left out of the toast, as the paste toast leaves
+    // its zeros out (Jason, 2026-09-25)
+    it("says only the non-zero count when a footnote had no definition, or no reference", async () => {
+        resetNotices();
+        const orphanReference = fakeEditor(["a[^n] b"], {
+            wholeDoc: true,
+            edits: true,
+            cursor: { line: 0, ch: 3 },
+            selection: { anchor: { line: 0, ch: 3 }, head: { line: 0, ch: 3 } },
+        });
+        await deleteFootnote(fakePlugin({}, orphanReference));
+        expect(messages()).toContain('Deleted "[^n]" everywhere: 1 reference.');
+        resetNotices();
+        const orphanDefinition = fakeEditor(["p", "", "[^n]: n"], {
+            wholeDoc: true,
+            edits: true,
+            cursor: { line: 2, ch: 3 },
+            selection: { anchor: { line: 2, ch: 3 }, head: { line: 2, ch: 3 } },
+        });
+        await deleteFootnote(fakePlugin({}, orphanDefinition));
+        expect(messages()).toContain('Deleted "[^n]" everywhere: 1 definition.');
+    });
+
     it("explains itself when the caret is on nothing deletable", async () => {
         resetNotices();
         const doc = fakeEditor(["plain prose here"], {

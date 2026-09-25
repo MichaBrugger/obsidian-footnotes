@@ -199,10 +199,14 @@ export function deleteFootnoteEverywhere(markdown: string, name: string): Delete
 export const DeleteTargetNotice =
     "Place the cursor on a footnote reference or definition to delete it.";
 
-/** The toast after a deletion: what went, in numbers. */
+/** The toast after a deletion: what went, in numbers. A zero count is left out rather than said, as the paste toast does (Jason, 2026-09-25). */
 function deleteFootnoteNotice(name: string, references: number, definitions: number): string {
     const count = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
-    return `Deleted ${quotedReference(name)} everywhere: ${count(references, "reference")} and ${count(definitions, "definition")}.`;
+    const went = [
+        references > 0 ? count(references, "reference") : null,
+        definitions > 0 ? count(definitions, "definition") : null,
+    ].filter((part): part is string => part !== null);
+    return `Deleted ${quotedReference(name)} everywhere: ${went.join(" and ")}.`;
 }
 
 /**
