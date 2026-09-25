@@ -1,9 +1,10 @@
+import { EditorView } from "@codemirror/view";
 import { Editor, EditorPosition, MarkdownView } from "obsidian";
 
 import type FootnotePlugin from "../main";
 import { docContext, listExistingFootnoteDefinitions } from "../editor/doc-context";
 import { showNotice } from "../editor/notice";
-import { readingViewActive, viewEditor } from "../editor/obsidian-internals";
+import { codeMirrorViewOf, readingViewActive, viewEditor } from "../editor/obsidian-internals";
 import { activeTableCellEditor } from "../editor/table-cursor";
 import { replaceMinimal } from "../editor/write-back";
 import { noticeLintAlerts } from "../linting/lint-alerts";
@@ -200,7 +201,67 @@ export function handlePaste(plugin: FootnotePlugin, event: ClipboardEvent, doc: 
     const [a, b] = [selections[0].anchor, selections[0].head];
     const [from, to] = a.line < b.line || (a.line === b.line && a.ch <= b.ch) ? [a, b] : [b, a];
     event.preventDefault();
+    landCarriedText(plugin, doc, from, to, body, carried, missing);
+    return true;
+}
 
+/**
+ * The same landing for text that arrives by another route than a paste
+ * event. On a phone, the keyboard's clipboard history (Gboard, Samsung
+ * Keyboard) commits the text through the input method, so no paste event
+ * fires and the editor-paste hook never sees it: the footnotes landed as
+ * plain text, definitions after the text (Jason's phone pass,
+ * 2026-09-25). CodeMirror reports such an insert to its input handlers,
+ * so this one looks at any inserted text that spans lines and ends in
+ * definition lines, and lands it the way a paste would, with the same
+ * toast and lint. `editorFor` turns the CodeMirror view into the Obsidian
+ * editor that owns it (the unit tests hand in the fake editor directly).
+ * Returns whether it took the insert over. A real paste never reaches
+ * here: CodeMirror handles those itself and the editor-paste hook covers
+ * them, so nothing is landed twice.
+ */
+export function carriedInputHandler(
+    plugin: FootnotePlugin,
+    editorFor: (view: EditorView) => Editor | null,
+): (view: EditorView, from: number, to: number, text: string) => boolean {
+    return (view, from, to, text) => {
+        if (!plugin.settings.carryFootnotesOnCopy || !text.includes("\n")) return false;
+        const { body, carried } = splitCarriedText(text);
+        if (carried.length === 0) return false;
+        const doc = editorFor(view);
+        if (!doc || activeTableCellEditor(doc)) return false;
+        landCarriedText(plugin, doc, doc.offsetToPos(from), doc.offsetToPos(to), body, carried, []);
+        return true;
+    };
+}
+
+/** The Obsidian editor whose CodeMirror view is `view`, or null when no open note owns it. */
+function editorOwning(plugin: FootnotePlugin, view: EditorView): Editor | null {
+    for (const leaf of plugin.app.workspace.getLeavesOfType("markdown")) {
+        const md = leaf.view;
+        if (!(md instanceof MarkdownView)) continue;
+        const editor = viewEditor(md);
+        if (editor && codeMirrorViewOf(editor) === view) return editor;
+    }
+    return null;
+}
+
+/**
+ * Lands `body` in place of the text between `from` and `to`, and the
+ * `carried` definitions where a creation press would put a definition,
+ * merged and renamed to fit the note, all in one transaction; then the
+ * toast with the counts, and the lint or its alerts. `missing` names the
+ * references whose definitions could not be found at copy time.
+ */
+function landCarriedText(
+    plugin: FootnotePlugin,
+    doc: Editor,
+    from: EditorPosition,
+    to: EditorPosition,
+    body: string,
+    carried: CarriedDefinition[],
+    missing: string[],
+): void {
     const ctx = docContext(doc);
     const plan = planCarriedPaste(doc.getValue(), body, carried);
     const bodyLines = plan.body.split("\n");
@@ -258,7 +319,6 @@ export function handlePaste(plugin: FootnotePlugin, event: ClipboardEvent, doc: 
     if (lintAfterFootnoteCreation(plugin, false) === null && !plugin.settings.lintOnFootnoteCreation) {
         noticeLintAlerts(plugin, doc.getValue());
     }
-    return true;
 }
 
 /** A carried block's text after its label, continuation lines joined with newlines, the way seedDefinitionBody wants a body. */
@@ -282,5 +342,10 @@ export function installCarryFootnoteHooks(plugin: FootnotePlugin): void {
             if (evt.defaultPrevented) return;
             if (handlePaste(plugin, evt, editor)) evt.preventDefault();
         }),
+    );
+    // text a phone keyboard's clipboard history commits through the input
+    // method (see carriedInputHandler)
+    plugin.registerEditorExtension(
+        EditorView.inputHandler.of(carriedInputHandler(plugin, (view) => editorOwning(plugin, view))),
     );
 }

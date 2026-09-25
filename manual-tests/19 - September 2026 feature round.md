@@ -80,6 +80,7 @@ Open **19b - Paste target** in a second pane. Fixture paragraph: a paragraph wit
 
 - [ ] Long-press `[^menu]` to select it, tap the delete toolbar icon: the deletion happens and the toast fits the screen
 - [ ] Select text with a footnote, Copy from the long-press menu, paste into another note: the definition follows
+- [ ] Copy text with a footnote, copy something else, then paste the footnote text from the keyboard's clipboard history (Gboard or Samsung Keyboard): it lands through the same pipeline, definition appended and the paste toast shown, not as plain text with the definition after it (your finding of 2026-09-25)
 - [ ] Cut a phrase whose footnote only it uses: the definition leaves with it in one undo
 
 [^twice]: cited twice, one line

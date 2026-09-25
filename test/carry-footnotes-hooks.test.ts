@@ -4,6 +4,7 @@ import { fakeEditor } from "./helpers/fake-editor";
 import { fakePlugin } from "./helpers/fake-plugin";
 import { messages, resetNotices } from "./helpers/notices";
 import {
+    carriedInputHandler,
     carryRegister,
     handleCopy,
     handleCut,
@@ -152,6 +153,38 @@ describe("paste", () => {
         const destination = editor(["p"], { line: 0, ch: 1 });
         handlePaste(fakePlugin({ carryFootnotesOnCopy: true }, destination), clipboardEvent("a[^gone]") as never, destination);
         expect(messages().some((m) => m.includes('"[^gone]"') && m.includes("no definition"))).toBe(true);
+    });
+});
+
+describe("text that arrives through the input method (a phone keyboard's clipboard history)", () => {
+    // Jason's phone pass, 2026-09-25: copying a footnote, copying something
+    // else, then pasting the footnote from the Android keyboard's clipboard
+    // history landed it as plain text, definitions after the text. Such a
+    // paste is committed through the input method, so no paste event fires;
+    // CodeMirror reports it to input handlers instead, and this one lands
+    // it the way a paste would.
+    it("lands carried text inserted by the input method as a paste would", () => {
+        const doc = editor(["Existing[^1] text.", "", "[^1]: an existing one"], { line: 0, ch: "Existing[^1] text.".length });
+        const handle = carriedInputHandler(fakePlugin({ carryFootnotesOnCopy: true }, doc), () => doc);
+        const at = doc.posToOffset({ line: 0, ch: "Existing[^1] text.".length });
+        expect(handle({} as never, at, at, " more[^own] here\n\n[^own]: carried")).toBe(true);
+        expect(doc.lines).toEqual(["Existing[^1] text. more[^own] here", "", "[^1]: an existing one", "[^own]: carried"]);
+        expect(messages()).toContain("Pasted with 1 footnote definition: 1 added.");
+    });
+
+    it("leaves ordinary typing, and inserted text without definition lines, to the editor", () => {
+        const doc = editor(["a"], { line: 0, ch: 1 });
+        const handle = carriedInputHandler(fakePlugin({ carryFootnotesOnCopy: true }, doc), () => doc);
+        expect(handle({} as never, 1, 1, "b")).toBe(false);
+        expect(handle({} as never, 1, 1, "two\nlines")).toBe(false);
+        expect(doc.lines).toEqual(["a"]);
+    });
+
+    it("stays out while carrying is off", () => {
+        const doc = editor(["a"], { line: 0, ch: 1 });
+        const handle = carriedInputHandler(fakePlugin({ carryFootnotesOnCopy: false }, doc), () => doc);
+        expect(handle({} as never, 1, 1, "x[^n]\n\n[^n]: n")).toBe(false);
+        expect(doc.lines).toEqual(["a"]);
     });
 });
 
