@@ -128,6 +128,9 @@ async function pollUntil(desc, code, predicate, timeoutMs = 6000) {
 // of Jason's working test sheets, 2026-09-08). Resolving by path makes a
 // wrong-tab run fail loudly instead.
 const NOTE_PATH = `${NOTE}.md`;
+// the vault folder on disk (the plugin dir sits under its .obsidian), for a
+// fixture too long to travel through one CLI argument
+const VAULT_DIR = process.cwd().slice(0, process.cwd().indexOf(".obsidian"));
 const EDITOR =
     `(() => { let leaf = null; app.workspace.iterateAllLeaves((l) => { ` +
     `if (l.view && l.view.file && l.view.file.path === ${jsLiteral(NOTE_PATH)} && l.view.editor) leaf = l; }); ` +
@@ -1703,37 +1706,63 @@ async function main() {
         // replacement, which drops that pane's caret to the top of the note;
         // the plugin now notes the caret and scroll of every other pane on
         // the note before it writes and puts them back once the copy lands.
+        // Jason's second report the same day: the caret came back but its
+        // line sat near the bottom of the window. Lines that wrap in a
+        // narrow pane have only estimated heights until drawn, and the copy
+        // resets the estimates, so a pixel scroll lands on the wrong line;
+        // the restore now anchors on the line at the top edge. Hence a
+        // VERTICAL split, long lines of varied length, and the check is the
+        // line at the top edge plus the caret's place in the window.
         resetSettings({ footnoteNaming: "numbered" });
-        const filler = Array.from({ length: 80 }, (_, i) => `Filler line ${i + 1} of the long body.`).join("\n");
+        const filler = Array.from({ length: 70 }, (_, i) => `Filler line ${i + 1} of the long body, padded so it wraps in a narrow pane: ${"lorem ipsum dolor sit amet ".repeat(2 + (i % 5))}end.`).join("\n");
         const before = `Top line with a named footnote[^alpha] here.\n\n${filler}\n\n[^alpha]: the definition at the bottom`;
         const after = before.replace(/\[\^alpha\]/g, "[^1]");
-        await setupNote(before);
-        const lastLine = before.split("\n").length - 1;
+        // the fixture is far too long for one CLI argument (a long eval is
+        // chunked on the socket and throws a JSON error in Obsidian's main
+        // process), so it goes through a dotfile the vault ignores
+        const fixtureFile = ".smoke-fixture.txt";
+        writeFileSync(join(VAULT_DIR, fixtureFile), before, "utf8");
+        await setupNote("fixture pending");
+        action(`(async () => { const text = await app.vault.adapter.read(${jsLiteral(fixtureFile)}); (${EDITOR}).editor.setValue(text); })();`);
+        await waitForEditorText(before);
+        await pollUntil("view data buffer to sync", `(${EDITOR}).data`, (v) => v === before);
+        const caretLine = 40;
         // every pane on the smoke note, in workspace order: the original first
         const PANES = `app.workspace.getLeavesOfType('markdown').filter((l) => l.view.file && l.view.file.path === ${jsLiteral(NOTE_PATH)})`;
         action(`(async () => { const f = app.vault.getAbstractFileByPath(${jsLiteral(NOTE_PATH)}); const b = app.workspace.getLeaf('split', 'vertical'); await b.openFile(f); })();`);
         await pollUntil("a second pane on the smoke note", `(${PANES}).length`, (v) => v === 2);
         try {
-            // pane B: caret on the last line, scrolled to the bottom; pane A
-            // active, with its caret near the top
+            // pane B: caret on line 40, that line centred in the window (a
+            // CodeMirror scroll request, re-applied until it holds); pane A
+            // active with its caret near the top
             action(
-                `const [a, b] = ${PANES}; b.view.editor.setCursor({line:${lastLine}, ch:0}); b.view.editor.scrollTo(0, 100000); ` +
+                `const [a, b] = ${PANES}; const cm = b.view.editor.cm; const pos = b.view.editor.posToOffset({line:${caretLine}, ch:4}); ` +
+                `cm.dispatch({ selection: { anchor: pos, head: pos }, effects: cm.constructor.scrollIntoView(pos, { y: 'center' }) }); ` +
                 `a.view.editor.setCursor({line:5, ch:3}); app.workspace.setActiveLeaf(a, {focus:true});`,
             );
-            await sleep(300);
-            const paneB = `(() => { const b = (${PANES})[1]; return { cursor: b.view.editor.getCursor(), top: Math.round(b.view.editor.getScrollInfo().top), text: b.view.editor.getValue() }; })()`;
+            await sleep(500);
+            // where pane B is: its caret, the line at the top edge of its
+            // window and how far into that line the edge sits, and where the
+            // caret line sits in the window
+            const paneB = `(() => { const b = (${PANES})[1]; const ed = b.view.editor; const cm = ed.cm; const st = cm.scrollDOM.scrollTop; const blk = cm.lineBlockAtHeight(st); const c = cm.coordsAtPos(cm.state.selection.main.head); const box = cm.scrollDOM.getBoundingClientRect(); ` +
+                `return { cursor: ed.getCursor(), topLine: cm.state.doc.lineAt(blk.from).number - 1, topOffset: Math.round(st - blk.top), caretY: c ? Math.round(c.top - box.top) : null, text: ed.getValue() }; })()`;
             const was = readJson(paneB);
-            if (was.cursor.line !== lastLine || was.top < 100) throw new Error(`pane B not arranged: ${jsLiteral({ cursor: was.cursor, top: was.top })}`);
+            if (was.cursor.line !== caretLine || was.caretY === null || was.topLine < 5) throw new Error(`pane B not arranged: ${jsLiteral({ cursor: was.cursor, topLine: was.topLine, caretY: was.caretY })}`);
             action(`app.commands.executeCommandById('${CMD_LINT}');`);
             await pollUntil("the lint copied into pane B", `(${paneB}).text`, (v) => v === after);
-            // the plugin's restore runs a beat after the copy lands
-            await sleep(400);
+            // the plugin's restore runs a beat after the copy lands, and its
+            // pixel correction a beat after that
+            await sleep(600);
             const now = readJson(paneB);
-            if (now.cursor.line !== lastLine) throw new Error(`pane B's caret moved to ${jsLiteral(now.cursor)}`);
-            if (Math.abs(now.top - was.top) > 40) throw new Error(`pane B scrolled from ${was.top} to ${now.top}`);
+            if (now.cursor.line !== caretLine) throw new Error(`pane B's caret moved to ${jsLiteral(now.cursor)}`);
+            if (now.topLine !== was.topLine || Math.abs(now.topOffset - was.topOffset) > 3) {
+                throw new Error(`pane B's top edge moved from line ${was.topLine} (+${was.topOffset}px) to line ${now.topLine} (+${now.topOffset}px)`);
+            }
+            if (Math.abs(now.caretY - was.caretY) > 3) throw new Error(`pane B's caret line moved from ${was.caretY}px to ${now.caretY}px down the window`);
         } finally {
             action(`const panes = ${PANES}; if (panes[1]) panes[1].detach();`);
             await pollUntil("the second pane closed", `(${PANES}).length`, (v) => v === 1);
+            unlinkSync(join(VAULT_DIR, fixtureFile));
         }
     });
 

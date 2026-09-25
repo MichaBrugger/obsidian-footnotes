@@ -1,6 +1,8 @@
+import { EditorView } from "@codemirror/view";
 import { Editor, EditorPosition, MarkdownView } from "obsidian";
 
 import { lineDiffChanges, lineMapper, mapFoldLines } from "./document-diff";
+import { codeMirrorViewOf } from "./obsidian-internals";
 
 // Writing a whole new text for the note back into the editor as the
 // smallest set of edits, keeping folds and the caret. Moved out of
@@ -46,11 +48,20 @@ export function replaceMinimal(doc: Editor, before: string, after: string, mdVie
     if (otherPanes.length > 0) restoreOtherPanes(otherPanes, after, lineMapper(changes, before));
 }
 
-/** Another pane's place in the same note: its editor, its selection (anchor and head), and how far it is scrolled. */
+/**
+ * Another pane's place in the same note: its editor, its selection (anchor
+ * and head), and where it is scrolled to, kept two ways. The line at the
+ * top edge of the window and how many pixels into that line the edge
+ * sits is the one that survives a rewrite (see restoreOtherPanes); the
+ * pixel scroll is the fallback where the CodeMirror view is out of reach.
+ */
 interface PanePlace {
     editor: Editor;
+    cm: EditorView | undefined;
     anchor: EditorPosition;
     head: EditorPosition;
+    topLine: number;
+    topOffset: number;
     scroll: { top: number; left: number };
 }
 
@@ -70,10 +81,22 @@ function otherPanesOn(mdView: MarkdownView): PanePlace[] {
         const view = leaf.view;
         if (!(view instanceof MarkdownView) || view === mdView || view.file?.path !== path) continue;
         const editor = view.editor;
+        const cm = codeMirrorViewOf(editor);
+        let topLine = 0;
+        let topOffset = 0;
+        if (cm) {
+            const scrollTop = cm.scrollDOM.scrollTop;
+            const block = cm.lineBlockAtHeight(scrollTop);
+            topLine = cm.state.doc.lineAt(block.from).number - 1;
+            topOffset = scrollTop - block.top;
+        }
         places.push({
             editor,
+            cm,
             anchor: editor.getCursor("anchor"),
             head: editor.getCursor("head"),
+            topLine,
+            topOffset,
             scroll: editor.getScrollInfo(),
         });
     }
@@ -90,6 +113,21 @@ function otherPanesOn(mdView: MarkdownView): PanePlace[] {
  * each pane's text to become the new text, then puts its selection back,
  * carried through the edits the way folds are, and its scroll position
  * after it. A pane whose copy never lands is left alone after a second.
+ *
+ * The scroll position is put back by LINE, not by pixel. CodeMirror only
+ * measures the lines it has drawn and estimates the rest, and the copy
+ * throws those estimates away, so the old pixel offset lands on a
+ * different line once lines wrap or vary in height (Jason's second
+ * report, 2026-09-24: the caret line came back near the bottom of the
+ * window; probed live: a 96 px drift in a narrow pane of wrapped lines).
+ * So the line that was at the top edge of the window is asked to sit at
+ * the top edge again, through CodeMirror's own scroll request, which it
+ * re-applies after every measurement until it holds; a beat later the
+ * pixels the edge sat into that line are added back, now that the line
+ * has been drawn and measured. Setting the selection through the view
+ * rather than the editor keeps Obsidian from also asking for the caret
+ * to be scrolled into view, which would win over the restore and park
+ * the caret line at the bottom edge (probed live, 2026-09-24).
  */
 function restoreOtherPanes(places: PanePlace[], after: string, mapLine: (line: number) => number): void {
     let waiting = places;
@@ -101,12 +139,26 @@ function restoreOtherPanes(places: PanePlace[], after: string, mapLine: (line: n
                 stillWaiting.push(place);
                 continue;
             }
+            const editor = place.editor;
             const at = (pos: EditorPosition): EditorPosition => {
-                const line = Math.min(mapLine(pos.line), place.editor.lastLine());
-                return { line, ch: Math.min(pos.ch, place.editor.getLine(line).length) };
+                const line = Math.min(mapLine(pos.line), editor.lastLine());
+                return { line, ch: Math.min(pos.ch, editor.getLine(line).length) };
             };
-            place.editor.setSelection(at(place.anchor), at(place.head));
-            place.editor.scrollTo(place.scroll.left, place.scroll.top);
+            const cm = place.cm;
+            if (!cm) {
+                editor.setSelection(at(place.anchor), at(place.head));
+                editor.scrollTo(place.scroll.left, place.scroll.top);
+                continue;
+            }
+            const topPos = editor.posToOffset({ line: Math.min(mapLine(place.topLine), editor.lastLine()), ch: 0 });
+            cm.dispatch({
+                selection: { anchor: editor.posToOffset(at(place.anchor)), head: editor.posToOffset(at(place.head)) },
+                effects: EditorView.scrollIntoView(topPos, { y: "start" }),
+            });
+            const topOffset = place.topOffset;
+            window.setTimeout(() => {
+                cm.scrollDOM.scrollTop = cm.lineBlockAt(topPos).top + topOffset;
+            }, 50);
         }
         waiting = stillWaiting;
         tries++;

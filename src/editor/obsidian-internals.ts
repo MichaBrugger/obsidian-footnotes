@@ -1,3 +1,4 @@
+import { EditorView } from "@codemirror/view";
 import {
     App,
     Editor,
@@ -37,6 +38,18 @@ interface ObsidianEditorView {
 
 export interface EditorWithCm extends Editor {
     cm?: ObsidianEditorView;
+}
+
+/**
+ * The CodeMirror 6 view behind an Obsidian editor, typed as the real
+ * thing, for the few places that need its scroll geometry (which line sits
+ * at the top of the window, how tall a line is), or undefined where there
+ * is none, as with the unit tests' stand-in editor. Obsidian hands plugins
+ * its own copy of the CodeMirror modules, so the class here is the class
+ * of the live view (write-back.ts relies on that for its scroll effect).
+ */
+export function codeMirrorViewOf(editor: Editor): EditorView | undefined {
+    return (editor as unknown as { cm?: EditorView }).cm;
 }
 
 /**
