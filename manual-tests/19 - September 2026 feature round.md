@@ -59,9 +59,9 @@ Fixtures: two inline footnotes with the same body^[the same note] and again^[the
 
 Open **19b - Paste target** in a second pane. Fixture paragraph: a paragraph with a shared footnote[^shared] and another use of it[^shared], one with its own[^own], and the chained one[^chain].
 
-- [ ] Select the fixture paragraph, Ctrl+C, click at the end of the line in 19b, Ctrl+V: the text lands, definitions for `shared`, `own`, `chain` and `inner` are appended after `[^1]: an existing one`, the toast reads "Pasted with 4 footnote definitions: 4 added, 0 reused, 0 renamed.", Reading view renders every footnote
+- [ ] Select the fixture paragraph, Ctrl+C, click at the end of the line in 19b, Ctrl+V: the text lands, definitions for `shared`, `own`, `chain` and `inner` are appended after `[^1]: an existing one`, the toast reads "Pasted with 4 footnote definitions: 4 added." (a zero count is never said), Reading view renders every footnote
 - [ ] One undo in 19b removes the text and all four definitions together
-- [ ] Ctrl+V a second time: 0 added, 4 reused, and the references point at the existing definitions. Paste once more after the `[^own-2]` rename of the next check: the toast says "4 reused (1 under a name this note already had)"
+- [ ] Ctrl+V a second time: the toast says "4 reused" and the references point at the existing definitions. Paste once more after the `[^own-2]` rename of the next check: the toast says "3 reused, 1 matched an existing footnote (same definition, different name)"
 - [ ] In 19b add a line `[^own]: a different body` at the bottom, Ctrl+V again: `[^own]` arrives renamed to `[^own-2]` with its own definition, toast says 1 renamed
 - [ ] Copy `Existing[^1] text.` from 19b, paste it here at the end of a paragraph: it lands as `[^1]` with its definition (this note has no `[^1]`). Undo
 - [ ] Cut: select exactly `one with its own[^own]` and Ctrl+X: the phrase and the `[^own]` definition leave in the SAME undo step, the toast says one definition was cut; Ctrl+V elsewhere in this note brings both back. Undo twice

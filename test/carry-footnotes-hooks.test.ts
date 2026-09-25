@@ -109,7 +109,8 @@ describe("paste", () => {
         expect(event.defaultPrevented).toBe(true);
         expect(destination.lines).toEqual(["x[^1]a[^2] b", "", "[^1]: uno", "[^2]: one"]);
         expect(destination.transactions).toBe(1);
-        expect(messages()).toContain("Pasted with 1 footnote definition: 1 added, 0 reused, 1 renamed.");
+        // zero counts are left out of the toast (Jason's pick A, 2026-09-25)
+        expect(messages()).toContain("Pasted with 1 footnote definition: 1 added, 1 renamed.");
     });
 
     it("reads definition lines off a clipboard from anywhere when the register does not match", () => {
@@ -125,7 +126,8 @@ describe("paste", () => {
         const event = clipboardEvent("a[^own]\n\n[^own]: the body");
         handlePaste(fakePlugin({ carryFootnotesOnCopy: true }, destination), event as never, destination);
         expect(destination.lines).toEqual(["s[^own-2]a[^own-2]", "", "[^own-2]: the body"]);
-        expect(messages()).toContain("Pasted with 1 footnote definition: 0 added, 1 reused (1 under a name this note already had), 0 renamed.");
+        // a definition the note already had under another name is "matched", its own count, in Jason's words (2026-09-25)
+        expect(messages()).toContain("Pasted with 1 footnote definition: 1 matched an existing footnote (same definition, different name).");
     });
 
     it("leaves a plain paste, a paste while the feature is off, and one another plugin already handled, to the editor", () => {

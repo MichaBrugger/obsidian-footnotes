@@ -6,9 +6,9 @@ Settings: defaults (**Carry footnote definitions on copy, cut, and paste** on). 
 
 ## Copy and paste into another note
 
-- [ ] Select the whole first fixture paragraph above (both `[^shared]`, `[^own]`, `[^chain]`), Ctrl+C, switch to "Paste target", Ctrl+V at the end of its line: the text lands, four definitions are appended after `[^1]: an existing one` (`shared`, `own`, `chain`, and `inner`, which only `chain`'s body cites), the toast reads "Pasted with 4 footnote definitions: 4 added, 0 reused, 0 renamed." and Reading view renders every footnote
+- [ ] Select the whole first fixture paragraph above (both `[^shared]`, `[^own]`, `[^chain]`), Ctrl+C, switch to "Paste target", Ctrl+V at the end of its line: the text lands, four definitions are appended after `[^1]: an existing one` (`shared`, `own`, `chain`, and `inner`, which only `chain`'s body cites), the toast reads "Pasted with 4 footnote definitions: 4 added." and Reading view renders every footnote
 - [ ] One undo in "Paste target" removes the text and the four definitions together
-- [ ] Paste the same clipboard a second time: the four definitions are reused, not added again (toast: 0 added, 4 reused), and the references point at them
+- [ ] Paste the same clipboard a second time: the four definitions are reused, not added again (toast: 4 reused), and the references point at them
 - [ ] In "Paste target", add a definition `[^own]: a different body`, then paste again: `[^own]` comes in renamed (`[^own-2]`) with its own definition, and the toast says 1 renamed
 - [ ] Copy `Existing[^1]` from "Paste target" and paste it into this note, where `[^1]` does not exist: it lands as `[^1]` with its definition. Then paste it again after adding a different `[^1]` here: it comes in as the next free number
 

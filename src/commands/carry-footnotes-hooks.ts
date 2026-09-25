@@ -231,11 +231,26 @@ export function handlePaste(plugin: FootnotePlugin, event: ClipboardEvent, doc: 
             : { line: from.line + bodyLines.length - 1, ch: bodyLines[bodyLines.length - 1].length };
     doc.transaction({ changes, selection: { from: end } });
 
+    // The counts read in a fixed order, added, reused, matched, renamed,
+    // and a zero is left out rather than said, so the usual paste reads
+    // "4 added." and stays short enough to finish reading before the
+    // toast goes; a familiar eye still scans the same order (Jason's pick
+    // A, 2026-09-25). "Matched" is a carried definition whose text the
+    // note already had under another name, so the reference took that
+    // name and nothing was added.
     const total = plan.added + plan.reused;
-    let notice =
-        `Pasted with ${total} footnote definition${total === 1 ? "" : "s"}: ${plan.added} added, ${plan.reused} reused` +
-        (plan.repointed > 0 ? ` (${plan.repointed} under a name this note already had)` : "") +
-        `, ${plan.renamed} renamed.`;
+    const matched = plan.repointed;
+    const counts: [number, string][] = [
+        [plan.added, "added"],
+        [plan.reused - matched, "reused"],
+        [matched, `matched ${matched === 1 ? "an existing footnote" : "existing footnotes"} (same definition, different name)`],
+        [plan.renamed, "renamed"],
+    ];
+    const said = counts
+        .filter(([count]) => count > 0)
+        .map(([count, what]) => `${count} ${what}`)
+        .join(", ");
+    let notice = `Pasted with ${total} footnote definition${total === 1 ? "" : "s"}: ${said}.`;
     if (missing.length > 0) {
         notice += ` ${missing.map(quotedReference).join(", ")} ${missing.length === 1 ? "has" : "have"} no definition to carry.`;
     }
