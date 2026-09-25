@@ -53,7 +53,7 @@ Fixtures: two inline footnotes with the same body^[the same note] and again^[the
 - [ ] Turn **Lint on footnote creation** on and run the same command: it lints straight after (numbering follows the text) and the note reads right in Reading view. Undo, turn the setting off
 - [ ] Run **Convert normal footnotes to inline footnotes**: `[^twice]` (if you restored it) becomes identical inline copies, `[^single]` becomes one, `[^long]` and `[^item]` stay, and the toast names them with their reasons ("more than one line", "inside a list item") and says a definition used more than once became copies
 - [ ] One undo restores references and definitions together
-- [ ] Round trip: convert to inline, then back to normal: a footnote that was used twice comes back as ONE definition with two references (the name is now a number, the sharing is restored)
+- [ ] Round trip: run **Convert normal footnotes to inline footnotes**, then **Convert inline footnotes to normal footnotes**. The note does not come back byte for byte, since this section's inline fixtures become normal footnotes too, so check three footnotes instead: the one that was `[^twice]` is ONE definition with two numbered references again (the sharing is restored, the name is now a number), `[^single]` is one reference with one definition, and `[^long]` and `[^item]` never moved. Undo twice
 
 ## 5. Copying, cutting, and pasting
 
