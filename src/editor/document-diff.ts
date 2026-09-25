@@ -194,6 +194,27 @@ export function mapFoldLines(folds: FoldRange[], changes: OffsetChange[], before
 }
 
 /**
+ * Where a line of the text before a rewrite sits afterwards, for putting
+ * another pane's caret back (write-back.ts, Jason's report 2026-09-24). It
+ * reads the same line alignment the folds use: a line rewritten in place
+ * is still the same line, a line below an insertion or deletion shifts
+ * with it, and a line deleted outright lands on the line before the
+ * deletion (the top of the note when there is none). The answer is always
+ * a real line of the new text.
+ */
+export function lineMapper(changes: OffsetChange[], before: string): (line: number) => number {
+    if (changes.length === 0) return (line) => line;
+    const after = applyOffsetChanges(before, changes);
+    const map = alignLines(before.split("\n"), after.split("\n"));
+    const last = after.split("\n").length - 1;
+    return (line) => {
+        if (line >= map.length) return last;
+        const { from, to } = map[line];
+        return Math.max(0, Math.min(last, from === -1 ? to : from));
+    };
+}
+
+/**
  * For each line of `a`, where it lives in `b`: `from` is the line a fold
  * may START on (-1 when the line is gone), `to` the line a fold may END
  * on.

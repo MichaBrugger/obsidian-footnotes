@@ -206,7 +206,11 @@ const BASELINE_SETTINGS = {
     enableFootnoteSectionHeading: false,
     footnoteSectionHeading: "# Footnotes",
     enableRemoveBlankLastLines: true,
-    renumberNamedFootnotes: false,
+    // the keys that replaced older ones sit here too, so a test that sets
+    // one cannot leak it into the tests after it (the second-pane test set
+    // Numbered and five lint tests then renumbered named footnotes, 2026-09-24)
+    footnoteNaming: "keep",
+    footnotePlacement: "after",
     lintDeleteOrphanedReferences: false,
     lintDeleteOrphanedDefinitions: false,
     // both missing from the baseline until 2026-09-09 (review D8): a test
@@ -1690,6 +1694,47 @@ async function main() {
             `JSON.stringify(((${EDITOR}).currentMode.getFoldInfo?.() || {folds:[]}).folds)`,
             (v) => v === '[{"from":0,"to":4}]',
         );
+    });
+
+    await test("lint leaves a second pane on the same note where it was (caret and scroll)", async () => {
+        // Jason's report (sheet 19, 2026-09-24): with the note split into two
+        // panes, linting from one made the other jump. Obsidian copies the
+        // rewrite into the other pane a moment later as one whole
+        // replacement, which drops that pane's caret to the top of the note;
+        // the plugin now notes the caret and scroll of every other pane on
+        // the note before it writes and puts them back once the copy lands.
+        resetSettings({ footnoteNaming: "numbered" });
+        const filler = Array.from({ length: 80 }, (_, i) => `Filler line ${i + 1} of the long body.`).join("\n");
+        const before = `Top line with a named footnote[^alpha] here.\n\n${filler}\n\n[^alpha]: the definition at the bottom`;
+        const after = before.replace(/\[\^alpha\]/g, "[^1]");
+        await setupNote(before);
+        const lastLine = before.split("\n").length - 1;
+        // every pane on the smoke note, in workspace order: the original first
+        const PANES = `app.workspace.getLeavesOfType('markdown').filter((l) => l.view.file && l.view.file.path === ${jsLiteral(NOTE_PATH)})`;
+        action(`(async () => { const f = app.vault.getAbstractFileByPath(${jsLiteral(NOTE_PATH)}); const b = app.workspace.getLeaf('split', 'vertical'); await b.openFile(f); })();`);
+        await pollUntil("a second pane on the smoke note", `(${PANES}).length`, (v) => v === 2);
+        try {
+            // pane B: caret on the last line, scrolled to the bottom; pane A
+            // active, with its caret near the top
+            action(
+                `const [a, b] = ${PANES}; b.view.editor.setCursor({line:${lastLine}, ch:0}); b.view.editor.scrollTo(0, 100000); ` +
+                `a.view.editor.setCursor({line:5, ch:3}); app.workspace.setActiveLeaf(a, {focus:true});`,
+            );
+            await sleep(300);
+            const paneB = `(() => { const b = (${PANES})[1]; return { cursor: b.view.editor.getCursor(), top: Math.round(b.view.editor.getScrollInfo().top), text: b.view.editor.getValue() }; })()`;
+            const was = readJson(paneB);
+            if (was.cursor.line !== lastLine || was.top < 100) throw new Error(`pane B not arranged: ${jsLiteral({ cursor: was.cursor, top: was.top })}`);
+            action(`app.commands.executeCommandById('${CMD_LINT}');`);
+            await pollUntil("the lint copied into pane B", `(${paneB}).text`, (v) => v === after);
+            // the plugin's restore runs a beat after the copy lands
+            await sleep(400);
+            const now = readJson(paneB);
+            if (now.cursor.line !== lastLine) throw new Error(`pane B's caret moved to ${jsLiteral(now.cursor)}`);
+            if (Math.abs(now.top - was.top) > 40) throw new Error(`pane B scrolled from ${was.top} to ${now.top}`);
+        } finally {
+            action(`const panes = ${PANES}; if (panes[1]) panes[1].detach();`);
+            await pollUntil("the second pane closed", `(${PANES}).length`, (v) => v === 1);
+        }
     });
 
     await test("footnote lands at the caret inside an actively edited table cell", async () => {
