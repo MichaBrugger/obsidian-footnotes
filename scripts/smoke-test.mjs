@@ -2381,7 +2381,11 @@ async function main() {
     });
 
     await test("lint cancels on a digit-ending footnote-prefix (QOL)", async () => {
-        resetSettings();
+        // the prefix is only read while its toggle is on (Jason's triage,
+        // 2026-09-24: with it off the lint says nothing and runs, with it
+        // on it cancels with the invalid-prefix toast); the baseline keeps
+        // the toggle off, so this scenario turns it on
+        resetSettings({ enableFootnotePrefix: true });
         const note =
             "---\nfootnote-prefix: 10\n---\nb[^2] a[^1] end\n\n[^1]: one\n[^2]: two";
         await setupNote(note);
@@ -2638,13 +2642,18 @@ async function main() {
         );
     });
 
-    await test("a blockquoted fence dies with its quote (2026-08-10 A5/A6)", async () => {
+    await test("a blockquoted fence ends at the blank line after its quote (2026-08-10 A5/A6, probed 2026-09-16)", async () => {
         // the fence used to run to EOF, hiding the rest of the note: the
-        // press below saw no live text and autonumbering counted [^9]
+        // press below saw no live text and autonumbering counted [^9].
+        // The blank line matters: a plain line directly under the quoted
+        // fence is swallowed by it (Reading view, probed 2026-09-16, and
+        // Jason's triage 2026-09-24 of the old fixture, which had no blank
+        // line and rightly got no footnote); a blank line ends the quote
+        // and the fence with it
         resetSettings();
-        await setupNote("> ```\n> fake[^9]\nAlpha done");
-        setCursorAndRun(2, 8, CMD_AUTONUM); // mid "done" - LIVE text
-        await expectEditorText("> ```\n> fake[^9]\nAlpha done[^1]\n\n[^1]: ");
+        await setupNote("> ```\n> fake[^9]\n\nAlpha done");
+        setCursorAndRun(3, 8, CMD_AUTONUM); // mid "done" - LIVE text
+        await expectEditorText("> ```\n> fake[^9]\n\nAlpha done[^1]\n\n[^1]: ");
     });
 
     await test("footnotes navigate inside a callout (2026-08-10 C22)", async () => {
